@@ -50,6 +50,13 @@ int main(int argc, char **argv) {
       timeout: 10_000,
       stdio: ["pipe", "pipe", "pipe"],
     });
+    // macOS may perform first-executable validation after compilation. Pay
+    // that bounded infrastructure cost before accepting a learner case, while
+    // still requiring an actual positive charged-footprint observation.
+    const prepared = Number(execFileSync(executable, [String(process.pid)], {
+      encoding: "utf8", timeout: 10_000, stdio: ["ignore", "pipe", "pipe"],
+    }).trim());
+    if (!Number.isFinite(prepared) || prepared <= 0) throw new Error("Memory helper unavailable");
     macHelper = executable;
     process.once("exit", () =>
       rmSync(directory, { recursive: true, force: true }),

@@ -9,7 +9,7 @@ class BuildContextTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);context=root/'context';context.mkdir();output=root/'output'
             (context/'.dockerignore').write_bytes((ROOT/'.dockerignore').read_bytes())
-            secrets=['.env','deploy/secrets/api.env','deploy/secrets/redis-password','deploy/state/accepted.json','deploy/generated/alertmanager.yml','deploy/grading/acceptance.json','deployment.env','local/private.env','local/private.env.production','local/signing.key','local/key.pem','local/key.p8','local/key.p12','local/key.pfx','local/id_rsa','local/id_ed25519','.ssh/config','packages/api/.env','packages/api/.env.production','packages/api/prototypes/native-grading/controller.ts']
+            secrets=['.env-backups/backup-data','e2e/.auth/session.json','.env','deploy/secrets/api.env','deploy/secrets/redis-password','deploy/state/accepted.json','deploy/generated/alertmanager.yml','deploy/grading/acceptance.json','deployment.env','local/private.env','local/private.env.production','local/signing.key','local/key.pem','local/key.p8','local/key.p12','local/key.pfx','local/id_rsa','local/id_ed25519','.ssh/config','packages/api/.env','packages/api/.env.production','packages/api/prototypes/native-grading/controller.ts']
             for index,name in enumerate(secrets):
                 path=context/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('SYNTHETIC_PRIVATE_CANARY_'+str(index))
             (context/'package.json').write_text('{"synthetic":true}')

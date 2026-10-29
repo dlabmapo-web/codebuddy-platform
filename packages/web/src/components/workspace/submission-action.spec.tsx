@@ -43,6 +43,7 @@ beforeEach(() => {
 });
 async function mount(
   reopenSolveSession?: () => Promise<{ solveSessionId: string } | null>,
+  initialResult?: Parameters<typeof useSubmission>[0]['initialResult'],
 ) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
@@ -58,6 +59,7 @@ async function mount(
       materialId: 'material',
       solveSessionId: 'expired',
       reopenSolveSession,
+      initialResult,
     });
     return null;
   }
@@ -192,6 +194,45 @@ it.each(['PASSED', 'ERRORED'] as const)(
       expect(f.state.result?.status).toBe(status);
       expect(f.state.submitting).toBe(false);
       expect(source.closed).toBe(true);
+    } finally {
+      await f.close();
+    }
+  },
+);
+
+it.each(['QUEUED', 'RUNNING'] as const)(
+  'resumes an owned selected %s attempt without admitting another action',
+  async (status) => {
+    const f = await mount(undefined, {
+      submissionId: 'attempt',
+      materialId: 'material',
+      status,
+      passedCount: 0,
+      totalCount: 1,
+      score: 0,
+      earnedWeight: null,
+      possibleWeight: null,
+      runtimeMs: null,
+      failureReason: null,
+      elapsedSec: 0,
+      attemptCount: 0,
+      createdAt: '2026-10-29T00:00:00.000Z',
+      gradedAt: null,
+      cases: [],
+    });
+    try {
+      expect(rpc.submit).not.toHaveBeenCalled();
+      expect(f.state.submitting).toBe(true);
+      expect(f.state.result).toBeNull();
+      expect(Source.all).toHaveLength(1);
+      expect(Source.all[0].url).toContain('/attempt/stream');
+      await act(async () => {
+        Source.all[0].send('result');
+        await pause();
+      });
+      expect(f.state.result?.status).toBe('PASSED');
+      expect(f.state.submitting).toBe(false);
+      expect(rpc.submit).not.toHaveBeenCalled();
     } finally {
       await f.close();
     }

@@ -66,6 +66,7 @@ export const apiEnvironmentSchema = z.object({
   TURTLE_TRIAL_SERVICE_SECRET: z.string().min(32).optional(),
   TURTLE_TRIAL_PUBLIC_WS_URL: z.string().url().optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  API_BIND_ADDRESS: z.enum(["127.0.0.1", "0.0.0.0", "::"]).optional(),
   PORT: z.coerce.number().int().min(1).max(65_535).default(4_000),
   WEB_ORIGIN: httpUrlSchema,
   SUPABASE_URL: httpsUrlSchema,

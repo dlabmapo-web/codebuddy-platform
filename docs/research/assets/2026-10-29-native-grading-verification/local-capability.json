@@ -1,0 +1,13 @@
+{
+  "platform": "darwin",
+  "architecture": "aarch64",
+  "cgroupDriver": "cgroupfs",
+  "cgroupVersion": "2",
+  "securityOptions": [
+    "name=seccomp,profile=unconfined",
+    "name=cgroupns"
+  ],
+  "supportedEnvironment": false,
+  "reason": "Requires rootless Docker with systemd cgroup v2",
+  "nativeAcceptanceExecuted": false
+}

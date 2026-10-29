@@ -1,0 +1,23 @@
+[
+  {
+    "evidence": "real-app-inventory-cli",
+    "pending": 4,
+    "ephemeralPending": 1,
+    "queueBacklog": {
+      "cove-grading": 2,
+      "cove-staff-practice": 1,
+      "cove-sample-checks": 2,
+      "cove-regrade": 2
+    },
+    "fenced": true,
+    "open": false
+  },
+  {
+    "evidence": "deterministic-driver-normal-epoch-rollover",
+    "jobs": 530,
+    "startEpoch": 5,
+    "endEpoch": 7,
+    "maximumMs": 2502.7084160000086,
+    "failures": 0
+  }
+]

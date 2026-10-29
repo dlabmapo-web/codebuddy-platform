@@ -46,3 +46,6 @@ deploy/grading
 **/id_rsa
 **/id_ed25519
 **/.ssh
+# Backups and browser session state are private regardless of their basenames.
+.env-backups
+e2e/.auth

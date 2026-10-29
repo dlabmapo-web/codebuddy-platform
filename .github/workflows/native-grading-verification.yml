@@ -1,0 +1,82 @@
+name: Isolated grading verification
+on:
+  push:
+    branches: [feat/production-native-grading]
+permissions:
+  contents: read
+concurrency:
+  group: native-grading-verification-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  local-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm prepare:grading
+      - run: node --test e2e/native-grading-acceptance-statistics.test.mjs packages/api/scripts/native-grading-e2e-env.test.mjs
+      # Dedicated config has no general development-Supabase globalSetup.
+      - run: bash packages/api/scripts/test-native-grading-isolated.sh --browser
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolated-grading-browser-evidence
+          path: test-results/native-*
+          retention-days: 14
+  rootless-capability:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile && pnpm prepare:grading
+      - name: Observe capability; ordinary hosted runner is not native acceptance
+        shell: bash
+        run: |
+          mkdir -p test-results/native-capability
+          status=0
+          node packages/grading-runtime/test/host-capability.mjs > test-results/native-capability/host.json || status=$?
+          if [ "$status" != 0 ] && [ "$status" != 2 ]; then exit "$status"; fi
+          printf '{"nativeAcceptanceExecuted":false,"capabilityExitCode":%s}\n' "$status" > test-results/native-capability/status.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rootless-capability-only
+          path: test-results/native-capability
+  # Never runs on PR input; requires an explicitly provisioned isolated runner
+  # and pre-reviewed config paths. No daemon/account setup or release mutation.
+  paired-linux-acceptance:
+    if: vars.GRADING_ISOLATED_ACCEPTANCE_ENABLED == 'true'
+    runs-on: [self-hosted, Linux, X64, cove-grading-isolated-acceptance]
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Measure already prepared baseline
+        env:
+          CONFIG: ${{ vars.GRADING_ISOLATED_BASELINE_CONFIG }}
+        run: xvfb-run -a node e2e/native-grading-acceptance.mjs "$CONFIG" test-results/paired-baseline
+      - name: Measure already prepared candidate
+        env:
+          CONFIG: ${{ vars.GRADING_ISOLATED_CANDIDATE_CONFIG }}
+        run: xvfb-run -a node e2e/native-grading-acceptance.mjs "$CONFIG" test-results/paired-candidate
+      - run: node e2e/native-grading-compare-acceptance.mjs test-results/paired-baseline test-results/paired-candidate test-results/paired-comparison.json
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-paired-linux-evidence
+          path: test-results/paired-*

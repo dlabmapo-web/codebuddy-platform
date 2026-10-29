@@ -660,6 +660,11 @@ export class PyodideExecutionEngine implements ExecutionEngine {
   }
 
   async warmUp(): Promise<void> {
+    // Compile/validate the platform's real charged-memory reader at startup.
+    // Its cold initialization is infrastructure, outside a student's deadline.
+    // Injected readers retain the existing case-baseline failure tests.
+    if (this.readMemoryMb === readProcessMemoryMb && this.readMemoryMb(process.pid) === null)
+      throw new Error("runner memory could not be measured; refusing readiness");
     await Promise.all(
       Array.from({ length: this.target }, () => this.spawnOne()),
     );

@@ -9,7 +9,7 @@ if(kind==='broker') {
 } else if(kind==='migration') {
  for(const path of ['prisma/schema.prisma','prisma.config.ts','scripts/setup-learning-storage.mts','node_modules/prisma/build/index.js','node_modules/tsx/dist/cli.mjs'])await access(path);
  const migrations=await readdir('prisma/migrations');if(migrations.length<70)throw new Error('Missing migration assets');
- for(const path of ['prototypes','/app/deploy','scripts/test-native-grading-isolated.sh']){try{await access(path);throw new Error('Forbidden migration payload');}catch(error){if(error.code!=='ENOENT')throw error;}}
+ for(const path of ['prototypes','/app/deploy','scripts/test-native-grading-isolated.sh','scripts/native-grading-e2e-server.mjs','scripts/native-grading-e2e-worker.mjs','scripts/native-grading-e2e-seed.mjs','scripts/native-grading-e2e-env.mjs']){try{await access(path);throw new Error('Forbidden migration payload');}catch(error){if(error.code!=='ENOENT')throw error;}}
  console.log('migration CLI/storage/schema and '+migrations.length+' migration entries verified; private payloads absent');
 } else {
 await import('@cove/grading-runtime');
@@ -17,7 +17,7 @@ const root=kind==='api'?'./dist/src':'./dist/api/src';
 await import(`${root}/judge/runtime-registry.js`);
 await import(`${root}/judge/broker-engine.js`);
 await import(`${root}/generated/prisma/client.js`);
-for(const path of ['src','prototypes','test','tests','prisma','scripts/test-native-grading-isolated.sh']) {
+for(const path of ['src','prototypes','test','tests','prisma','scripts/test-native-grading-isolated.sh','scripts/native-grading-e2e-server.mjs','scripts/native-grading-e2e-worker.mjs','scripts/native-grading-e2e-seed.mjs','scripts/native-grading-e2e-env.mjs']) {
  try {await access(path);throw new Error('Forbidden production payload: '+path);}
  catch(error){if(error.code!=='ENOENT')throw error;}
 }

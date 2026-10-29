@@ -24,6 +24,11 @@ describe("PyodideExecutionEngine", { timeout: 30_000 }, () => {
     await engine.dispose();
   });
 
+  it("prepares actual OS memory measurement before the first short case", async () => {
+    const result = await engine.run({ ...limits, code: 'print("ready")', timeLimitMs: 500 });
+    expect(result).toMatchObject({ outcome: "PASSED", stdout: "ready\n" });
+  });
+
   describe("result integrity — the student cannot forge their own verdict", () => {
     /**
      * The original defect. `globals().clear()` never cleared `sys.modules`, and

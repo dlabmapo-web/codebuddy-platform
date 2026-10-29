@@ -1,0 +1,100 @@
+{
+  "nativeAcceptancePassed": false,
+  "localPlatform": "darwin/arm64; Docker Desktop Linux aarch64/cgroupfs; not rootless/systemd",
+  "broadBrowser": {
+    "path": "test-results/native-1793249905-28002-a592aec0",
+    "stats": {
+      "startTime": "2026-10-29T04:58:53.451Z",
+      "duration": 175605.962,
+      "expected": 17,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "profileTimeLimitMs": 1000
+  },
+  "strongerTransportCovering": {
+    "path": "test-results/native-1793251403-50880-ecd8a9ac",
+    "stats": {
+      "startTime": "2026-10-29T05:23:58.055Z",
+      "duration": 77169.663,
+      "expected": 4,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "profileTimeLimitMs": 2000,
+    "overlapsBroadCases": 4
+  },
+  "priorTransportDiagnostic": {
+    "path": "test-results/native-1793251208-46363-5d6d45a9",
+    "stats": {
+      "startTime": "2026-10-29T05:20:44.632Z",
+      "duration": 108711.033,
+      "expected": 0,
+      "skipped": 3,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "exerciseTimeLimitMs": 1000,
+    "publicOutcome": "Time limit exceeded",
+    "publicCaseRuntimeMs": 1029,
+    "sampleActualMatchedExpected": true,
+    "rootCause": "not established; no one-second performance claim"
+  },
+  "localImages": [
+    {
+      "role": "api",
+      "localTag": "cove-api:task6",
+      "configId": "sha256:0ff791f6b43d30cbc1d6bc81675bf4f51b3174d6b8f420a674abb7248f07c161",
+      "architecture": "arm64",
+      "sourceLabel": null,
+      "published": false,
+      "importFilesystemSmoke": "passed"
+    },
+    {
+      "role": "worker",
+      "localTag": "cove-judge:task6",
+      "configId": "sha256:a3631be8e825c1f2008095687f6ec05b1442284a9bae8722891eb2ce2637eb3b",
+      "architecture": "arm64",
+      "sourceLabel": null,
+      "published": false,
+      "importFilesystemSmoke": "passed"
+    }
+  ],
+  "webProduction": {
+    "buildId": "osbjMtB-aCIuwFtlShWm9",
+    "staticPages": 42,
+    "standaloneAbortCoveringCasesPassed": 1,
+    "standaloneAbortOverlap": true,
+    "serverSha256": "cde5deee47710efad30d20692401ecc65f20818a253eff4d47645e3e0333dd89"
+  },
+  "finalProductSourceHashes": {
+    "packages/api/src/app.module.ts": "f96cd0576f8b76c8a611164acbab7bddb4aad26bc7a386d598b062b4b366da83",
+    "packages/api/src/config/env.schema.ts": "b2dcd357bd99d64e551b4766203100c9cbab5fd401920e84813cdad4586e1467",
+    "packages/api/src/main.ts": "9e53d421e351ba88e48cb5ad927e4aeec5d5b070255a90f915b3f74ae5651f10",
+    "packages/api/src/judge/runtime-coordinator.ts": "d150ec764d2cc15081fa57d495f05e8455d4422e4ad24012d22af3687b1a98e5",
+    "packages/api/src/judge/process-memory.ts": "d5030053ac87ccdf35c14dbdd247cb42e58eecbb4fb3fe752dbbe4d300789582",
+    "packages/api/src/judge/pyodide-engine.ts": "8d311fd4f6baa867668b8ecf528420eae88839726d246209fd5acdb0c56b3d24",
+    "packages/web/src/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_hooks/use-submission.ts": "2aa095c095e7a0f1648ac5e774f4910d67cabbff9c4f91713ea15ae25230b868"
+  },
+  "otherChecks": {
+    "apiGradingRegressionFiles": 29,
+    "apiGradingRegressionCases": 413,
+    "sharedFiles": 5,
+    "sharedCases": 85,
+    "runtimeCases": 41,
+    "webRecoveryFiles": 4,
+    "webRecoveryCases": 24,
+    "defaultUnavailableMemoryReadinessDoubleCases": 1,
+    "durableIntegrationCases": 26,
+    "redisSampleStoreCases": 11,
+    "realSeedContractCases": 1,
+    "fixtureGuardCases": 3,
+    "statisticsCases": 2,
+    "syntheticCopyCanaries": 22
+  },
+  "countsNotice": "Separate commands and overlapping covering reruns; do not add into a grand passing-test count.",
+  "linuxPositive": "not executed; capability and entrypoint refused exit 2",
+  "rulingsPreserved": 19
+}

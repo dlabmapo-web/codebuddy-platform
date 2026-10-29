@@ -29,6 +29,12 @@ export class RuntimeCoordinator {
     if (health.type !== 'health' || health.workerGeneration !== this.workerGeneration) throw new BrokerFailure('WORKER_GENERATION_MISMATCH');
     const expected = this.registry.manifest.capabilities.runtimes.map(runtimeDescriptorIdentity).sort();
     if (JSON.stringify(expected) !== JSON.stringify(health.capabilities.runtimes.map(runtimeDescriptorIdentity).sort())) throw new BrokerFailure('CAPABILITY_MISMATCH');
+    // Broker journal replacement/rollback cannot make a sealed source epoch
+    // current again. A lost seal reply legitimately leaves the broker one
+    // epoch ahead of the durable intent and is reconciled by the same UUID.
+    const durable = await this.db.gradingAdmissionEpoch.findFirst({ orderBy: { epoch: 'desc' }, select: { epoch: true, sealedAt: true } });
+    if (durable && (durable.epoch > BigInt(health.admissionEpoch) ||
+      (durable.epoch === BigInt(health.admissionEpoch) && durable.sealedAt))) throw new BrokerFailure('ADMISSION_EPOCH_ROLLBACK');
     return health;
   }
   descriptor(work: { executionRuntimeSnapshot?: unknown; engineVersion: string }) {

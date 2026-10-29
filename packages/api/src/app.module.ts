@@ -30,7 +30,7 @@ import { TeachModule } from "./teach/teach.module.js";
   imports: [
     ConfigModule.forRoot({
       cache: true,
-      envFilePath: [".env.local", ".env"],
+      envFilePath: process.env.DOTENV_CONFIG_PATH ? [process.env.DOTENV_CONFIG_PATH] : [".env.local", ".env"],
       isGlobal: true,
       validate: validateEnvironment,
     }),

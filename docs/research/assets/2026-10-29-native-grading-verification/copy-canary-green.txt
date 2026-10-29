@@ -1,0 +1,6 @@
+test_secret_canaries_never_enter_copy_layers (test_build_context.BuildContextTests.test_secret_canaries_never_enter_copy_layers) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.713s
+
+OK

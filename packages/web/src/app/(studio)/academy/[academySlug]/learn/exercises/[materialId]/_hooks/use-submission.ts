@@ -61,12 +61,16 @@ export function useSubmission({
     { academyId, materialId, classId, mode: 'student' },
     userId,
   );
-  const [submitting, setSubmitting] = React.useState(false);
+  const initialPending =
+    initialResult && !isTerminalStatus(initialResult.status)
+      ? initialResult
+      : null;
+  const [submitting, setSubmitting] = React.useState(Boolean(initialPending));
   const [submissionId, setSubmissionId] = React.useState<string | null>(null);
   const [totalCount, setTotalCount] = React.useState(0);
   const [reported, setReported] = React.useState<ReportedCase[]>([]);
   const [result, setResult] = React.useState<SubmissionResult | null>(
-    initialResult,
+    initialPending ? null : initialResult,
   );
   const [error, setError] = React.useState<unknown>(null);
   const generation = React.useRef(0);
@@ -78,7 +82,7 @@ export function useSubmission({
   const [trackedScope, setTrackedScope] = React.useState(scope);
   if (trackedScope !== scope) {
     setTrackedScope(scope);
-    setResult(initialResult);
+    setResult(initialPending ? null : initialResult);
     setReported([]);
     setError(null);
     setSubmitting(false);
@@ -100,7 +104,7 @@ export function useSubmission({
     setSubmissionId(null);
     setTotalCount(0);
     setTrackedResultId(initialResult?.submissionId ?? null);
-    setResult(initialResult);
+    setResult(initialPending ? null : initialResult);
     setReported([]);
     setError(null);
   }
@@ -163,6 +167,79 @@ export function useSubmission({
     },
     [academyId, queryClient, teardown, userId, materialId, scope],
   );
+
+  const watch = React.useCallback(
+    (id: string, count: number, action: number) => {
+      const active = () =>
+        generation.current === action && currentScope.current === scope;
+      teardown();
+      activeId.current = id;
+      busy.current = true;
+      setSubmitting(true);
+      setSubmissionId(id);
+      setTotalCount(count);
+      setResult(null);
+      setReported([]);
+      setError(null);
+      // The stream is proxied through the web app: `EventSource` cannot set an
+      // Authorization header, and the session cookie only works same-origin.
+      const source = new EventSource(
+        `/api/learn/submissions/${id}/stream?academyId=${academyId}`,
+      );
+      sourceRef.current = source;
+
+      source.addEventListener('progress', (event) => {
+        if (!active()) return;
+        let data: unknown;
+        try {
+          data = JSON.parse((event as MessageEvent<string>).data);
+        } catch {
+          return;
+        }
+        const payload = submissionProgressEventSchema.safeParse(data);
+        if (!payload.success) return;
+        setReported((current) => [
+          ...current.filter((item) => item.position !== payload.data.position),
+          payload.data,
+        ]);
+        fallbackRef.current?.touch();
+      });
+
+      source.addEventListener('result', () => {
+        if (!active()) return;
+        void loadResult(id);
+      });
+
+      source.onerror = (event) => {
+        if (!active()) return;
+        if (event instanceof MessageEvent) {
+          busy.current = false;
+          setError(new Error('GRADING_UNAVAILABLE'));
+          setSubmitting(false);
+          teardown();
+        }
+        // Do not tear down: `EventSource` reconnects on its own, and the
+        // fallback below covers the case where it never recovers.
+      };
+
+      fallbackRef.current = createSubmissionFallback(
+        () => void loadResult(id),
+        FALLBACK_AFTER_MS,
+      );
+      fallbackRef.current.touch();
+    },
+    [academyId, loadResult, scope, teardown],
+  );
+
+  // An owned pending attempt selected by the normal Submit URL resumes result
+  // observation only. Reloading never resubmits accepted code or mints an action.
+  const pendingId = initialPending?.submissionId;
+  const pendingCount = initialPending?.totalCount ?? 0;
+  React.useEffect(() => {
+    if (!pendingId) return;
+    watch(pendingId, pendingCount, ++generation.current);
+    return teardown;
+  }, [pendingId, pendingCount, scope, watch, teardown]);
 
   const submit = React.useCallback(
     async (code: string) => {
@@ -227,64 +304,19 @@ export function useSubmission({
 
       if (!active()) return;
       request.current = null;
-      activeId.current = accepted.submissionId;
+      const location = new URL(window.location.href);
+      if (location.pathname.endsWith(`/learn/exercises/${materialId}`)) {
+        location.searchParams.set('submission', accepted.submissionId);
+        window.history.replaceState(null, '', location);
+      }
+      watch(accepted.submissionId, accepted.totalCount, action);
       void queryClient.invalidateQueries({
         queryKey: ['latest-submission', userId, academyId, materialId],
       });
-      setSubmissionId(accepted.submissionId);
-      setTotalCount(accepted.totalCount);
-
-      // The stream is proxied through the web app: `EventSource` cannot set an
-      // Authorization header, and the session cookie only works same-origin.
-      const source = new EventSource(
-        `/api/learn/submissions/${accepted.submissionId}/stream?academyId=${academyId}`,
-      );
-      sourceRef.current = source;
-
-      source.addEventListener('progress', (event) => {
-        if (!active()) return;
-        let data: unknown;
-        try {
-          data = JSON.parse((event as MessageEvent<string>).data);
-        } catch {
-          return;
-        }
-        const payload = submissionProgressEventSchema.safeParse(data);
-        if (!payload.success) return;
-        setReported((current) => [
-          ...current.filter((item) => item.position !== payload.data.position),
-          payload.data,
-        ]);
-        fallbackRef.current?.touch();
-      });
-
-      source.addEventListener('result', () => {
-        if (!active()) return;
-        void loadResult(accepted.submissionId);
-      });
-
-      source.onerror = (event) => {
-        if (!active()) return;
-        if (event instanceof MessageEvent) {
-          busy.current = false;
-          setError(new Error('GRADING_UNAVAILABLE'));
-          setSubmitting(false);
-          teardown();
-        }
-        // Do not tear down: `EventSource` reconnects on its own, and the
-        // fallback below covers the case where it never recovers.
-      };
-
-      fallbackRef.current = createSubmissionFallback(
-        () => void loadResult(accepted.submissionId),
-        FALLBACK_AFTER_MS,
-      );
-      fallbackRef.current.touch();
     },
     [
       academyId,
       classId,
-      loadResult,
       materialId,
       queryClient,
       reopenSolveSession,
@@ -292,6 +324,7 @@ export function useSubmission({
       scope,
       teardown,
       userId,
+      watch,
     ],
   );
 

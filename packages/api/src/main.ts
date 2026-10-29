@@ -74,7 +74,10 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  await app.listen(configService.get("PORT", { infer: true }));
+  const host = configService.get("API_BIND_ADDRESS", { infer: true });
+  const port = configService.get("PORT", { infer: true });
+  if (host) await app.listen(port, host);
+  else await app.listen(port);
 }
 
 void bootstrap();

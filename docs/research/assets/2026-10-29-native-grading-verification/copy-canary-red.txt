@@ -1,0 +1,15 @@
+test_secret_canaries_never_enter_copy_layers (test_build_context.BuildContextTests.test_secret_canaries_never_enter_copy_layers) ... FAIL
+
+======================================================================
+FAIL: test_secret_canaries_never_enter_copy_layers (test_build_context.BuildContextTests.test_secret_canaries_never_enter_copy_layers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "deploy/scripts/grading/tests/test_build_context.py", line 21, in test_secret_canaries_never_enter_copy_layers
+    for name in secrets:self.assertFalse((output/'context'/name).exists(),name)
+                        ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : .env-backups/backup-data
+
+----------------------------------------------------------------------
+Ran 1 test in 1.234s
+
+FAILED (failures=1)

@@ -8,6 +8,8 @@ import { ExecutionCapacity } from './execution-capacity.js';
 import { gradingSnapshotFor, exerciseProfileColumns } from './grading-profile.js';
 import { defaultEliceGradingProfile, legacyCaseGrading } from '@cove/shared';
 import { randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,7 +25,7 @@ import { GradingService, type CaseRow } from './grading.service.js';
 import { JudgeQueue } from './judge.queue.js';
 import { DispatchIntentService } from './dispatch-intent.js';
 import { SampleExecution } from './sample-execution.js';
-import { RuntimeReadinessPublisher, assertRuntimeReady } from './runtime-readiness.js';
+import { RuntimeReadinessPublisher, assertRuntimeReady, readinessKey } from './runtime-readiness.js';
 import { startJudgeMonitor } from './judge-monitor.js';
 import { ExecutionTelemetry } from './execution-telemetry.js';
 import { Logger } from '@nestjs/common';
@@ -74,8 +76,8 @@ describe.skipIf(!databaseUrl || !redisUrl)('native grading durable application i
     if (server) await new Promise<void>(resolve => server.close(() => resolve()));
     await broker?.stop(); if (directory) await rm(directory, { recursive: true, force: true });
   });
-  async function attempt(count = 2, runtime: import('@cove/shared').RuntimeDescriptor = nativeFixture) {
-    const material = await db.material.create({ data: { lectureId: lecture, title: 'Fixture', type: 'PROGRAMMING_EXERCISE', position: (await db.material.count()) + 1,
+  async function attempt(count = 2, runtime: import('@cove/shared').RuntimeDescriptor = nativeFixture, reuseMaterialId?: string) {
+    const material = reuseMaterialId ? { id: reuseMaterialId } : await db.material.create({ data: { lectureId: lecture, title: 'Fixture', type: 'PROGRAMMING_EXERCISE', position: (await db.material.count()) + 1,
       programmingExercise: { create: { externalKey: randomUUID(), difficulty: 'EASY', starterCode: '', memoryLimitMb: 128, timeLimitMs: 1000 } } } });
     return db.submission.create({ data: {
       userId: user, materialId: material.id, sourceMaterialId: material.id, courseId: course, gradingRevision: 1, language: 'PYTHON',
@@ -388,6 +390,66 @@ describe.skipIf(!databaseUrl || !redisUrl)('native grading durable application i
     try { await control.reconcile(); } finally { clock.mockRestore(); }
     expect(await db.gradingCaseCheckpoint.findUnique({ where: { id: checkpoint.id } })).toBeNull();
     expect((await db.submission.findUniqueOrThrow({ where: { id: item.id } })).status).toBe('ERRORED');
+  });
+  it('executes the real read-only inventory CLI against nonzero queues, STOPPING samples and the admission fence', async () => {
+    const manifestPath = join(directory, 'inventory-manifest.json'); await writeFile(manifestPath, JSON.stringify(manifestFixture));
+    const item = await attempt(1), stopping = randomUUID();
+    await queue.enqueue(item.id); await queue.enqueuePractice(randomUUID()); await queue.enqueueSampleCheck(randomUUID());
+    await queue.enqueueRegrade({ submissionId: randomUUID(), runId: randomUUID(), requestId: null });
+    await redis.set(`cove:sample-check:${stopping}`, JSON.stringify({ status: 'STOPPING', snapshot: { executionRuntimeSnapshot: nativeFixture } }));
+    await redis.del(readinessKey(manifestFixture, workerGeneration));
+    const command = () => promisify(execFile)(process.execPath, ['scripts/grading-inventory.mjs'], { cwd: process.cwd(), env: {
+      PATH: process.env.PATH, HOME: process.env.HOME, DOTENV_CONFIG_PATH: '/dev/null', DATABASE_URL: databaseUrl, REDIS_URL: redisUrl,
+      GRADING_RUNTIME_MANIFEST_PATH: manifestPath, GRADING_WORKER_GENERATION: workerGeneration,
+    } });
+    try {
+      const fenced = JSON.parse((await command()).stdout);
+      expect(fenced).toMatchObject({ complete: true, admissionFence: { readinessAbsent: true, workerGeneration } });
+      expect(fenced.pending).toBeGreaterThan(0); expect(fenced.ephemeralPending).toBeGreaterThan(0);
+      for (const name of ['cove-grading', 'cove-staff-practice', 'cove-sample-checks', 'cove-regrade']) expect(fenced.queueBacklog[name]).toBeGreaterThan(0);
+      expect(fenced.references).toContainEqual(nativeFixture);
+      const publisher = new RuntimeReadinessPublisher(manifestFixture, workerGeneration, async () => redis, signal => coordinator().health(signal));
+      await publisher.poll(true);
+      const open = JSON.parse((await command()).stdout);
+      expect(open.admissionFence.readinessAbsent).toBe(false);
+      expect(JSON.stringify(open)).not.toContain('print(');
+      console.log(JSON.stringify({ evidence: 'real-app-inventory-cli', pending: fenced.pending, ephemeralPending: fenced.ephemeralPending,
+        queueBacklog: fenced.queueBacklog, fenced: fenced.admissionFence.readinessAbsent, open: open.admissionFence.readinessAbsent }));
+    } finally { await redis.del(`cove:sample-check:${stopping}`, readinessKey(manifestFixture, workerGeneration)); }
+  });
+  it('normally rolls admission through more than 512 completed jobs without a sweep stall', async () => {
+    const control = coordinator(); const startEpoch = (await control.health()).admissionEpoch;
+    const observations: Array<{ index: number; elapsedMs: number; status: string }> = [];
+    const seed = await attempt(1);
+    for (let index = 0; index < 530; index++) {
+      const item = index === 0 ? seed : await attempt(1, nativeFixture, seed.materialId!); const began = performance.now();
+      await grader(control).grade(item.id, async () => undefined);
+      const result = await db.submission.findUniqueOrThrow({ where: { id: item.id } });
+      observations.push({ index, elapsedMs: performance.now() - began, status: result.status });
+      expect(result.status, `normal job ${index}`).toBe('PASSED');
+    }
+    await control.reconcile();
+    expect((await control.health()).admissionEpoch).toBeGreaterThanOrEqual(startEpoch + 2);
+    expect(Math.max(...observations.map(row => row.elapsedMs))).toBeLessThan(10_000);
+    console.log(JSON.stringify({ evidence: 'deterministic-driver-normal-epoch-rollover', jobs: observations.length,
+      startEpoch, endEpoch: (await control.health()).admissionEpoch, maximumMs: Math.max(...observations.map(row => row.elapsedMs)), failures: observations.filter(row => row.status !== 'PASSED').length }));
+  }, 240_000);
+  it('rejects a replaced empty broker journal behind durable sealed epochs before source admission', async () => {
+    const replacementDirectory = await mkdtemp(join(tmpdir(), 'cove-rollback-broker-'));
+    const replacement = new Broker(manifestFixture, { ...driver, discover: async () => [] }, new Journal(replacementDirectory), workerGeneration, [{ runtime: nativeFixture, memoryLimitMb: 128, targetReady: 1 }]);
+    let replacementServer: Awaited<ReturnType<typeof serve>> | undefined;
+    try {
+      await replacement.start(); replacementServer = await serve(join(replacementDirectory, 'broker.sock'), request => replacement.handle(request));
+      const control = coordinator(new BrokerClient(join(replacementDirectory, 'broker.sock')));
+      const before = executed, item = await attempt(1);
+      await expect(control.health()).rejects.toThrow('ADMISSION_EPOCH_ROLLBACK');
+      await expect(control.claim({ submissionId: item.id }, { runtime: nativeFixture, kind: 'submission', memoryLimitMb: 128 })).rejects.toThrow('ADMISSION_EPOCH_ROLLBACK');
+      expect(executed).toBe(before);
+      expect((await db.submission.findUniqueOrThrow({ where: { id: item.id } })).status).toBe('QUEUED');
+    } finally {
+      if (replacementServer) await new Promise<void>(resolve => replacementServer!.close(() => resolve()));
+      await replacement.stop(); await rm(replacementDirectory, { recursive: true, force: true });
+    }
   });
   it('publishes healthy saturated readiness, then blocks admission and pauses queues after a real broker cleanup fault', async () => {
     const control = coordinator();

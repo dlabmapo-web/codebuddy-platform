@@ -13,6 +13,11 @@ const validEnvironment = {
 };
 
 describe("validateEnvironment", () => {
+  it("preserves default listener binding and validates explicit loopback binding", () => {
+    expect(validateEnvironment(validEnvironment).API_BIND_ADDRESS).toBeUndefined();
+    expect(validateEnvironment({ ...validEnvironment, API_BIND_ADDRESS: "127.0.0.1" }).API_BIND_ADDRESS).toBe("127.0.0.1");
+    expect(() => validateEnvironment({ ...validEnvironment, API_BIND_ADDRESS: "remote.example" })).toThrow(/API_BIND_ADDRESS/);
+  });
   it("defaults native off and requires a pinned manifest path for activation", () => {
     expect(validateEnvironment(validEnvironment).GRADING_NATIVE_ENABLED).toBe(false);
     expect(validateEnvironment(validEnvironment).GRADING_RUNTIME_MANIFEST_PATH).toBeUndefined();

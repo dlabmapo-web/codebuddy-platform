@@ -1,0 +1,34 @@
+name: Disposable native grading kernel checks
+on:
+  push:
+    branches: [feat/production-native-grading]
+permissions:
+  contents: read
+concurrency:
+  group: native-grading-kernel-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  kernel:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GRADING_DISPOSABLE_CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:grading
+      - run: python3 -m unittest discover -s deploy/scripts/grading/ci -p 'test_*.py' -q
+      - run: python3 -m unittest discover -s deploy/scripts/grading/tests -p test_build_context.py -v
+      - run: bash deploy/scripts/grading/ci/run.sh
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: disposable-native-kernel-${{ github.sha }}
+          path: test-results/disposable-native-kernel/summary.json
+          retention-days: 1
+          if-no-files-found: error

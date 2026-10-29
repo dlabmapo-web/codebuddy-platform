@@ -30,6 +30,7 @@ packages/api/prototypes
 **/*.test.ts
 packages/grading-runtime/test
 deploy/scripts/grading/tests
+deploy/scripts/grading/ci
 # Local deployment credentials/state must never enter any COPY layer, including migration.
 deploy/secrets
 deploy/state

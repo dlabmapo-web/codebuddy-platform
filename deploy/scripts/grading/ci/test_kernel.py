@@ -393,3 +393,222 @@ console.log(JSON.stringify(sourceFor(fixtures('limits','cpython').find(x=>x.name
 
 
 if __name__ == "__main__": unittest.main()
+
+
+# Task3 collection/workflow fixtures are local contracts, never Linux evidence.
+import evidence
+import shutil
+
+
+class CollectorContracts(unittest.TestCase):
+    def test_missing_authoritative_report_never_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            value = evidence.collect(Path(directory).resolve(), dict(primary=0, observation=0, cleanup=0), 'kernel', owner=os.getuid())
+            self.assertFalse(value['success'])
+            self.assertEqual(value['statuses']['collection'], 1)
+            self.assertIn('kernel.json:missing', value['collectionFailures'])
+
+    def test_reader_refuses_symlink_parent_path_escape_owner_and_overflow(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve(); (root/'safe.json').write_text('{}')
+            (root/'link.json').symlink_to(root/'safe.json')
+            (root/'linked').symlink_to(root, target_is_directory=True)
+            for name in ('link.json','linked/safe.json','../safe.json','/etc/passwd'):
+                with self.subTest(name=name), self.assertRaises((OSError, ValueError)):
+                    evidence.read_json(root, name, os.getuid(), 128)
+            with self.assertRaises(ValueError): evidence.read_json(root, 'safe.json', os.getuid()+1, 128)
+            with self.assertRaises(ValueError): evidence.read_json(root, 'safe.json', os.getuid(), 1)
+
+    def test_projection_discards_raw_payloads_and_preserves_kernel_proof(self):
+        report = complete_report()
+        report.update(productionEquivalent=False, nativeAcceptanceExecuted=False,
+                      environment={'SECRET':'RAW_SECRET_CANARY'}, failure={'category':'kernel','type':'ValueError','message':'RAW_SECRET_CANARY'})
+        next(c for c in report['cases'] if 'stdout' in c)['stdout']['data']='RAW_SECRET_CANARY'
+        report['hostProof']['cases']['retained']['before']['source']='RAW_SECRET_CANARY'
+        value=evidence.project_report(report)
+        self.assertNotIn('RAW_SECRET_CANARY',json.dumps(value))
+        self.assertEqual(len(value['cases']),24)
+        self.assertEqual(len(value['hostProof']['allocations']),24)
+        self.assertEqual(len(value['kernelEvents']),48)
+        kernel.validate_results(value)
+
+    def test_forbidden_files_and_internal_handshakes_are_never_read(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve(); worker=root/'evidence'; worker.mkdir()
+            for name in ('state.json','broker.env','private.key'):
+                (root/name).write_text('RAW_SECRET_CANARY')
+            for name in ('functional.request.json','functional.reply.json','kernel.json','worker-host-proof.json'):
+                (worker/name).write_text('RAW_SECRET_CANARY')
+            value=evidence.collect(root, dict(primary=9,observation=4,cleanup=7), 'kernel', owner=os.getuid())
+            self.assertNotIn('RAW_SECRET_CANARY',json.dumps(value))
+            self.assertEqual(value['statuses'], dict(primary=9,observation=4,cleanup=7,collection=1))
+
+    def test_artifact_total_bound_and_symlink_output_refusal(self):
+        with self.assertRaises(ValueError): evidence.encode({'data':'x'*(20*2**20)})
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve(); target=root/'target'; target.write_text('original')
+            link=root/'summary.json'; link.symlink_to(target)
+            with self.assertRaises(OSError): evidence.write_summary(link, {})
+            self.assertEqual(target.read_text(),'original')
+
+    def test_zero_exit_status_without_kernel_proof_cannot_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve()
+            (root/'kernel.json').write_text(json.dumps(dict(version=1,success=True,cases=[])))
+            (root/'kernel.json').chmod(0o600)
+            value=evidence.collect(root, dict(primary=0,observation=0,cleanup=0), 'kernel', owner=os.getuid())
+            self.assertFalse(value['success'])
+            self.assertIn('kernel.json:invalid',value['collectionFailures'])
+
+
+class WorkflowContracts(unittest.TestCase):
+    node=CoordinatorContracts.node
+    def test_structured_workflow_contract_and_duplicate_yaml_rejection(self):
+        self.node("""
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {readFileSync} from 'node:fs';
+const web=createRequire(new URL('./packages/web/package.json',import.meta.url));
+const eslint=createRequire(web.resolve('eslint/package.json'));
+const yaml=eslint('js-yaml');
+const parse=s=>yaml.load(s,{schema:yaml.JSON_SCHEMA,json:false});
+assert.throws(()=>parse('jobs: {}\\njobs: {}\\n'),/duplicated/);
+const text=readFileSync('.github/workflows/native-grading-kernel.yml','utf8');
+const w=parse(text);
+assert.deepEqual(w.on,{push:{branches:['feat/production-native-grading']}});
+assert.deepEqual(w.permissions,{contents:'read'});
+assert.equal(w.concurrency['cancel-in-progress'],false);
+assert(w.concurrency.group.includes('github.ref'));
+assert.deepEqual(Object.keys(w.jobs),['kernel']);
+const j=w.jobs.kernel;
+assert.equal(j['runs-on'],'ubuntu-24.04'); assert.equal(j['timeout-minutes'],45);
+assert.deepEqual(j.env,{GRADING_DISPOSABLE_CI:'1'});
+assert.equal(j.environment,undefined); assert.equal(j.permissions,undefined);
+assert(!text.includes('secrets.') && !text.includes('continue-on-error'));
+assert(j.steps.some(s=>s.run==='pnpm install --frozen-lockfile'));
+assert(j.steps.some(s=>s.uses==='actions/setup-node@v4' && s.with['node-version']===22));
+assert(j.steps.some(s=>s.uses==='pnpm/action-setup@v4'));
+const run=j.steps.find(s=>s.run==='bash deploy/scripts/grading/ci/run.sh'); assert(run);
+const upload=j.steps.find(s=>s.uses==='actions/upload-artifact@v4');
+assert.equal(upload.if,'always()'); assert.equal(upload.with['retention-days'],1);
+assert.equal(upload.with.path,'test-results/disposable-native-kernel/summary.json');
+assert.equal(upload.with['if-no-files-found'],'error');
+""")
+
+    def test_wrapper_keeps_primary_and_all_secondary_failures(self):
+        root=Path(__file__).resolve().parents[4]
+        for primary in (0,23):
+            with self.subTest(primary=primary), tempfile.TemporaryDirectory() as directory:
+                folder=Path(directory).resolve(); binpath=folder/'bin'; binpath.mkdir()
+                # Only administrative calls are faked. The real wrapper/trap and
+                # collector execute; no host mutation is possible via this stub.
+                sudo=binpath/'sudo'
+                # collector failure is separately controlled, with status record
+                # captured before returning; no positive evidence is fabricated.
+                sudo.write_text('#!/bin/bash\nprintf "%s\\n" "$*" >> "$CALLS"\ncase "$*" in\n*"kernel.py run"*) exit '+str(primary)+';;\n*"provision.py observe"*) if [[ -f "$OBSERVED" ]]; then exit 31; fi; touch "$OBSERVED";;\n*"provision.py cleanup"*) exit 37;;\n*"evidence.py collect"*) printf \'{"statuses":{"primary":%s,"observation":31,"cleanup":37,"collection":1},"success":false}\\n\' "$PRIMARY"; exit 1;;\nesac\nexit 0\n')
+                sudo.chmod(0o755)
+                for name in ('pnpm','bash'):
+                    path=binpath/name; path.write_text('#!/bin/sh\nexit 0\n'); path.chmod(0o755)
+                output=folder/'output'; output.mkdir()
+                env={**os.environ,'PATH':str(binpath)+':'+os.environ['PATH'],'GITHUB_SHA':'a'*40,'GITHUB_ACTIONS':'true','RUNNER_ENVIRONMENT':'github-hosted','GRADING_DISPOSABLE_CI':'1','CALLS':str(folder/'calls'),'OBSERVED':str(folder/'observed'),'PRIMARY':str(primary)}
+                # Run from a synthetic checkout containing only wrapper inputs.
+                (output/'deploy/scripts').mkdir(parents=True)
+                shutil.copytree(root/'deploy/scripts/grading',output/'deploy/scripts/grading')
+                script=output/'deploy/scripts/grading/ci/run.sh'
+                result=subprocess.run(['/bin/bash',str(script)],env=env,capture_output=True,text=True,timeout=10)
+                self.assertEqual(result.returncode,primary or 31,result.stderr+result.stdout+str(list((output/'test-results/disposable-native-kernel').glob('*'))))
+                value=json.loads((output/'test-results/disposable-native-kernel/summary.json').read_text())
+                self.assertEqual(value['statuses'],dict(primary=primary,observation=31,cleanup=37,infrastructure=0,collection=1,finalization=0))
+                self.assertFalse((output/'test-results/disposable-native-kernel/collected.json').exists())
+                calls=(folder/'calls').read_text()
+                self.assertIn('provision.py cleanup',calls)
+                self.assertNotIn('--preserve-env',calls)
+                self.assertIn('GRADING_CI_NODE_SOURCE=/',calls)
+
+
+class DiagnosticContracts(unittest.TestCase):
+    def test_only_literal_invariant_reasons_survive(self):
+        reason='Missing or ambiguous gated interpreter'
+        value=evidence.diagnostic('Disposable kernel checks failed: ValueError: '+reason)
+        self.assertEqual(value,dict(type='ValueError',reason=reason))
+        value=evidence.diagnostic('Disposable kernel checks failed: ValueError: RAW_SECRET_CANARY')
+        self.assertNotIn('RAW_SECRET_CANARY',json.dumps(value))
+        self.assertEqual(value['reason'],'unclassified-controller-failure')
+        self.assertIsNone(evidence.diagnostic('raw arbitrary journal or learner output'))
+
+
+class InfrastructureContracts(unittest.TestCase):
+    def test_only_exact_owned_unit_journals_are_bounded_and_sanitized(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve(); state=root/'state.json'; state.write_text('{}')
+            real_popen=subprocess.Popen
+            calls=[]
+            raw=json.dumps(dict(MESSAGE='daemon startup failed password=RAW_SECRET https://user:RAW_SECRET@example.test/path',PRIORITY='3',UNRELATED='RAW_SECRET'))+'\n'
+            def journal(args,**kwargs):
+                calls.append(args)
+                return real_popen([sys.executable,'-c','import sys;sys.stdout.write('+repr(raw)+')'],**kwargs)
+            import sys
+            with patch.object(kernel.host,'check_host'), patch.object(kernel.host,'load_state',return_value=dict(uid=11000)), patch.object(kernel.host,'verify_accounts'), patch.object(kernel.host,'STATE',state), patch.object(kernel.host,'STATE_DIR',root), patch.object(evidence.subprocess,'Popen',side_effect=journal), patch.object(evidence.os,'fstat',return_value=Mock(st_uid=0,st_mode=0o40700)):
+                self.assertEqual(evidence.infrastructure_snapshot(),0)
+            value=json.loads((root/'infrastructure.json').read_text())
+            self.assertEqual(len(calls),2)
+            for args in calls:
+                self.assertIn('_UID=11000',args)
+                self.assertIn('--lines=40',args)
+                self.assertIn('--output-fields=MESSAGE,PRIORITY',args)
+                self.assertIn(args[-1],['_SYSTEMD_USER_UNIT=cove-grading-docker.service','_SYSTEMD_USER_UNIT=cove-grading-broker.service'])
+            self.assertNotIn('RAW_SECRET',json.dumps(value))
+            self.assertNotIn('UNRELATED',json.dumps(value))
+            self.assertEqual(value['authority'],'diagnostic-only')
+            self.assertEqual(evidence.project_infrastructure(value),value)
+            value['units']['worker.service']={}
+            with self.assertRaises(ValueError): evidence.project_infrastructure(value)
+
+    def test_finalization_retains_statuses_when_privileged_collection_has_no_json(self):
+        import argparse
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ,{'GITHUB_SHA':'b'*40}):
+            folder=Path(directory).resolve(); (folder/'collected.json').write_text('')
+            args=argparse.Namespace(directory=str(folder),primary=17,observation=19,cleanup=23,infrastructure=29,collection=31)
+            self.assertEqual(evidence.finalize(args),1)
+            value=json.loads((folder/'summary.json').read_text())
+            self.assertEqual(value['statuses'],dict(primary=17,observation=19,cleanup=23,infrastructure=29,collection=31,finalization=1))
+            self.assertFalse(value['success'])
+            self.assertEqual(value['sourceCommit'],'b'*40)
+
+    def test_raw_capture_values_and_broader_acceptance_claim_are_refused(self):
+        value=complete_report(); next(c for c in value['cases'] if 'stdout' in c)['stdout']='RAW_SECRET'
+        with self.assertRaises(ValueError): evidence.project_report(value)
+        value=complete_report(); value['productionEquivalent']=True
+        with self.assertRaises(ValueError): evidence.project_report(value)
+
+
+class SuccessSummaryContracts(unittest.TestCase):
+    def test_success_requires_authoritative_case_kernel_and_cleanup_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve(); value=complete_report()
+            value.update(productionEquivalent=False,nativeAcceptanceExecuted=False)
+            descriptor=dict(version=1,engine='cpython',engineVersion='3.12.16',pythonVersion='3.12.16',platform='linux',architecture='amd64',imageDigest='sha256:'+'a'*64,packageManifestHash='sha256:'+'b'*64,shimVersion='cove-guest-1',memoryPolicy='native-cgroup-growth-v1',executionPolicy='wall-v1')
+            value['before']['runtimes']=[descriptor]
+            for name,data in [('kernel.json',value),('prepare-observation.json',observation()),('observation.json',observation()),('cleanup.json',dict(version=1,cleaned=True,ownedProcessesAbsent=True,ownedNamespacesAbsent=True,unexpectedContainers=False))]:
+                path=root/name; path.write_text(json.dumps(data)); path.chmod(0o600)
+            result=evidence.collect(root,dict(primary=0,observation=0,cleanup=0),'complete',owner=os.getuid())
+            self.assertTrue(result['success'])
+            self.assertEqual(result['executedCaseCount'],24)
+            self.assertEqual(result['requiredCaseCount'],24)
+            self.assertEqual(result['evidence']['kernel.json']['before']['runtimes'],[descriptor])
+            self.assertTrue(result['authoritativeHostProof'])
+            for key in ('primary','observation','cleanup'):
+                statuses=dict(primary=0,observation=0,cleanup=0); statuses[key]=5
+                failed=evidence.collect(root,statuses,'complete',owner=os.getuid())
+                self.assertFalse(failed['success'])
+
+
+    def test_failed_authoritative_report_with_zero_primary_status_is_not_passing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve()
+            for name,value in [('kernel.json',dict(version=1,success=False,cases=[],failure=dict(category='setup',type='ValueError'))),('prepare-observation.json',observation()),('observation.json',observation()),('cleanup.json',dict(version=1,cleaned=True))]:
+                path=root/name; path.write_text(json.dumps(value)); path.chmod(0o600)
+            result=evidence.collect(root,dict(primary=0,observation=0,cleanup=0),'complete',owner=os.getuid())
+            self.assertFalse(result['success'])
+            self.assertEqual(result['statuses']['collection'],1)
+            self.assertFalse(result['authoritativeHostProof'])

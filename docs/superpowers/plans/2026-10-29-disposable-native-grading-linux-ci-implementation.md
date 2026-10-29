@@ -218,7 +218,9 @@ with `test(grading): verify real rootless guests and recovery`.
 **Files:** Create `deploy/scripts/grading/ci/run.sh`, `evidence.py`,
 `.github/workflows/native-grading-kernel.yml`, evidence collector tests in
 `deploy/scripts/grading/ci/test_kernel.py`, and
-`docs/research/2026-10-29-disposable-native-grading-linux-verification.md`.
+`docs/research/2026-10-29-disposable-native-grading-linux-verification.md`; modify
+`.dockerignore` and `deploy/scripts/grading/tests/test_build_context.py` to keep
+CI-only host controllers outside every production COPY context.
 
 **Interfaces:** Consumes Task1 provision/observe/cleanup and Task2 kernel run.
 Produces a feature-branch push workflow and at most20MiB sanitized summary artifact. Collect the root-owned authoritative report
@@ -230,7 +232,11 @@ environment, not the entire caller PATH/environment.
 - [ ] **Step 1: Add failing bounded collector/workflow contracts.**
 
 Test missing evidence, symlink/path escape, forbidden files, size overflow and
-preservation of the original test failure alongside cleanup failures. Test actual
+preservation of the original test failure alongside cleanup failures. Extend the
+existing real BuildKit synthetic-canary test with files under
+`deploy/scripts/grading/ci/`; require they are absent from the exported COPY
+context while the safe package fixture remains. Add that path to `.dockerignore`.
+Test actual
 workflow branch/runner/timeout/permissions, no production environment/secrets/
 untrusted PR trigger, and one-day retention using the frozen web ESLint js-yaml
 parser via Node createRequire, JSON_SCHEMA and duplicate-key rejection; no new

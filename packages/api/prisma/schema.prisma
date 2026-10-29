@@ -1770,6 +1770,12 @@ model ExerciseCollaborationDocument {
 
 /// One graded attempt at an exercise.
 model Submission {
+  /// Frozen admission identity. Null on historical and non-executable rows.
+  executionRuntimeSnapshot Json? @map("execution_runtime_snapshot")
+  executionGeneration Int? @map("execution_generation")
+  executionLeaseToken String? @map("execution_lease_token") @db.Uuid
+  dispatchIntent GradingDispatchIntent?
+  executionCheckpoints GradingCaseCheckpoint[]
   /// Immutable quiz question, choices and answer key, never executed as code.
   quizSnapshot     Json?            @map("quiz_snapshot")
   id               String           @id @default(uuid()) @db.Uuid
@@ -2787,6 +2793,10 @@ model StaffPracticeDraft {
 
 /// Immutable grading input and private, redacted result. Never a student submission.
 model StaffPracticeAttempt {
+  executionGeneration Int? @map("execution_generation")
+  executionLeaseToken String? @map("execution_lease_token") @db.Uuid
+  dispatchIntent GradingDispatchIntent?
+  executionCheckpoints GradingCaseCheckpoint[]
   academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
@@ -2807,4 +2817,55 @@ model StaffPracticeAttempt {
   @@index([academyId, userId, materialId, context, createdAt(sort: Desc)], map: "staff_practice_attempts_owner_history_idx")
   @@index([status, createdAt])
   @@map("staff_practice_attempts")
+}
+
+
+/// Outbox written atomically with an immutable database-backed attempt.
+/// SQL enforces exactly one owner; sample checks retain Redis atomic admission.
+model GradingDispatchIntent {
+  id String @id @default(uuid()) @db.Uuid
+  submissionId String? @unique @map("submission_id") @db.Uuid
+  staffPracticeAttemptId String? @unique @map("staff_practice_attempt_id") @db.Uuid
+  submission Submission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  staffPracticeAttempt StaffPracticeAttempt? @relation(fields: [staffPracticeAttemptId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  nextAttemptAt DateTime @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  dispatchedAt DateTime? @map("dispatched_at") @db.Timestamptz(6)
+  dispatchAttempts Int @default(0) @map("dispatch_attempts")
+  leaseToken String? @map("lease_token") @db.Uuid
+  leaseExpiresAt DateTime? @map("lease_expires_at") @db.Timestamptz(6)
+  /// Partial in SQL: acknowledged intents are absent from the sweeper index.
+  @@index([nextAttemptAt, id], map: "grading_dispatch_pending_idx")
+  @@map("grading_dispatch_intents")
+}
+
+/// Private evaluated cases. No progress/grade writes until final atomic commit.
+/// SQL bounds sample output and excludes all hidden-case output.
+model GradingCaseCheckpoint {
+  id String @id @default(uuid()) @db.Uuid
+  submissionId String? @map("submission_id") @db.Uuid
+  staffPracticeAttemptId String? @map("staff_practice_attempt_id") @db.Uuid
+  submission Submission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  staffPracticeAttempt StaffPracticeAttempt? @relation(fields: [staffPracticeAttemptId], references: [id], onDelete: Cascade)
+  generation Int
+  leaseToken String @map("lease_token") @db.Uuid
+  casePosition Int @map("case_position")
+  receiptId String? @unique @map("receipt_id") @db.Uuid
+  executionRuntimeSnapshot Json @map("execution_runtime_snapshot")
+  comparator CaseComparator
+  outcome CaseOutcome
+  outputMatched Boolean? @map("output_matched")
+  softLimitExceeded Boolean @default(false) @map("soft_limit_exceeded")
+  runtimeMs Int? @map("runtime_ms")
+  weight Int
+  softPenalty Int? @map("soft_penalty")
+  awardedWeight Int? @map("awarded_weight")
+  executionState CaseExecutionState @map("execution_state")
+  isSample Boolean @map("is_sample")
+  actualOutput String? @map("actual_output")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  @@unique([submissionId, generation, casePosition], map: "grading_checkpoint_submission_case_key")
+  @@unique([staffPracticeAttemptId, generation, casePosition], map: "grading_checkpoint_practice_case_key")
+  @@index([createdAt, id], map: "grading_checkpoint_reconciliation_idx")
+  @@map("grading_case_checkpoints")
 }

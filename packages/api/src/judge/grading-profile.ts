@@ -1,5 +1,7 @@
 import {
   gradingProfileBounds,
+  runtimeDescriptorSchema,
+  runtimeDescriptorIdentity,
   inputPromptPolicySchema,
   inputPromptPolicyForSemanticVersion,
   type InputPromptPolicy,
@@ -67,7 +69,7 @@ export type ExerciseGradingSource = ProfileColumns & {
  * does not understand is refused as a configuration error rather than guessed
  * at. Never holds a secret.
  */
-export const gradingPolicySnapshotSchema = z.object({
+const gradingPolicySnapshotBaseSchema = z.object({
   version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   inputPromptPolicy: inputPromptPolicySchema.optional(),
   semanticVersion: z.string(),
@@ -86,12 +88,31 @@ export const gradingPolicySnapshotSchema = z.object({
     memoryLimitMb: z.number().int().positive(),
     outputBytes: z.number().int().positive().max(MAX_OUTPUT_BYTES),
   }),
-}).superRefine((policy, ctx) => {
+});
+const historicalGradingPolicySnapshotSchema = gradingPolicySnapshotBaseSchema.superRefine((policy, ctx) => {
   const valid = policy.version === 3
     ? policy.semanticVersion === "elice-v2" && policy.inputPromptPolicy === "IGNORE"
     : policy.semanticVersion === "elice-v1" && (policy.inputPromptPolicy === undefined || policy.inputPromptPolicy === "INCLUDE");
   if (!valid) ctx.addIssue({ code: "custom", message: "Inconsistent prompt policy snapshot" });
 });
+const gradingPolicySnapshotV4Schema = gradingPolicySnapshotBaseSchema.omit({ version: true, runtime: true, inputPromptPolicy: true }).extend({
+  version: z.literal(4), runtime: runtimeDescriptorSchema, inputPromptPolicy: inputPromptPolicySchema,
+  comparator: z.strictObject({
+    runtime: z.literal("pyodide-cpython"), engineVersion: z.string().min(1).max(128),
+    budgetMs: z.number().int().min(gradingProfileBounds.comparatorTimeLimitMs.min).max(gradingProfileBounds.comparatorTimeLimitMs.max),
+  }),
+  ceilings: z.strictObject({
+    totalTimeLimitMs: z.number().int().min(gradingProfileBounds.totalTimeLimitMs.min).max(gradingProfileBounds.totalTimeLimitMs.max),
+    caseTimeLimitMs: z.number().int().min(100).max(60000),
+    memoryLimitMb: z.number().int().min(16).max(4096),
+    outputBytes: z.number().int().positive().max(MAX_OUTPUT_BYTES),
+  }),
+}).strict().superRefine((policy, ctx) => {
+  if (!((policy.semanticVersion === "elice-v1" && policy.inputPromptPolicy === "INCLUDE") ||
+        (policy.semanticVersion === "elice-v2" && policy.inputPromptPolicy === "IGNORE")))
+    ctx.addIssue({ code: "custom", message: "Inconsistent prompt policy snapshot" });
+});
+export const gradingPolicySnapshotSchema = z.union([historicalGradingPolicySnapshotSchema, gradingPolicySnapshotV4Schema]);
 export type GradingPolicySnapshot = z.infer<typeof gradingPolicySnapshotSchema>;
 
 /**
@@ -285,9 +306,14 @@ export function resolveGradingProfile(
  */
 export function runtimeMismatch(
   policy: GradingPolicySnapshot,
-  running: { engine: string | null; comparator: string | null },
+  running: { engine: string | null; comparator: string | null; descriptor?: unknown },
 ): string | null {
-  const recordedEngine = `pyodide-${policy.runtime.engineVersion}`;
+  if (policy.version === 4) {
+    const parsed = runtimeDescriptorSchema.safeParse(running.descriptor);
+    if (!parsed.success || runtimeDescriptorIdentity(parsed.data) !== runtimeDescriptorIdentity(policy.runtime))
+      return "runner descriptor differs from frozen runtime";
+  }
+  const recordedEngine = `${policy.runtime.engine}-${policy.runtime.engineVersion}`;
   const recordedComparator = `pyodide-${policy.comparator.engineVersion}`;
   if (running.engine !== recordedEngine) {
     return `runner is ${running.engine ?? "unknown"}, submission recorded ${recordedEngine}`;

@@ -1,4 +1,4 @@
-import type { CaseOutcome, InputPromptPolicy } from "@cove/shared";
+import type { CaseOutcome, InputPromptPolicy, ExecutionAttemptContext, RuntimeDescriptor } from "@cove/shared";
 import { gradingDataLimits } from "@cove/shared/grading-limits";
 
 /**
@@ -10,6 +10,9 @@ export const MAX_OUTPUT_BYTES = gradingDataLimits.stdoutBytes;
 export type ExecutionRequest = {
   /** Trusted infrastructure cancellation; never accepted from the wire as data. */
   signal?: AbortSignal;
+  /** Frozen per-attempt identity for the versioned broker; omitted by legacy callers. */
+  context?: ExecutionAttemptContext;
+  runtime?: RuntimeDescriptor;
   inputPromptPolicy?: InputPromptPolicy;
   code: string;
   stdin: string;

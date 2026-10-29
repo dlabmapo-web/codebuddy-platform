@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { caseComparatorSchema, inputPromptPolicySchema, materialScorePolicySchema, quizSnapshotSchema } from "@cove/shared";
+import { gradingPolicySnapshotSchema } from "./grading-profile.js";
+import { runtimeDescriptorIdentity, runtimeDescriptorSchema, caseComparatorSchema, inputPromptPolicySchema, materialScorePolicySchema, quizSnapshotSchema } from "@cove/shared";
 
 /** Internal only: this contains hidden expectations and must never cross an API boundary. */
-export const practiceSnapshotSchema = z.object({
+const practiceSnapshotV1Schema = z.object({
   version: z.literal(1),
   submissionPolicy: z.literal("AUTOMATIC").default("AUTOMATIC"),
   courseId: z.uuid().optional(),
@@ -29,4 +30,14 @@ export const practiceSnapshotSchema = z.object({
     effectiveTimeLimitMs: z.number().nullable(),
   })),
 });
+export const practiceSnapshotSchema = z.union([
+  practiceSnapshotV1Schema,
+  practiceSnapshotV1Schema.extend({ version: z.literal(2), executionRuntimeSnapshot: runtimeDescriptorSchema }).superRefine((snapshot, ctx) => {
+    if (snapshot.gradingMode === "ELICE_STDIO") {
+      const policy = gradingPolicySnapshotSchema.safeParse(snapshot.gradingPolicySnapshot);
+      if (!policy.success || policy.data.version !== 4 || runtimeDescriptorIdentity(policy.data.runtime) !== runtimeDescriptorIdentity(snapshot.executionRuntimeSnapshot))
+        ctx.addIssue({ code: "custom", message: "Practice v2 requires matching v4 grading runtime" });
+    }
+  }),
+]);
 export type PracticeSnapshot = z.infer<typeof practiceSnapshotSchema>;

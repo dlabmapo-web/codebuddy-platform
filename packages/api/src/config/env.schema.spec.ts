@@ -13,6 +13,14 @@ const validEnvironment = {
 };
 
 describe("validateEnvironment", () => {
+  it("defaults native off and requires a pinned manifest path for activation", () => {
+    expect(validateEnvironment(validEnvironment).GRADING_NATIVE_ENABLED).toBe(false);
+    expect(validateEnvironment(validEnvironment).GRADING_RUNTIME_MANIFEST_PATH).toBeUndefined();
+    expect(() => validateEnvironment({ ...validEnvironment, GRADING_NATIVE_ENABLED: "true" })).toThrow(/MANIFEST/);
+    expect(() => validateEnvironment({ ...validEnvironment, GRADING_NATIVE_ENABLED: "yes" })).toThrow();
+    expect(() => validateEnvironment({ ...validEnvironment, GRADING_RUNTIME_MANIFEST_PATH: "relative.json" })).toThrow();
+    expect(validateEnvironment({ ...validEnvironment, GRADING_NATIVE_ENABLED: "false", GRADING_RUNTIME_MANIFEST_PATH: "/immutable/runtime.json" }).GRADING_NATIVE_ENABLED).toBe(false);
+  });
   it('keeps public turtle disabled by default and requires an independent guest pool', () => {
     expect(validateEnvironment(validEnvironment).TURTLE_TRIAL_ENABLED).toBe(false);
     expect(() => validateEnvironment({ ...validEnvironment, TURTLE_TRIAL_ENABLED: 'true' })).toThrow(/TURTLE_TRIAL_PIN_PEPPER/);

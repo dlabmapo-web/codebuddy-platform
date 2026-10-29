@@ -1,4 +1,4 @@
-import { inputPromptPolicySchema, programmingExerciseGradingModeSchema, inputPromptPolicyForSemanticVersion, type InputPromptPolicy } from "@cove/shared";
+import { executionEngineVersion, runtimeDescriptorSchema, runtimeDescriptorIdentity, inputPromptPolicySchema, programmingExerciseGradingModeSchema, inputPromptPolicyForSemanticVersion, type InputPromptPolicy } from "@cove/shared";
 import type { ExerciseGradingSource } from "./grading-profile.js";
 import { gradingSnapshotFor, gradingPolicySnapshotSchema, resolveGradingProfile } from "./grading-profile.js";
 import type { SampleSnapshot } from "./sample-check.store.js";
@@ -55,6 +55,16 @@ export function sampleSnapshotFor(
 
 /** Historical Redis records lack both fields. New semantics must be explicit. */
 export function sampleInputPromptPolicy(snapshot: SampleSnapshot): InputPromptPolicy | null {
+  if (snapshot.version !== undefined && snapshot.version !== 1 && snapshot.version !== 2) return null;
+  if (snapshot.version === 2) {
+    const runtime = runtimeDescriptorSchema.safeParse(snapshot.executionRuntimeSnapshot);
+    if (!runtime.success) return null;
+    if (snapshot.gradingMode === "LEGACY_STDIO" && snapshot.engineVersion !== executionEngineVersion(runtime.data)) return null;
+    if ("policy" in snapshot) {
+      const policy = gradingPolicySnapshotSchema.safeParse(snapshot.policy);
+      if (!policy.success || policy.data.version !== 4 || runtimeDescriptorIdentity(policy.data.runtime) !== runtimeDescriptorIdentity(runtime.data)) return null;
+    }
+  }
   const parsed = inputPromptPolicySchema.safeParse(snapshot.inputPromptPolicy === undefined ? "INCLUDE" : snapshot.inputPromptPolicy);
   if (!parsed.success) return null;
   const parsedMode = programmingExerciseGradingModeSchema.safeParse(

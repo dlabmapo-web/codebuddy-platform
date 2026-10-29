@@ -135,6 +135,10 @@ export const apiEnvironmentSchema = z.object({
     .default(10_000),
   /** CPU-bound work, so this tracks cores rather than being set high. */
   JUDGE_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(4),
+  /** Disabled until the reviewed release manifest and broker generation are ready. */
+  GRADING_NATIVE_ENABLED: z.enum(["true", "false"]).default("false").transform(value => value === "true"),
+  /** Loaded and frozen once; no hot reload or implicit development manifest. */
+  GRADING_RUNTIME_MANIFEST_PATH: z.string().min(1).max(4096).refine(value => value.startsWith("/") && !value.includes("\0"), "must be an absolute manifest path").optional(),
   JUDGE_METRICS_SECRET: z.string().min(32).optional(),
   JUDGE_TRACE_TIMINGS: z.preprocess(v => v === "true" || v === true, z.boolean()).default(false),
   JUDGE_HEALTH_BIND: z.enum(["127.0.0.1", "0.0.0.0"]).default("127.0.0.1"),
@@ -222,6 +226,8 @@ export const apiEnvironmentSchema = z.object({
     .enum(["development", "test", "production"])
     .optional(),
 }).superRefine((environment, context) => {
+  if (environment.GRADING_NATIVE_ENABLED && !environment.GRADING_RUNTIME_MANIFEST_PATH)
+    context.addIssue({ code: "custom", path: ["GRADING_RUNTIME_MANIFEST_PATH"], message: "is required when native grading is enabled" });
   if (environment.TURTLE_TRIAL_BROWSER_ENABLED || environment.TURTLE_TRIAL_BROWSER_ADMISSION_ENABLED) {
     if (!environment.TURTLE_TRIAL_ENABLED || !environment.TURTLE_TRIAL_BROWSER_ENABLED) context.addIssue({ code: 'custom', path: ['TURTLE_TRIAL_BROWSER_ENABLED'], message: 'browser execution requires the trial and browser feature flags' });
     for (const key of ['TURTLE_TRIAL_BROWSER_RUNTIME_ORIGIN', 'TURTLE_TRIAL_BROWSER_RUNTIME_ID'] as const) if (!environment[key]) context.addIssue({ code: 'custom', path: [key], message: 'is required for browser execution' });

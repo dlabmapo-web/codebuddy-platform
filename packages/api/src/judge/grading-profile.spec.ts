@@ -39,3 +39,20 @@ describe("snapshotted input prompt semantics", () => {
     expect(sampleInputPromptPolicy({ ...historical, gradingSemanticVersion: "legacy-v99" })).toBeNull();
   });
 });
+
+
+import { nativeFixture } from "../../../shared/src/testing/grading-runtime-fixtures.js";
+import { runtimeMismatch } from "./grading-profile.js";
+
+describe("v4 explicit runtime decoder", () => {
+  it("keeps comparator identity independent from native execution and preserves prompt semantics", () => {
+    const old = gradingSnapshotFor(exercise(true, false), { engineVersion: "0.27.5" }).submission.gradingPolicySnapshot!;
+    const policy = gradingPolicySnapshotSchema.parse({ ...old, version: 4, runtime: nativeFixture, inputPromptPolicy: "INCLUDE" });
+    expect(policy.comparator.engineVersion).toBe("0.27.5");
+    expect(runtimeMismatch(policy, { engine: "cpython-3.12.10", comparator: "pyodide-0.27.5" })).toMatch(/descriptor/);
+    expect(runtimeMismatch(policy, { engine: "cpython-3.12.10", comparator: "pyodide-0.27.5", descriptor: { ...nativeFixture, imageDigest: `sha256:${"f".repeat(64)}` } })).toMatch(/descriptor/);
+    expect(runtimeMismatch(policy, { engine: "cpython-3.12.10", comparator: "pyodide-0.27.5", descriptor: nativeFixture })).toBeNull();
+    expect(gradingPolicySnapshotSchema.safeParse({ ...policy, semanticVersion: "elice-v2" }).success).toBe(false);
+    expect(runtimeMismatch(policy, { engine: "cpython-3.12.10", comparator: "cpython-3.12.10", descriptor: nativeFixture })).toMatch(/comparator/);
+  });
+});

@@ -1,4 +1,4 @@
-import type { InputPromptPolicy, SampleCheckOutcome, SampleCheckStatus } from "@cove/shared";
+import type { InputPromptPolicy, RuntimeDescriptor, SampleCheckOutcome, SampleCheckStatus } from "@cove/shared";
 import type { Redis } from "ioredis";
 
 import type { EnhancedCase } from "./case-evaluator.js";
@@ -26,7 +26,10 @@ export const SAMPLE_TERMINAL_TTL_MS = 15 * 60_000;
  * case, never the rest of the exercise. The job never reads the exercise, so
  * an edit made after acceptance cannot change a check already running.
  */
-export type SampleSnapshot = {
+export type SampleRuntimeVersion =
+  | { version?: 1; executionRuntimeSnapshot?: never }
+  | { version: 2; executionRuntimeSnapshot: RuntimeDescriptor };
+export type SampleSnapshot = SampleRuntimeVersion & {
   inputPromptPolicy?: InputPromptPolicy;
   gradingSemanticVersion?: string;
   code: string;

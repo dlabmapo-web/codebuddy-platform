@@ -25,7 +25,7 @@ they do not establish Linux execution or containment.
 
 | Check | Local result |
 | --- | --- |
-| CI Python contracts, including actual JS transport/schema helpers | 60 pass |
+| CI Python contracts, including actual JS transport/schema helpers | 64 pass |
 | Runtime TypeScript build and runtime tests | 41 pass, zero skips |
 | Real BuildKit synthetic COPY-context export | pass |
 | Python compilation, shell syntax and whitespace checks | pass |
@@ -86,6 +86,16 @@ with at most40 messages/unit, 1KiB/message, 64KiB read/unit and a15-second deadl
 Sensitive assignments and credential-bearing URLs are redacted. Worker,
 container and broad host journals are never queried. These excerpts are clearly
 labelled diagnostic, separately from authoritative kernel proof.
+
+Every prerequisite has a stable workflow step ID. An always-run stdlib-only
+inline finalizer receives only source revision and step outcomes through explicit
+environment values, so checkout, tool setup, installation or local-check failure
+still produces a bounded failure summary. A skipped wrapper is recorded as
+native/cleanup unexecuted; missing evidence from a wrapper that started is
+recorded as unknown. No host or cleanup proof is invented. Valid wrapper
+summaries retain their exact bytes and inode. Missing authoritative evidence
+makes the fallback fail; earlier failed steps remain failed. Upload runs only
+after the finalizer marks the regular, owned, bounded, no-symlink path safe.
 
 The upload contains only `test-results/disposable-native-kernel/summary.json`,
 with a strict20MiB total bound, exact source commit, explicit failure dispositions

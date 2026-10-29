@@ -14,18 +14,141 @@ jobs:
     env:
       GRADING_DISPOSABLE_CI: '1'
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - id: checkout
+        uses: actions/checkout@v4
+      - id: pnpm
+        uses: pnpm/action-setup@v4
+      - id: node
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm prepare:grading
-      - run: python3 -m unittest discover -s deploy/scripts/grading/ci -p 'test_*.py' -q
-      - run: python3 -m unittest discover -s deploy/scripts/grading/tests -p test_build_context.py -v
-      - run: bash deploy/scripts/grading/ci/run.sh
-      - if: always()
+      - id: install
+        run: pnpm install --frozen-lockfile
+      - id: prepare
+        run: pnpm prepare:grading
+      - id: contracts
+        run: python3 -m unittest discover -s deploy/scripts/grading/ci -p 'test_*.py' -q
+      - id: build_context
+        run: python3 -m unittest discover -s deploy/scripts/grading/tests -p test_build_context.py -v
+      - id: kernel
+        run: bash deploy/scripts/grading/ci/run.sh
+      # Stdlib-only fallback still runs when checkout, Node or pnpm failed.
+      - id: evidence_summary
+        if: always()
+        shell: bash
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+          OUTCOME_CHECKOUT: ${{ steps.checkout.outcome }}
+          OUTCOME_PNPM: ${{ steps.pnpm.outcome }}
+          OUTCOME_NODE: ${{ steps.node.outcome }}
+          OUTCOME_INSTALL: ${{ steps.install.outcome }}
+          OUTCOME_PREPARE: ${{ steps.prepare.outcome }}
+          OUTCOME_CONTRACTS: ${{ steps.contracts.outcome }}
+          OUTCOME_BUILD_CONTEXT: ${{ steps.build_context.outcome }}
+          OUTCOME_KERNEL: ${{ steps.kernel.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import stat
+          import sys
+
+          MAXIMUM = 20 * 2**20
+          STAGES = ('checkout','pnpm','node','install','prepare','contracts','build_context','kernel')
+          STATUSES = {'primary','observation','cleanup','infrastructure','collection','finalization'}
+          source = os.environ.get('SOURCE_COMMIT','')
+          if not re.fullmatch(r'[0-9a-f]{40}',source): raise ValueError('Invalid source revision')
+          outcomes = {name:os.environ.get('OUTCOME_'+name.upper(),'unknown') for name in STAGES}
+          outcomes = {name:value if value in ('success','failure','cancelled','skipped') else 'unknown' for name,value in outcomes.items()}
+
+          def directory(path):
+              # No repository/dependency import; works even when checkout never completed.
+              if not Path(path).is_absolute() or '..' in Path(path).parts: raise ValueError('Unsafe directory path')
+              fd = os.open('/',os.O_RDONLY|os.O_DIRECTORY)
+              try:
+                  for part in Path(path).parts[1:]:
+                      child = os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
+                      os.close(fd); fd = child
+                  return fd
+              except BaseException:
+                  os.close(fd); raise
+
+          def safe(info):
+              return info.st_uid == os.getuid() and not info.st_mode & 0o022
+
+          def unique(pairs):
+              value = {}
+              for key,item in pairs:
+                  if key in value: raise ValueError('Duplicate JSON key')
+                  value[key] = item
+              return value
+
+          def nonfinite(_):
+              raise ValueError('Nonfinite JSON value')
+
+          def uploadable():
+              output = Path(os.environ['GITHUB_OUTPUT'])
+              parent = directory(output.parent)
+              try:
+                  fd = os.open(output.name,os.O_WRONLY|os.O_APPEND|os.O_CREAT|os.O_NOFOLLOW,0o600,dir_fd=parent)
+                  with os.fdopen(fd,'wb') as stream:
+                      info = os.fstat(stream.fileno())
+                      if not stat.S_ISREG(info.st_mode) or not safe(info) or info.st_nlink != 1:
+                          raise ValueError('Unsafe step output')
+                      stream.write(b'uploadable=true\n')
+              finally: os.close(parent)
+
+          fd = directory(Path.cwd())
+          try:
+              for name in ('test-results','disposable-native-kernel'):
+                  try: os.mkdir(name,0o700,dir_fd=fd)
+                  except FileExistsError: pass
+                  child = os.open(name,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
+                  os.close(fd); fd = child
+                  if not safe(os.fstat(fd)): raise ValueError('Unsafe artifact directory')
+              try: existing = os.open('summary.json',os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW,dir_fd=fd)
+              except FileNotFoundError: existing = None
+              if existing is not None:
+                  with os.fdopen(existing,'rb') as stream:
+                      info = os.fstat(stream.fileno())
+                      if not stat.S_ISREG(info.st_mode) or not safe(info) or info.st_nlink != 1 or info.st_size > MAXIMUM:
+                          raise ValueError('Unsafe existing summary')
+                      data = stream.read(MAXIMUM+1)
+                      if len(data) > MAXIMUM: raise ValueError('Summary size overflow')
+                  value = json.loads(data,object_pairs_hook=unique,parse_constant=nonfinite)
+                  if not (isinstance(value,dict) and value.get('version') == 1 and type(value.get('success')) is bool
+                          and value.get('sourceCommit') == source and value.get('productionEquivalent') is False
+                          and value.get('nativeAcceptanceExecuted') is False and set(value.get('statuses',{})) == STATUSES
+                          and all(type(n) is int and 0 <= n <= 255 for n in value['statuses'].values())):
+                      raise ValueError('Invalid existing summary')
+                  # Preserve all bytes and inode of both passing and failing wrapper records.
+                  uploadable()
+                  sys.exit(0)
+              first = next((name for name in STAGES if outcomes[name] in ('failure','cancelled')),None)
+              first = first or next((name for name in STAGES if outcomes[name] != 'success'),'summary-missing')
+              unexecuted = outcomes['kernel'] == 'skipped'
+              value = dict(version=1,sourceCommit=source,success=False,stage=first,
+                           productionEquivalent=False,nativeAcceptanceExecuted=False,
+                           workflowOutcomes=outcomes,workflowDisposition='cancelled' if 'cancelled' in outcomes.values() and 'failure' not in outcomes.values() else 'failed',
+                           nativeKernelResult='unexecuted' if unexecuted else 'unknown',
+                           cleanupResult='unexecuted' if unexecuted else 'unknown',
+                           authoritativeHostProof=False,evidence={},
+                           failure=dict(category='wrapper-summary-unavailable'),
+                           statuses={name:None for name in STATUSES})
+              data = (json.dumps(value,sort_keys=True,separators=(',',':'))+'\n').encode()
+              if len(data) > MAXIMUM: raise ValueError('Summary size overflow')
+              target = os.open('summary.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=fd)
+              with os.fdopen(target,'wb') as stream: stream.write(data)
+              uploadable()
+          finally: os.close(fd)
+          # Missing authoritative wrapper evidence can never create a passing job.
+          sys.exit(1)
+          PY
+      - id: upload
+        if: always() && steps.evidence_summary.outputs.uploadable == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: disposable-native-kernel-${{ github.sha }}

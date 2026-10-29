@@ -490,7 +490,7 @@ assert(j.steps.some(s=>s.uses==='actions/setup-node@v4' && s.with['node-version'
 assert(j.steps.some(s=>s.uses==='pnpm/action-setup@v4'));
 const run=j.steps.find(s=>s.run==='bash deploy/scripts/grading/ci/run.sh'); assert(run);
 const upload=j.steps.find(s=>s.uses==='actions/upload-artifact@v4');
-assert.equal(upload.if,'always()'); assert.equal(upload.with['retention-days'],1);
+assert.equal(upload.if,"always() && steps.evidence_summary.outputs.uploadable == 'true'"); assert.equal(upload.with['retention-days'],1);
 assert.equal(upload.with.path,'test-results/disposable-native-kernel/summary.json');
 assert.equal(upload.with['if-no-files-found'],'error');
 """)
@@ -612,3 +612,95 @@ class SuccessSummaryContracts(unittest.TestCase):
             self.assertFalse(result['success'])
             self.assertEqual(result['statuses']['collection'],1)
             self.assertFalse(result['authoritativeHostProof'])
+
+
+class PrerequisiteEvidenceContracts(unittest.TestCase):
+    node=CoordinatorContracts.node
+
+    def fallback_step(self):
+        steps=json.loads(self.node("""
+import {createRequire} from 'node:module';
+import {readFileSync} from 'node:fs';
+const web=createRequire(new URL('./packages/web/package.json',import.meta.url));
+const yaml=createRequire(web.resolve('eslint/package.json'))('js-yaml');
+console.log(JSON.stringify(yaml.load(readFileSync('.github/workflows/native-grading-kernel.yml','utf8'),{schema:yaml.JSON_SCHEMA,json:false}).jobs.kernel.steps));
+"""))
+        matches=[step for step in steps if step.get('id') == 'evidence_summary']
+        self.assertEqual(len(matches),1,'Always-run prerequisite fallback is absent')
+        step=matches[0]
+        self.assertEqual(step['if'],'always()')
+        self.assertNotIn('${{',step['run'])
+        ids=['checkout','pnpm','node','install','prepare','contracts','build_context','kernel']
+        self.assertEqual([s['id'] for s in steps[:8]],ids)
+        self.assertEqual(step['env'],{'SOURCE_COMMIT':'${{ github.sha }}',**{'OUTCOME_'+key.upper():'${{ steps.'+key+'.outcome }}' for key in ids}})
+        self.assertEqual(steps[-1]['if'],"always() && steps.evidence_summary.outputs.uploadable == 'true'")
+        return step
+
+    def run_fallback(self, folder, failed='install', wrapper='skipped'):
+        step=self.fallback_step()
+        ids=['checkout','pnpm','node','install','prepare','contracts','build_context','kernel']
+        outcomes={key:('success' if ids.index(key)<ids.index(failed) else 'failure' if key==failed else 'skipped') for key in ids}
+        outcomes['kernel']=wrapper
+        env={**os.environ,'SOURCE_COMMIT':'c'*40,'GITHUB_OUTPUT':str(folder/'outputs'),**{'OUTCOME_'+key.upper():value for key,value in outcomes.items()},'UNRELATED_SECRET':'RAW_SECRET_CANARY'}
+        result=subprocess.run(['/bin/bash','-e','-c',step['run']],cwd=folder,env=env,capture_output=True,text=True,timeout=10)
+        return result,outcomes
+
+    def test_prerequisite_failures_without_checkout_leave_uploadable_unexecuted_summary(self):
+        for stage in ('checkout','pnpm','node','install','prepare','contracts','build_context'):
+            with self.subTest(stage=stage),tempfile.TemporaryDirectory() as directory:
+                folder=Path(directory).resolve()
+                result,outcomes=self.run_fallback(folder,stage)
+                self.assertNotEqual(result.returncode,0,'Fallback must not make missing native evidence green')
+                summary=folder/'test-results/disposable-native-kernel/summary.json'
+                value=json.loads(summary.read_text())
+                self.assertEqual(value['sourceCommit'],'c'*40)
+                self.assertEqual(value['stage'],stage)
+                self.assertEqual(value['workflowOutcomes'],outcomes)
+                self.assertFalse(value['success'])
+                self.assertEqual(value['nativeKernelResult'],'unexecuted')
+                self.assertEqual(value['cleanupResult'],'unexecuted')
+                self.assertEqual(value['evidence'],{})
+                self.assertFalse(value['authoritativeHostProof'])
+                self.assertNotIn('RAW_SECRET_CANARY',summary.read_text())
+                self.assertIn('uploadable=true',(folder/'outputs').read_text())
+
+    def test_existing_valid_wrapper_summary_is_preserved_byte_for_byte(self):
+        for success in (False,True):
+            with self.subTest(success=success),tempfile.TemporaryDirectory() as directory:
+                folder=Path(directory).resolve(); target=folder/'test-results/disposable-native-kernel/summary.json';target.parent.mkdir(parents=True)
+                statuses=dict(primary=0 if success else 17,observation=0,cleanup=0,infrastructure=0,collection=0,finalization=0)
+                data=(json.dumps(dict(version=1,sourceCommit='c'*40,success=success,productionEquivalent=False,nativeAcceptanceExecuted=False,statuses=statuses,evidence={}),indent=2)+'\n').encode()
+                target.write_bytes(data);target.chmod(0o600)
+                before=target.stat()
+                result,_=self.run_fallback(folder,'kernel','success' if success else 'failure')
+                self.assertEqual(result.returncode,0,result.stderr)
+                self.assertEqual(target.read_bytes(),data)
+                self.assertEqual(target.stat().st_ino,before.st_ino)
+                self.assertIn('uploadable=true',(folder/'outputs').read_text())
+
+    def test_missing_wrapper_summary_reports_unknown_native_and_cleanup(self):
+        for outcome in ('failure','success','cancelled','RAW_SECRET_CANARY'):
+            with self.subTest(outcome=outcome),tempfile.TemporaryDirectory() as directory:
+                folder=Path(directory).resolve();result,_=self.run_fallback(folder,'kernel',outcome)
+                self.assertNotEqual(result.returncode,0)
+                summary=(folder/'test-results/disposable-native-kernel/summary.json').read_text()
+                value=json.loads(summary)
+                self.assertEqual(value['nativeKernelResult'],'unknown')
+                self.assertEqual(value['cleanupResult'],'unknown')
+                self.assertEqual(value['stage'],'summary-missing' if outcome=='success' else 'kernel')
+                self.assertNotIn('RAW_SECRET_CANARY',summary)
+
+    def test_fallback_refuses_symlink_paths_and_oversized_existing_summary(self):
+        for kind in ('parent','summary','overflow'):
+            with self.subTest(kind=kind),tempfile.TemporaryDirectory() as directory:
+                folder=Path(directory).resolve();outside=folder/'outside';outside.mkdir()
+                marker=outside/'private';marker.write_text('RAW_SECRET_CANARY')
+                if kind=='parent': (folder/'test-results').symlink_to(outside,target_is_directory=True)
+                else:
+                    target=folder/'test-results/disposable-native-kernel/summary.json';target.parent.mkdir(parents=True)
+                    if kind=='summary':target.symlink_to(marker)
+                    else:target.write_bytes(b'x'*(20*2**20+1))
+                result,_=self.run_fallback(folder)
+                self.assertNotEqual(result.returncode,0)
+                self.assertFalse((folder/'outputs').exists())
+                self.assertEqual(marker.read_text(),'RAW_SECRET_CANARY')

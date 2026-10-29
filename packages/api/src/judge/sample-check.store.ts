@@ -137,6 +137,7 @@ if redis.call('ZCARD', KEYS[3]) >= tonumber(ARGV[5]) then return {'academy-full'
 redis.call('HSET', KEYS[5], 'tokens', tokens - 1, 'updated_at', now_ms)
 redis.call('PEXPIRE', KEYS[5], window_ms)
 redis.call('SET', KEYS[4], ARGV[2], 'PX', ARGV[3])
+redis.call('ZADD', 'cove:sample-check:dispatch', ARGV[4], ARGV[1])
 redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[3])
 redis.call('SET', KEYS[2], ARGV[1], 'PX', ARGV[3])
 redis.call('ZADD', KEYS[3], tonumber(ARGV[4]) + tonumber(ARGV[3]), ARGV[1])
@@ -258,6 +259,12 @@ export class SampleCheckStore {
     return { kind: "accepted" };
   }
 
+  async pendingDispatch(limit = 100): Promise<string[]> {
+    return (await this.client()).zrange('cove:sample-check:dispatch', 0, Math.min(limit, 100) - 1);
+  }
+  async acknowledgeDispatch(checkId: string): Promise<void> {
+    await (await this.client()).zrem('cove:sample-check:dispatch', checkId);
+  }
   async get(checkId: string): Promise<SampleCheckRecord | null> {
     const raw = await (await this.client()).get(key.record(checkId));
     return raw ? (JSON.parse(raw) as SampleCheckRecord) : null;

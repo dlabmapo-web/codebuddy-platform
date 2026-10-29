@@ -1,3 +1,4 @@
+import type { RuntimeDescriptor } from "@cove/shared";
 import {
   gradingProfileBounds,
   runtimeDescriptorSchema,
@@ -125,10 +126,10 @@ export type GradingPolicySnapshot = z.infer<typeof gradingPolicySnapshotSchema>;
  */
 export function gradingSnapshotFor(
   exercise: ExerciseGradingSource,
-  runtime: { engineVersion: string },
+  runtime: { engineVersion: string; descriptor?: RuntimeDescriptor },
 ) {
   const enhanced = exercise.gradingMode === "ELICE_STDIO";
-  const policy: GradingPolicySnapshot | null = enhanced
+  let policy: GradingPolicySnapshot | null = enhanced
     ? {
         // Older workers only understand v1 and must refuse these submissions
         // rather than grade them using their smaller, hardcoded output cap.
@@ -154,9 +155,12 @@ export function gradingSnapshotFor(
       }
     : null;
 
+  if (policy && runtime.descriptor) policy = { ...policy, version: 4, runtime: runtime.descriptor, inputPromptPolicy: exercise.inputPromptPolicy ?? "INCLUDE" };
+
   return {
     submission: {
       submissionPolicy: "AUTOMATIC" as const,
+      ...(runtime.descriptor ? { executionRuntimeSnapshot: runtime.descriptor } : {}),
       inputPromptPolicy: exercise.inputPromptPolicy ?? "INCLUDE",
       gradingMode: exercise.gradingMode,
       gradingSemanticVersion: exercise.gradingSemanticVersion,

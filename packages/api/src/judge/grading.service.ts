@@ -1,3 +1,5 @@
+import type { RuntimeCoordinator } from "./runtime-coordinator.js";
+import type { ExecutionSession } from "./execution-lease.js";
 import { quizSnapshotSchema } from "@cove/shared";
 import { Injectable, Logger } from "@nestjs/common";
 import { ExecutionTelemetry, withExecutionCaseCount } from "./execution-telemetry.js";
@@ -42,6 +44,8 @@ export type GradingWork = Pick<GradingSubmission,
   "materialScorePolicy"
 > & {
   quizSnapshot: unknown;
+  engineVersion?: string;
+  executionRuntimeSnapshot?: unknown;
   gradingPolicySnapshot?: unknown;
   gradingCases: Array<Omit<GradingSubmission["gradingCases"][number], "id" | "submissionId">>;
   material?: GradingSubmission["material"];
@@ -123,15 +127,44 @@ export class GradingService {
      */
     comparator: OutputComparator,
     readonly telemetry = new ExecutionTelemetry(),
+    private readonly coordinator?: RuntimeCoordinator,
+    private readonly session?: ExecutionSession,
   ) {
-    this.engine = { get version() { return engine.version; }, run: request => this.telemetry.time("engine", () => engine.run(request)), dispose: () => engine.dispose() };
+    this.engine = { descriptor: engine.descriptor, get version() { return engine.version; }, run: request => this.telemetry.time("engine", () => engine.run(request)), dispose: () => engine.dispose() };
     this.comparator = { get version() { return comparator.version; }, compare: request => this.telemetry.time("compare", () => comparator.compare(request)) };
   }
 
+  bindSession(session: ExecutionSession): GradingService {
+    return new GradingService(this.prisma, session.executionEngine(), this.points, this.comparator, this.telemetry, undefined, session);
+  }
   async grade(
     submissionId: string,
     report: (progress: GradingProgress) => Promise<void>,
+    recovery = false,
   ): Promise<void> {
+    if (this.coordinator) {
+      const submission = await this.prisma.submission.findUnique({ where: { id: submissionId }, include: gradingInclude });
+      if (!submission || !["QUEUED", "RUNNING"].includes(submission.status)) return;
+      if (!submission.quizSnapshot) {
+        recovery ||= submission.status === "RUNNING" && !this.coordinator.ownedAttempts.has(submissionId);
+        let runtime;
+        try { runtime = this.coordinator.descriptor(submission); }
+        catch {
+          if (submission.status !== 'QUEUED') throw new Error('Frozen running runtime unavailable');
+          await this.prisma.submission.updateMany({ where: { id: submissionId, status: 'QUEUED' }, data: { status: 'ERRORED', failureReason: 'RUNTIME_UNAVAILABLE', gradedAt: new Date() } });
+          return;
+        }
+        const session = await this.coordinator.claim({ submissionId }, { runtime, memoryLimitMb: submission.memoryLimitMb, kind: submission.regradeRunId ? "maintenance" : "submission" }, recovery);
+        if (!session) return;
+        const child = this.bindSession(session);
+        try {
+          try { await session.restore(); }
+          catch { await child.fail(submissionId, "RECOVERY_UNAVAILABLE"); return; }
+          await child.execute(submission, report, recovery ? submission.startedAt!.getTime() : Date.now());
+        } finally { await this.coordinator.finished(session); }
+        return;
+      }
+    }
     // Claiming is a conditional update, so a duplicate delivery finds nothing
     // to claim and exits rather than grading the same submission twice.
     const claimed = await this.telemetry.time("claim", () => this.prisma.submission.updateMany({
@@ -174,6 +207,7 @@ export class GradingService {
     const reportProgress = report;
     report = progress => this.telemetry.time("report", () => reportProgress(progress));
     const fail = (reason: string) => sink ? sink.fail(reason) : this.fail(submissionId, reason);
+    if (submission.executionRuntimeSnapshot && !this.engine.descriptor) { await fail("RUNTIME_UNAVAILABLE"); return; }
     if (submission?.quizSnapshot) {
       const parsed = quizSnapshotSchema.safeParse(submission.quizSnapshot);
       if (!parsed.success || !parsed.data.definition.choices.some((c) => c.id === submission.code)) {
@@ -208,7 +242,7 @@ export class GradingService {
       return;
     }
     if (profile.kind === "legacy") {
-      await this.gradeLegacy(submission, report, sink);
+      await this.gradeLegacy(submission, report, sink, claimedAt);
       return;
     }
     // Graded only on the runtimes it was recorded against. Checked before a
@@ -217,6 +251,7 @@ export class GradingService {
       ? runtimeMismatch(profile.policy, {
           engine: this.engine.version,
           comparator: this.comparator.version,
+          descriptor: this.engine.descriptor,
         })
       : "no policy snapshot";
     if (mismatch) {
@@ -232,9 +267,11 @@ export class GradingService {
     submission: GradingWork,
     report: (progress: GradingProgress) => Promise<void>,
     sink?: GradeSink,
+    claimedAt = Date.now(),
   ): Promise<void> {
     const submissionId = submission.id;
     const results: CaseRow[] = [];
+    const deadline = claimedAt + submission.timeLimitMs * submission.gradingCases.length + GRADING_OVERHEAD_MS;
 
     try {
       let stopped = false;
@@ -242,18 +279,24 @@ export class GradingService {
         const position = testCase.position;
         const isSample = testCase.isSample;
 
+        const recovered = this.session?.recovered.get(position);
+        if (recovered) { results.push(recovered); if (shouldStopAfter(recovered.outcome)) stopped = true; continue; }
         if (stopped) {
-          results.push(skipped(position, isSample));
+          const row = skipped(position, isSample); results.push(row);
+          await this.session?.checkpoint(row, testCase);
           continue;
         }
 
+        if (this.session) assertWithin(deadline);
         const run = await this.engine.run({
+          ...(this.engine.descriptor ? { casePosition: position } : {}),
           inputPromptPolicy: submission.inputPromptPolicy,
           code: submission.code,
           stdin: testCase.input,
           timeLimitMs: submission.timeLimitMs,
           memoryLimitMb: submission.memoryLimitMb,
         });
+        if (this.session) assertWithin(deadline);
         const outcome = caseOutcomeFor({
           engineOutcome: run.outcome,
           stdout: run.stdout,
@@ -265,7 +308,7 @@ export class GradingService {
           position,
           isSample,
           outcome,
-          runtimeMs: run.runtimeMs,
+          runtimeMs: Math.min(86400000, Math.ceil(run.runtimeMs)),
           // Only a sample may disclose what the code produced. A hidden case
           // records its outcome and nothing else, or a student could
           // reconstruct hidden expectations by submitting probes.
@@ -274,6 +317,7 @@ export class GradingService {
           executionState: "EXECUTED",
         });
 
+        await this.session?.checkpoint(results[results.length - 1]!, testCase);
         await report({
           submissionId,
           position,
@@ -284,6 +328,7 @@ export class GradingService {
 
         if (shouldStopAfter(outcome)) stopped = true;
       }
+      if (this.session) assertWithin(deadline);
     } catch (error) {
       this.logger.error(`grading ${submissionId} threw: ${String(error)}`);
       await (sink ? sink.fail("ENGINE_FAILURE") : this.fail(submissionId, "ENGINE_FAILURE"));
@@ -324,14 +369,22 @@ export class GradingService {
       let stopped = false;
       for (const testCase of cases) {
         const { position, isSample } = testCase;
+        const recovered = this.session?.recovered.get(position);
+        if (recovered) {
+          results.push(recovered); executionBudgetMs -= Math.min(executionBudgetMs, testCase.effectiveTimeLimitMs ?? submission.timeLimitMs, this.session!.recoveredExecutionMs.get(position) ?? recovered.runtimeMs);
+          if (profile.continuationPolicy === "LEGACY_STOP_ON_RESOURCE" && shouldStopAfter(recovered.outcome)) stopped = true;
+          continue;
+        }
         if (stopped || executionBudgetMs <= 0) {
-          results.push({ ...skipped(position, isSample), awardedWeight: 0 });
+          const row = { ...skipped(position, isSample), awardedWeight: 0 }; results.push(row);
+          await this.session?.checkpoint(row, testCase);
           continue;
         }
 
         const evaluation = await evaluateEnhancedCase(
           { engine: this.engine, comparator: this.comparator },
           {
+            ...(this.engine.descriptor ? { casePosition: position } : {}),
             inputPromptPolicy: submission.inputPromptPolicy,
             code: submission.code,
             memoryLimitMb: submission.memoryLimitMb,
@@ -375,7 +428,7 @@ export class GradingService {
           position,
           isSample,
           outcome,
-          runtimeMs: run.runtimeMs,
+          runtimeMs: Math.min(86400000, Math.ceil(run.runtimeMs)),
           actualOutput: isSample ? run.stdout.slice(0, 10_000) : null,
           awardedWeight: awardedWeightFor({
             outcome,
@@ -385,6 +438,7 @@ export class GradingService {
           executionState: "EXECUTED",
         });
 
+        await this.session?.checkpoint(results[results.length - 1]!, testCase);
         await report({
           submissionId,
           position,
@@ -473,8 +527,10 @@ export class GradingService {
 
     if (sink) { await sink.fail(abort.failureReason, rows); return; }
     await this.telemetry.time("commit", () => this.prisma.$transaction(async (tx) => {
+      await this.session?.fence(tx);
+      await this.session?.terminal(tx);
       const updated = await tx.submission.updateMany({
-        where: { id: submission.id, status: "RUNNING" },
+        where: { id: submission.id, status: "RUNNING", ...this.session?.fenceWhere },
         data: {
           status: "ERRORED",
           failureReason: abort.failureReason,
@@ -509,8 +565,11 @@ export class GradingService {
     // One transaction: a verdict and the progress it implies must never be
     // observable apart.
     await this.telemetry.time("commit", () => this.prisma.$transaction(async (tx) => {
+      await this.session?.fence(tx);
+      const committedResults = this.session ? await this.session.consume(tx, results) : results;
+      await this.session?.terminal(tx);
       const updated = await tx.submission.updateMany({
-        where: { id: submissionId, status: "RUNNING" },
+        where: { id: submissionId, status: "RUNNING", ...this.session?.fenceWhere },
         data: {
           status: summary.status,
           passedCount: summary.passedCount,
@@ -523,7 +582,7 @@ export class GradingService {
       if (updated.count === 0) return;
 
       await tx.submissionCase.createMany({
-        data: results.map((item) => ({ submissionId, ...item })),
+        data: committedResults.map((item) => ({ submissionId, ...item })),
       });
 
       const materialId = submission.materialId;
@@ -603,6 +662,14 @@ export class GradingService {
 
   /** A judge fault. Never counted against the student's attempts. */
   private async fail(submissionId: string, reason: string): Promise<void> {
+    if (this.session) {
+      await this.prisma.$transaction(async tx => {
+        await this.session!.fence(tx); await this.session!.terminal(tx);
+        await tx.submission.updateMany({ where: { id: submissionId, status: "RUNNING", ...this.session!.fenceWhere },
+          data: { status: "ERRORED", failureReason: reason, gradedAt: new Date(), gradingAborted: true, gradingAbortReason: "INFRASTRUCTURE_FAILURE" } });
+      });
+      return;
+    }
     await this.prisma.submission.updateMany({
       where: { id: submissionId, status: { in: ["QUEUED", "RUNNING"] } },
       data: { status: "ERRORED", failureReason: reason, gradedAt: new Date() },
@@ -622,12 +689,12 @@ export class GradingService {
     const runningCutoff = new Date(Date.now() - input.runningOlderThanMs);
     const [queued, errored] = await this.prisma.$transaction([
       this.prisma.submission.findMany({
-        where: { status: "QUEUED", createdAt: { lt: queuedCutoff } },
+        where: { status: "QUEUED", regradeRunId: null, createdAt: { lt: queuedCutoff } },
         select: { id: true },
         take: 100,
       }),
       this.prisma.submission.updateMany({
-        where: { status: "RUNNING", startedAt: { lt: runningCutoff } },
+        where: { status: "RUNNING", executionGeneration: null, startedAt: { lt: runningCutoff } },
         data: {
           status: "ERRORED",
           failureReason: "WORKER_LOST",

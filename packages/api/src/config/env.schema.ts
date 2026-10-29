@@ -164,6 +164,7 @@ export const apiEnvironmentSchema = z.object({
    * means student code runs in child processes of the judge itself, which is
    * allowed only outside production.
    */
+  GRADING_WORKER_GENERATION: z.uuid().optional(),
   JUDGE_SANDBOX_SOCKET: z.string().min(1).optional(),
   /** Pinned, and shared with the browser so run and submit agree. */
   PYODIDE_VERSION: z.string().default("0.27.5"),

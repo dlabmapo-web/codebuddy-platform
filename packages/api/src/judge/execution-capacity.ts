@@ -21,13 +21,14 @@
  */
 export class ExecutionCapacity {
   private official = 0;
+  private readonly officialWaiters: Array<() => void> = [];
   private background = 0;
   private readonly waiters: Array<{
     admit: () => void;
     requireIdle: boolean;
   }> = [];
 
-  constructor(private readonly total: number) {
+  constructor(private readonly total: number, private readonly strict = false) {
     if (!Number.isInteger(total) || total < 1) {
       throw new Error("execution capacity must be a positive integer");
     }
@@ -40,7 +41,11 @@ export class ExecutionCapacity {
 
   /** Runs official grading, counted but never delayed. */
   async runOfficial<T>(work: () => Promise<T>): Promise<T> {
-    this.official += 1;
+    if (this.strict) await new Promise<void>(resolve => {
+      if (this.official + this.background < this.total && this.officialWaiters.length === 0) { this.official++; resolve(); }
+      else this.officialWaiters.push(resolve);
+    });
+    else this.official += 1;
     try {
       return await work();
     } finally {
@@ -110,12 +115,14 @@ export class ExecutionCapacity {
   }
 
   private admissible(waiter: { requireIdle: boolean }): boolean {
+    if (this.strict && (this.officialWaiters.length > 0 || this.official + this.background >= this.total)) return false;
     if (this.background >= this.backgroundLimit) return false;
     return !waiter.requireIdle || this.official === 0;
   }
 
   /** First come, first served among background work. */
   private wake(): void {
+    while (this.strict && this.officialWaiters.length && this.official + this.background < this.total) { this.official++; this.officialWaiters.shift()!(); }
     while (this.waiters.length > 0 && this.admissible(this.waiters[0]!)) {
       const waiter = this.waiters.shift()!;
       this.background += 1;

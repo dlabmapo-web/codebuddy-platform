@@ -205,6 +205,8 @@ export class JudgeQueue implements OnModuleDestroy {
    * a double-clicked button cannot enqueue the same grading twice.
    */
   async enqueue(submissionId: string): Promise<void> {
+    const prior = await this.queue.getJob(submissionId);
+    if (prior && await prior.isFailed()) { await prior.retry(); return; }
     await this.queue.add(
       "grade",
       { submissionId },
@@ -213,6 +215,8 @@ export class JudgeQueue implements OnModuleDestroy {
   }
 
   async enqueuePractice(attemptId: string): Promise<void> {
+    const prior = await this.practiceQueue.getJob(attemptId);
+    if (prior && await prior.isFailed()) { await prior.retry(); return; }
     await this.practiceQueue.add("practice", { attemptId }, { jobId: attemptId });
   }
 
@@ -226,6 +230,8 @@ export class JudgeQueue implements OnModuleDestroy {
    * deduplicate exactly as the live path does.
    */
   async enqueueRegrade(job: RegradeJob): Promise<void> {
+    const prior = await this.regradeQueue.getJob(`regrade:${job.runId}:${job.submissionId}`);
+    if (prior && await prior.isFailed()) { await prior.retry(); return; }
     await this.regradeQueue.add("regrade", job, {
       jobId: `regrade:${job.runId}:${job.submissionId}`,
     });

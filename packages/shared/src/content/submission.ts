@@ -122,6 +122,8 @@ export const submissionSummarySchema = z.object({
 export type SubmissionSummary = z.infer<typeof submissionSummarySchema>;
 
 export const submitExerciseSchema = z.object({
+  /** Optional action key. Reuse the same UUID when retrying a lost admission reply. */
+  requestId: z.uuid().optional(),
   academyId: z.uuid(),
   materialId: z.uuid(),
   classId: z.uuid(),

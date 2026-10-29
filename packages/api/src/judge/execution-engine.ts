@@ -8,6 +8,8 @@ import { gradingDataLimits } from "@cove/shared/grading-limits";
 export const MAX_OUTPUT_BYTES = gradingDataLimits.stdoutBytes;
 
 export type ExecutionRequest = {
+  /** Frozen snapshot position; independent of retries and call counters. */
+  casePosition?: number;
   /** Trusted infrastructure cancellation; never accepted from the wire as data. */
   signal?: AbortSignal;
   /** Frozen per-attempt identity for the versioned broker; omitted by legacy callers. */
@@ -42,6 +44,7 @@ export type ExecutionResult = {
 export interface ExecutionEngine {
   /** Recorded on every submission so a runtime upgrade stays auditable. */
   readonly version: string;
+  readonly descriptor?: RuntimeDescriptor;
   run(request: ExecutionRequest): Promise<ExecutionResult>;
   dispose(): Promise<void>;
 }

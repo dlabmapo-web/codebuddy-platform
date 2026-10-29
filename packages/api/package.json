@@ -70,7 +70,8 @@
     "socket.io": "^4.8.3",
     "svix": "^1.99.1",
     "yjs": "^13.6.32",
-    "zod": "^4.1.13"
+    "zod": "^4.1.13",
+    "@cove/grading-runtime": "workspace:*"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",

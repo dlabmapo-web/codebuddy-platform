@@ -63,6 +63,7 @@ export type EnhancedCaseEvaluation =
 export async function evaluateEnhancedCase(
   deps: { engine: ExecutionEngine; comparator: OutputComparator },
   input: {
+    casePosition?: number;
     code: string;
     inputPromptPolicy?: InputPromptPolicy;
     memoryLimitMb: number;
@@ -83,6 +84,7 @@ export async function evaluateEnhancedCase(
   const limit = Math.min(studentLimit, remaining);
   const executionStartedAt = Date.now();
   const execution = deps.engine.run({
+    ...(input.casePosition === undefined ? {} : { casePosition: input.casePosition }),
     inputPromptPolicy: input.inputPromptPolicy ?? "INCLUDE",
     code: input.code,
     stdin: testCase.input,

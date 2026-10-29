@@ -231,6 +231,12 @@ function createService(options?: {
 }
 
 describe("SubmissionService.submit", () => {
+  it('acknowledges the durable attempt and outbox without waiting for queue transport', async () => {
+    const { service, queue, transaction } = createService();
+    vi.mocked(queue.enqueue).mockReturnValue(new Promise(() => undefined));
+    expect(await service.submit(identity, { academyId, classId, materialId, code: 'print(1)' })).toMatchObject({ submissionId });
+    expect(transaction.submission.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ dispatchIntent: { create: {} } }) }));
+  });
   it('refuses automatic grading of a converted Turtle material while retaining its programming history', async () => {
     const { service, prisma, queue } = createService({ material: { ...materialWith({ testCases: [{ position: 1, input: '', expectedOutput: 'x', visibility: 'SAMPLE' }] }), type: 'TURTLE_EXERCISE' } });
     await expect(service.submit(identity, { academyId, classId, materialId, code: 'print(1)' })).rejects.toMatchObject({ code: 'EXERCISE_NOT_AVAILABLE' });

@@ -1,3 +1,5 @@
+import { executionEngineVersion } from "@cove/shared";
+import type { SampleExecution } from "./sample-execution.js";
 import { Logger } from "@nestjs/common";
 import { sampleCheckDisplayLimit, type SampleCheckStatus } from "@cove/shared";
 
@@ -43,7 +45,15 @@ export class SampleCheckRunner {
     private readonly engine: ExecutionEngine,
     private readonly comparator: OutputComparator,
     private readonly capacity: ExecutionCapacity,
-  ) {}
+    private readonly brokerSamples?: SampleExecution,
+  ) {
+    brokerSamples?.setRecovery(async (id, engine) => {
+      const record = await store.get(id);
+      if (!record || !['RUNNING', 'STOPPING'].includes(record.status)) return;
+      if (record.dispatchedAt === null) { await this.markFailed(id); return; }
+      await new SampleCheckRunner(store, engine, comparator, capacity).execute(record, record.dispatchedAt);
+    });
+  }
 
   async run(checkId: string): Promise<void> {
     const record = await this.store.get(checkId);
@@ -70,7 +80,18 @@ export class SampleCheckRunner {
       });
       // Cancelled between the queue and the slot.
       if (!running) return;
-      await this.execute(running, dispatchedAt);
+      if (this.brokerSamples) {
+        const snapshot = running.snapshot;
+        const engineVersion = snapshot.version === 2 ? executionEngineVersion(snapshot.executionRuntimeSnapshot)
+          : snapshot.gradingMode === "LEGACY_STDIO" ? snapshot.engineVersion : `pyodide-${snapshot.policy.runtime.engineVersion}`;
+        const runtime = this.brokerSamples.coordinator.descriptor({ engineVersion, executionRuntimeSnapshot: snapshot.executionRuntimeSnapshot });
+        const session = await this.brokerSamples.begin(checkId, runtime, snapshot.memoryLimitMb);
+        try {
+          await session.engine.reserve();
+          await new SampleCheckRunner(this.store, session.engine, this.comparator, this.capacity).execute(running, dispatchedAt);
+          await session.finish();
+        } finally { session.abandon(); }
+      } else await this.execute(running, dispatchedAt);
     } finally {
       release();
     }
@@ -87,6 +108,7 @@ export class SampleCheckRunner {
 
   private async execute(record: SampleCheckRecord, dispatchedAt: number): Promise<void> {
     const { snapshot } = record;
+    if (snapshot.version === 2 && !this.engine.descriptor) { await this.end(record, ["RUNNING"], "UNAVAILABLE", { failure: "RUNTIME_UNAVAILABLE" }); return; }
     const inputPromptPolicy = sampleInputPromptPolicy(snapshot);
     if (inputPromptPolicy === null) {
       await this.end(record, ["RUNNING"], "UNAVAILABLE", { failure: "UNSUPPORTED_POLICY" });
@@ -98,6 +120,7 @@ export class SampleCheckRunner {
       : runtimeMismatch(snapshot.policy, {
           engine: this.engine.version,
           comparator: this.comparator.version,
+          descriptor: this.engine.descriptor,
         });
     // Legacy Submit uses this exact normalizer, not the enhanced CPython rule.
     const comparator: OutputComparator = legacy ? {
@@ -122,6 +145,7 @@ export class SampleCheckRunner {
       evaluation = await evaluateEnhancedCase(
         { engine: this.engine, comparator },
         {
+          ...(this.engine.descriptor ? { casePosition: 1 } : {}),
           inputPromptPolicy,
           code: snapshot.code,
           memoryLimitMb: snapshot.memoryLimitMb,

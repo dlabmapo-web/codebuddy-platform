@@ -1771,9 +1771,11 @@ model ExerciseCollaborationDocument {
 /// One graded attempt at an exercise.
 model Submission {
   /// Frozen admission identity. Null on historical and non-executable rows.
+  admissionRequestId String? @map("admission_request_id") @db.Uuid
   executionRuntimeSnapshot Json? @map("execution_runtime_snapshot")
   executionGeneration Int? @map("execution_generation")
   executionLeaseToken String? @map("execution_lease_token") @db.Uuid
+  executionLeases GradingExecutionLease[]
   dispatchIntent GradingDispatchIntent?
   executionCheckpoints GradingCaseCheckpoint[]
   /// Immutable quiz question, choices and answer key, never executed as code.
@@ -1797,6 +1799,7 @@ model Submission {
   /// things read this: `nextProgress` leaves `attemptCount` alone, and every
   /// history a person reads filters it out. See §5.1, §5.4 and §5.5 of the
   /// console operations design.
+  regradeCountedAt DateTime? @map("regrade_counted_at") @db.Timestamptz(6)
   regradeRunId     String?          @map("regrade_run_id") @db.Uuid
   language         ExerciseLanguage
   timeLimitMs      Int              @map("time_limit_ms")
@@ -1899,6 +1902,7 @@ model Submission {
   /// ordinary submission, which is nearly all of them.
   @@index([regradeRunId, status])
   @@map("submissions")
+  @@unique([userId, admissionRequestId], map: "submission_admission_request_key")
 }
 
 /// One sitting with one problem, opened by the server.
@@ -2795,6 +2799,7 @@ model StaffPracticeDraft {
 model StaffPracticeAttempt {
   executionGeneration Int? @map("execution_generation")
   executionLeaseToken String? @map("execution_lease_token") @db.Uuid
+  executionLeases GradingExecutionLease[]
   dispatchIntent GradingDispatchIntent?
   executionCheckpoints GradingCaseCheckpoint[]
   academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
@@ -2856,6 +2861,7 @@ model GradingCaseCheckpoint {
   outcome CaseOutcome
   outputMatched Boolean? @map("output_matched")
   softLimitExceeded Boolean @default(false) @map("soft_limit_exceeded")
+  measuredRuntimeMs Float? @map("measured_runtime_ms")
   runtimeMs Int? @map("runtime_ms")
   weight Int
   softPenalty Int? @map("soft_penalty")
@@ -2868,4 +2874,53 @@ model GradingCaseCheckpoint {
   @@unique([staffPracticeAttemptId, generation, casePosition], map: "grading_checkpoint_practice_case_key")
   @@index([createdAt, id], map: "grading_checkpoint_reconciliation_idx")
   @@map("grading_case_checkpoints")
+}
+
+
+/// Immutable execution identity; lifecycle fields never replace the original authority.
+model GradingExecutionLease {
+  id String @id @default(uuid()) @db.Uuid
+  submissionId String? @map("submission_id") @db.Uuid
+  staffPracticeAttemptId String? @map("staff_practice_attempt_id") @db.Uuid
+  submission Submission? @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  staffPracticeAttempt StaffPracticeAttempt? @relation(fields: [staffPracticeAttemptId], references: [id], onDelete: Restrict)
+  generation Int
+  leaseToken String @unique @map("lease_token") @db.Uuid
+  workerGeneration String @map("worker_generation") @db.Uuid
+  brokerGeneration String @map("broker_generation") @db.Uuid
+  reservationId String? @map("reservation_id") @db.Uuid
+  admissionEpoch BigInt @map("admission_epoch")
+  kind String
+  runtime Json
+  memoryLimitMb Int @map("memory_limit_mb")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  terminalCommitId String? @map("terminal_commit_id") @db.Uuid
+  retiredAt DateTime? @map("retired_at") @db.Timestamptz(6)
+  cases GradingExecutionCase[]
+  @@unique([submissionId, generation])
+  @@unique([staffPracticeAttemptId, generation])
+  @@index([admissionEpoch, retiredAt])
+  @@map("grading_execution_leases")
+}
+
+/// Source-release intent persists before run. A missing receipt cannot authorize replay.
+model GradingExecutionCase {
+  id String @id @default(uuid()) @db.Uuid
+  leaseId String @map("lease_id") @db.Uuid
+  lease GradingExecutionLease @relation(fields: [leaseId], references: [id], onDelete: Restrict)
+  position Int
+  checkpointId String? @map("checkpoint_id") @db.Uuid
+  receiptId String? @map("receipt_id") @db.Uuid
+  acknowledgedAt DateTime? @map("acknowledged_at") @db.Timestamptz(6)
+  @@unique([leaseId, position])
+  @@map("grading_execution_cases")
+}
+
+/// One durable seal intent per epoch. Admission pauses while its acknowledgement is uncertain.
+model GradingAdmissionEpoch {
+  epoch BigInt @id
+  workerGeneration String @map("worker_generation") @db.Uuid
+  reconciliationId String? @unique @map("reconciliation_id") @db.Uuid
+  sealedAt DateTime? @map("sealed_at") @db.Timestamptz(6)
+  @@map("grading_admission_epochs")
 }

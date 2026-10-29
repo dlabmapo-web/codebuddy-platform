@@ -1,3 +1,4 @@
+import { admitRuntime } from "../judge/runtime-admission.js";
 import { createHash, randomUUID } from "node:crypto";
 
 import { HttpStatus, Injectable, Logger, Optional } from "@nestjs/common";
@@ -114,9 +115,10 @@ export class SampleCheckService {
     // Hidden and nonexistent positions are indistinguishable from here.
     if (!testCase) throw notFound();
 
+    const descriptor = await admitRuntime(this.config, this.prisma, { academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision, context: "live", memoryLimitMb: exercise.memoryLimitMb, timeLimitMs: exercise.timeLimitMs });
     const snapshot = sampleSnapshotFor(
       exercise, testCase, input.code,
-      this.config.get("PYODIDE_VERSION", { infer: true }),
+      this.config.get("PYODIDE_VERSION", { infer: true }), descriptor,
     );
     if (!snapshot) throw unavailable();
 
@@ -177,17 +179,9 @@ export class SampleCheckService {
         throw new AppException("SAMPLE_CHECK_RATE_LIMITED", HttpStatus.TOO_MANY_REQUESTS);
       }
 
-      try {
-        await queue.enqueueSampleCheck(record.checkId);
-      } catch (error) {
-        this.logger.error(`sample check ${record.checkId} could not be queued: ${String(error)}`);
-        await store.transition(record, ["QUEUED"], {
-          status: "UNAVAILABLE",
-          failure: "ENQUEUE_FAILED",
-          finishedAt: Date.now(),
-        });
-        throw unavailable();
-      }
+      void Promise.resolve().then(() => queue.enqueueSampleCheck(record.checkId))
+        .then(() => store.acknowledgeDispatch(record.checkId))
+        .catch(error => this.logger.error(`sample check ${record.checkId} dispatch remains pending: ${String(error)}`));
       return toView(record, true);
     } catch (error) {
       if (error instanceof AppException) throw error;

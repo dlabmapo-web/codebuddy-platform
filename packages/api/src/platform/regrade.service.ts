@@ -1,3 +1,5 @@
+import { executionEngineVersion } from "@cove/shared";
+import { admitRuntime } from "../judge/runtime-admission.js";
 import { quizDefinitionSchema } from "@cove/shared";
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -725,7 +727,7 @@ export class RegradeService {
                 select: {
                   title: true,
                   position: true,
-                  course: { select: { title: true } },
+                  course: { select: { title: true, academyId: true } },
                 },
               },
             },
@@ -745,7 +747,8 @@ export class RegradeService {
       // `SubmissionService` stamps it: a repair is graded now, by this
       // deployment, and must say so.
       const engineVersion = this.config.get("PYODIDE_VERSION", { infer: true });
-      const snapshot = gradingSnapshotFor(exercise, { engineVersion });
+      const descriptor = quiz ? undefined : await admitRuntime(this.config, tx, { academyId: material.lecture.courseModule.course.academyId, materialId: original.materialId, gradingRevision: exercise.gradingRevision, context: "live", memoryLimitMb: exercise.memoryLimitMb, timeLimitMs: exercise.timeLimitMs });
+      const snapshot = gradingSnapshotFor(exercise, { engineVersion, descriptor });
 
       const courseModule = material.lecture.courseModule;
       const repair = await tx.submission.create({
@@ -764,7 +767,8 @@ export class RegradeService {
           ...(quiz ? { quizSnapshot: { version: 1, title: material.title, description: exercise.description, definition: quiz } } : {}),
           code: original.code,
           totalCount: quiz ? 1 : exercise.testCases.length,
-          engineVersion,
+          engineVersion: descriptor ? executionEngineVersion(descriptor) : engineVersion,
+          dispatchIntent: { create: {} },
           problemTitle: material.title,
           courseTitle: courseModule.course.title,
           moduleTitle: courseModule.title,

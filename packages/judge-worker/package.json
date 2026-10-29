@@ -21,7 +21,8 @@
     "pg": "^8.22.0",
     "pyodide": "0.27.5",
     "reflect-metadata": "^0.2.2",
-    "zod": "^4.1.13"
+    "zod": "^4.1.13",
+    "@cove/grading-runtime": "workspace:*"
   },
   "devDependencies": {
     "@cove/api": "workspace:*",

@@ -1,3 +1,4 @@
+import type { RuntimeDescriptor } from "@cove/shared";
 import { executionEngineVersion, runtimeDescriptorSchema, runtimeDescriptorIdentity, inputPromptPolicySchema, programmingExerciseGradingModeSchema, inputPromptPolicyForSemanticVersion, type InputPromptPolicy } from "@cove/shared";
 import type { ExerciseGradingSource } from "./grading-profile.js";
 import { gradingSnapshotFor, gradingPolicySnapshotSchema, resolveGradingProfile } from "./grading-profile.js";
@@ -9,15 +10,17 @@ export function sampleSnapshotFor(
   testCase: ExerciseGradingSource["testCases"][number],
   code: string,
   engineVersion: string,
+  descriptor?: RuntimeDescriptor,
 ): SampleSnapshot | null {
   const profile = resolveGradingProfile(exercise, exercise.testCases);
   if (profile.kind === "unsupported" || testCase.visibility !== "SAMPLE") return null;
   if (profile.kind === "legacy") {
     return {
+      ...(descriptor ? { version: 2 as const, executionRuntimeSnapshot: descriptor } : { version: 1 as const }),
       inputPromptPolicy: profile.inputPromptPolicy,
       gradingSemanticVersion: exercise.gradingSemanticVersion,
       gradingMode: "LEGACY_STDIO",
-      engineVersion: `pyodide-${engineVersion}`,
+      engineVersion: descriptor ? executionEngineVersion(descriptor) : `pyodide-${engineVersion}`,
       code,
       memoryLimitMb: exercise.memoryLimitMb,
       // Infrastructure may wait for a runner; student execution still gets
@@ -33,9 +36,10 @@ export function sampleSnapshotFor(
       },
     };
   }
-  const snapshot = gradingSnapshotFor({ ...exercise, testCases: [testCase] }, { engineVersion });
+  const snapshot = gradingSnapshotFor({ ...exercise, testCases: [testCase] }, { engineVersion, descriptor });
   const selected = snapshot.cases[0]!;
   return {
+    ...(descriptor ? { version: 2 as const, executionRuntimeSnapshot: descriptor } : { version: 1 as const }),
     inputPromptPolicy: profile.inputPromptPolicy,
     gradingSemanticVersion: exercise.gradingSemanticVersion,
     code,

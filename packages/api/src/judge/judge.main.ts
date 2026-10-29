@@ -1,3 +1,8 @@
+import { BrokerClient } from "@cove/grading-runtime";
+import { RuntimeCoordinator } from "./runtime-coordinator.js";
+import { loadRuntimeManifest } from "./runtime-registry.js";
+import { SampleExecution } from "./sample-execution.js";
+import { DispatchIntentService } from "./dispatch-intent.js";
 import { PracticeRunner } from "./practice.runner.js";
 import "reflect-metadata";
 // The judge boots without Nest, so nothing else loads the env file for it.
@@ -62,8 +67,15 @@ async function bootstrap(): Promise<void> {
   // Redis credentials and needs the network, so a runner beside it — however
   // locked down from inside — shares everything the boundary exists to keep
   // from it. In-process runners remain for development only.
+  const telemetry = new ExecutionTelemetry();
+  const manifest = environment.GRADING_RUNTIME_MANIFEST_PATH ? await loadRuntimeManifest(environment.GRADING_RUNTIME_MANIFEST_PATH) : undefined;
+  if (manifest && (!environment.JUDGE_SANDBOX_SOCKET || !environment.GRADING_WORKER_GENERATION)) throw new Error("Manifest-aware judge requires broker socket and GRADING_WORKER_GENERATION");
+  const coordinator = manifest ? new RuntimeCoordinator(prisma, new BrokerClient(environment.JUDGE_SANDBOX_SOCKET!), environment.GRADING_WORKER_GENERATION!, manifest, telemetry) : undefined;
   let engine: ExecutionEngine & { warmUp(): Promise<void> };
-  if (environment.JUDGE_SANDBOX_SOCKET) {
+  if (coordinator) {
+    engine = { version: 'descriptor-bound', warmUp: async () => { await coordinator.health(); },
+      run: async () => { throw new Error('Per-job frozen execution session required'); }, dispose: async () => undefined };
+  } else if (environment.JUDGE_SANDBOX_SOCKET) {
     engine = new SandboxExecutionEngine(
       environment.JUDGE_SANDBOX_SOCKET,
       environment.PYODIDE_VERSION,
@@ -86,7 +98,6 @@ async function bootstrap(): Promise<void> {
       environment.JUDGE_CONCURRENCY,
     );
   }
-  const telemetry = new ExecutionTelemetry();
   const comparator = new ComparatorPool(environment.JUDGE_COMPARATOR_POOL_SIZE, {}, telemetry);
   const grading = new GradingService(
     prisma,
@@ -94,6 +105,7 @@ async function bootstrap(): Promise<void> {
     new PointAwardService(prisma),
     comparator,
     telemetry,
+    coordinator,
   );
   const queue = new JudgeQueue(environment.REDIS_URL);
 
@@ -104,10 +116,37 @@ async function bootstrap(): Promise<void> {
   // One gate for every consumer of the runners: official grading is never
   // delayed by it, and background work — regrades and sample checks together
   // — can never take the slot it reserves for submissions.
-  const capacity = new ExecutionCapacity(environment.JUDGE_CONCURRENCY);
+  const capacity = new ExecutionCapacity(coordinator ? 2 : environment.JUDGE_CONCURRENCY, Boolean(coordinator));
   const measured = <T>(kind: ExecutionKind, action: () => Promise<T>, jobId: string) => withExecutionKind(kind, () => grading.telemetry.time("service", action), jobId);
 
-  const practice = new PracticeRunner(prisma, grading);
+  const regrade = new RegradeRunner(prisma, grading);
+  const practice = new PracticeRunner(prisma, grading, coordinator);
+  const sampleStore = new SampleCheckStore(() => queue.redis());
+  const brokerSamples = coordinator ? new SampleExecution(() => queue.redis(), coordinator) : undefined;
+  const samples = new SampleCheckRunner(
+    sampleStore,
+    engine,
+    comparator,
+    capacity,
+    brokerSamples,
+  );
+  const dispatcher = new DispatchIntentService(prisma, queue);
+  if (coordinator) {
+    await coordinator.initialize();
+    // Recover before queue consumers start. Each job keeps its original wall deadline.
+    for (;;) {
+      const submissions = await prisma.submission.findMany({ where: { status: 'RUNNING', executionGeneration: { not: null } }, select: { id: true, regradeRunId: true }, take: 100 });
+      const attempts = await prisma.staffPracticeAttempt.findMany({ where: { status: 'RUNNING', executionGeneration: { not: null } }, select: { id: true }, take: 100 });
+      if (!submissions.length && !attempts.length) break;
+      for (const row of submissions) {
+        if (row.regradeRunId) await regrade.run({ submissionId: row.id, runId: row.regradeRunId, requestId: null });
+        else await grading.grade(row.id, async () => undefined, true);
+      }
+      for (const row of attempts) await practice.run(row.id, true);
+    }
+    await coordinator.reconcile();
+  }
+  await dispatcher.flush();
   const worker = queue.createWorker(
     (job) => {
       if (job.queuedAtMs !== undefined) telemetry.observe("queue", Math.max(0, Date.now() - job.queuedAtMs), "official");
@@ -132,7 +171,6 @@ async function bootstrap(): Promise<void> {
   // Maintenance re-grading, on its own queue so a run cannot put a live
   // submission behind it. The same process and therefore the same interpreter
   // pool, which is what `REGRADE_CONCURRENCY` is sized against.
-  const regrade = new RegradeRunner(prisma, grading);
   const regradeWorker = queue.createRegradeWorker(
     (job) => {
       if (job.queuedAtMs !== undefined) telemetry.observe("queue", Math.max(0, Date.now() - job.queuedAtMs), "regrade");
@@ -144,12 +182,6 @@ async function bootstrap(): Promise<void> {
   // Public sample checks: practice runs of one public case, judged by the
   // same evaluator as official grading and written only to their own
   // short-lived records.
-  const samples = new SampleCheckRunner(
-    new SampleCheckStore(() => queue.redis()),
-    engine,
-    comparator,
-    capacity,
-  );
   const sampleWorker = queue.createSampleWorker(
     (job) => {
       if (job.queuedAtMs !== undefined) telemetry.observe("queue", Math.max(0, Date.now() - job.queuedAtMs), "sample");
@@ -169,13 +201,27 @@ async function bootstrap(): Promise<void> {
     sampleConcurrency: environment.SAMPLE_CHECK_CONCURRENCY, readinessGuard: environment.JUDGE_READINESS_GUARD, traceTimings: environment.JUDGE_TRACE_TIMINGS }));
 
   const sweeper = setInterval(() => {
+    void telemetry.time('dispatch', () => dispatcher.flush()).catch(error => logger.error(`dispatch recovery failed: ${String(error)}`));
+    void coordinator?.reconcile().catch(error => logger.error(`execution recovery failed: ${String(error)}`));
+    if (coordinator) void dispatcher.recoverLeased(coordinator.ownedAttempts).catch(error => logger.error(`leased dispatch recovery failed: ${String(error)}`));
+    void prisma.submission.findMany({ where: { status: 'QUEUED', regradeRunId: { not: null }, createdAt: { lt: new Date(Date.now() - QUEUED_STALE_AFTER_MS) } },
+      select: { id: true, regradeRunId: true }, take: 100,
+    }).then(rows => Promise.all(rows.map(row => queue.enqueueRegrade({ submissionId: row.id, runId: row.regradeRunId!, requestId: null }))))
+      .catch(error => logger.error(`maintenance dispatch recovery failed: ${String(error)}`));
+    void sampleStore.pendingDispatch().then(async ids => {
+      for (const id of ids) {
+        const record = await sampleStore.get(id);
+        if (record?.status === 'QUEUED') await queue.enqueueSampleCheck(id);
+        await sampleStore.acknowledgeDispatch(id);
+      }
+    }).catch(error => logger.error(`sample dispatch recovery failed: ${String(error)}`));
     void prisma.staffPracticeAttempt.findMany({
       where: { status: "QUEUED", createdAt: { lt: new Date(Date.now() - QUEUED_STALE_AFTER_MS) } },
       select: { id: true }, take: 100,
     }).then((rows) => Promise.all(rows.map((row) => queue.enqueuePractice(row.id))))
       .catch((error) => logger.error(`practice sweeper failed: ${String(error)}`));
     void prisma.staffPracticeAttempt.updateMany({
-      where: { status: "RUNNING", startedAt: { lt: new Date(Date.now() - STALE_AFTER_MS) } },
+      where: { status: "RUNNING", executionGeneration: null, startedAt: { lt: new Date(Date.now() - STALE_AFTER_MS) } },
       data: { status: "ERRORED", gradedAt: new Date() },
     }).catch((error) => logger.error(`practice recovery failed: ${String(error)}`));
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AsyncLocalStorage } from "node:async_hooks";
 
-export const executionStages = ["acquire", "prepare", "execute", "exit", "drain", "cleanup", "identity", "claim", "load", "engine", "compare", "comparator_acquire", "comparator_execute", "report", "commit", "grading", "service", "queue"] as const;
+export const executionStages = ["admission", "dispatch", "checkpoint", "recovery", "retire", "seal", "acquire", "prepare", "execute", "exit", "drain", "cleanup", "identity", "claim", "load", "engine", "compare", "comparator_acquire", "comparator_execute", "report", "commit", "grading", "service", "queue"] as const;
 export type ExecutionStage = typeof executionStages[number];
 export const executionKinds = ["sandbox", "official", "practice", "sample", "regrade"] as const;
 export type ExecutionKind = typeof executionKinds[number];

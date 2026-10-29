@@ -50,11 +50,13 @@ export class RegradeRunner {
     const failed =
       !settled || settled.status === "ERRORED" || settled.status === "CANCELLED";
 
-    await this.prisma.platformOperationRun.update({
-      where: { id: job.runId },
-      data: failed
-        ? { failedCount: { increment: 1 } }
-        : { completedCount: { increment: 1 } },
+    if (!settled || settled.status === 'QUEUED' || settled.status === 'RUNNING') return;
+    await this.prisma.$transaction(async tx => {
+      const counted = await tx.submission.updateMany({ where: { id: job.submissionId, regradeRunId: job.runId, regradeCountedAt: null,
+        status: { notIn: ['QUEUED', 'RUNNING'] } }, data: { regradeCountedAt: new Date() } });
+      if (!counted.count) return;
+      await tx.platformOperationRun.update({ where: { id: job.runId }, data: failed
+        ? { failedCount: { increment: 1 } } : { completedCount: { increment: 1 } } });
     });
 
     await this.settleIfDone(job, trace);

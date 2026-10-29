@@ -1,3 +1,4 @@
+import { admitRuntime } from "../judge/runtime-admission.js";
 import { createPracticeAttempt } from "./staff-practice.repository.js";
 import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -98,9 +99,10 @@ export class StaffPracticeService {
     if (!quiz && (!exercise.testCases.length || resolveGradingProfile(exercise, exercise.testCases).kind === "unsupported")) {
       throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
     }
-    const grading = gradingSnapshotFor(exercise, { engineVersion: String(this.config.get("PYODIDE_VERSION")) });
+    const descriptor = quiz ? undefined : await admitRuntime(this.config, this.prisma, { academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision, context: input.preview ? "preview" : "live", memoryLimitMb: exercise.memoryLimitMb, timeLimitMs: exercise.timeLimitMs });
+    const grading = gradingSnapshotFor(exercise, { engineVersion: String(this.config.get("PYODIDE_VERSION")), descriptor });
     const snapshot = practiceSnapshotSchema.parse({
-      version: 1, courseId: material.lecture.courseModule.courseId, gradingRevision: exercise.gradingRevision,
+      version: descriptor ? 2 : 1, courseId: material.lecture.courseModule.courseId, gradingRevision: exercise.gradingRevision,
       timeLimitMs: exercise.timeLimitMs, memoryLimitMb: exercise.memoryLimitMb,
       ...grading.submission, gradingCases: quiz ? [] : grading.cases,
       quizSnapshot: quiz ? { version: 1, title: material.title, description: exercise.description, definition: quiz } : null,
@@ -113,8 +115,7 @@ export class StaffPracticeService {
     if (attempt.materialId !== input.materialId || attempt.code !== input.code) {
       throw new AppException("PERMISSION_DENIED", HttpStatus.CONFLICT);
     }
-    try { if (attempt.status === "QUEUED") await this.queue.enqueuePractice(attempt.id); }
-    catch { throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE); }
+    if (attempt.status === "QUEUED") void Promise.resolve().then(() => this.queue!.enqueuePractice(attempt.id)).catch(() => undefined);
     const stored = practiceSnapshotSchema.parse(attempt.snapshot);
     return { submissionId: attempt.id, totalCount: stored.quizSnapshot ? 1 : stored.gradingCases.length };
   }

@@ -109,3 +109,21 @@ describe("ExecutionCapacity", () => {
     expect(gate.stats().background).toBe(0);
   });
 });
+
+it('strict broker mode shares two slots and gives waiting official work FIFO priority', async () => {
+  const capacity = new ExecutionCapacity(2, true);
+  const order: string[] = [];
+  let releaseBackground!: () => void, releaseFirst!: () => void;
+  const background = capacity.runBackground(async () => { order.push('background'); await new Promise<void>(resolve => { releaseBackground = resolve; }); });
+  await Promise.resolve();
+  const first = capacity.runOfficial(async () => { order.push('first'); await new Promise<void>(resolve => { releaseFirst = resolve; }); });
+  await Promise.resolve();
+  const second = capacity.runOfficial(async () => { order.push('second'); });
+  const laterBackground = capacity.runBackground(async () => { order.push('later-background'); });
+  await Promise.resolve();
+  expect(order).toEqual(['background', 'first']);
+  releaseFirst(); await first; await second;
+  expect(order).toEqual(['background', 'first', 'second']);
+  releaseBackground(); await Promise.all([background, laterBackground]);
+  expect(order.at(-1)).toBe('later-background');
+});

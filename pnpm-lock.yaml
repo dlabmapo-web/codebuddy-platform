@@ -23,6 +23,9 @@ importers:
 
   packages/api:
     dependencies:
+      '@cove/grading-runtime':
+        specifier: workspace:*
+        version: link:../grading-runtime
       '@cove/shared':
         specifier: workspace:*
         version: link:../shared
@@ -251,6 +254,9 @@ importers:
 
   packages/judge-worker:
     dependencies:
+      '@cove/grading-runtime':
+        specifier: workspace:*
+        version: link:../grading-runtime
       '@cove/shared':
         specifier: workspace:*
         version: link:../shared

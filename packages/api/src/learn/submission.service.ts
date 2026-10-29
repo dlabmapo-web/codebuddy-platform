@@ -1,3 +1,5 @@
+import { executionEngineVersion } from "@cove/shared";
+import { admitRuntime } from "../judge/runtime-admission.js";
 import { quizDefinitionSchema, quizFeedback } from "@cove/shared";
 import { HttpStatus, Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -81,6 +83,7 @@ export class SubmissionService {
       classId: string;
       code: string;
       solveSessionId?: string;
+      requestId?: string;
     },
   ): Promise<{ submissionId: string; totalCount: number }> {
     const actor = await this.access.requirePermission(
@@ -92,6 +95,14 @@ export class SubmissionService {
     const scope = learningScopeFor(input.academyId, actor);
     if (!this.queue) {
       throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    if (input.requestId) {
+      const prior = await this.prisma.submission.findUnique({ where: { userId_admissionRequestId: { userId, admissionRequestId: input.requestId } } });
+      if (prior) {
+        if (prior.sourceMaterialId !== input.materialId || prior.classId !== input.classId || prior.code !== input.code) throw new AppException("PERMISSION_DENIED", HttpStatus.CONFLICT);
+        await this.assertOwnership(identity.authUserId, input.academyId, prior.id);
+        return { submissionId: prior.id, totalCount: prior.totalCount };
+      }
     }
     await this.consumeRateLimit(userId);
 
@@ -151,7 +162,8 @@ export class SubmissionService {
           );
         }
         const engineVersion = this.config.get("PYODIDE_VERSION", { infer: true });
-        const snapshot = gradingSnapshotFor(exercise, { engineVersion });
+        const descriptor = quiz ? undefined : await admitRuntime(this.config, tx, { academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision, context: "live", memoryLimitMb: exercise.memoryLimitMb, timeLimitMs: exercise.timeLimitMs });
+        const snapshot = gradingSnapshotFor(exercise, { engineVersion, descriptor });
 
         await this.classContext.resolveWith(tx, {
           academyId: input.academyId,
@@ -176,6 +188,7 @@ export class SubmissionService {
         const created = await tx.submission.create({
           data: {
             userId,
+            admissionRequestId: input.requestId,
             materialId: material.id,
             sourceMaterialId: material.id,
             courseId: courseModule.courseId,
@@ -189,7 +202,8 @@ export class SubmissionService {
             ...(quiz ? { quizSnapshot: { version: 1, title: material.title, description: exercise.description, definition: quiz } } : {}),
             code: input.code,
             totalCount: quiz ? 1 : exercise.testCases.length,
-            engineVersion,
+            engineVersion: descriptor ? executionEngineVersion(descriptor) : engineVersion,
+            dispatchIntent: { create: {} },
             solveSessionId: solveSession?.id ?? null,
             solveElapsedSec: solveSession
               ? solveElapsedSeconds(solveSession.startedAt, new Date())
@@ -212,17 +226,19 @@ export class SubmissionService {
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
+        if (input.requestId) {
+          const prior = await this.prisma.submission.findUnique({ where: { userId_admissionRequestId: { userId, admissionRequestId: input.requestId } } });
+          if (prior && prior.sourceMaterialId === input.materialId && prior.classId === input.classId && prior.code === input.code) return { submissionId: prior.id, totalCount: prior.totalCount };
+        }
         throw new AppException("SUBMISSION_IN_FLIGHT", HttpStatus.CONFLICT);
       }
       throw error;
     }
 
     const submissionId = createdSubmission.id;
-    try {
-      await this.queue.enqueue(submissionId);
-    } catch (error) {
-      this.logger.error(`enqueue failed for ${submissionId}: ${String(error)}`);
-    }
+    // Admission is durable now. Queue transport cannot hold the acknowledgement hostage.
+    void Promise.resolve().then(() => this.queue!.enqueue(submissionId))
+      .catch(error => this.logger.error(`enqueue failed for ${submissionId}: ${String(error)}`));
     return { submissionId, totalCount: createdSubmission.totalCount };
   }
 

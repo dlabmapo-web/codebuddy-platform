@@ -17,6 +17,7 @@ def drained(inventory, now=None):
     require('queueBacklog' in inventory and all(n==0 for n in inventory['queueBacklog'].values()),'Queues not drained')
 
 def update_env(path, updates):
+    owner=path.stat()
     rows=path.read_text().splitlines();seen=set();out=[]
     for row in rows:
         key,sep,_=row.partition('=')
@@ -26,6 +27,7 @@ def update_env(path, updates):
     out.extend(k+'='+v for k,v in updates.items() if k not in seen)
     fd,tmp=tempfile.mkstemp(dir=path.parent,prefix='.grading-env-')
     try:
+        if (os.fstat(fd).st_uid,os.fstat(fd).st_gid)!=(owner.st_uid,owner.st_gid):os.fchown(fd,owner.st_uid,owner.st_gid)
         with os.fdopen(fd,'w') as file:file.write('\n'.join(out)+'\n');file.flush();os.fsync(file.fileno())
         os.chmod(tmp,0o600);os.replace(tmp,path)
     finally:
@@ -53,7 +55,7 @@ def execute_handover(compose, user_service, preflight, commit_environment):
     compose('up','-d','--wait','--wait-timeout','300','--no-deps','judge-worker','api')
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('action',choices=['plan','drain-check','handover','activate','rollback']);parser.add_argument('--deploy-root',type=Path,default=Path('/opt/cove'));parser.add_argument('--bundle',type=Path,required=True);parser.add_argument('--host-config',type=Path);parser.add_argument('--trusted-key',type=Path);parser.add_argument('--trusted-key-sha256');parser.add_argument('--grading-uid',type=int);parser.add_argument('--control-gid',type=int);parser.add_argument('--apply',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('action',choices=['plan','drain-check','handover','activate','rollback','retained-update','binary-rollback','resume-release','repair-release']);parser.add_argument('--deploy-root',type=Path,default=Path('/opt/cove'));parser.add_argument('--bundle',type=Path,required=True);parser.add_argument('--host-config',type=Path);parser.add_argument('--trusted-key',type=Path);parser.add_argument('--trusted-key-sha256');parser.add_argument('--grading-uid',type=int);parser.add_argument('--control-gid',type=int);parser.add_argument('--current-host-config',type=Path);parser.add_argument('--apply',action='store_true');args=parser.parse_args()
     root=args.deploy_root.resolve();bundle=args.bundle.resolve();inventory=read_json(bundle/'inventory.json');release=read_json(bundle/'release.json');verify_retention(release,inventory)
     if args.action=='plan':print(json.dumps(handover_plan()));return
     if args.action=='drain-check':drained(inventory);print('Trusted inventory is drained; no services changed.');return
@@ -70,6 +72,12 @@ def main():
     def preflight():
         require(args.host_config is not None and args.trusted_key is not None and args.trusted_key_sha256,'Explicit host config and trusted signer required')
         run(['python3',str(Path(__file__).with_name('release.py')),str(bundle),'--host-config',str(args.host_config),'--trusted-key',str(args.trusted_key),'--trusted-key-sha256',args.trusted_key_sha256])
+    if args.action in ['retained-update','binary-rollback','resume-release','repair-release']:
+        from retained_operator import run_retained
+        run_retained(args,root,state,env)
+        return
+    if state.exists():
+        require('transition' not in read_json(state),'Unresolved retained transition requires resume-release; selection/binary changes refused')
     if args.action=='handover':
         require(not state.exists(),'Handover already retained; use reviewed forward-compatible update procedure')
         drained(inventory)

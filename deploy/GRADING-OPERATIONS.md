@@ -103,18 +103,24 @@ expected worker UUID. API gets only its existing private Redis readiness authori
 (GET/PTTL, 6-second expiry); it receives no broker/daemon socket. Worker receives
 only the control socket. Neither broker env nor release bundle contains DB/Redis.
 
-`host.py CONFIG --write-daemon-pid` is the daemon unit's ExecStartPost. It scans
-host `/proc`, matches the dedicated UID, actual `dockerd` executable and exact
-`--config-file`, and proves cgroup membership before recording its host PID. It
+`host.py CONFIG --write-daemon-pid` is the daemon unit's ExecStartPost. It connects to the actual Unix endpoint, obtains the Linux kernel SO_PEERCRED
+PID/UID, checks `/proc/PID/exe` against the reviewed executable path, inode and
+SHA256, matches the exact `--config-file`, and proves cgroup membership before
+recording its host PID and `.identity.json` sidecar. It compares kernel process
+start time and socket device/inode before/after to reject restart and PID reuse.
+This requires the installed non-socket-activated daemon; an intermediary or socket
+activation owner fails the executable check. Broker startup verifies the sidecar
+and streams the executable hash; every subsequent daemon attestation verifies
+process start time, executable inode/path and socket continuity. It
 never trusts RootlessKit MainPID or Docker's namespace PID file. Normal
 `python3 /opt/cove/scripts/grading/host.py CONFIG` is read-only and fails on Desktop.
 Run full verification as an administrator able to inspect both daemons; do not
 solve that requirement by giving the grading account rootful daemon access.
 
-Full host JSON keys are `uid`, `controlGid`, `daemonConfig`, `cgroupParent`, `daemonSocket`,
+Full host JSON keys are `uid`, `controlGid`, `daemonConfig`, `daemonExecutable`, `daemonExecutableSha256`, `cgroupParent`, `daemonSocket`,
 `daemonPidFile`, `daemonId`, `daemonDataRoot`, `socketInode`, `socketDevice`,
 `brokerEntrypoint`, `manifestPath`, `images`, `applicationImages`, `workerGeneration`, `applicationSocket`, `composeProject`,
-`rootfulRunningIds` (full IDs), `turtleServices`, `externalCgroups`, `turtleIdentity`,
+`rootfulRunningIds` (full IDs of running containers EXCLUDING this project's API/worker, whose exact pinned images/config/budgets are checked separately), `turtleServices`, `externalCgroups`, `turtleIdentity`,
 `systemMemoryBytes`, `systemCpus`, `headroomMemoryBytes`, `headroomCpus`, and
 `diskRequiredBytes`. Daemon ExecStartPost needs only the PID-matching subset.
 `externalCgroups` entries have `{path, role, limits}`; limits contain
@@ -215,12 +221,81 @@ non-scoring infrastructure resolution through the trusted coordinator; never
 replay native work as Pyodide. No destructive migration or historical regrading.
 
 After the marker exists, ordinary `set-v2-release.sh`, `deploy.sh`, `rollback.sh`
-and common base-Compose helpers fail before mutation. For later application
-updates, prepare a forward-compatible immutable bundle and review live inventory,
-reader tests and image retention first; use the explicit merged Compose files,
-retaining the manifest/incarnation and native flag. This implementation deliberately
-does not auto-authorize replacing the retained bundle or deleting its marker.
-Direct hand-written Docker commands remain an operator responsibility.
+and common base-Compose helpers still fail before mutation. Use the supported
+retained commands below rather than editing the marker or omitting the override.
+
+### Retained updates, binary rollback and interrupted-release repair
+
+All commands use the shared deployment lock and require an explicitly approved
+maintenance window. They stop the API to fence new admission while the existing
+worker drains; the CLI never applies this procedure as part of ordinary release.
+
+```sh
+python3 /opt/cove/scripts/grading/control.py retained-update --apply \
+  --bundle /opt/cove/grading/bundles/CANDIDATE \
+  --current-host-config /private/CURRENT-host.json --host-config /private/CANDIDATE-host.json \
+  --trusted-key /private/reviewer-public.pem --trusted-key-sha256 TRUSTED_PIN
+```
+
+`binary-rollback` has the same arguments and may select older compatible API,
+worker and broker binaries, but requires the **exact current complete manifest
+and worker authority**, all v4/v2 readers and retained images. It does not restore
+older certification metadata or change accepted runtime descriptors. Both actions
+finish with native selection false; `activate` remains a separate fresh-proof gate.
+
+The candidate bundle also contains fresh `previous-inventory.json`. Its signed
+`acceptance.json` adds `transition:{previousReleaseIdentity,
+previousInventoryIdentity,previousConfigurationIdentity}`. These bind the retained
+source release, the fresh source inventory and source host config; the ordinary
+acceptance fields bind the target release/config/inventory/evidence. The old
+release's original signature still authenticates its immutable content; the NEW
+fresh signature authorizes this transition and both inventories. Candidate
+capabilities retain every current full descriptor and historical decoder mapping,
+plus all inventory references. A schema-valid certification/academy expansion is
+supported by `retained-update`; native activation remains separate.
+
+Target host config adds `brokerEnvironmentPath` (the existing credential-free
+broker.env), `brokerArtifactDirectory` (pre-extracted immutable artifact), and
+`requireConfiguredApplications:true`, plus `warmProfilesPath` and its canonical
+`warmProfilesIdentity` SHA256. Warm configuration is installed with the candidate
+manifest and bound through the signed host configuration. Source and target configs retain the same
+account, daemon executable/socket/data-root, family, broker entrypoint, other host
+workloads/Turtle budgets and reserves. Existing pinned guest and app images must
+already be present. The tool never pulls a mutable tag or starts a second family.
+`rootfulRunningIds` excludes API/worker IDs so recreating those containers does not
+invalidate unrelated-host evidence. Their actual pinned images, env, group,
+mounts and prospective budgets are verified even while stopped. Broker artifacts
+must be prepared in advance; the fixed `current` symlink is changed only while
+broker/worker are stopped. Journal/owner and descriptor identities remain intact.
+
+The durable intent is written/fsynced before stopping anything. The stopped API's
+allocation is used by a bounded one-shot of the freshly validated candidate API image to run the
+read-only inventory CLI, with existing app credentials staying in that container.
+This image override is process-local and preserves the current manifest/env; a
+broken pending API image therefore cannot trap compatible repair at inventory.
+A fresh live projection must match the signed inventory and show all four queues,
+DB-backed work, ephemeral work and recoverable leases drained. The projection
+omits only observation time and readiness-fence metadata; full original inventory
+bytes remain signature-bound. A mismatch leaves the API fenced and worker able
+to finish old work; refresh inventories/proof and resume rather than erase state.
+
+The worker stops before broker replacement. Candidate env/artifact pointers are
+installed, stopped candidate consumers are created, then broker starts. Full
+live target preflight runs before consumers start and again after readiness.
+The retained pointer commits last. On **any** exception the pending intent remains;
+a post-start failure may already have accepted target work, so its descriptor
+manifest/images cannot be discarded. `resume-release` retries the same target with
+fresh evidence/inventories and re-fences/drains target work first.
+
+If that immutable candidate cannot become healthy, `repair-release` is the explicit
+escape route. Supply a newly signed compatible binary candidate and the same
+arguments. Its previous release/config/inventory identify the FAILED TARGET;
+its complete manifest and worker authority must exactly preserve that target.
+The repair intent is durably installed before any service command, then follows
+the same fenced drain/non-overlap/preflight/commit sequence. Thus a known-good
+older reader binary can recover service with current metadata, without marker
+edits or automatic restoration of an older runtime manifest. Interrupted repairs
+are themselves resumable. Stale or missing proofs never authorize a bypass.
 
 ## Observations and acceptance interfaces
 
@@ -243,3 +318,17 @@ Family counters and per-generation cleanup failures supply continuity. The API/
 worker existing metrics retain queue, dispatch, comparison, actual transaction
 acknowledgement and readiness; Task6 adds the browser clock boundary. Health does
 not run learner programs, and no legacy sandbox diagnostics are fabricated.
+
+## Clean bootstrap and packaging warning audit
+
+`pnpm prepare:grading` emits shared then grading-runtime; root dev/dev:api/typecheck,
+ordinary CI prerequisites and API pretest use this dependency order. It does not
+launch services or read a database. The clean-path check removes reliance on both
+ignored dist directories before emitting/importing them.
+
+`python3 deploy/scripts/grading/audit-build-warnings.py KIND BUILD_LOG` audits
+expected pnpm production-deploy dev-bin ENOENT names only: API acorn/browserslist/
+esbuild/terser/vite/webpack, worker prisma. These are excluded build tools, not
+service executables; the migration image separately retains and checks Prisma/tsx.
+Any new bin name or different failure rejects the audit. Output is never globally
+suppressed, and the production import/filesystem/migration smoke remains required.

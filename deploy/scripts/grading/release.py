@@ -59,10 +59,9 @@ def verify_profiles(inventory):
         require(16 <= p['memoryLimitMb'] <= 4096 and 1 <= p['timeLimitMs'] <= 60000, 'Invalid declared compatibility profile')
         require(p['memoryLimitMb']+320 <= 1024, 'Active compatibility profile cannot be physically funded; preserve allowance and block handover')
 
-def verify_activation(release, manifest, host, inventory, proof, evidence, now=None):
+def verify_content(release, manifest, inventory, proof, evidence, now=None):
     now=int(time.time()) if now is None else now
-    for obj in [release,manifest,host,inventory,proof]: require(obj['version']==1, 'Unknown evidence version')
-    verify_host(host,now)
+    for obj in [release,manifest,inventory,proof]: require(obj['version']==1, 'Unknown evidence version')
     require(release['concurrency']==2 and release['maxSpare']==0, 'Unvalidated concurrency/spare change')
     require(manifest['capabilities']['maxActive']==2 and manifest['capabilities']['maxBackground']==1 and manifest['capabilities']['maxSpare']==0, 'Manifest resource bank mismatch')
     require(re.fullmatch('[a-f0-9]{40}',release['sourceCommit']), 'Missing source commit')
@@ -88,13 +87,38 @@ def verify_activation(release, manifest, host, inventory, proof, evidence, now=N
         require(re.fullmatch(r'[^\s@]+@sha256:[a-f0-9]{64}',image['pullReference']), 'Immutable registry pull digest required separately from config ID')
     require(proof['nativeAcceptancePassed'] is True, 'Native acceptance missing')
     require(0 <= now-proof['issuedAt'] <= 86400 and now < proof['expiresAt'] <= proof['issuedAt']+86400, 'Stale/future acceptance proof')
-    bindings=dict(releaseIdentity=digest(release),manifestIdentity=digest(manifest),workerGeneration=release['workerGeneration'],hostIdentity=host['hostIdentity'],configurationIdentity=host['configurationIdentity'],inventoryIdentity=digest(inventory),evidenceIdentity=digest(evidence))
+    bindings=dict(releaseIdentity=digest(release),manifestIdentity=digest(manifest),workerGeneration=release['workerGeneration'],inventoryIdentity=digest(inventory),evidenceIdentity=digest(evidence))
     require(all(proof.get(k)==v for k,v in bindings.items()), 'Acceptance content/generation/host binding mismatch')
     for key in ['compatibility','containment','recovery','performance','mixedLoad','browser','scans','certifications','observations']:
         record=evidence.get(key,{})
         require(record.get('version')==1 and record.get('passed') is True and re.fullmatch('[a-f0-9]{64}',record.get('reportHash','')), 'Missing/failed '+key+' evidence')
     if manifest['native'] is not None:
         require(len(manifest['certifications'])>0 and len(manifest['academyAllowances'])>0, 'Missing certified native pilot scope')
+
+def verify_activation(release, manifest, host, inventory, proof, evidence, now=None):
+    now=int(time.time()) if now is None else now
+    verify_host(host,now)
+    verify_content(release,manifest,inventory,proof,evidence,now)
+    require(proof['hostIdentity']==host['hostIdentity'] and proof['configurationIdentity']==host['configurationIdentity'],'Acceptance host/configuration mismatch')
+
+def load_signed_bundle(bundle, public_key, key_pin, fresh=True):
+    """Static content validation, distinct from actual target host verification."""
+    bundle=Path(bundle)
+    verify_signature(bundle/'acceptance.json',bundle/'acceptance.sig',public_key,key_pin)
+    content={name:read_json(bundle/(name+'.json')) for name in ['release','manifest','inventory','acceptance','evidence']}
+    proof=content['acceptance']
+    for key,name in [('releaseIdentity','release'),('manifestIdentity','manifest'),('inventoryIdentity','inventory'),('evidenceIdentity','evidence')]:
+        require(proof.get(key)==digest(content[name]),'Signed bundle content mismatch')
+    if fresh:
+        now=int(time.time())
+        require(0<=now-proof['issuedAt']<=86400 and now<proof['expiresAt']<=proof['issuedAt']+86400,'Stale signed bundle')
+    subprocess.run(['node',str(Path(__file__).with_name('validate-manifest.mjs')),str(bundle/'manifest.json')],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    for record in content['evidence'].values():
+        require(re.fullmatch('[a-f0-9]{64}',record.get('reportHash','')),'Invalid evidence hash')
+        report=bundle/'reports'/record['reportHash']
+        require(report.is_file() and report.stat().st_size<=64*MIB and hashlib.sha256(report.read_bytes()).hexdigest()==record['reportHash'],'Evidence report bytes missing/changed')
+    if fresh:verify_content(content['release'],content['manifest'],content['inventory'],proof,content['evidence'])
+    return content
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
@@ -104,11 +128,8 @@ def main():
     parser.add_argument('--host-config',type=Path,required=True)
     args=parser.parse_args()
     bundle=args.bundle.resolve()
-    verify_signature(bundle/'acceptance.json',bundle/'acceptance.sig',args.trusted_key,args.trusted_key_sha256)
-    release=read_json(bundle/'release.json'); manifest=read_json(bundle/'manifest.json')
-    # The JS shared schema is the single structural authority; do not duplicate it.
-    validator=Path(__file__).with_name('validate-manifest.mjs')
-    subprocess.run(['node',str(validator),str(bundle/'manifest.json')],check=True,stdout=subprocess.DEVNULL)
+    content=load_signed_bundle(bundle,args.trusted_key,args.trusted_key_sha256)
+    release=content['release'];manifest=content['manifest']
     from host import collect_host
     host_config=read_json(args.host_config)
     require(host_config['applicationImages']==release['applicationImages'] and host_config['workerGeneration']==release['workerGeneration'], 'Host application/incarnation mismatch')
@@ -117,12 +138,7 @@ def main():
     from artifact import tree_identity
     require(tree_identity(Path(host_config['brokerEntrypoint']).parent.parent)==release['brokerArtifact']['treeIdentity'], 'Extracted broker artifact content mismatch')
     host=collect_host(host_config)
-    evidence=read_json(bundle/'evidence.json')
-    for record in evidence.values():
-        require(re.fullmatch('[a-f0-9]{64}',record.get('reportHash','')), 'Invalid evidence hash')
-        report=bundle/'reports'/record['reportHash']
-        require(report.is_file() and report.stat().st_size<=64*MIB and hashlib.sha256(report.read_bytes()).hexdigest()==record['reportHash'], 'Evidence report bytes missing/changed')
-    verify_activation(release,manifest,host,read_json(bundle/'inventory.json'),read_json(bundle/'acceptance.json'),evidence)
+    verify_activation(release,manifest,host,content['inventory'],content['acceptance'],content['evidence'])
     print('Verified signed release, live host, immutable images and retained readers; selection remains disabled until explicit activation.')
 
 if __name__=='__main__':

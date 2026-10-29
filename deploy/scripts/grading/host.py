@@ -29,19 +29,8 @@ def limits(path):
     return dict(memoryBytes=int((path/'memory.max').read_text()),cpus=int(quota)/int(period),pids=int((path/'pids.max').read_text()),swapBytes=int((path/'memory.swap.max').read_text()))
 
 def daemon_pid(config):
-    parent=Path(config['cgroupParent']).resolve(strict=True)
-    expected=('--config-file='+config['daemonConfig']).encode()
-    matches=[]
-    for entry in Path('/proc').iterdir():
-        if not entry.name.isdecimal(): continue
-        try:
-            if entry.stat().st_uid!=config['uid']: continue
-            args=(entry/'cmdline').read_bytes().split(b'\0')
-            if Path(os.fsdecode(args[0])).name!='dockerd' or expected not in args: continue
-            if inside(parent,group(int(entry.name))): matches.append(int(entry.name))
-        except (FileNotFoundError,PermissionError,ProcessLookupError): continue
-    require(len(matches)==1,'Cannot uniquely prove dedicated host dockerd PID/config/cgroup')
-    return matches[0]
+    from daemon_identity import attest_daemon
+    return attest_daemon(config)['pid']
 
 def docker(socket,*args): return command(['docker','--host','unix://'+socket,*args])
 
@@ -53,7 +42,9 @@ def collect_host(config):
     info=json.loads(docker(config['daemonSocket'],'info','--format','{{json .}}'))
     require(all(info.get(key) is True for key in ['MemoryLimit','CpuCfsQuota','PidsLimit']), 'Daemon cannot enforce required controllers')
     require(set(['cpu','memory','pids']) <= set((parent/'cgroup.subtree_control').read_text().split()), 'Family controllers not enabled for children')
-    pid=daemon_pid(config)
+    from daemon_identity import attest_daemon
+    daemon_identity=attest_daemon(config)
+    pid=daemon_identity['pid']
     require(int(Path(config['daemonPidFile']).read_text())==pid,'Host dockerd PID file mismatch')
     require(info['DockerRootDir']==config['daemonDataRoot'],'Wrong dedicated data root')
     socket=Path(config['daemonSocket']).stat()
@@ -80,8 +71,13 @@ def collect_host(config):
     broker_env=dict(item.decode().split('=',1) for item in Path(f'/proc/{broker_pid}/environ').read_bytes().split(b'\0') if b'=' in item)
     for key,value in dict(GRADING_RUNTIME_MANIFEST_PATH=config['manifestPath'],GRADING_WORKER_GENERATION=config['workerGeneration'],GRADING_DAEMON_ID=config['daemonId'],GRADING_DAEMON_SOCKET=config['daemonSocket'],GRADING_CGROUP_PARENT=str(parent)).items():
         require(broker_env.get(key)==value,'Running broker configuration differs from attested release')
+    if config.get('warmProfilesPath'):
+        require(broker_env.get('GRADING_WARM_PROFILES_PATH')==config['warmProfilesPath'] and digest(read_json(config['warmProfilesPath']))==config['warmProfilesIdentity'],'Broker warm profile identity mismatch')
     all_ids=set(docker(config['applicationSocket'],'ps','-q','--no-trunc').split())
-    require(all_ids==set(config['rootfulRunningIds']),'Host container inventory changed')
+    application_ids=set()
+    for service in ['api','judge-worker']:
+        application_ids.update(docker(config['applicationSocket'],'ps','-aq','--no-trunc','--filter','label=com.docker.compose.project='+config['composeProject'],'--filter','label=com.docker.compose.service='+service).split())
+    require(all_ids-application_ids==set(config['rootfulRunningIds']),'Non-application host container inventory changed')
     ids=sorted(all_ids | set(docker(config['applicationSocket'],'ps','-aq','--no-trunc','--filter','label=com.docker.compose.project='+config['composeProject']).split()))
     require(ids,'Missing application workload inventory')
     # Explicit projection prevents Config.Env (application credentials) leaving Docker.
@@ -96,7 +92,7 @@ def collect_host(config):
         service=labels.get('com.docker.compose.service')
         if labels.get('com.docker.compose.project')==config['composeProject'] and service in ['api','judge-worker']:
             require(image==config['applicationImages']['api' if service=='api' else 'worker'], 'Running application reader image differs from pinned release')
-            if running:
+            if running or config.get('requireConfiguredApplications',False):
                 projection='{{range .Config.Env}}{{if or (eq (index (split . "=") 0) "GRADING_RUNTIME_MANIFEST_PATH") (eq (index (split . "=") 0) "GRADING_WORKER_GENERATION")}}{{println .}}{{end}}{{end}}'
                 settings=docker(config['applicationSocket'],'inspect','--format',projection,cid).splitlines()
                 require('GRADING_WORKER_GENERATION='+config['workerGeneration'] in settings and 'GRADING_RUNTIME_MANIFEST_PATH=/etc/cove-grading/manifest.json' in settings,'Running application manifest/incarnation mismatch')
@@ -113,6 +109,9 @@ def collect_host(config):
     legacy=[x for x in workloads if x['service']=='judge-sandbox']
     worker=[x for x in workloads if x['service']=='judge-worker']
     require(len(worker)==1,'One trusted worker required')
+    api=[x for x in workloads if x['service']=='api']
+    require(len(api)==1,'One trusted API required')
+    prospective=[x for x in [worker[0],api[0]] if not x['running']]
     active=[x for x in workloads if x['running']]
     require(all(x['memoryBytes']>0 and x['cpus']>0 and x['pids']>0 for x in active),'Unbounded active application workload')
     # Independent all-daemon census must match the approved inventory. Unrelated
@@ -130,19 +129,29 @@ def collect_host(config):
     require(any(x['role']=='turtle' for x in external) or turtle,'Active Turtle allocation missing')
     capacity=int(next(line.split()[1] for line in Path('/proc/meminfo').read_text().splitlines() if line.startswith('MemTotal:')))*1024
     disk=os.statvfs(config['daemonDataRoot'])
-    envelope=dict(memoryBytes=capacity,cpus=os.cpu_count(),reservedMemoryBytes=sum(x['memoryBytes'] for x in active)+1280*2**20+(0 if worker[0]['running'] else 768*2**20)+sum(x['limits']['memoryBytes'] for x in external)+config['systemMemoryBytes']+config['headroomMemoryBytes'],reservedCpus=sum(x['cpus'] for x in active)+1.5+(0 if worker[0]['running'] else .75)+sum(x['limits']['cpus'] for x in external)+config['systemCpus']+config['headroomCpus'],diskFreeBytes=disk.f_bavail*disk.f_frsize,diskRequiredBytes=config['diskRequiredBytes'],turtleUnchanged=digest(dict(containers=turtle,cgroups=[x for x in external if x['role']=='turtle']))==config['turtleIdentity'])
+    envelope=dict(memoryBytes=capacity,cpus=os.cpu_count(),reservedMemoryBytes=sum(x['memoryBytes'] for x in active)+1280*2**20+sum(x['memoryBytes'] for x in prospective)+sum(x['limits']['memoryBytes'] for x in external)+config['systemMemoryBytes']+config['headroomMemoryBytes'],reservedCpus=sum(x['cpus'] for x in active)+1.5+sum(x['cpus'] for x in prospective)+sum(x['limits']['cpus'] for x in external)+config['systemCpus']+config['headroomCpus'],diskFreeBytes=disk.f_bavail*disk.f_frsize,diskRequiredBytes=config['diskRequiredBytes'],turtleUnchanged=digest(dict(containers=turtle,cgroups=[x for x in external if x['role']=='turtle']))==config['turtleIdentity'])
     result=dict(version=1,observedAt=int(time.time()),hostIdentity=hashlib.sha256(Path('/etc/machine-id').read_bytes()).hexdigest(),architecture={'x86_64':'amd64','aarch64':'arm64'}.get(platform.machine(),platform.machine()),platform='linux',rootless='name=rootless' in info.get('SecurityOptions',[]),cgroupDriver=info.get('CgroupDriver'),cgroupVersion=info.get('CgroupVersion'),controllers=(parent/'cgroup.controllers').read_text().split(),daemonId=info['ID'],expectedDaemonId=config['daemonId'],daemonInsideFamily=inside(parent,group(pid)),brokerInsideFamily=inside(parent,group(broker_pid)),legacyStopped=all(not x['running'] for x in legacy),worker={k:worker[0][k] for k in ['memoryBytes','cpus','pids']},family=limits(parent),hostEnvelope=envelope,configurationIdentity=digest(config))
+    verify_images(config)
+    require(attest_daemon(config)==daemon_identity,'Daemon identity changed during host observation')
+    require(read_json(config['daemonPidFile']+'.identity.json')==daemon_identity,'Daemon start identity differs from service attestation')
+    return result
+
+def verify_images(config):
     for image in config['images']:
         inspected=json.loads(docker(config['daemonSocket'],'image','inspect',image['pullReference'],'--format','{{json .}}'))
         require(inspected['Id']==image['configId'] and inspected['Architecture']==image['architecture'],'Pulled OCI digest/config image identity mismatch')
         require(inspected['Config']['Labels']['io.cove.grading.package']==image['packageManifestHash'],'Guest package identity mismatch')
-    return result
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('config');p.add_argument('--write-daemon-pid',action='store_true');a=p.parse_args();config=read_json(a.config)
     if a.write_daemon_pid:
         # Sole controlled mutation: write proven host PID, not namespace pidfile.
-        pid=daemon_pid(config); path=Path(config['daemonPidFile']);path.write_text(str(pid)+'\n');path.chmod(0o600)
+        from daemon_identity import attest_daemon
+        identity=attest_daemon(config)
+        path=Path(config['daemonPidFile'])
+        sidecar=Path(str(path)+'.identity.json')
+        sidecar.write_text(json.dumps(identity)+'\n');sidecar.chmod(0o600)
+        path.write_text(str(identity['pid'])+'\n');path.chmod(0o600)
     else:
         result=collect_host(config);verify_host(result,int(time.time()));print(json.dumps(result,sort_keys=True))
 if __name__=='__main__':

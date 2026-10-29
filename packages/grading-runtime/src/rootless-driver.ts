@@ -20,6 +20,7 @@ import {
 } from "./cgroup.js";
 import { join, dirname, basename } from "node:path";
 import { MiB } from "./resource-bank.js";
+import { loadDaemonIdentity, verifyDaemonIdentity, type DaemonIdentity } from "./daemon-identity.js";
 import { BoundedCapture } from "./capture.js";
 import type { Allocation, GuestDriver } from "./driver.js";
 type Config = {
@@ -58,6 +59,7 @@ export class RootlessDriver implements GuestDriver {
   private live = new Map<string, Live>();
   private verified = false;
   private daemonPid = 0;
+  private daemonIdentity?: DaemonIdentity;
   private socketIdentity?: string;
   private uncertainCreates = new Set<string>();
   constructor(readonly config: Config) {
@@ -121,6 +123,7 @@ export class RootlessDriver implements GuestDriver {
       socket.isSocket() && socket.uid === process.getuid?.(),
       "Daemon socket must belong to broker account",
     );
+    if (this.daemonIdentity) await verifyDaemonIdentity(this.daemonIdentity,socket);
     const identity = `${socket.dev}:${socket.ino}`;
     invariant(
       !this.socketIdentity || this.socketIdentity === identity,
@@ -129,6 +132,9 @@ export class RootlessDriver implements GuestDriver {
     this.socketIdentity = identity;
   }
   async verify() {
+    this.daemonIdentity = await loadDaemonIdentity(this.config.daemonPidFile);
+    invariant(this.daemonIdentity.uid === process.getuid?.(), "Daemon identity must match dedicated broker account");
+    await verifyDaemonIdentity(this.daemonIdentity,await stat(this.config.socket),true);
     await this.attestEndpoint();
     const daemonPid = Number(
       (await readFile(this.config.daemonPidFile, "utf8")).trim(),

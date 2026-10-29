@@ -7,6 +7,11 @@ deploy_root="${COVE_DEPLOY_ROOT:-$(cd -- "$script_dir/.." && pwd)}"
 compose_file="$deploy_root/compose.production.yml"
 deployment_env="$deploy_root/deployment.env"
 
+# Must be called AFTER acquiring state/deploy.lock and before writing active env.
+assert_legacy_deployment_locked() {
+  [[ ! -e "$deploy_root/state/grading-handover.json" ]] || fail "Rootless grading is retained under deployment lock; ordinary release/rollback refused before mutation."
+}
+
 compose() {
   [[ ! -e "$deploy_root/state/grading-handover.json" ]] || fail "Retained rootless grading requires explicit compose.grading.yml and validated release."
   local profiles=()

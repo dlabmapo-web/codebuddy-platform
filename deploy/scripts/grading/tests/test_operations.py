@@ -50,6 +50,26 @@ class OperationTests(unittest.TestCase):
                 result=subprocess.run(['bash',str(ROOT/'deploy/scripts'/script)],env={**os.environ,'COVE_DEPLOY_ROOT':directory},capture_output=True,text=True)
                 self.assertNotEqual(result.returncode,0);self.assertIn('refused before mutation',result.stderr)
                 self.assertEqual((root/'deployment.env').read_text(),'unchanged')
+    def test_marker_created_at_lock_acquisition_refuses_before_any_release_copy(self):
+        for script in ['deploy.sh','rollback.sh','set-v2-release.sh']:
+            with self.subTest(script=script), tempfile.TemporaryDirectory() as directory:
+                root=Path(directory);(root/'state').mkdir();(root/'bin').mkdir()
+                (root/'deployment.env').write_text('unchanged')
+                (root/'candidate.env').write_text('candidate')
+                (root/'state/previous-deployment.env').write_text('previous')
+                mocks={
+                    'flock':'#!/bin/bash\nprintf "{}" > "$COVE_DEPLOY_ROOT/state/grading-handover.json"\n',
+                    'install':'#!/bin/bash\ntouch "$COVE_DEPLOY_ROOT/mutated"\nexit 99\n',
+                    'cp':'#!/bin/bash\ntouch "$COVE_DEPLOY_ROOT/mutated"\nexit 99\n',
+                }
+                for name,body in mocks.items():
+                    path=root/'bin'/name;path.write_text(body);path.chmod(0o755)
+                arguments=[str(root/'candidate.env')] if script=='deploy.sh' else ['ghcr.io/synthetic','sha-'+'a'*40,'false','false','false','false'] if script=='set-v2-release.sh' else []
+                result=subprocess.run(['bash',str(ROOT/'deploy/scripts'/script),*arguments],env={**os.environ,'COVE_DEPLOY_ROOT':directory,'PATH':str(root/'bin')+os.pathsep+os.environ['PATH']},capture_output=True,text=True)
+                self.assertNotEqual(result.returncode,0)
+                self.assertIn('retained under deployment lock',result.stderr)
+                self.assertFalse((root/'mutated').exists())
+                self.assertEqual((root/'deployment.env').read_text(),'unchanged')
     def test_metrics_stale_and_label_injection_rejected(self):
         sample=dict(version=1,observedAt=100,brokerGeneration='private',workerGeneration='private',pool=dict(active=0,running=0,preparing=0,prepared=1,quarantined=0,cleanupFailures=2,ready=True,resources=dict(allocations=1,bytes=1,pids=1,waiting=1,oldestWaitMs=25)),family=dict(memoryCurrentBytes=10),children=[])
         output=render_metrics(sample,100);self.assertIn('cleanupFailures 2.0',output);self.assertNotIn('private',output)

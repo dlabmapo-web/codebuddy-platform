@@ -11,7 +11,7 @@
     "start": "node dist/src/main.js",
     "pretypecheck": "pnpm db:generate",
     "typecheck": "tsc --noEmit",
-    "pretest": "pnpm --filter @cove/shared build && pnpm db:generate",
+    "pretest": "pnpm --filter @cove/shared build && pnpm --filter @cove/grading-runtime build && pnpm db:generate",
     "test": "vitest run",
     "db:format": "prisma format",
     "db:validate": "prisma validate",
@@ -87,6 +87,7 @@
   },
   "files": [
     "dist",
-    "scripts/grading-inventory.mjs"
+    "scripts/grading-inventory.mjs",
+    "scripts/grading-inventory-queues.mjs"
   ]
 }

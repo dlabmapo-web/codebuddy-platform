@@ -1,6 +1,7 @@
 // Run only inside the trusted API/worker environment. No dotenv loading.
 // Read-only projection; never emit code, answers, users, credentials or raw jobs.
 import pg from 'pg';
+import { readQueueBacklog } from './grading-inventory-queues.mjs';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { Redis } from 'ioredis';
@@ -46,13 +47,7 @@ try {
       if(['QUEUED','RUNNING','STOPPING'].includes(record.status)) {ephemeralPending++;if(!record.snapshot?.executionRuntimeSnapshot)legacySamples++;}
     }
   } while(cursor!=='0');
-  const queueBacklog={};
-  for(const queue of ['cove-grading','cove-staff-practice','cove-sample-checks','cove-regrade']) {
-    let total=0;
-    for(const state of ['wait','active','paused'])total+=await redis.llen(`bull:${queue}:${state}`);
-    for(const state of ['delayed','prioritized','waiting-children'])total+=await redis.zcard(`bull:${queue}:${state}`);
-    queueBacklog[queue]=total;
-  }
+  const queueBacklog=await readQueueBacklog(redis);
   await database.query('COMMIT');
   console.log(JSON.stringify({version:1,observedAt:Math.floor(Date.now()/1000),complete:true,activeProfiles:profiles.rows,references:[...references.values()].sort((a,b)=>runtimeDescriptorIdentity(a).localeCompare(runtimeDescriptorIdentity(b))),pending:Number(counts.pending),legacyPending:Number(counts.legacy)+legacySamples,recoverable:Number(counts.recoverable),ephemeralPending,queueBacklog,admissionFence}));
 } catch {

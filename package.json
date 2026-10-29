@@ -7,12 +7,12 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --filter @cove/shared --filter @cove/i18n build && pnpm --parallel --filter @cove/api --filter @cove/web --filter @cove/judge-worker dev",
+    "dev": "pnpm prepare:grading && pnpm --filter @cove/i18n build && pnpm --parallel --filter @cove/api --filter @cove/web --filter @cove/judge-worker dev",
     "dev:web": "pnpm --filter @cove/web dev",
-    "dev:api": "pnpm --filter @cove/shared build && pnpm --filter @cove/api dev",
+    "dev:api": "pnpm prepare:grading && pnpm --filter @cove/api dev",
     "dev:home": "pnpm --filter @cove/i18n build && pnpm --filter @cove/home dev",
     "build": "pnpm -r build",
-    "typecheck": "pnpm --filter @cove/shared --filter @cove/i18n build && pnpm -r typecheck && pnpm typecheck:e2e",
+    "typecheck": "pnpm prepare:grading && pnpm --filter @cove/i18n build && pnpm -r typecheck && pnpm typecheck:e2e",
     "typecheck:e2e": "tsc --noEmit -p e2e/tsconfig.json",
     "lint": "pnpm -r lint",
     "start:web": "pnpm --filter @cove/web start",
@@ -24,7 +24,8 @@
     "deploy:validate": "bash deploy/scripts/validate-local.sh",
     "load:production": "bash deploy/load/run.sh",
     "e2e:dlab": "playwright test --config e2e/dlab.playwright.config.ts",
-    "test:dlab": "bash packages/api/scripts/test-dlab-isolated.sh"
+    "test:dlab": "bash packages/api/scripts/test-dlab-isolated.sh",
+    "prepare:grading": "pnpm --filter @cove/shared build && pnpm --filter @cove/grading-runtime build"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

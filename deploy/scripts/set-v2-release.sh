@@ -19,6 +19,10 @@ require_file "$deployment_env"
 
 mkdir -p "$deploy_root/state"
 chmod 700 "$deploy_root/state"
+require_command flock
+exec 9>"$deploy_root/state/deploy.lock"
+flock -n 9 || fail "another production deployment is already running"
+assert_legacy_deployment_locked
 candidate="$(mktemp "$deploy_root/state/v2-release.XXXXXX")"
 cp "$deployment_env" "$candidate"
 chmod 600 "$candidate"
@@ -84,4 +88,7 @@ for key in sorted(optional - seen):
 path.write_text("\n".join(lines) + "\n")
 PY
 
+# deploy.sh acquires the same lock and rechecks the marker before active writes.
+# Close this preparation lock first; the unlocked interval cannot bypass its gate.
+exec 9>&-
 "$script_dir/deploy.sh" "$candidate"

@@ -8,6 +8,11 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 previous="$deploy_root/state/previous-deployment.env"
 require_file "$previous"
 
+require_command flock
+exec 9>"$deploy_root/state/deploy.lock"
+flock -n 9 || fail "another production deployment is already running"
+assert_legacy_deployment_locked
+
 current_copy="$deploy_root/state/failed-deployment.env"
 install -m 600 "$deployment_env" "$current_copy"
 # Stop the newer web before restoring an API that may lack its endpoints.

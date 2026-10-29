@@ -16,6 +16,7 @@ chmod 700 "$state_dir"
 
 exec 9>"$state_dir/deploy.lock"
 flock -n 9 || fail "another production deployment is already running"
+assert_legacy_deployment_locked
 
 candidate_copy="$state_dir/candidate-deployment.env"
 install -m 600 "$candidate" "$candidate_copy"

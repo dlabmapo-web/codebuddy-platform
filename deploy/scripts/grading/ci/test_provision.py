@@ -1,0 +1,166 @@
+import importlib.util
+from pathlib import Path
+import unittest
+
+spec = importlib.util.spec_from_file_location('ci', Path(__file__).with_name('provision.py'))
+ci = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ci)
+
+def ci_environment():
+    return dict(GITHUB_ACTIONS='true', RUNNER_ENVIRONMENT='github-hosted', GRADING_DISPOSABLE_CI='1')
+
+class ProvisionTests(unittest.TestCase):
+    def test_non_ci_host_refused(self):
+        with self.assertRaises(ValueError):
+            ci.require_ephemeral_host({'GITHUB_ACTIONS': 'false'}, 'Linux', 'x86_64', 0)
+
+    def test_wrong_architecture_refused(self):
+        with self.assertRaises(ValueError):
+            ci.require_ephemeral_host(ci_environment(), 'Linux', 'aarch64', 0)
+
+    def test_root_required(self):
+        with self.assertRaises(ValueError):
+            ci.require_ephemeral_host(ci_environment(), 'Linux', 'x86_64', 1001)
+
+    def test_exact_guard_accepts(self):
+        ci.require_ephemeral_host(ci_environment(), 'Linux', 'x86_64', 0)
+
+
+class SafetyContracts(unittest.TestCase):
+    def test_only_official_candidate_is_accepted(self):
+        policy='  Candidate: 5:29.0.0-1~ubuntu.24.04~noble\n  Version table:\n     5:29.0.0-1~ubuntu.24.04~noble 500\n        500 https://download.docker.com/linux/ubuntu noble/stable amd64 Packages\n'
+        self.assertTrue(ci.official_rootless_candidate(policy))
+        self.assertFalse(ci.official_rootless_candidate(policy.replace('download.docker.com','untrusted.example')))
+        self.assertFalse(ci.official_rootless_candidate(policy.replace('Candidate: 5:29.0.0-1~ubuntu.24.04~noble','Candidate: 5:30.0.0-1~ubuntu.24.04~noble')))
+
+    def test_guard_precedes_mutation(self):
+        from unittest.mock import patch
+        with patch.object(ci, 'require_ephemeral_host', side_effect=ValueError('refused')), patch.object(ci.Path,'mkdir') as mkdir, patch.object(ci,'command') as command:
+            with self.assertRaises(ValueError): ci.prepare('/irrelevant')
+            mkdir.assert_not_called(); command.assert_not_called()
+
+    def test_existing_account_group_and_path_refused(self):
+        import tempfile
+        for users,groups in [(['cove-grading'],[]), ([],['cove-grading-control']), (['cove-grading-ci-worker'],[])]:
+            with self.subTest(users=users,groups=groups), self.assertRaises(ValueError):
+                ci.require_absent([],users,groups)
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(ValueError): ci.require_absent([Path(directory)],[],[])
+
+    def test_existing_different_configuration_refused_without_write(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'config'; path.write_text('old')
+            with self.assertRaises(ValueError): ci.write_owned({},path,'new')
+            self.assertEqual(path.read_text(),'old')
+
+    def test_subordinate_range_avoids_all_overlaps_and_real_accounts(self):
+        start,count=ci.subordinate_range(['alice:100000:65536\nbob:180000:65536\n','carol:300000:65536\n'],[260000])
+        self.assertEqual(count,65536)
+        for low,high in [(100000,165536),(180000,245536),(260000,260001),(300000,365536)]:
+            self.assertTrue(start+count<=low or start>=high)
+
+    def test_malformed_or_overflow_subordinate_database_refused(self):
+        for value in ['name:1:0','name:xyz:65536','name:4294967290:65536','bad']:
+            with self.subTest(value=value), self.assertRaises(ValueError): ci.subordinate_range([value])
+
+    def test_changed_inode_contents_modes_or_symlink_refused(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'owned'; path.write_text('one'); original=ci.snapshot(path)
+            ci.validate_owned(path,original)
+            path.write_text('two')
+            with self.assertRaises(ValueError): ci.validate_owned(path,original)
+            path.unlink(); path.symlink_to(Path(directory))
+            with self.assertRaises(ValueError): ci.validate_owned(path,original)
+
+    def test_exact_container_identity_required(self):
+        import copy
+        allocation='11111111-1111-4111-8111-111111111111'
+        state=dict(owner='22222222-2222-4222-8222-222222222222',images=[dict(configId='sha256:'+'a'*64)])
+        item=dict(Id='b'*64,Name='/cove-grade-'+allocation,Image=state['images'][0]['configId'],Config=dict(Labels={'io.cove.grading.owner':state['owner'],'io.cove.grading.allocation':allocation}))
+        self.assertEqual(ci.owned_containers(state,[item]),[item])
+        for key,value in [('Image','sha256:'+'c'*64),('Name','/unrelated'),('Id','short')]:
+            changed=copy.deepcopy(item); changed[key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError): ci.owned_containers(state,[changed])
+        changed=copy.deepcopy(item);changed['Config']['Labels']['io.cove.grading.owner']='another'
+        with self.assertRaises(ValueError):ci.owned_containers(state,[changed])
+
+    def test_immutable_image_label_platform_and_id_required(self):
+        import copy
+        descriptor=dict(imageDigest='sha256:'+'a'*64,architecture='amd64',packageManifestHash='sha256:'+'b'*64,shimVersion='cove-guest-1',engine='cpython',engineVersion='3.12.16',pythonVersion='3.12.16')
+        labels={'io.cove.grading.'+label:descriptor[key] for label,key in [('package','packageManifestHash'),('shim','shimVersion'),('engine','engine'),('version','engineVersion'),('python','pythonVersion')]}
+        image=dict(Id=descriptor['imageDigest'],Os='linux',Architecture='amd64',Config=dict(Labels=labels))
+        ci.verify_image(image,descriptor)
+        for key,value in [('Id','mutable:ci'),('Os','windows'),('Architecture','arm64')]:
+            changed=copy.deepcopy(image); changed[key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):ci.verify_image(changed,descriptor)
+        image['Config']['Labels']['io.cove.grading.package']='sha256:'+'c'*64
+        with self.assertRaises(ValueError):ci.verify_image(image,descriptor)
+
+    def test_manifest_change_fails_before_daemon_access(self):
+        from unittest.mock import patch
+        with patch.object(ci,'read_json',return_value=dict(version=1)),patch.object(ci,'docker') as docker:
+            with self.assertRaisesRegex(ValueError,'Manifest identity'):
+                ci.verify_manifest(dict(manifestPath='unused',manifestIdentity='wrong'))
+            docker.assert_not_called()
+
+    def test_cleanup_changed_path_refuses_before_stop(self):
+        from unittest.mock import patch
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'owned'; path.write_text('one'); identity=ci.snapshot(path); path.write_text('changed')
+            state=dict(uid=123,controlGid=456,workerGid=789,subordinateStart=100000,ownedPaths={str(path):identity},ownedFiles={})
+            with patch.object(ci,'check_host'),patch.object(ci,'STATE',path),patch.object(ci,'load_state',return_value=state),patch.object(ci,'verify_accounts'),patch.object(ci,'verify_subordinate'),patch.object(ci,'subordinate_contents',return_value=[]),patch.object(ci.grp,'getgrnam',side_effect=KeyError),patch.object(ci,'command') as command:
+                with self.assertRaisesRegex(ValueError,'identity changed'):ci.cleanup()
+                command.assert_not_called()
+
+    def test_subordinate_later_changes_refused(self):
+        state={'subordinateStart':100000}
+        ci.verify_subordinate(state,['cove-grading:100000:65536','cove-grading:100000:65536'])
+        for changed in ['cove-grading:100001:65536','cove-grading:100000:65536\nother:120000:65536','']:
+            with self.subTest(changed=changed),self.assertRaises(ValueError):ci.verify_subordinate(state,[changed])
+
+    def test_cleanup_cleaned_receipt_is_idempotent(self):
+        from unittest.mock import patch
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'state';path.write_text('{}')
+            with patch.object(ci,'check_host'),patch.object(ci,'STATE',path),patch.object(ci,'load_state',return_value={'cleaned':True,'delegationPath':'/not-present-cove-test'}),patch.object(ci,'command') as command:
+                self.assertTrue(ci.cleanup()['alreadyAbsent']);command.assert_not_called()
+
+    def test_bundle_production_schema_and_funding_and_identity_rejections(self):
+        import subprocess
+        script=r'''
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {descriptor,bundle} from './deploy/scripts/grading/ci/bundle.mjs';
+const raw=Buffer.from('{"version":1}');
+const hash='sha256:'+createHash('sha256').update(raw).digest('hex');
+function runtime(engine,id) {
+ const identity={engine,engineVersion:engine==='cpython'?'3.12.16':'0.27.5',pythonVersion:engine==='cpython'?'3.12.16':'3.12.7',packageManifestHash:hash,shimVersion:'cove-guest-1'};
+ const labels=Object.fromEntries(Object.entries({engine:'engine',version:'engineVersion',python:'pythonVersion',package:'packageManifestHash',shim:'shimVersion'}).map(([l,k])=>['io.cove.grading.'+l,identity[k]]));
+ const image={Id:'sha256:'+id.repeat(64),Os:'linux',Architecture:'amd64',Config:{Labels:labels}};
+ const result=descriptor(image,identity,raw);
+ assert.throws(()=>descriptor({...image,Architecture:'arm64'},identity,raw));
+ assert.throws(()=>descriptor({...image,Id:'mutable:ci'},identity,raw));
+ assert.throws(()=>descriptor(image,identity,Buffer.from('changed')));
+ assert.throws(()=>descriptor({...image,Config:{Labels:{...labels,'io.cove.grading.shim':'wrong'}}},identity,raw));
+ return result;
+}
+const n=runtime('cpython','a'),p=runtime('pyodide','b');
+const value=bundle(n,p);
+assert.equal(value.manifest.capabilities.maxActive,2);
+assert.equal(value.manifest.capabilities.maxBackground,1);
+assert.equal(value.manifest.capabilities.maxSpare,0);
+assert.equal(value.warmProfiles.reduce((sum,p)=>sum+p.targetReady,0),2);
+assert(value.warmProfiles.every(p=>p.memoryLimitMb===128));
+assert.equal(256+value.warmProfiles.reduce((sum,p)=>sum+p.memoryLimitMb+(p.runtime.engine==='cpython'?128:320),0),960);
+assert.throws(()=>bundle(n,n));
+'''
+        root=Path(__file__).resolve().parents[4]
+        result=subprocess.run(['node','--input-type=module','-e',script],cwd=root,capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+
+if __name__ == '__main__':
+    unittest.main()

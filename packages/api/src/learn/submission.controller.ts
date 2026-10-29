@@ -10,6 +10,7 @@ import {
 import {
   isTerminalStatus,
   submissionProgressEventSchema,
+  submissionResultSchema,
 } from "@cove/shared";
 import { Observable, ReplaySubject } from "rxjs";
 
@@ -20,6 +21,13 @@ import { SupabaseAuthService } from "../auth/supabase-auth.service.js";
 import { SubmissionService } from "./submission.service.js";
 
 type StreamEvent = { type: string; data: string };
+// Preserve the narrow official result event while validating both pending and
+// terminal state through the same public grading contract.
+const streamResultSchema = submissionResultSchema.pick({
+  status: true,
+  passedCount: true,
+  totalCount: true,
+});
 
 /** Comment frames keep proxies from closing an idle stream. */
 const KEEP_ALIVE_MS = 15_000;
@@ -59,7 +67,10 @@ export class SubmissionController {
       ? authorization.slice("Bearer ".length)
       : null;
     if (!token) {
-      throw new AppException("AUTHENTICATION_REQUIRED", HttpStatus.UNAUTHORIZED);
+      throw new AppException(
+        "AUTHENTICATION_REQUIRED",
+        HttpStatus.UNAUTHORIZED,
+      );
     }
 
     const identity = await this.auth.verifyAccessToken(token);
@@ -76,6 +87,8 @@ export class SubmissionController {
     const subject = new ReplaySubject<StreamEvent>(1);
     const timers: NodeJS.Timeout[] = [];
     let closed = false;
+    let reading = false;
+    let readAgain = false;
 
     const finish = () => {
       if (closed) return;
@@ -89,13 +102,37 @@ export class SubmissionController {
     };
 
     const emitResult = async () => {
-      const submission = await this.prisma.submission.findUnique({
-        where: { id: submissionId },
-        select: { status: true, passedCount: true, totalCount: true },
-      });
-      if (!submission) return;
-      subject.next({ type: "result", data: JSON.stringify(submission) });
-      if (isTerminalStatus(submission.status)) finish();
+      if (closed) return;
+      if (reading) {
+        readAgain = true;
+        return;
+      }
+      reading = true;
+      try {
+        do {
+          readAgain = false;
+          const submission = await this.prisma.submission.findUnique({
+            where: { id: submissionId },
+            select: { status: true, passedCount: true, totalCount: true },
+          });
+          if (closed) return;
+          const result = streamResultSchema.parse(submission);
+          subject.next({ type: "result", data: JSON.stringify(result) });
+          if (isTerminalStatus(result.status)) {
+            finish();
+            return;
+          }
+        } while (readAgain && !closed);
+      } catch {
+        if (closed) return;
+        subject.next({
+          type: "error",
+          data: JSON.stringify({ submissionId, reason: "JUDGE_UNAVAILABLE" }),
+        });
+        finish();
+      } finally {
+        reading = false;
+      }
     };
 
     const onProgress = ({ jobId, data }: { jobId: string; data: unknown }) => {
@@ -113,17 +150,11 @@ export class SubmissionController {
       if (jobId !== submissionId) return;
       void emitResult();
     };
-    const onFailed = ({ jobId }: {
-      jobId: string;
-      failedReason: string;
-    }) => {
+    const onFailed = ({ jobId }: { jobId: string; failedReason: string }) => {
       if (jobId !== submissionId) return;
-      subject.next({
-        type: "error",
-        // BullMQ's raw reason can contain exception input. Keep the public
-        // error deliberately generic.
-        data: JSON.stringify({ submissionId, reason: "JUDGE_FAILED" }),
-      });
+      // Queue history includes previous failures of a recovered same-ID job.
+      // Reconcile current durable state; the worker's old reason is no verdict.
+      void emitResult();
     };
 
     this.queue?.events.on("progress", onProgress);
@@ -134,7 +165,10 @@ export class SubmissionController {
     void emitResult();
 
     timers.push(
-      setInterval(() => subject.next({ type: "ping", data: "" }), KEEP_ALIVE_MS),
+      setInterval(
+        () => subject.next({ type: "ping", data: "" }),
+        KEEP_ALIVE_MS,
+      ),
     );
     timers.push(setTimeout(finish, MAX_STREAM_MS));
 

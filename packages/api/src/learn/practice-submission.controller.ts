@@ -108,9 +108,10 @@ export class PracticeSubmissionController {
     const onCompleted = ({ jobId }: { jobId: string }) => {
       if (jobId === submissionId) void readResult();
     };
-    // Failed jobs may be retried: never disclose a worker exception as a verdict.
+    // Retained failure events may belong to an earlier execution of this job.
+    // Only the current authorized durable result determines its visible state.
     const onFailed = ({ jobId }: { jobId: string }) => {
-      if (jobId === submissionId) fail();
+      if (jobId === submissionId) void readResult();
     };
     events?.on("completed", onCompleted);
     events?.on("failed", onFailed);

@@ -19,14 +19,11 @@ function createController(options?: { ownershipError?: Error }) {
       ? vi.fn().mockRejectedValue(options.ownershipError)
       : vi.fn().mockResolvedValue(undefined),
   } as unknown as SubmissionService;
+  const read = vi
+    .fn()
+    .mockResolvedValue({ status: "RUNNING", passedCount: 0, totalCount: 2 });
   const prisma = {
-    submission: {
-      findUnique: vi.fn().mockResolvedValue({
-        status: "RUNNING",
-        passedCount: 0,
-        totalCount: 2,
-      }),
-    },
+    submission: { findUnique: read },
   } as unknown as PrismaService;
   const auth = {
     verifyAccessToken: vi.fn().mockResolvedValue({
@@ -37,6 +34,7 @@ function createController(options?: { ownershipError?: Error }) {
   return {
     events,
     submissions,
+    read,
     controller: new SubmissionController(submissions, prisma, auth, queue),
   };
 }
@@ -98,4 +96,106 @@ describe("SubmissionController.stream", () => {
     expect(serialized).toContain("WRONG_OUTPUT");
     subscription.unsubscribe();
   });
+});
+
+const flush = async () => {
+  for (let i = 0; i < 12; i++) await Promise.resolve();
+};
+it("reconciles a historical failure as RUNNING and still delivers current completion", async () => {
+  const f = createController();
+  const received: { type: string; data: string }[] = [];
+  const stream = await f.controller.stream(
+    submissionId,
+    academyId,
+    "Bearer token",
+  );
+  stream.subscribe((event) => received.push(event));
+  await flush();
+  f.events.emit("failed", { jobId: submissionId, failedReason: SECRET });
+  await flush();
+  expect(received.filter((event) => event.type === "error")).toEqual([]);
+  expect(f.events.listenerCount("completed")).toBe(1);
+  f.read.mockResolvedValue({
+    status: "PASSED",
+    passedCount: 2,
+    totalCount: 2,
+    lease: SECRET,
+  });
+  f.events.emit("completed", { jobId: submissionId });
+  await flush();
+  expect(JSON.parse(received.at(-1)!.data)).toEqual({
+    status: "PASSED",
+    passedCount: 2,
+    totalCount: 2,
+  });
+  expect(JSON.stringify(received)).not.toContain(SECRET);
+  expect(f.events.eventNames()).toEqual([]);
+});
+it("reports a durable ERRORED verdict rather than a worker failure as a grade", async () => {
+  const f = createController();
+  const received: { type: string; data: string }[] = [];
+  const stream = await f.controller.stream(
+    submissionId,
+    academyId,
+    "Bearer token",
+  );
+  stream.subscribe((event) => received.push(event));
+  await flush();
+  f.read.mockResolvedValue({
+    status: "ERRORED",
+    passedCount: 0,
+    totalCount: 2,
+    failedReason: SECRET,
+  });
+  f.events.emit("failed", { jobId: submissionId, failedReason: SECRET });
+  await flush();
+  expect(received.at(-1)).toEqual({
+    type: "result",
+    data: JSON.stringify({ status: "ERRORED", passedCount: 0, totalCount: 2 }),
+  });
+  expect(JSON.stringify(received)).not.toContain(SECRET);
+  expect(f.events.eventNames()).toEqual([]);
+});
+
+it("reconciles completion arriving during a pending failure/result read", async () => {
+  const f = createController();
+  let resolve!: (value: {
+    status: string;
+    passedCount: number;
+    totalCount: number;
+  }) => void;
+  f.read.mockImplementationOnce(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      }),
+  );
+  const received: { type: string; data: string }[] = [];
+  (
+    await f.controller.stream(submissionId, academyId, "Bearer token")
+  ).subscribe((event) => received.push(event));
+  f.events.emit("failed", { jobId: submissionId, failedReason: SECRET });
+  f.read.mockResolvedValue({ status: "PASSED", passedCount: 2, totalCount: 2 });
+  f.events.emit("completed", { jobId: submissionId });
+  resolve({ status: "RUNNING", passedCount: 0, totalCount: 2 });
+  await flush();
+  expect(received.map((event) => JSON.parse(event.data).status)).toEqual([
+    "RUNNING",
+    "PASSED",
+  ]);
+  expect(f.events.eventNames()).toEqual([]);
+});
+it("closes with a generic error when current durable state cannot be read", async () => {
+  const f = createController();
+  const received: { type: string; data: string }[] = [];
+  (
+    await f.controller.stream(submissionId, academyId, "Bearer token")
+  ).subscribe((event) => received.push(event));
+  await flush();
+  f.read.mockRejectedValue(new Error(SECRET));
+  f.events.emit("failed", { jobId: submissionId, failedReason: SECRET });
+  await flush();
+  expect(received.at(-1)!.type).toBe("error");
+  expect(JSON.stringify(received)).not.toContain(SECRET);
+  expect(f.events.eventNames()).toEqual([]);
 });

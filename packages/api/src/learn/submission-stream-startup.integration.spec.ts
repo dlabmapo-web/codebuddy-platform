@@ -45,9 +45,14 @@ async function bounded<T>(promise: Promise<T>): Promise<T> {
 describe.skipIf(!redisUrl || !fixtureId)(
   "real BullMQ stream startup ordering",
   () => {
-    it.each(["practice", "official"] as const)(
-      "replays a %s completion retained before the first XREAD",
-      async (kind) => {
+    it.each([
+      { kind: "practice", retry: false },
+      { kind: "official", retry: false },
+      { kind: "practice", retry: true },
+      { kind: "official", retry: true },
+    ] as const)(
+      "delivers current $kind verdict with retry=$retry after delayed first XREAD",
+      async ({ kind, retry }) => {
         const endpoint = new URL(redisUrl!);
         expect(endpoint.protocol).toBe("redis:");
         expect(endpoint.hostname).toBe("127.0.0.1");
@@ -93,9 +98,19 @@ describe.skipIf(!redisUrl || !fixtureId)(
             .fn()
             .mockResolvedValue({ authUserId: "synthetic-owner" }),
         } as unknown as SupabaseAuthService;
+        let deliveries = 0;
+        const retryStarted = deferred<void>(),
+          finishRetry = deferred<void>();
         const worker = new Worker(
           producer.name,
           async () => {
+            deliveries++;
+            if (retry && deliveries === 1)
+              throw new Error("PRIVATE_PREVIOUS_WORKER_FAILURE");
+            if (retry) {
+              retryStarted.resolve();
+              await finishRetry.promise;
+            }
             // Synthetic committed result store; actual BullMQ completion/XADD happens
             // only after this handler returns. No real database is used or claimed.
             status = "PASSED";
@@ -113,6 +128,29 @@ describe.skipIf(!redisUrl || !fixtureId)(
             worker.waitUntilReady(),
             once(observer, "ready"),
           ]);
+          if (retry) {
+            const failed = once(worker, "failed");
+            if (kind === "practice")
+              await judge.practiceQueue.add(
+                "retry-regression",
+                { attemptId: id },
+                { jobId: id, attempts: 1 },
+              );
+            else
+              await judge.queue.add(
+                "retry-regression",
+                { submissionId: id },
+                { jobId: id, attempts: 1 },
+              );
+            workerRun = worker.run();
+            await bounded(failed);
+            const job = await producer.getJob(id);
+            expect(await job!.getState()).toBe("failed");
+            if (kind === "practice") await judge.enqueuePractice(id);
+            else await judge.enqueue(id);
+            await bounded(retryStarted.promise);
+            expect(await job!.getState()).toBe("active");
+          }
           const controller =
             kind === "practice"
               ? new PracticeSubmissionController(
@@ -131,17 +169,30 @@ describe.skipIf(!redisUrl || !fixtureId)(
                   judge,
                 );
           const running = deferred<void>(),
-            terminal = deferred<void>();
+            terminal = deferred<void>(),
+            reconciled = deferred<void>();
+          let released = false,
+            streamClosed = false;
+          const received: { type: string; data: string }[] = [];
           const stream = await controller.stream(
             id,
             academyId,
             "Bearer synthetic-token",
           );
-          subscription = stream.subscribe((event) => {
-            if (event.type !== "result") return;
-            const value = JSON.parse(event.data);
-            if (value.status === "RUNNING") running.resolve();
-            if (value.status === "PASSED") terminal.resolve();
+          subscription = stream.subscribe({
+            next: (event) => {
+              received.push(event);
+              if (event.type !== "result") return;
+              const value = JSON.parse(event.data);
+              if (value.status === "RUNNING") {
+                running.resolve();
+                if (released) reconciled.resolve();
+              }
+              if (value.status === "PASSED") terminal.resolve();
+            },
+            complete: () => {
+              streamClosed = true;
+            },
           });
           await bounded(running.promise);
           // Client readiness alone is deliberately satisfied while run() is still
@@ -152,21 +203,22 @@ describe.skipIf(!redisUrl || !fixtureId)(
           const xread = vi.spyOn(eventClient, "xread");
           expect(xread).not.toHaveBeenCalled();
           const completed = once(worker, "completed");
-          if (kind === "practice") {
-            await judge.practiceQueue.add(
-              "startup-regression",
-              { attemptId: id },
-              { jobId: id },
-            );
-          } else {
-            await judge.queue.add(
-              "startup-regression",
-              { submissionId: id },
-              { jobId: id },
-            );
+          if (!retry) {
+            if (kind === "practice")
+              await judge.practiceQueue.add(
+                "startup-regression",
+                { attemptId: id },
+                { jobId: id },
+              );
+            else
+              await judge.queue.add(
+                "startup-regression",
+                { submissionId: id },
+                { jobId: id },
+              );
+            workerRun = worker.run();
+            await bounded(completed);
           }
-          workerRun = worker.run();
-          await bounded(completed);
           const retained = await observer.xrange(
             producer.toKey("events"),
             "-",
@@ -177,20 +229,41 @@ describe.skipIf(!redisUrl || !fixtureId)(
               const eventIndex = fields.indexOf("event"),
                 jobIndex = fields.indexOf("jobId");
               return (
-                fields[eventIndex + 1] === "completed" &&
+                fields[eventIndex + 1] === (retry ? "failed" : "completed") &&
                 fields[jobIndex + 1] === id
               );
             }),
           ).toBe(true);
           expect(xread).not.toHaveBeenCalled();
-          // The authoritative read returned RUNNING and completion is now retained
-          // in real Redis before QueueEvents can consume anything.
-          startConsumer.resolve();
+          // The authoritative read returned RUNNING before any consumption.
+          // Replayed completion must resolve it; replayed earlier failure must
+          // reconcile the still-running retry without aborting its live stream.
+          if (retry) {
+            const oldFailure = once(events, "failed");
+            released = true;
+            startConsumer.resolve();
+            await bounded(oldFailure);
+            expect(received.filter((event) => event.type === "error")).toEqual(
+              [],
+            );
+            expect(streamClosed).toBe(false);
+            await bounded(reconciled.promise);
+            expect(status).toBe("RUNNING");
+            finishRetry.resolve();
+            await bounded(completed);
+          } else startConsumer.resolve();
           await bounded(terminal.promise);
+          expect(received.filter((event) => event.type === "error")).toEqual(
+            [],
+          );
+          expect(JSON.stringify(received)).not.toContain(
+            "PRIVATE_PREVIOUS_WORKER_FAILURE",
+          );
           expect(xread.mock.calls[0]).toContain("0-0");
           expect(workerErrors).toEqual([]);
         } finally {
           startConsumer.resolve();
+          finishRetry.resolve();
           subscription?.unsubscribe();
           await worker.close();
           await workerRun;

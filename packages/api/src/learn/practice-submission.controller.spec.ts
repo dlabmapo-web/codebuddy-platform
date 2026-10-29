@@ -171,10 +171,13 @@ describe("owner-scoped practice completion", () => {
 it("does not miss completion while the post-attachment read is pending", async () => {
   const f = fixture();
   let resolveRead!: (value: SubmissionResult) => void;
-  const pending = await f.service.get({ authUserId: "auth" } as SupabaseIdentity, {
-    academyId,
-    submissionId: id,
-  });
+  const pending = await f.service.get(
+    { authUserId: "auth" } as SupabaseIdentity,
+    {
+      academyId,
+      submissionId: id,
+    },
+  );
   vi.spyOn(f.service, "get")
     .mockImplementationOnce(async () => pending)
     .mockImplementationOnce(
@@ -191,5 +194,37 @@ it("does not miss completion while the post-attachment read is pending", async (
   resolveRead(pending);
   await flush();
   expect(JSON.parse(received.at(-1)!.data).status).toBe("PASSED");
+  expect(f.events.eventNames()).toEqual([]);
+});
+
+it("reconciles an old failed notification as current RUNNING before successful retry completion", async () => {
+  const f = fixture();
+  const received: { type: string; data: string }[] = [];
+  const stream = await f.controller.stream(id, academyId, "Bearer token");
+  stream.subscribe((event) => received.push(event));
+  await flush();
+  f.events.emit("failed", { jobId: id, failedReason: "PRIVATE_WORKER_REASON" });
+  await flush();
+  expect(received.filter((event) => event.type === "error")).toEqual([]);
+  expect(f.events.listenerCount("completed")).toBe(1);
+  f.attempt.result = result("PASSED");
+  f.events.emit("completed", { jobId: id });
+  await flush();
+  expect(JSON.parse(received.at(-1)!.data).status).toBe("PASSED");
+  expect(JSON.stringify(received)).not.toContain("PRIVATE_WORKER_REASON");
+  expect(f.events.eventNames()).toEqual([]);
+});
+it("delivers a durable ERRORED practice result on failure notification", async () => {
+  const f = fixture();
+  const received: { type: string; data: string }[] = [];
+  const stream = await f.controller.stream(id, academyId, "Bearer token");
+  stream.subscribe((event) => received.push(event));
+  await flush();
+  f.attempt.result = result("ERRORED");
+  f.events.emit("failed", { jobId: id, failedReason: "PRIVATE_WORKER_REASON" });
+  await flush();
+  expect(received.at(-1)!.type).toBe("result");
+  expect(JSON.parse(received.at(-1)!.data).status).toBe("ERRORED");
+  expect(JSON.stringify(received)).not.toContain("PRIVATE_WORKER_REASON");
   expect(f.events.eventNames()).toEqual([]);
 });

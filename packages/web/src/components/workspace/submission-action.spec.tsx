@@ -155,3 +155,45 @@ it('ignores a late official result after reset and closes the previous stream', 
     await f.close();
   }
 });
+
+it.each(['PASSED', 'ERRORED'] as const)(
+  'keeps official retry RUNNING until the current durable %s result',
+  async (status) => {
+    const f = await mount();
+    try {
+      rpc.getSubmission.mockResolvedValueOnce({
+        submissionId: 'attempt',
+        status: 'RUNNING',
+        totalCount: 1,
+        cases: [],
+      });
+      await act(async () => {
+        await f.state.submit('print(1)');
+      });
+      const source = Source.all[0];
+      await act(async () => {
+        source.send('result');
+        await pause();
+      });
+      expect(f.state.submitting).toBe(true);
+      expect(f.state.result).toBe(null);
+      expect(f.state.error).toBe(null);
+      expect(source.closed).toBe(false);
+      rpc.getSubmission.mockResolvedValue({
+        submissionId: 'attempt',
+        status,
+        totalCount: 1,
+        cases: [],
+      });
+      await act(async () => {
+        source.send('result');
+        await pause();
+      });
+      expect(f.state.result?.status).toBe(status);
+      expect(f.state.submitting).toBe(false);
+      expect(source.closed).toBe(true);
+    } finally {
+      await f.close();
+    }
+  },
+);

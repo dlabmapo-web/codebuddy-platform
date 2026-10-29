@@ -363,3 +363,34 @@ it('does not refetch automatically on repeated disconnects after the recovery bu
     await f.close();
   }
 });
+
+it.each(['PASSED', 'ERRORED'] as const)(
+  'keeps practice retry RUNNING until the current durable %s result',
+  async (status) => {
+    const f = await mount();
+    try {
+      await act(async () => {
+        await f.state.submit('print(1)');
+        await pause();
+      });
+      const source = Source.all[0];
+      await act(async () => {
+        source.send('result', value('RUNNING'));
+        await pause();
+      });
+      expect(f.state.submitting).toBe(true);
+      expect(f.state.result?.status).toBe('RUNNING');
+      expect(f.state.error).toBe(null);
+      expect(source.closed).toBe(false);
+      await act(async () => {
+        source.send('result', value(status));
+        await pause();
+      });
+      expect(f.state.result?.status).toBe(status);
+      expect(f.state.submitting).toBe(false);
+      expect(source.closed).toBe(true);
+    } finally {
+      await f.close();
+    }
+  },
+);

@@ -94,11 +94,11 @@ type RuntimeSelectionContext = {
 
 ## Task 3: Admission, durable dispatch, descriptor-bound evaluation and recovery
 
-**Files:** Modify `submission.service.ts`, `staff-practice.service.ts`, `sample-check.service.ts` (actual located service), regrade admission, `judge.queue.ts`, `judge.main.ts`, `grading.service.ts`, `practice.runner.ts`, `sample-check.runner.ts`, `case-evaluator.ts`, `execution-capacity.ts`, `execution-engine.ts`, `sandbox-engine.ts`. Create runtime client/router, dispatch-intent service, fenced checkpoint/recovery modules and targeted tests.
+**Files:** Modify `submission.service.ts`, `staff-practice.service.ts`, `sample-check.service.ts` (actual located service), regrade admission, `judge.queue.ts`, `judge.main.ts`, `grading.service.ts`, `practice.runner.ts`, `sample-check.runner.ts`, `case-evaluator.ts`, `execution-capacity.ts`, `execution-engine.ts`, `sandbox-engine.ts`. Create runtime client/router, dispatch-intent service, fenced checkpoint/recovery modules and targeted tests. Add a second additive Prisma migration for immutable private execution-lease history required to retain original worker/broker/reservation context across recovery.
 
 **Consumes:** Task 1 registry/persistence types and Task 2 broker protocol. Existing public RPC result schemas stay compatible.
 
-**Produces:** Frozen descriptors on all newly accepted executable work; one registry and role-independent policy; outbox insertion inside attempt transaction; idempotent queue dispatch/sweeping; actual broker job leases across both engines/workload kinds; per-job immutable engine adapter; fenced claims/checkpoints and finalization with no duplicate execution/award.
+**Produces:** Frozen descriptors on all newly accepted executable work; one registry and role-independent policy; outbox insertion inside attempt transaction; idempotent queue dispatch/sweeping; actual broker job leases across both engines/workload kinds; per-job immutable engine adapter; fenced claims/checkpoints and finalization with no duplicate execution/award. `GradingExecutionLease` stores its owner, generation/token, worker generation, original broker generation, reservation ID, runtime/budget and lifecycle state; changing an attempt’s active generation must not erase an older lease context needed to retrieve/ack its receipt. Sample lease context stays in its private Redis record, preserving ephemeral semantics.
 
 - [ ] Add admission tests verifying transaction boundaries and frozen identity:
   ```ts
@@ -109,6 +109,7 @@ type RuntimeSelectionContext = {
   ```
   Also cover queue outage after commit, retry after uncertain acknowledgement, stale worker fence, crash after removal/before case checkpoint and after checkpoint/before final commit, old snapshot routing and disabled manifest behavior.
 - [ ] Wire selection consistently into student/practice/sample/regrade snapshots; retain complete original policies and comparator identity. Resolve old work without invented image provenance. Native readiness/catalog errors cannot silently relabel accepted work.
+- [ ] Persist immutable claim/lease context before source release; persist the broker reservation ID before calling run. A crash between reserve and its DB acknowledgement must be recoverable through idempotent reserve using the stored original context. Derive stable case IDs from frozen case positions, not a run-call counter that resets after recovery.
 - [ ] Integrate descriptor-bound engine contexts into the existing evaluator; never mutate a global `.version` across concurrent jobs. Claim only with the owned reservation/fence. Acknowledge receipts only after private case checkpoint durability; final transaction consumes checkpoints and preserves points atomicity.
 - [ ] Integrate durable dispatch and recovery in normal worker lifecycle, with bounded batches and idempotent job IDs. Preserve separate queues/background priorities and check broker generation before execution/commit. Post-commit events only.
 - [ ] Run targeted submission/practice/sample/regrade/points/queue tests, migration-backed integration with fresh local PostgreSQL/Redis, and API/worker typechecks. Commit and report real commands and limitations.

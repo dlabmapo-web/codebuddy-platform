@@ -1,0 +1,14 @@
+# Broker runtime artifact only; production runs in the delegated host user service
+# so it can inspect host PIDs/cgroups. Do not mount a host daemon into this image.
+FROM node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS build
+WORKDIR /build
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY packages/shared packages/shared
+COPY packages/grading-runtime packages/grading-runtime
+RUN pnpm install --frozen-lockfile --ignore-scripts --filter @cove/grading-runtime... && pnpm --filter @cove/shared build && pnpm --filter @cove/grading-runtime build && pnpm --filter @cove/grading-runtime deploy --prod /artifact
+FROM node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da
+COPY --from=build /artifact /opt/grading-runtime
+WORKDIR /opt/grading-runtime
+USER 1000:1000
+ENTRYPOINT ["node", "dist/main.js"]

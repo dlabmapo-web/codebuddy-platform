@@ -125,7 +125,7 @@ const bound = { brokerGeneration: z.uuid(), context: executionAttemptContextSche
 const reserved = { ...bound, reservationId: z.uuid() };
 export const brokerRequestSchema = z.discriminatedUnion("type", [
   z.strictObject({ ...envelope, type: z.literal("health") }),
-  z.strictObject({ ...envelope, ...bound, type: z.literal("reserve") }),
+  z.strictObject({ ...envelope, ...bound, type: z.literal("reserve"), memoryLimitMb: z.number().int().min(16).max(4096) }),
   z.strictObject({ ...envelope, ...reserved, type: z.literal("run"), input: brokerExecutionInputSchema }),
   z.strictObject({ ...envelope, ...reserved, type: z.literal("receipt") }),
   z.strictObject({ ...envelope, ...reserved, type: z.literal("ack"), receiptId: z.uuid(), checkpointId: z.uuid() }),

@@ -142,6 +142,19 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@22.20.1)(happy-dom@20.14.5)(vite@8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1))
 
+  packages/grading-runtime:
+    dependencies:
+      '@cove/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/gui-runtime:
     dependencies:
       ws:

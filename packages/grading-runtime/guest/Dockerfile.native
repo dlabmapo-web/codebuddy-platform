@@ -1,0 +1,15 @@
+# This digest identifies the base OCI index, never the built grading guest.
+FROM python:3.12.16-slim-bookworm@sha256:e697c81897302a4c4333bade000d98038fbb21eb064f8ee1fd42d02ebcd9d337 AS compiler
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev && rm -rf /var/lib/apt/lists/*
+COPY packages/grading-runtime/guest/gated-launcher.c /build/gated-launcher.c
+RUN gcc -O2 -Wall -Wextra -Werror /build/gated-launcher.c -o /build/gated-launcher
+FROM python:3.12.16-slim-bookworm@sha256:e697c81897302a4c4333bade000d98038fbb21eb064f8ee1fd42d02ebcd9d337
+ARG PACKAGE_MANIFEST_HASH
+LABEL io.cove.grading.package=$PACKAGE_MANIFEST_HASH io.cove.grading.shim="cove-guest-1" io.cove.grading.engine="cpython" io.cove.grading.version="3.12.16" io.cove.grading.python="3.12.16"
+COPY --from=compiler /build/gated-launcher /opt/guest/gated-launcher
+COPY packages/grading-runtime/guest/supervisor.py packages/grading-runtime/guest/native.py /opt/guest/
+COPY packages/grading-runtime/guest/artifacts/cpython-identity.json /opt/guest/identity.json
+COPY packages/grading-runtime/guest/artifacts/cpython-manifest.json /opt/guest/package-manifest.json
+RUN test "$(python3 --version)" = "Python 3.12.16" && test -n "$PACKAGE_MANIFEST_HASH" && python3 -c 'import json,os; assert json.load(open("/opt/guest/identity.json"))["packageManifestHash"] == os.environ["PACKAGE_MANIFEST_HASH"]'
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+ENTRYPOINT ["python3", "-I", "-u", "/opt/guest/supervisor.py"]

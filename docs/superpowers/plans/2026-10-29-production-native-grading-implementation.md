@@ -153,8 +153,8 @@ type RuntimeSelectionContext = {
 
 **Produces:** Repeatable browser E2E tests for staff/student Submit, correct/wrong/runtime/limit outcomes, first/repeat points, disconnect/refresh recovery, staff ownership and grade isolation, frozen engine/revision and fail-closed unsupported native activation. Production rootless positive/containment and 100-run AMD64 performance cohorts have a separate capability-gated entrypoint with a truthful executed/not-executed report.
 
-- [ ] Boot unique disposable PostgreSQL/Redis fixtures with explicit loopback URLs, minimal migration scaffolding, and scoped cleanup traps; refuse remote DB/production endpoints before any seed/migrate. Test bridge owns synthetic auth identities only. No production dotenv selection.
-- [ ] Add Playwright assertions against visible results and acknowledged persisted records:
+- [x] Boot unique disposable PostgreSQL/Redis fixtures with explicit loopback URLs, minimal migration scaffolding, and scoped cleanup traps; refuse remote DB/production endpoints before any seed/migrate. Test bridge owns synthetic auth identities only. No production dotenv selection.
+- [x] Add Playwright assertions against visible results and acknowledged persisted records:
   ```ts
   await page.getByRole('button', {name:'Submit', exact:true}).click();
   await expect(page.getByRole('heading', {name:'Everything passed'})).toBeVisible();
@@ -162,9 +162,9 @@ type RuntimeSelectionContext = {
   expect(await fixture.countPointAwards()).toBe(1);
   ```
   Test native only through the real verified broker when the environment supports it. Use deterministic drivers for contract tests only and label them accordingly. Unsupported rootless native activation must fail closed, while the existing disabled/default path remains usable.
-- [ ] Run local browser E2E and available real-container checks. Retain reports/traces/screenshots of failures, fix actual regressions, then rerun covering tests. Run core shared/API/worker/web typechecks and appropriate grading regressions.
-- [ ] Provide Linux AMD64 rootless CI/harness commands for paired 100-submission 1/5/10 cohorts, first/repeat points, two-in-flight/ten-client burst and mixed load, collecting all failed outcomes and post-commit/browser boundaries. Do not execute on production or purchase/provision a server implicitly.
-- [ ] Write the verification report distinguishing executed local tests, test doubles, capability failures, unexecuted AMD64 acceptance, remaining certification coverage and disabled activation. Do not claim five-second production acceptance without the specified evidence. Commit and report.
+- [x] Run local browser E2E and available real-container checks. Retain reports/traces/screenshots of failures, fix actual regressions, then rerun covering tests. Run core shared/API/worker/web typechecks and appropriate grading regressions.
+- [x] Provide Linux AMD64 rootless CI/harness commands for paired 100-submission 1/5/10 cohorts, first/repeat points, two-in-flight/ten-client burst and mixed load, collecting all failed outcomes and post-commit/browser boundaries. Do not execute on production or purchase/provision a server implicitly.
+- [x] Write the verification report distinguishing executed local tests, test doubles, capability failures, unexecuted AMD64 acceptance, remaining certification coverage and disabled activation. Do not claim five-second production acceptance without the specified evidence. Commit and report.
 
 ## Final integration review
 

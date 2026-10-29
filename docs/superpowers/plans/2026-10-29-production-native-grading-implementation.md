@@ -168,9 +168,9 @@ type RuntimeSelectionContext = {
 
 ## Final integration review
 
-- [ ] Generate one full implementation-range review package; perform code-review skill's security/performance/correctness review with fresh reviewer context.
-- [ ] Address critical/important findings in one scoped fix wave and rerun covering tests; record any adjudicated residual risks.
-- [ ] Verify a clean committed branch and preserve commands/results/evidence in tracked documentation. No push, merge to v2, or deployment is included in this implementation request.
+- [x] Generate one full implementation-range review package; perform code-review skill's security/performance/correctness review with fresh reviewer context.
+- [x] Address critical/important findings in one scoped fix wave and rerun covering tests; record any adjudicated residual risks.
+- [x] Verify a clean committed branch and preserve commands/results/evidence in tracked documentation. No push, merge to v2, or deployment is included in this implementation request.
 
 ## Environment facts recorded before implementation
 

@@ -22,7 +22,7 @@ not ok 3 - real stopped immutable broker carrier matches copied host tree and re
   error: |-
     Command failed: docker --host unix:///Users/jurabeksamiev/.docker/run/docker.sock cp f75aecfdc908929015a5ace67f3c91acb8872593972783969cb486f60f7147d0:/opt/grading-runtime/. <owned-temporary-directory>
     invalid symlink "<owned-temporary-directory>/node_modules/.pnpm/node_modules/@cove/grading-runtime" -> "../../../../../build/packages/grading-runtime"
-    
+
   code: 'ERR_TEST_FAILURE'
   stack: |-
     genericNodeError (node:internal/errors:983:15)

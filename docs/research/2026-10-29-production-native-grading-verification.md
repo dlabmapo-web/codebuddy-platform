@@ -597,6 +597,31 @@ DB/Redis fixtures and stopped carriers were cleaned. No deployment, activation,
 publication, push or native acceptance occurred; the 21 prior rulings below
 remain verbatim for final adjudication.
 
+## Final review and local handoff
+
+The complete branch review at `d4cad35c` found three Important integration issues.
+The single final fix wave `496b4fff` resolved all three; the scoped rereview
+approved the disabled implementation with **no remaining Critical, Important or
+Minor finding**. The reviewer independently matched all 24 recorded source/build
+hashes. This is merge-readiness review, not a merge, deployment or native
+activation.
+
+- [Initial whole-branch findings](assets/2026-10-29-native-grading-verification/whole-branch-review.md)
+- [Final fix and covering verification](assets/2026-10-29-native-grading-verification/final-fix-report.md)
+- [Final scoped approval](assets/2026-10-29-native-grading-verification/whole-branch-rereview.md)
+
+The local branch `feat/production-native-grading` and worktree
+`/Users/jurabeksamiev/Developer/codebuddy-platform-native-grading` are preserved.
+They share the original repository's Git history. The original checkout remains
+on `feat/public-turtle-browser-pilot`, unchanged. No push, PR, merge, tag,
+deployment or production configuration change was performed.
+
+Local browser, persistence, recovery, production-build and artifact checks above
+are complete. Linux AMD64 rootless/systemd positive containment, resource and
+paired performance cohorts, release scans, certifications and pilot remain
+unexecuted release gates. Native selection stays disabled; the five-second
+production target remains unverified.
+
 ## Preserved implementation rulings
 
 The following 21 decisions preserve the SDD ledger verbatim, including reason
@@ -643,3 +668,5 @@ Ruling: Give only the four transport-correctness fixtures an explicit two-second
 Ruling: Leave the disclosed Next development destination-stream digest and pg client-query deprecation as non-blocking Minor diagnostics — actual production standalone abort/navigation remained healthy with zero listeners, and unrelated framework/driver cleanup supplies no additional grading correctness proof in this fix — cost if wrong: development stderr noise and a future dependency investigation remain; no global suppression or claim of a proven root cause.
 
 Ruling: Fix the exact unused build-only self-workspace symlink in broker packaging and rebuild only that artifact — the new real extraction/tree test exposed a concrete producer defect preventing the required strict artifact verification, so the consumer fix cannot finish honestly without repairing its artifact — cost if wrong: a superseding broker config ID and narrow rebuild/import/tree validation; existing symlink/mount/identity policy stays strict, API/worker images remain unchanged, and the prior failed artifact is disclosed.
+
+Ruling: Preserve the local feature branch and linked worktree at handoff — the authorized implementation/E2E plan explicitly excludes push, merge and deployment, so keeping the reversible local state completes that scope without an unnecessary integration question — cost if wrong: integration remains for a later explicit request; all commits and the inspection workspace remain available.

@@ -2,6 +2,7 @@
 import json
 import hashlib
 import os
+import re
 from pathlib import Path
 import subprocess
 import time
@@ -18,6 +19,36 @@ FIXED_HOST_FIELDS=('uid','controlGid','daemonConfig','daemonExecutable','daemonE
 
 def collect_candidate_inventory(compose, image):
     return json.loads(compose('run','--rm','--no-deps','--pull','never','--entrypoint','node','api','scripts/grading-inventory.mjs',capture=True,overrides={'API_IMAGE':image}))
+
+def stopped_consumer(run,docker,project,service,reconcile=False):
+    """Reconcile only inspected stopped IDs from an authoritative owned census.
+
+    Compose may leave old-stopped/new-created containers across interrupted
+    recreation. Removing all such duplicates is resumable even between removals;
+    absence is allowed only before the later create phase, never before startup.
+    """
+    def census():
+        ids=run(docker+['ps','-aq','--no-trunc','--filter','label=com.docker.compose.project='+project,'--filter','label=com.docker.compose.service='+service],True).split()
+        require(len(ids)==len(set(ids)) and all(re.fullmatch('[a-f0-9]{64}',cid) for cid in ids),'Invalid consumer census')
+        return set(ids)
+    def inspect(cid):
+        projection='{"Id":{{json .Id}},"Labels":{{json .Config.Labels}},"State":{{json .State}}}'
+        value=json.loads(run(docker+['inspect','--format',projection,cid],True))
+        require(value['Id']==cid and value['Labels'].get('com.docker.compose.project')==project and value['Labels'].get('com.docker.compose.service')==service,'Consumer ownership differs from census')
+        require(value['Labels'].get('com.docker.compose.oneoff','').lower()=='false','Unknown/one-shot consumer cannot be reconciled')
+        verify_stopped_container(value['State'])
+    ids=census()
+    for cid in sorted(ids):inspect(cid)
+    require(census()==ids,'Consumer census changed during termination proof')
+    if reconcile and len(ids)>1:
+        # No force/volumes/global Compose removal. A concurrent start makes rm
+        # fail, retaining the fence. Re-prove each exact ID before its removal.
+        for cid in sorted(ids):
+            inspect(cid)
+            run(docker+['rm',cid])
+        require(not census(),'Reconciled consumers remain or new consumer appeared')
+    else:
+        require(len(ids)==1 or reconcile and not ids,'One stopped consumer required before startup')
 
 def run_retained(args,root,state_path,environment):
     require(state_path.is_file(),'Retained deployment required')
@@ -87,11 +118,8 @@ def run_retained(args,root,state_path,environment):
     userctl=['runuser','-u','cove-grading','--','env',f"XDG_RUNTIME_DIR=/run/user/{config['uid']}",f"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{config['uid']}/bus",'systemctl','--user']
     broker_started_at=0
     journal_identity=None
-    def stopped_consumer(service):
-        # Census all containers, including stopped/restarting ones, not a cached ID.
-        ids=run(docker+['ps','-aq','--no-trunc','--filter','label=com.docker.compose.project='+config['composeProject'],'--filter','label=com.docker.compose.service='+service],True).split()
-        require(len(ids)==1,'One retained consumer required; duplicate/unknown process refused')
-        verify_stopped_container(json.loads(run(docker+['inspect','--format','{{json .State}}',ids[0]],True)))
+    def consumer(service,reconcile=False):
+        stopped_consumer(run,docker,config['composeProject'],service,reconcile)
     def stopped_broker():
         properties=dict(line.split('=',1) for line in run(userctl+['show','cove-grading-broker.service','--property=ActiveState,MainPID'],True).splitlines())
         group=Path(config['cgroupParent'])/'cove-grading-broker.service'
@@ -123,8 +151,8 @@ def run_retained(args,root,state_path,environment):
     def action(name):
         nonlocal broker_started_at,journal_identity
         if name=='stop-api':compose('stop','--timeout','90','api')
-        elif name=='verify-api-stopped':stopped_consumer('api')
-        elif name=='verify-worker-stopped':stopped_consumer('judge-worker')
+        elif name=='verify-api-stopped':consumer('api',reconcile=True)
+        elif name=='verify-worker-stopped':consumer('judge-worker',reconcile=True)
         elif name=='verify-broker-stopped':stopped_broker()
         elif name=='preserve-recovery-state':
             journal_identity=journal_snapshot()
@@ -136,7 +164,7 @@ def run_retained(args,root,state_path,environment):
         elif name=='create-consumers':compose('create','--no-deps','--force-recreate','--pull','never','api','judge-worker')
         elif name=='start-broker':
             if recovering:
-                stopped_consumer('api');stopped_consumer('judge-worker');stopped_broker()
+                consumer('api');consumer('judge-worker');stopped_broker()
                 require(journal_snapshot()==journal_identity,'Retained journal changed while broker stopped')
             broker_started_at=int(time.time()*1000)
             run(userctl+['start','cove-grading-broker.service'])
@@ -154,7 +182,7 @@ def run_retained(args,root,state_path,environment):
         elif name in ['preflight','verify-running']:preflight()
         elif name=='start-consumers':
             if recovering:
-                stopped_consumer('api');stopped_consumer('judge-worker')
+                consumer('api');consumer('judge-worker')
                 verify_broker_cleanup(read_json(config['observationsPath']),target['workerGeneration'],broker_started_at)
                 compose('up','-d','--wait','--wait-timeout','300','--no-deps','--pull','never','judge-worker')
                 compose('up','-d','--wait','--wait-timeout','300','--no-deps','--pull','never','api')

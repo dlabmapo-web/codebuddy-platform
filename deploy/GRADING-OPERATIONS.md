@@ -331,9 +331,17 @@ bundle. Never edit the journal, checkpoints, retained pointer or pending intent
 to make a proof match. A different repair candidate uses `repair-release` again.
 
 The repair intent is fsynced before service mutation. API admission stops first,
-then the worker stops. A complete Compose service-container census requires one
-consumer, stopped state, PID zero and no restart; duplicates/unknown state refuse
-replacement. Broker stop requires inactive/failed systemd state, MainPID zero
+then the worker stops. A complete Compose service-container census proves every
+full container ID belongs to the exact project/service, is not a one-shot, is
+stopped with PID zero and is not restarting. An interrupted Compose recreation
+may leave old-stopped/new-created containers. Only after proving the entire
+census stopped and unchanged, repair removes those duplicates by exact ID with
+`docker rm` (no force or volume deletion), then requires a fresh empty census.
+An interruption during this cleanup can resume from one or zero stopped
+containers. Successful absence is supported only before consumer creation;
+startup requires a fresh census with exactly one confirmed-stopped container
+per service. Failed/unknown/changing census or any live instance refuses cleanup
+and startup. Broker stop requires inactive/failed systemd state, MainPID zero
 and an empty service cgroup. The frozen journal identity is checked against the
 signature and saved privately in `state/grading-recovery-state.json`. Source
 intent, leases, checkpoints and queue records stay in their original app stores;

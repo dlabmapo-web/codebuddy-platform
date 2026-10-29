@@ -152,3 +152,44 @@ The 11 skipped sample-store tests require explicitly isolated Redis configuratio
 Reviewed scope against spec sections 4/7/8/13. Corrected an initial wire envelope overconstraint so compatibility supports existing declared 16–4096 MiB and effective execution can receive less than 100 ms; native certification remains bounded. Separated broker generation from worker generation and restricted broker outcomes to execution-only states. Strengthened bound-factory validation from version-only to complete descriptor equality; added malformed/versioned sample correlation checks. Historical decoders and default writers retain legacy behavior, with no invented image backfill.
 
 No actual architecture blockers remain for Task 1. Task 2 must implement real broker identity/cgroup/resource/protocol enforcement and bounded transport/journal behavior. Task 3 must integrate frozen selection at atomic admission, new snapshot writers, fenced worker/checkpoint/final persistence, dispatch and Redis recovery without changing legacy paths when no manifest exists. Invalid manifests fail closed; transient slot pressure after acceptance must queue/fail infrastructure, never reselect another descriptor. The SQL-only checks/RLS were reviewed but not applied or exercised against a database in this task. Release manifests require independently reviewed real digests, interpreter patch selection and certification; synthetic test fixtures are not deployable manifests.
+
+## Round 1 fix — preserve the recorded historical engine/version
+
+Addressed the Important finding in `task-1-review.md`: registered historical adapters previously could replace an accepted Pyodide interpreter with CPython or another Pyodide version. Each historical manifest entry now requires `entry.engineVersion === executionEngineVersion(entry.adapter)`. The historical null-snapshot resolver also checks that the adapter's prefixed engine/version exactly matches the work's persisted identity before returning it. Provenance remains `unrecorded`; a matching adapter is not evidence of a historical image/package/shim digest. No exported signature or persistence schema changed.
+
+Changed covering tests:
+
+- Shared `rejects a registered cross-engine historical adapter`: registers the existing complete CPython fixture but maps the recorded `pyodide-0.27.5` key to it; expects the specific historical-identity validation error.
+- Shared `rejects a registered same-engine/different-version historical adapter`: registers a complete immutable Pyodide `0.28.0` descriptor but maps the recorded `pyodide-0.27.5` key to it; expects the same validation error. Registration succeeds independently, so the rejection specifically exercises engine/version correlation.
+- Shared `accepts a matching historical engine/version without requiring recorded image provenance`: retains the exact matching historical Pyodide mapping.
+- API parameterized `refuses a cross-engine historical adapter before registry creation` and `refuses a same-engine/different-version historical adapter before registry creation`: reject both invalid manifests through the registry's actual parsing boundary.
+- API `keeps matching historical engine/version provenance explicitly unrecorded`: resolves an explicit null snapshot to `{provenance:'unrecorded',engineVersion:'pyodide-0.27.5',adapter:compatibilityFixture}` and verifies there is no recorded `descriptor` field. Existing absent-snapshot/unrecorded-provenance test remains intact.
+
+Tests were added and run before the implementation fix. Exact focused commands and output:
+
+```text
+pnpm --filter @cove/shared exec vitest run src/grading-runtime.spec.ts
+Before fix: 1 file failed; 2 failed | 7 passed (9).
+Both new negative scenarios: AssertionError: expected true to be false.
+After fix: 1 file passed; 9 passed (9); exit 0.
+
+pnpm --filter @cove/api exec vitest run src/judge/runtime-registry.spec.ts
+Before fix: 1 file failed; 2 failed | 5 passed (7).
+Both new negative scenarios: AssertionError: expected [Function] to throw an error.
+After fix (including new explicit-null positive test): 1 file passed; 8 passed (8); exit 0.
+
+pnpm --filter @cove/shared build
+> tsc -p tsconfig.build.json
+exit 0
+
+pnpm --filter @cove/shared exec tsc --noEmit
+exit 0; no diagnostics
+
+pnpm --filter @cove/api exec tsc --noEmit
+exit 0; no diagnostics
+
+git diff --check
+exit 0; no whitespace errors
+```
+
+All commands retained the task worktree as their explicit working directory. No unrelated suites, Prisma/database operations, Redis/browser acceptance, or production checks were rerun. Self-review: the manifest validation and resolver guard preserve exactly the historical family/version while leaving image provenance unrecorded; full-descriptor matching for recorded snapshots is unchanged. This fix is limited to the review finding, its covering tests and this report.

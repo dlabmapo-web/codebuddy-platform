@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { brokerRequestSchema, brokerResponseSchema, brokerExecutionInputSchema, brokerExecutionResultSchema, runtimeDescriptorSchema, runtimeManifestSchema } from "./grading-runtime.js";
-import { manifestFixture, nativeFixture } from "./testing/grading-runtime-fixtures.js";
+import { compatibilityFixture, manifestFixture, nativeFixture } from "./testing/grading-runtime-fixtures.js";
 
 describe("immutable grading contracts", () => {
   it("validates complete descriptors and rejects mutable image tags and inconsistent accounting", () => {
@@ -14,6 +14,23 @@ describe("immutable grading contracts", () => {
     expect(runtimeManifestSchema.safeParse(manifestFixture).success).toBe(true);
     expect(runtimeManifestSchema.safeParse({ ...manifestFixture, certifications: [...manifestFixture.certifications, ...manifestFixture.certifications] }).success).toBe(false);
     expect(runtimeManifestSchema.safeParse({ ...manifestFixture, certifications: [{ ...manifestFixture.certifications[0], runtime: { ...nativeFixture, shimVersion: "other" } }] }).success).toBe(false);
+  });
+  it.each([
+    ["cross-engine", nativeFixture],
+    ["same-engine/different-version", Object.freeze({ ...compatibilityFixture, engineVersion: "0.28.0" })],
+  ])("rejects a registered %s historical adapter", (_scenario, adapter) => {
+    const manifest = { ...manifestFixture,
+      historical: [{ engineVersion: "pyodide-0.27.5", adapter }],
+      capabilities: { ...manifestFixture.capabilities, runtimes: [...manifestFixture.capabilities.runtimes, ...(adapter.engine === "pyodide" ? [adapter] : [])] },
+    };
+    const parsed = runtimeManifestSchema.safeParse(manifest);
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) expect(parsed.error.issues.some(issue => issue.message === "Historical adapter and recorded engine version disagree")).toBe(true);
+  });
+  it("accepts a matching historical engine/version without requiring recorded image provenance", () => {
+    expect(runtimeManifestSchema.parse(manifestFixture).historical).toEqual([
+      { engineVersion: "pyodide-0.27.5", adapter: compatibilityFixture },
+    ]);
   });
   it("rejects old broker versions, unknown fields and unbounded requests before execution", () => {
     const health = { protocol: 1, type: "health", requestId: "10000000-0000-4000-8000-000000000004" };

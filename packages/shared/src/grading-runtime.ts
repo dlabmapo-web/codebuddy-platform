@@ -79,6 +79,8 @@ export const runtimeManifestSchema = z.strictObject({
   for (const runtime of [manifest.compatibility, ...(manifest.native ? [manifest.native] : []), ...manifest.historical.map(entry => entry.adapter)])
     if (!identities.includes(runtimeDescriptorIdentity(runtime))) fail("Runtime missing broker capability");
   if (new Set(manifest.historical.map(entry => entry.engineVersion)).size !== manifest.historical.length) fail("Duplicate historical identity");
+  for (const entry of manifest.historical)
+    if (entry.engineVersion !== executionEngineVersion(entry.adapter)) fail("Historical adapter and recorded engine version disagree");
   const allowances = manifest.academyAllowances.map(entry => JSON.stringify([entry.organizationId, entry.academyId]));
   if (new Set(allowances).size !== allowances.length) fail("Duplicate academy allowance");
   const keys = manifest.certifications.map(runtimeCertificationKey);

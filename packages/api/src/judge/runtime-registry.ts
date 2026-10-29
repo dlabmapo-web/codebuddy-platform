@@ -85,6 +85,8 @@ export function createRuntimeRegistry<T extends { readonly version: string; read
       }
       const mapping = manifest.historical.find(entry => entry.engineVersion === work.engineVersion);
       if (!mapping) throw new Error(`Unknown historical runtime ${work.engineVersion}`);
+      if (executionEngineVersion(mapping.adapter) !== work.engineVersion)
+        throw new Error("Historical adapter and recorded engine version disagree");
       return Object.freeze({ provenance: "unrecorded", engineVersion: work.engineVersion, adapter: mapping.adapter });
     },
     bindEngine(input: RuntimeDescriptor): DescriptorBoundClient<T> {

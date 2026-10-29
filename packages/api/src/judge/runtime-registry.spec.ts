@@ -31,6 +31,26 @@ describe("runtime selection and provenance", () => {
     expect(native.version).toBe("cpython-3.12.10"); expect(compatibility.version).toBe("pyodide-0.27.5");
     expect(() => registry.bindEngine({ ...nativeFixture, shimVersion: "absent" })).toThrow();
   });
+  it.each([
+    ["cross-engine", nativeFixture],
+    ["same-engine/different-version", Object.freeze({ ...compatibilityFixture, engineVersion: "0.28.0" })],
+  ])("refuses a %s historical adapter before registry creation", (_scenario, adapter) => {
+    const manifest = { ...manifestFixture,
+      historical: [{ engineVersion: "pyodide-0.27.5", adapter }],
+      capabilities: { ...manifestFixture.capabilities, runtimes: [...manifestFixture.capabilities.runtimes, ...(adapter.engine === "pyodide" ? [adapter] : [])] },
+    };
+    expect(() => createRuntimeRegistry({ enabled: false, manifest,
+      clientFactory: descriptor => ({ version: `${descriptor.engine}-${descriptor.engineVersion}`, descriptor }),
+    })).toThrow(/Historical adapter and recorded engine version disagree/);
+  });
+  it("keeps matching historical engine/version provenance explicitly unrecorded", () => {
+    const registry = createRuntimeRegistry({ enabled: false, manifest: manifestFixture,
+      clientFactory: descriptor => ({ version: `${descriptor.engine}-${descriptor.engineVersion}`, descriptor }),
+    });
+    const resolution = registry.resolveHistoricalRuntime({ engineVersion: "pyodide-0.27.5", executionRuntimeSnapshot: null });
+    expect(resolution).toEqual({ provenance: "unrecorded", engineVersion: "pyodide-0.27.5", adapter: compatibilityFixture });
+    expect(resolution).not.toHaveProperty("descriptor");
+  });
   it("rejects descriptor drift at historical resolution and factory binding", () => {
     const registry = createRuntimeRegistry({ enabled: false, manifest: manifestFixture, clientFactory: descriptor => Object.freeze({ version: `${descriptor.engine}-${descriptor.engineVersion}`, descriptor }) });
     expect(registry.resolveHistoricalRuntime({ engineVersion: "cpython-3.12.10", executionRuntimeSnapshot: nativeFixture })).toEqual({ provenance: "recorded", descriptor: nativeFixture });

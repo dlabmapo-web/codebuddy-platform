@@ -197,6 +197,9 @@ export class JudgeQueue implements OnModuleDestroy {
   get events(): QueueEvents {
     this.eventsInstance ??= new QueueEvents(GRADING_QUEUE, {
       connection: redisConnection(this.redisUrl),
+      // Preserve completions committed before this lazy consumer's first XREAD,
+      // just as for practice; QueueEvents advances this replayable cursor.
+      lastEventId: "0-0",
     });
     return this.eventsInstance;
   }
@@ -204,6 +207,11 @@ export class JudgeQueue implements OnModuleDestroy {
   get practiceEvents(): QueueEvents {
     this.practiceEventsInstance ??= new QueueEvents(PRACTICE_QUEUE, {
       connection: redisConnection(this.redisUrl),
+      // A lazy consumer can start XREAD after the controller's RUNNING read
+      // and completion commit. '$' skips that retained event, even after client
+      // readiness. Replay the bounded history (BullMQ defaults to ~10k events),
+      // then let QueueEvents advance its normal cursor across reconnects.
+      lastEventId: "0-0",
     });
     return this.practiceEventsInstance;
   }

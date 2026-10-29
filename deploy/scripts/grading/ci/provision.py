@@ -510,6 +510,12 @@ def cleanup():
         return dict(version=1,cleaned=True,alreadyAbsent=True)
     state=load_state()
     if state.get('cleaned'):
+        for lookup,names in [(pwd.getpwnam,['cove-grading','cove-grading-ci-worker']),
+                             (grp.getgrnam,['cove-grading-control','cove-grading-ci-worker'])]:
+            for name in names:
+                try: lookup(name)
+                except KeyError: continue
+                raise ValueError('Owned principal reappeared after cleanup: '+name)
         require(not any(os.path.lexists(p) for p in [OPT,HOME,WORKER_HOME,CONTROL,*SYSTEM_FILES,Path(state['delegationPath'])]),'Owned resources reappeared after cleanup')
         return dict(version=1,cleaned=True,alreadyAbsent=True)
     verify_accounts(state,allow_missing=True)

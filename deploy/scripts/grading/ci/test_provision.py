@@ -126,8 +126,24 @@ class SafetyContracts(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/'state';path.write_text('{}')
-            with patch.object(ci,'check_host'),patch.object(ci,'STATE',path),patch.object(ci,'load_state',return_value={'cleaned':True,'delegationPath':'/not-present-cove-test'}),patch.object(ci,'command') as command:
+            with patch.object(ci,'check_host'),patch.object(ci,'STATE',path),patch.object(ci,'load_state',return_value={'cleaned':True,'delegationPath':'/not-present-cove-test'}),patch.object(ci.pwd,'getpwnam',side_effect=KeyError),patch.object(ci.grp,'getgrnam',side_effect=KeyError),patch.object(ci,'command') as command:
                 self.assertTrue(ci.cleanup()['alreadyAbsent']);command.assert_not_called()
+
+    def test_cleanup_cleaned_receipt_refuses_reappeared_principals(self):
+        from unittest.mock import patch
+        import tempfile
+        for kind,name in [('account','cove-grading'),('account','cove-grading-ci-worker'),('group','cove-grading-control'),('group','cove-grading-ci-worker')]:
+            with self.subTest(kind=kind,name=name),tempfile.TemporaryDirectory() as directory:
+                path=Path(directory)/'state';path.write_text('{}')
+                def account_lookup(requested):
+                    if kind=='account' and requested==name: return object()
+                    raise KeyError(requested)
+                def group_lookup(requested):
+                    if kind=='group' and requested==name: return object()
+                    raise KeyError(requested)
+                with patch.object(ci,'check_host'),patch.object(ci,'STATE',path),patch.object(ci,'load_state',return_value={'cleaned':True,'delegationPath':'/not-present-cove-test'}),patch.object(ci.pwd,'getpwnam',side_effect=account_lookup),patch.object(ci.grp,'getgrnam',side_effect=group_lookup),patch.object(ci,'command') as command,patch.object(ci,'user_command') as user_command,patch.object(ci.shutil,'rmtree') as rmtree:
+                    with self.assertRaisesRegex(ValueError,'principal.*reappeared'):ci.cleanup()
+                    command.assert_not_called();user_command.assert_not_called();rmtree.assert_not_called()
 
     def test_bundle_production_schema_and_funding_and_identity_rejections(self):
         import subprocess

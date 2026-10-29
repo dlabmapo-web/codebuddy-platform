@@ -1,9 +1,9 @@
 # Disposable native grading Linux verification — 2026-10-29
 
-Status: **local contracts pass; actual disposable Linux execution is pending**.
-No native containment, OOM, cancellation, recovery or production acceptance
-success is claimed. The controller owns the feature-branch push, actual workflow
-observation, evidence download and evidence closure after source review.
+Status: **paused at the user's request after the first disposable Linux run
+failed during prerequisite preparation**. Local contracts pass. No native
+containment, OOM, cancellation, recovery or production acceptance success is
+claimed. Resume instructions are in `2026-10-29-native-grading-resume.md`.
 
 ## Source and execution
 
@@ -13,8 +13,16 @@ observation, evidence download and evidence closure after source review.
 - Trigger: pushes to that branch only; Ubuntu24.04 AMD64 hosted runner; 45-minute
   timeout; read-only repository permission; no deployment environment/credentials.
 - Concurrency queues newer revisions without cancelling the active first record.
-- Actual run URL, Linux source commit, artifact digest and runner identity:
-  **pending; no run has been started by the implementer**.
+- First actual run: <https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/40848107655>.
+- Tested source: `19ae8a290158df943b1d6292c6d655595071dd92`.
+- Outcome: failed at `prepare`; official prerequisite installation simulation
+  proposed changing a protected rootful-engine package, so the guard refused.
+  The current artifact does not identify which protected package/version.
+- Downloaded artifact: ID `12886185688`, compressed size634 bytes. Sanitized
+  summary archived in `assets/2026-10-29-disposable-native-grading-linux-verification/`.
+- Archived summary SHA256: `f2f7b4167b24d21a9fe6b529a387e1b6154fd051d20b056a0d73c3c5efc64cd0`.
+- Linux AMD64 image builds succeeded. The dedicated grading daemon and all24
+  required kernel cases remained unstarted; no positive native proof exists.
 - Production remains untouched. No merge, deployment or activation is authorized
   by this verification stage.
 
@@ -38,13 +46,13 @@ are excluded by `.dockerignore`; the safe package fixture remains.
 
 | Required group | Required count | Actual Linux result |
 | --- | ---: | --- |
-| Functional cases, CPython and Pyodide | 16 | pending |
-| Native isolation and charged scratch | 1 | pending |
-| Native learner memory and PID limits | 2 | pending |
-| Native cancellation | 1 | pending |
-| Retained receipt and active broker restart | 2 | pending |
-| Distinct guest-parent and control-local OOM | 2 | pending |
-| Total | 24 | pending |
+| Functional cases, CPython and Pyodide | 16 | not executed |
+| Native isolation and charged scratch | 1 | not executed |
+| Native learner memory and PID limits | 2 | not executed |
+| Native cancellation | 1 | not executed |
+| Retained receipt and active broker restart | 2 | not executed |
+| Distinct guest-parent and control-local OOM | 2 | not executed |
+| Total | 24 | not executed |
 
 The actual summary can pass only with all24 unique required cases, validated
 source/allocation/receipt bindings, actual GATE/EXEC events, native local OOM
@@ -70,7 +78,10 @@ owners/modes, duplicate JSON keys and oversized inputs are rejected. It projects
 only bounded identity/counter/status fields. Root observations retain
 architecture/kernel/Node/Docker, immutable daemon/image/package/broker-tree and
 runtime identities, effective family/worker limits and remaining host headroom.
-The actual values, system reserve observations and cleanup receipt are **pending**.
+Full daemon/family/system-reserve observations are unavailable because
+preparation stopped early. The actual cleanup receipt reports success, original
+owned processes/namespaces absent and no unexpected containers. Primary exit1
+was retained separately from cleanup exit0 and collection exit1.
 
 Optional worker phase summaries are diagnostic only. Internal request/reply
 handshakes, convenience `evidence/kernel.json`, worker host-proof copies, private
@@ -106,7 +117,9 @@ select a passing record.
 
 ## Remaining acceptance limits
 
-The prior17-case Pyodide browser CI is a separate result. This task has not
+The prior17-case Pyodide browser CI is a separate passing result
+(run40835892964). The new ordinary isolated run40848107576 was still in progress
+at the last observation and should be checked on resume. This task has not
 executed complete application/native E2E, paired100-sample cohorts, mixed-load
 p95 or production host equivalence. Release signatures, activation, performance
 acceptance and every production gate remain unverified unless separately

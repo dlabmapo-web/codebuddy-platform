@@ -4,6 +4,11 @@
 
 **Goal:** Execute initial real rootless Linux native-runtime checks on a disposable standard GitHub VM without changing production.
 
+**Execution checkpoint:** Paused at the user’s request on2026-10-29. Tasks1/2 and
+Task3 code/review are complete. The first actual Linux run failed in prerequisite
+preparation before guest execution. Resume from
+`docs/research/2026-10-29-native-grading-resume.md`; do not restart completed tasks.
+
 **Architecture:** A guarded administrator harness prepares the existing dedicated
 grading units and immutable local artifacts. A distinct bounded unprivileged
 coordinator uses only the production broker socket. Host-only observation and
@@ -229,7 +234,7 @@ worker-writable report alone is insufficient host proof. Pass setup-node's actua
 absolute executable as `GRADING_CI_NODE_SOURCE` through narrowly scoped sudo
 environment, not the entire caller PATH/environment.
 
-- [ ] **Step 1: Add failing bounded collector/workflow contracts.**
+- [x] **Step 1: Add failing bounded collector/workflow contracts.**
 
 Test missing evidence, symlink/path escape, forbidden files, size overflow and
 preservation of the original test failure alongside cleanup failures. Extend the
@@ -242,7 +247,7 @@ untrusted PR trigger, and one-day retention using the frozen web ESLint js-yaml
 parser via Node createRequire, JSON_SCHEMA and duplicate-key rejection; no new
 YAML dependency or hand-written parser is needed.
 
-- [ ] **Step 2: Implement the run and evidence entrypoints.**
+- [x] **Step 2: Implement the run and evidence entrypoints.**
 
 Build dependencies/images before grading starts; use `bash deploy/scripts/build-grading-images.sh ci linux/amd64`.
 Then guard/provision, observe, run actual kernel cases, observe and exact cleanup

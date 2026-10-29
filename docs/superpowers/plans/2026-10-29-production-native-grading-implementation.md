@@ -59,17 +59,17 @@ type RuntimeSelectionContext = {
 
 **Produces:** Runtime descriptor/manifest/certification/protocol schemas and types; runtime registry with strict selection, historical resolution and per-attempt binding interfaces; nullable `Submission.executionRuntimeSnapshot` and execution lease token; staff lease token; dispatch-intent and private per-case checkpoint tables with uniqueness/indexes. New fields are optional/null for historical data. Env supports disabled native activation and immutable manifest path.
 
-- [ ] Add meaningful decoder/selection tests before implementation. Core assertions:
+- [x] Add meaningful decoder/selection tests before implementation. Core assertions:
   ```ts
   expect(selectRuntime({enabled:false, manifest, context})).toEqual(manifest.compatibility);
   expect(selectRuntime({enabled:true, manifest, context: {...context, gradingRevision:2}})).toEqual(manifest.compatibility);
   expect(() => runtimeDescriptorSchema.parse({...native, imageDigest:'latest'})).toThrow();
   ```
   Use complete typed fixture descriptors in test helpers. Test cross-organization UUID/context mismatch, duplicate certification, native unsupported budgets, unknown historical versions, and v4 comparator identity independent of execution.
-- [ ] Run focused shared/API tests and retain the expected initial failure evidence.
-- [ ] Implement strict schemas, immutable validated manifest loading, selection and provenance handling; preserve original policy behavior with native off. Update snapshot/profile consumers enough to keep current builds valid. Define real database relations, generation/checkpoint keys and bounded dispatch indexes; generate Prisma client.
-- [ ] Run shared build, focused decoder/registry tests, API/judge-worker typechecks and Prisma schema validation. No production migrations.
-- [ ] Commit the task and write the scoped report with test commands/results and exact interfaces for later tasks.
+- [x] Run focused shared/API tests and retain the expected initial failure evidence.
+- [x] Implement strict schemas, immutable validated manifest loading, selection and provenance handling; preserve original policy behavior with native off. Update snapshot/profile consumers enough to keep current builds valid. Define real database relations, generation/checkpoint keys and bounded dispatch indexes; generate Prisma client.
+- [x] Run shared build, focused decoder/registry tests, API/judge-worker typechecks and Prisma schema validation. No production migrations.
+- [x] Commit the task and write the scoped report with test commands/results and exact interfaces for later tasks.
 
 ## Task 2: Production execution broker, guests, and kernel resource enforcement
 
@@ -79,7 +79,7 @@ type RuntimeSelectionContext = {
 
 **Produces:** Buildable production broker and immutable guest artifacts. Trusted `BrokerClient` protocol supports health, whole-job reservation, per-case execution, fenced receipt retrieval/ack, release and cancellation. Driver verifies rootless/systemd/cgroup v2 and parent membership before accepting code. Compatibility guests use the real pinned Pyodide runner artifacts; no duplicate grading/comparator implementation.
 
-- [ ] Add resource/lifecycle tests with a deterministic driver that records allocations and cleanup. Test:
+- [x] Add resource/lifecycle tests with a deterministic driver that records allocations and cleanup. Test:
   ```ts
   const a = await bank.reserve({bytes:512*MiB, pids:32});
   expect(await bank.tryReserve({bytes:900*MiB,pids:32})).toBeNull();
@@ -87,10 +87,10 @@ type RuntimeSelectionContext = {
   expect(pool.census().quarantined).toBe(1); // after unconfirmed removal
   ```
   Test FIFO/large-request fairness, background reservation, cancellation/create/removal races, stale generations, restart reconciliation, immutable image restrictions, bounded frames/output and receipts, partial UTF-8, and single-use state transitions.
-- [ ] Implement protocol/client/server and allocator/receipt journal before wiring real container execution. Native refuses READY without a verified learner leaf; compatibility preserves baseline memory/runtime semantics. No test-only bypass in production startup.
-- [ ] Implement fixed-argument rootless driver and guest launch handshake: assign launcher to learner leaf before CPython initialization, check baseline and limits, then release source. The supervisor/daemon socket never reaches learner FDs/mounts. Confirm exit/drain/all descendants/removal before replying. Use immutable owned IDs for cleanup.
-- [ ] Run Node/Python unit and protocol integration tests. Run local real-container tests where supported; explicitly test fail-closed behavior for this host's unsupported rootless parent. Never claim rootful or fake-driver tests prove rootless containment.
-- [ ] Build guest/broker artifacts, run source/import checks, document exact commands and capability results, commit and report.
+- [x] Implement protocol/client/server and allocator/receipt journal before wiring real container execution. Native refuses READY without a verified learner leaf; compatibility preserves baseline memory/runtime semantics. No test-only bypass in production startup.
+- [x] Implement fixed-argument rootless driver and guest launch handshake: assign launcher to learner leaf before CPython initialization, check baseline and limits, then release source. The supervisor/daemon socket never reaches learner FDs/mounts. Confirm exit/drain/all descendants/removal before replying. Use immutable owned IDs for cleanup.
+- [x] Run Node/Python unit and protocol integration tests. Run local real-container tests where supported; explicitly test fail-closed behavior for this host's unsupported rootless parent. Never claim rootful or fake-driver tests prove rootless containment.
+- [x] Build guest/broker artifacts, run source/import checks, document exact commands and capability results, commit and report.
 
 ## Task 3: Admission, durable dispatch, descriptor-bound evaluation and recovery
 
@@ -100,7 +100,7 @@ type RuntimeSelectionContext = {
 
 **Produces:** Frozen descriptors on all newly accepted executable work; one registry and role-independent policy; outbox insertion inside attempt transaction; idempotent queue dispatch/sweeping; actual broker job leases across both engines/workload kinds; per-job immutable engine adapter; fenced claims/checkpoints and finalization with no duplicate execution/award. `GradingExecutionLease` stores its owner, generation/token, worker generation, original broker generation, reservation ID, runtime/budget and lifecycle state; changing an attempt’s active generation must not erase an older lease context needed to retrieve/ack its receipt. Sample lease context stays in its private Redis record, preserving ephemeral semantics.
 
-- [ ] Add admission tests verifying transaction boundaries and frozen identity:
+- [x] Add admission tests verifying transaction boundaries and frozen identity:
   ```ts
   expect(created.executionRuntimeSnapshot.engine).toBe('cpython');
   expect(dispatchIntent.attemptId).toBe(created.id);
@@ -108,11 +108,11 @@ type RuntimeSelectionContext = {
   expect(enqueuedJobIds).toEqual([created.id]);
   ```
   Also cover queue outage after commit, retry after uncertain acknowledgement, stale worker fence, crash after removal/before case checkpoint and after checkpoint/before final commit, old snapshot routing and disabled manifest behavior.
-- [ ] Wire selection consistently into student/practice/sample/regrade snapshots; retain complete original policies and comparator identity. Resolve old work without invented image provenance. Native readiness/catalog errors cannot silently relabel accepted work.
-- [ ] Persist immutable claim/lease context before source release; persist the broker reservation ID before calling run. A crash between reserve and its DB acknowledgement must be recoverable through idempotent reserve using the stored original context. Derive stable case IDs from frozen case positions, not a run-call counter that resets after recovery.
-- [ ] Integrate descriptor-bound engine contexts into the existing evaluator; never mutate a global `.version` across concurrent jobs. Claim only with the owned reservation/fence. Acknowledge receipts only after private case checkpoint durability; final transaction consumes checkpoints and preserves points atomicity.
-- [ ] Integrate durable dispatch and recovery in normal worker lifecycle, with bounded batches and idempotent job IDs. Preserve separate queues/background priorities and check broker generation before execution/commit. Post-commit events only.
-- [ ] Run targeted submission/practice/sample/regrade/points/queue tests, migration-backed integration with fresh local PostgreSQL/Redis, and API/worker typechecks. Commit and report real commands and limitations.
+- [x] Wire selection consistently into student/practice/sample/regrade snapshots; retain complete original policies and comparator identity. Resolve old work without invented image provenance. Native readiness/catalog errors cannot silently relabel accepted work.
+- [x] Persist immutable claim/lease context before source release; persist the broker reservation ID before calling run. A crash between reserve and its DB acknowledgement must be recoverable through idempotent reserve using the stored original context. Derive stable case IDs from frozen case positions, not a run-call counter that resets after recovery.
+- [x] Integrate descriptor-bound engine contexts into the existing evaluator; never mutate a global `.version` across concurrent jobs. Claim only with the owned reservation/fence. Acknowledge receipts only after private case checkpoint durability; final transaction consumes checkpoints and preserves points atomicity.
+- [x] Integrate durable dispatch and recovery in normal worker lifecycle, with bounded batches and idempotent job IDs. Preserve separate queues/background priorities and check broker generation before execution/commit. Post-commit events only.
+- [x] Run targeted submission/practice/sample/regrade/points/queue tests, migration-backed integration with fresh local PostgreSQL/Redis, and API/worker typechecks. Commit and report real commands and limitations.
 
 ## Task 4: Owner-scoped practice completion and frontend recovery
 
@@ -122,10 +122,10 @@ type RuntimeSelectionContext = {
 
 **Produces:** Owner-authorized practice SSE completion with current polling retained as fallback, narrow result reads, no broad course refresh before verdict.
 
-- [ ] Read `packages/web/AGENTS.md` and installed Next route-handler docs before web edits. Add tests for another user's/academy's attempt, revoked membership, completed-before-connect, reconnect, stale results and failed stream recovery.
-- [ ] Implement scoped controller/BFF and frontend EventSource lifecycle with cleanup and bounded fallback. Filter payloads through public schemas; never stream hidden expectations or internal leases.
-- [ ] Verify student SSE tests still pass and practice completion does not open student monitoring or change points.
-- [ ] Run API/web targeted tests and web/API typechecks. Commit and report.
+- [x] Read `packages/web/AGENTS.md` and installed Next route-handler docs before web edits. Add tests for another user's/academy's attempt, revoked membership, completed-before-connect, reconnect, stale results and failed stream recovery.
+- [x] Implement scoped controller/BFF and frontend EventSource lifecycle with cleanup and bounded fallback. Filter payloads through public schemas; never stream hidden expectations or internal leases.
+- [x] Verify student SSE tests still pass and practice completion does not open student monitoring or change points.
+- [x] Run API/web targeted tests and web/API typechecks. Commit and report.
 
 ## Task 5: Rootless deployment, manifest verification and disabled activation
 
@@ -135,15 +135,15 @@ type RuntimeSelectionContext = {
 
 **Produces:** Operator-reviewable rootless user-service setup; family cgroup membership and effective CPU/memory/PID/swap attestation; explicit budget handover and image retention; activation refused without compatibility/certification/Linux acceptance proof; forward-compatible rollback for already accepted native and v4 Pyodide work.
 
-- [ ] Add tests that missing CPU delegation, wrong daemon, unrelated cgroup, image mismatch, unsigned/stale proof, mismatched concurrency and over-budget overlap all reject activation:
+- [x] Add tests that missing CPU delegation, wrong daemon, unrelated cgroup, image mismatch, unsigned/stale proof, mismatched concurrency and over-budget overlap all reject activation:
   ```python
   with self.assertRaises(ValueError):
       verify_activation({**valid, 'nativeAcceptancePassed': False})
   ```
   Valid fixtures must check actual manifest hashes/generation rather than a caller-supplied success boolean alone.
-- [ ] Implement scoped fixed-service installers/verifiers; no daemon sharing with Turtle, no global cleanup/prune, no app or production credentials in broker release. Preserve effective existing settings unless the explicit grading override is selected.
-- [ ] Provide normal install/verify/drain/rollback commands; disable only new native selection on rollback and retain compatible readers/images for queued/recoverable work. No irreversible schema rollback.
-- [ ] Run Python/shell checks, compose config validation without printing secrets, manifest/guard tests, build/typecheck checks, commit and report.
+- [x] Implement scoped fixed-service installers/verifiers; no daemon sharing with Turtle, no global cleanup/prune, no app or production credentials in broker release. Preserve effective existing settings unless the explicit grading override is selected.
+- [x] Provide normal install/verify/drain/rollback commands; disable only new native selection on rollback and retain compatible readers/images for queued/recoverable work. No irreversible schema rollback.
+- [x] Run Python/shell checks, compose config validation without printing secrets, manifest/guard tests, build/typecheck checks, commit and report.
 
 ## Task 6: Isolated end-to-end testing, Linux acceptance harness and final report
 

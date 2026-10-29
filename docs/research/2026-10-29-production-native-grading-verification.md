@@ -606,6 +606,7 @@ Minor finding**. The reviewer independently matched all 24 recorded source/build
 hashes. This is merge-readiness review, not a merge, deployment or native
 activation.
 
+- [Archived runtime-contract producer report](assets/2026-10-29-native-grading-verification/runtime-contracts-task-report.md)
 - [Initial whole-branch findings](assets/2026-10-29-native-grading-verification/whole-branch-review.md)
 - [Final fix and covering verification](assets/2026-10-29-native-grading-verification/final-fix-report.md)
 - [Final scoped approval](assets/2026-10-29-native-grading-verification/whole-branch-rereview.md)

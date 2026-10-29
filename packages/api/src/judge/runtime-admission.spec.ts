@@ -8,6 +8,8 @@ import { admitRuntime } from './runtime-admission.js';
 import { gradingSnapshotFor } from './grading-profile.js';
 import { defaultEliceGradingProfile, legacyCaseGrading } from '@cove/shared';
 import { exerciseProfileColumns } from './grading-profile.js';
+import { requireRuntimeReadiness } from './runtime-readiness.js';
+vi.mock('./runtime-readiness.js', () => ({ requireRuntimeReadiness: vi.fn(async () => undefined) }));
 
 describe('runtime admission', () => {
   it('leaves no-manifest legacy operation usable without a tenant/runtime lookup', async () => {
@@ -28,10 +30,16 @@ describe('runtime admission', () => {
       const frozen = gradingSnapshotFor(source, { engineVersion: '0.27.5', descriptor });
       expect(frozen.submission.executionRuntimeSnapshot).toEqual(nativeFixture);
       expect(frozen.submission.gradingPolicySnapshot).toMatchObject({ version: 4, runtime: nativeFixture, comparator: { engineVersion: '0.27.5' } });
-      expect(await admitRuntime(new ConfigService({ GRADING_RUNTIME_MANIFEST_PATH: path }), db as never, contextFixture)).toEqual(compatibilityFixture);
+      const compatibilityConfig = new ConfigService({ GRADING_RUNTIME_MANIFEST_PATH: path });
+      expect(await admitRuntime(compatibilityConfig, db as never, contextFixture)).toEqual(compatibilityFixture);
       await expect(admitRuntime(config, db as never, { ...contextFixture, memoryLimitMb: 4096 })).rejects.toThrow();
       await writeFile(path, '{}');
       expect(await admitRuntime(config, db as never, contextFixture)).toEqual(nativeFixture);
+      vi.mocked(requireRuntimeReadiness).mockRejectedValueOnce(new Error('cleanup fault'));
+      await expect(admitRuntime(config, db as never, contextFixture)).rejects.toMatchObject({ code: 'GRADING_UNAVAILABLE' });
+      expect(descriptor).toEqual(nativeFixture);
+      vi.mocked(requireRuntimeReadiness).mockRejectedValueOnce(new Error('missing worker'));
+      await expect(admitRuntime(compatibilityConfig, db as never, contextFixture)).rejects.toMatchObject({ code: 'GRADING_UNAVAILABLE' });
     } finally { await rm(directory, { recursive: true, force: true }); }
   });
 });

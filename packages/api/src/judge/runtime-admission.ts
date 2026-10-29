@@ -4,6 +4,7 @@ import { guestBudget, ResourceBank } from '@cove/grading-runtime';
 import { AppException } from '../common/app-exception.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { createRuntimeRegistry, loadRuntimeManifest } from './runtime-registry.js';
+import { requireRuntimeReadiness, type ReadinessRedisProvider } from './runtime-readiness.js';
 
 type Configuration = { get(key: string): unknown };
 const registries = new WeakMap<Configuration, ReturnType<typeof loadRegistry>>();
@@ -15,12 +16,13 @@ async function loadRegistry(config: Configuration) {
 }
 /** Admission only. Workers resolve the recorded identity without reselecting a certification. */
 export async function admitRuntime(config: Configuration, db: Pick<Prisma.TransactionClient, 'academy'>,
-  context: Omit<RuntimeSelectionContext, 'organizationId'>): Promise<RuntimeDescriptor | undefined> {
+  context: Omit<RuntimeSelectionContext, 'organizationId'>, redis?: ReadinessRedisProvider): Promise<RuntimeDescriptor | undefined> {
   try {
     let pending = registries.get(config);
     if (!pending) { pending = loadRegistry(config); registries.set(config, pending); }
     const registry = await pending;
     if (!registry) return undefined;
+    await requireRuntimeReadiness(config, registry.manifest, redis);
     const academy = await db.academy.findUniqueOrThrow({ where: { id: context.academyId }, select: { organizationId: true } });
     const descriptor = registry.selectRuntime({ ...context, organizationId: academy.organizationId });
     // Use the broker's single physical budget authority. Never lower authored memory.

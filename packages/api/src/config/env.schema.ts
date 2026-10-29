@@ -158,13 +158,14 @@ export const apiEnvironmentSchema = z.object({
    * most judges; each costs a warm Pyodide in the judge's own memory.
    */
   JUDGE_COMPARATOR_POOL_SIZE: z.coerce.number().int().min(1).max(8).default(1),
+  /** Expected trusted worker incarnation; required by manifest-aware API admission and the judge. */
+  GRADING_WORKER_GENERATION: z.uuid().optional(),
   /**
    * Where the judge reaches the student-code sandbox: a Unix socket shared
    * with a separate, network-less container (see `sandbox-server.ts`). Unset
    * means student code runs in child processes of the judge itself, which is
    * allowed only outside production.
    */
-  GRADING_WORKER_GENERATION: z.uuid().optional(),
   JUDGE_SANDBOX_SOCKET: z.string().min(1).optional(),
   /** Pinned, and shared with the browser so run and submit agree. */
   PYODIDE_VERSION: z.string().default("0.27.5"),

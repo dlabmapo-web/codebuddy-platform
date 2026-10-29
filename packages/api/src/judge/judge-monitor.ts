@@ -5,6 +5,7 @@ import { sandboxResources } from "./sandbox-resources.js";
 import type { ExecutionDiagnostics } from "./execution-telemetry.js";
 import { ExecutionTelemetry, renderExecutionTimings } from "./execution-telemetry.js";
 import { JudgeReadiness } from "./judge-readiness.js";
+import { RUNTIME_HEALTH_POLL_MS, type BrokerReadiness } from "./runtime-readiness.js";
 
 type Worker = { pause(doNotWaitActive?: boolean): Promise<void>; resume(): void; client: Promise<{ status: string }> };
 type QueueSnapshot = { kind: "official" | "practice" | "sample" | "regrade"; waiting: number; active: number; delayed: number; failed: number; oldestWaitMs: number };
@@ -19,6 +20,7 @@ export function startJudgeMonitor(options: {
   port: number; bind: string; secret?: string; guard: boolean; telemetry: ExecutionTelemetry;
   diagnostics: () => Promise<ExecutionDiagnostics | undefined>; workers: Worker[];
   queues?: () => Promise<QueueSnapshot[]>;
+  brokerHealth?: (redisReady: boolean) => Promise<BrokerReadiness>;
 }) {
   const readiness = new JudgeReadiness();
   const delay = monitorEventLoopDelay({ resolution: 20 }); delay.enable();
@@ -35,8 +37,9 @@ export function startJudgeMonitor(options: {
         Promise.all(tasks),
         new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("health poll deadline")), 5000); timer.unref(); }),
       ]);
-      readiness.update(diagnostics, redisReady);
-    } catch { readiness.update(undefined, false); }
+      if (options.brokerHealth) readiness.updateBroker(await options.brokerHealth(redisReady), redisReady);
+      else readiness.update(diagnostics, redisReady);
+    } catch { if (options.brokerHealth) readiness.updateBroker({ ready: false }, false); else readiness.update(undefined, false); }
     finally { clearTimeout(timer); }
     if (!stopped && options.guard) {
       const nextPaused = readiness.shouldPause();
@@ -57,10 +60,10 @@ export function startJudgeMonitor(options: {
       queuePolling = options.queues().then(snapshot => { queues = snapshot; queuesAt = performance.now(); })
         .catch(() => { queues = undefined; }).finally(() => { queuePolling = undefined; });
     }
-    polling = poll().catch(() => { readiness.update(undefined, false); }).finally(() => { polling = undefined; });
+    polling = poll().catch(() => { if (options.brokerHealth) readiness.updateBroker({ ready: false }, false); else readiness.update(undefined, false); }).finally(() => { polling = undefined; });
   };
   tick();
-  const interval = setInterval(tick, 5000); interval.unref();
+  const interval = setInterval(tick, options.brokerHealth ? RUNTIME_HEALTH_POLL_MS : 5000); interval.unref();
   const server = options.port > 0 ? createServer((request, response) => {
     response.setHeader("Cache-Control", "private, no-store");
     if (request.method !== "GET") { response.writeHead(405); response.end(); return; }
@@ -78,6 +81,7 @@ export function startJudgeMonitor(options: {
     const lines = ["# TYPE cove_judge_stage_seconds histogram", renderExecutionTimings(options.telemetry.snapshot(), "judge"),
       `cove_judge_ready ${Number(state.ready)}`, `cove_judge_diagnostics_available ${Number(Boolean(diagnostics) && state.reason !== "stale")}`,
       `cove_judge_guard_paused ${Number(paused)}`];
+    if (options.brokerHealth) lines.push(`cove_judge_broker_ready ${Number(state.ready)}`);
     lines.push(...resourceMetrics(sandboxResources(delay.percentile(95) / 1e6), "worker"));
     if (diagnostics && state.reason !== "stale") {
       lines.push(renderExecutionTimings(diagnostics.timings, "sandbox"));

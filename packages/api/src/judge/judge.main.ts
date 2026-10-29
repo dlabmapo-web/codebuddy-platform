@@ -3,6 +3,7 @@ import { RuntimeCoordinator } from "./runtime-coordinator.js";
 import { loadRuntimeManifest } from "./runtime-registry.js";
 import { SampleExecution } from "./sample-execution.js";
 import { DispatchIntentService } from "./dispatch-intent.js";
+import { RuntimeReadinessPublisher } from "./runtime-readiness.js";
 import { PracticeRunner } from "./practice.runner.js";
 import "reflect-metadata";
 // The judge boots without Nest, so nothing else loads the env file for it.
@@ -191,10 +192,13 @@ async function bootstrap(): Promise<void> {
     (checkId) => void samples.markFailed(checkId),
   );
   const healthPort = Number(process.env.JUDGE_HEALTH_PORT ?? 0);
+  const runtimeReadiness = coordinator ? new RuntimeReadinessPublisher(coordinator.registry.manifest,
+    environment.GRADING_WORKER_GENERATION!, () => queue.redis(), signal => coordinator.health(signal)) : undefined;
   const monitor = startJudgeMonitor({ port: healthPort, bind: environment.JUDGE_HEALTH_BIND,
     secret: environment.JUDGE_METRICS_SECRET, guard: environment.JUDGE_READINESS_GUARD,
     telemetry: grading.telemetry, workers: [worker, practiceWorker, regradeWorker, sampleWorker],
     diagnostics: () => engine instanceof SandboxExecutionEngine ? engine.readDiagnostics() : Promise.resolve(undefined),
+    brokerHealth: runtimeReadiness ? ready => runtimeReadiness.poll(ready) : undefined,
     queues: () => queue.diagnostics() });
   logger.log(JSON.stringify({ event: "judge.config", concurrency: environment.JUDGE_CONCURRENCY,
     comparatorPool: environment.JUDGE_COMPARATOR_POOL_SIZE, backgroundConcurrency: environment.REGRADE_CONCURRENCY,

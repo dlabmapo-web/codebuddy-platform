@@ -15,8 +15,8 @@ export interface LeasePersistence {
 export class BrokerFailure extends Error {
   constructor(readonly code: string) { super(`Grading broker: ${code}`); }
 }
-export async function brokerRequest(client: BrokerClient, request: ClientRequest): Promise<Exclude<BrokerResponse, { type: 'error' }>> {
-  const response = await client.request(request);
+export async function brokerRequest(client: BrokerClient, request: ClientRequest, signal?: AbortSignal): Promise<Exclude<BrokerResponse, { type: 'error' }>> {
+  const response = await client.request(request, signal);
   if (response.type === 'error') throw new BrokerFailure(response.code);
   return response;
 }

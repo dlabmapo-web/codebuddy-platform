@@ -162,7 +162,7 @@ export class SubmissionService {
           );
         }
         const engineVersion = this.config.get("PYODIDE_VERSION", { infer: true });
-        const descriptor = quiz ? undefined : await admitRuntime(this.config, tx, { academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision, context: "live", memoryLimitMb: exercise.memoryLimitMb, timeLimitMs: exercise.timeLimitMs });
+        const descriptor = quiz ? undefined : await admitRuntime(this.config, tx, { academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision, context: "live", memoryLimitMb: exercise.memoryLimitMb, timeLimitMs: exercise.timeLimitMs }, () => this.queue!.redis());
         const snapshot = gradingSnapshotFor(exercise, { engineVersion, descriptor });
 
         await this.classContext.resolveWith(tx, {

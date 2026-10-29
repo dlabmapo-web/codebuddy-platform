@@ -1,6 +1,7 @@
 import type { ExecutionDiagnostics } from "./execution-telemetry.js";
+import { RUNTIME_READINESS_TTL_MS, type BrokerReadiness } from "./runtime-readiness.js";
 
-export type JudgeReadinessState = { ready: boolean; reason: "ready" | "redis" | "unavailable" | "stale" | "starved" | "replacement"; supported: boolean };
+export type JudgeReadinessState = { ready: boolean; reason: "ready" | "redis" | "unavailable" | "stale" | "starved" | "replacement" | "broker"; supported: boolean };
 /** Timers use local monotonic receipt times, never the remote process's clock. */
 export class JudgeReadiness {
   private receivedAt = -Infinity;
@@ -9,11 +10,20 @@ export class JudgeReadiness {
   private healthySamples = 0;
   private recovering = false;
   diagnostics: ExecutionDiagnostics | undefined;
+  private broker: BrokerReadiness | undefined;
   constructor(private readonly now = () => performance.now()) {}
   update(diagnostics: ExecutionDiagnostics | undefined, redis: boolean) {
+    this.broker = undefined;
     this.redis = redis;
     this.diagnostics = diagnostics;
     if (diagnostics) { this.supported = true; this.receivedAt = this.now(); }
+    this.observe();
+  }
+  updateBroker(broker: BrokerReadiness, redis: boolean) {
+    this.broker = broker; this.redis = redis; this.diagnostics = undefined;
+    this.supported = true; this.receivedAt = this.now(); this.observe();
+  }
+  private observe() {
     const state = this.state();
     this.healthySamples = state.ready ? this.healthySamples + 1 : 0;
     if (this.supported && !state.ready) this.recovering = true;
@@ -22,6 +32,10 @@ export class JudgeReadiness {
   state(): JudgeReadinessState {
     const result = (ready: boolean, reason: JudgeReadinessState["reason"]) => ({ ready, reason, supported: this.supported });
     if (!this.redis) return result(false, "redis");
+    if (this.broker) {
+      if (this.now() - this.receivedAt > RUNTIME_READINESS_TTL_MS) return result(false, "stale");
+      return result(this.broker.ready, this.broker.ready ? "ready" : "broker");
+    }
     if (!this.diagnostics) return result(false, "unavailable");
     if (this.now() - this.receivedAt > 15000) return result(false, "stale");
     const p = this.diagnostics.pool;

@@ -87,6 +87,12 @@ export class StaffPracticeService {
     if (existing && (existing.materialId !== input.materialId || existing.code !== input.code || existing.context !== (input.preview ? `preview:${exercise.gradingRevision}` : "live"))) {
       throw new AppException("PERMISSION_DENIED", HttpStatus.CONFLICT);
     }
+    // A retry observes its accepted frozen identity even if new admission is paused.
+    if (existing) {
+      if (existing.status === "QUEUED") void Promise.resolve().then(() => this.queue!.enqueuePractice(existing.id)).catch(() => undefined);
+      const stored = practiceSnapshotSchema.parse(existing.snapshot);
+      return { submissionId: existing.id, totalCount: stored.quizSnapshot ? 1 : stored.gradingCases.length };
+    }
     if (!existing && !await this.queue.consumeSubmissionToken(actor.userId,
       Number(this.config.get("SUBMISSION_RATE_LIMIT") ?? 10), 60_000)) {
       throw new AppException("SUBMISSION_RATE_LIMITED", HttpStatus.TOO_MANY_REQUESTS);
@@ -99,7 +105,7 @@ export class StaffPracticeService {
     if (!quiz && (!exercise.testCases.length || resolveGradingProfile(exercise, exercise.testCases).kind === "unsupported")) {
       throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
     }
-    const descriptor = quiz ? undefined : await admitRuntime(this.config, this.prisma, { academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision, context: input.preview ? "preview" : "live", memoryLimitMb: exercise.memoryLimitMb, timeLimitMs: exercise.timeLimitMs });
+    const descriptor = quiz ? undefined : await admitRuntime(this.config, this.prisma, { academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision, context: input.preview ? "preview" : "live", memoryLimitMb: exercise.memoryLimitMb, timeLimitMs: exercise.timeLimitMs }, () => this.queue!.redis());
     const grading = gradingSnapshotFor(exercise, { engineVersion: String(this.config.get("PYODIDE_VERSION")), descriptor });
     const snapshot = practiceSnapshotSchema.parse({
       version: descriptor ? 2 : 1, courseId: material.lecture.courseModule.courseId, gradingRevision: exercise.gradingRevision,

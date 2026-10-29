@@ -24,8 +24,8 @@ export class RuntimeCoordinator {
       clientFactory: descriptor => ({ descriptor, version: executionEngineVersion(descriptor) }) });
   }
   setSampleRecovery(reconcile: () => Promise<void>, count: () => Promise<number>, epochCount: (epoch: number) => Promise<number>, sealed: (epoch: number) => Promise<void>) { this.sampleSealed = sealed; this.sampleReconcile = reconcile; this.sampleCount = count; this.sampleEpochCount = epochCount; }
-  async health() {
-    const health = await brokerRequest(this.client, { type: 'health' });
+  async health(signal?: AbortSignal) {
+    const health = await brokerRequest(this.client, { type: 'health' }, signal);
     if (health.type !== 'health' || health.workerGeneration !== this.workerGeneration) throw new BrokerFailure('WORKER_GENERATION_MISMATCH');
     const expected = this.registry.manifest.capabilities.runtimes.map(runtimeDescriptorIdentity).sort();
     if (JSON.stringify(expected) !== JSON.stringify(health.capabilities.runtimes.map(runtimeDescriptorIdentity).sort())) throw new BrokerFailure('CAPABILITY_MISMATCH');
@@ -143,14 +143,24 @@ export class RuntimeCoordinator {
     // Restrict protects active recovery. Only acknowledged epoch retirement permits
     // removing private authority and restoring ordinary owner/material deletion.
     await this.db.$transaction(async tx => {
-      const rows = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT l.id FROM grading_execution_leases l
+      const rows = await tx.$queryRaw<Array<{ id: string; submission_id: string | null; staff_practice_attempt_id: string | null; generation: number; lease_token: string }>>`
+        SELECT l.id, l.submission_id, l.staff_practice_attempt_id, l.generation, l.lease_token FROM grading_execution_leases l
         JOIN grading_admission_epochs e ON e.epoch = l.admission_epoch
         WHERE e.sealed_at IS NOT NULL AND l.retired_at IS NOT NULL
           AND l.terminal_commit_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM grading_execution_leases other
+            LEFT JOIN grading_admission_epochs other_epoch ON other_epoch.epoch = other.admission_epoch
+            WHERE (other.submission_id = l.submission_id OR other.staff_practice_attempt_id = l.staff_practice_attempt_id)
+              AND (other.terminal_commit_id IS NULL OR other.retired_at IS NULL OR other_epoch.sealed_at IS NULL))
+          AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.id = l.submission_id AND s.status IN ('QUEUED', 'RUNNING'))
+          AND NOT EXISTS (SELECT 1 FROM staff_practice_attempts p WHERE p.id = l.staff_practice_attempt_id AND p.status IN ('QUEUED', 'RUNNING'))
         ORDER BY l.created_at, l.id LIMIT 512 FOR UPDATE OF l SKIP LOCKED`;
       if (!rows.length) return;
       const ids = rows.map(row => row.id);
+      await tx.gradingCaseCheckpoint.deleteMany({ where: { OR: rows.map(row => ({
+        submissionId: row.submission_id, staffPracticeAttemptId: row.staff_practice_attempt_id,
+        generation: row.generation, leaseToken: row.lease_token,
+      })) } });
       await tx.gradingExecutionCase.deleteMany({ where: { leaseId: { in: ids } } });
       await tx.gradingExecutionLease.deleteMany({ where: { id: { in: ids } } });
     });

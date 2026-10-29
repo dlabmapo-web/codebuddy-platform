@@ -8,7 +8,7 @@ import { ExecutionCapacity } from './execution-capacity.js';
 import { gradingSnapshotFor, exerciseProfileColumns } from './grading-profile.js';
 import { defaultEliceGradingProfile, legacyCaseGrading } from '@cove/shared';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ConfigService } from '@nestjs/config';
@@ -23,6 +23,11 @@ import { GradingService, type CaseRow } from './grading.service.js';
 import { JudgeQueue } from './judge.queue.js';
 import { DispatchIntentService } from './dispatch-intent.js';
 import { SampleExecution } from './sample-execution.js';
+import { RuntimeReadinessPublisher, assertRuntimeReady } from './runtime-readiness.js';
+import { startJudgeMonitor } from './judge-monitor.js';
+import { ExecutionTelemetry } from './execution-telemetry.js';
+import { Logger } from '@nestjs/common';
+import { StaffPracticeService } from '../learn/staff-practice.service.js';
 import type { ExecutionSession } from './execution-lease.js';
 
 const databaseUrl = process.env.COVE_NATIVE_TEST_DATABASE_URL;
@@ -38,13 +43,13 @@ describe.skipIf(!databaseUrl || !redisUrl)('native grading durable application i
   let server: Awaited<ReturnType<typeof serve>>, directory: string;
   let workerGeneration = randomUUID();
   const org = randomUUID(), academy = randomUUID(), user = randomUUID(), course = randomUUID(), module = randomUUID(), lecture = randomUUID();
-  let executed = 0;
+  let executed = 0, removalFault = false;
   const guests = new Set<string>();
   const driver: GuestDriver = {
     verify: async () => undefined, discover: async () => [...guests],
     create: async allocation => { guests.add(allocation.id); }, ready: async () => undefined,
     execute: async () => { executed++; return { stdout: 'ok\n', stderr: '', outcome: 'PASSED', runtimeMs: 1.25, outputTruncated: false }; },
-    remove: async id => { guests.delete(id); },
+    remove: async id => { if (removalFault) throw new Error('injected cleanup failure'); guests.delete(id); },
   };
   const comparator = { version: 'pyodide-0.27.5', compare: async () => ({ kind: 'match' as const }) };
   const unused = { version: 'unused', run: async () => { throw new Error('Unbound execution'); }, dispose: async () => undefined };
@@ -261,9 +266,14 @@ describe.skipIf(!databaseUrl || !redisUrl)('native grading durable application i
     const item = await attempt(); const first = coordinator(); const session = (await first.claim({ submissionId: item.id }, { runtime: nativeFixture, memoryLimitMb: 128, kind: 'submission' }))!;
     await runCase(session, 1); await session.checkpoint(row(1), item.gradingCases[0]!);
     await db.submission.update({ where: { id: item.id }, data: { startedAt: new Date(0) } });
-    const before = executed; const restart = coordinator(); await grader(restart).grade(item.id, async () => undefined, true); await restart.reconcile();
+    const before = executed; const restart = coordinator();
+    const error = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    try { await grader(restart).grade(item.id, async () => undefined, true); expect(error).toHaveBeenCalledWith(expect.stringContaining('TOTAL_DEADLINE')); }
+    finally { error.mockRestore(); }
+    await restart.reconcile();
     expect((await db.submission.findUniqueOrThrow({ where: { id: item.id } })).status).toBe('ERRORED');
     expect(executed).toBe(before);
+    expect(await db.gradingCaseCheckpoint.count({ where: { submissionId: item.id } })).toBe(1);
   });
   it('returns the committed result without waiting for delayed terminal retirement', async () => {
     const item = await attempt(1); let release!: () => void; let reached!: () => void;
@@ -295,6 +305,11 @@ describe.skipIf(!databaseUrl || !redisUrl)('native grading durable application i
     expect(await redis.get(`cove:sample-check:${id}`)).toBeNull();
   });
   it('retries a lost seal acknowledgement with the durable reconciliation UUID', async () => {
+    const checkpoints = await db.gradingCaseCheckpoint.findMany();
+    const owners = [...new Set(checkpoints.flatMap(row => row.submissionId ? [row.submissionId] : []))];
+    const publicResults = await db.submission.findMany({ where: { id: { in: owners } }, select: { id: true, status: true, runtimeMs: true, passedCount: true, cases: true }, orderBy: { id: 'asc' } });
+    expect(publicResults.some(row => row.status === 'ERRORED')).toBe(true);
+    expect(checkpoints.some(row => row.generation > 1)).toBe(true);
     const seed = await attempt(1); const health = await coordinator().health();
     await db.gradingAdmissionEpoch.upsert({ where: { epoch: BigInt(health.admissionEpoch) }, create: { epoch: BigInt(health.admissionEpoch), workerGeneration }, update: {} });
     await db.gradingExecutionLease.createMany({ data: Array.from({ length: 256 }, (_, i) => ({ submissionId: seed.id, generation: i + 1, leaseToken: randomUUID(),
@@ -303,12 +318,15 @@ describe.skipIf(!databaseUrl || !redisUrl)('native grading durable application i
     const transport = { request: async (request: ClientRequest) => { const response = await client.request(request); if (request.type === 'seal' && !lost) { lost = true; throw new Error('lost seal response'); } return response; } } as BrokerClient;
     const restarted = coordinator(transport);
     await expect(restarted.reconcile()).rejects.toThrow('lost seal response');
+    expect(await db.gradingCaseCheckpoint.count()).toBe(checkpoints.length);
     const intent = await db.gradingAdmissionEpoch.findUniqueOrThrow({ where: { epoch: BigInt(health.admissionEpoch) } });
     expect(intent.reconciliationId).not.toBeNull(); expect(intent.sealedAt).toBeNull();
     await expect(restarted.claim({ submissionId: seed.id }, { runtime: nativeFixture, memoryLimitMb: 128, kind: "submission" })).rejects.toThrow("EPOCH_RECONCILING");
     await restarted.reconcile();
     expect((await db.gradingAdmissionEpoch.findUniqueOrThrow({ where: { epoch: intent.epoch } })).reconciliationId).toBe(intent.reconciliationId);
     expect((await restarted.health()).admissionEpoch).toBe(health.admissionEpoch + 1);
+    expect(await db.gradingCaseCheckpoint.count({ where: { submissionId: { in: owners } } })).toBe(0);
+    expect(await db.submission.findMany({ where: { id: { in: owners } }, select: { id: true, status: true, runtimeMs: true, passedCount: true, cases: true }, orderBy: { id: 'asc' } })).toEqual(publicResults);
   });
   it('reconstructs epoch control metadata after Redis admission survived a rolled-back DB authority write', async () => {
     const control = coordinator(); const samples = new SampleExecution(async () => redis, control); const health = await control.health();
@@ -330,6 +348,8 @@ describe.skipIf(!databaseUrl || !redisUrl)('native grading durable application i
     const lease = await db.gradingExecutionLease.findFirstOrThrow({ where: { staffPracticeAttemptId: practice.id } });
     expect(lease.retiredAt).not.toBeNull();
     expect(await db.gradingExecutionCase.count({ where: { leaseId: lease.id } })).toBe(1);
+    expect(await db.gradingCaseCheckpoint.count({ where: { staffPracticeAttemptId: practice.id } })).toBe(1);
+    const publicResult = (await db.staffPracticeAttempt.findUniqueOrThrow({ where: { id: practice.id } })).result;
     await expect(db.material.delete({ where: { id: item.materialId! } })).rejects.toMatchObject({ code: 'P2003' });
     expect(await db.gradingExecutionLease.count({ where: { admissionEpoch: lease.admissionEpoch } })).toBe(1);
     // Age the normal reconciliation clock without waiting or manufacturing admissions.
@@ -337,9 +357,74 @@ describe.skipIf(!databaseUrl || !redisUrl)('native grading durable application i
     try { await control.reconcile(); } finally { clock.mockRestore(); }
     expect((await db.gradingAdmissionEpoch.findUniqueOrThrow({ where: { epoch: lease.admissionEpoch } })).sealedAt).not.toBeNull();
     expect(await samples.epochCount(Number(lease.admissionEpoch))).toBe(0);
+    expect(await db.gradingCaseCheckpoint.count({ where: { staffPracticeAttemptId: practice.id } })).toBe(0);
+    expect((await db.staffPracticeAttempt.findUniqueOrThrow({ where: { id: practice.id } })).result).toEqual(publicResult);
     await db.material.delete({ where: { id: item.materialId! } });
     expect(await db.staffPracticeAttempt.findUnique({ where: { id: practice.id } })).toBeNull();
     expect(await db.gradingExecutionCase.count({ where: { leaseId: lease.id } })).toBe(0);
+  });
+  it('preserves an older sealed checkpoint while another generation still needs recovery authority', async () => {
+    const item = await attempt(1), control = coordinator(), health = await control.health();
+    const sealed = await db.gradingAdmissionEpoch.findFirstOrThrow({ where: { sealedAt: { not: null } } });
+    const token = randomUUID(), currentToken = randomUUID();
+    // Synthetic source-free history isolates the cross-generation GC guard.
+    const prior = await db.gradingExecutionLease.create({ data: { submissionId: item.id, generation: 1, leaseToken: token,
+      workerGeneration, brokerGeneration: health.brokerGeneration, admissionEpoch: sealed.epoch, kind: 'submission', runtime: nativeFixture,
+      memoryLimitMb: 128, terminalCommitId: randomUUID(), retiredAt: new Date() } });
+    const current = await db.gradingExecutionLease.create({ data: { submissionId: item.id, generation: 2, leaseToken: currentToken,
+      workerGeneration, brokerGeneration: health.brokerGeneration, admissionEpoch: BigInt(health.admissionEpoch), kind: 'submission', runtime: nativeFixture, memoryLimitMb: 128 } });
+    await db.submission.update({ where: { id: item.id }, data: { status: 'RUNNING', startedAt: new Date(), executionGeneration: 2, executionLeaseToken: currentToken } });
+    const checkpoint = await db.gradingCaseCheckpoint.create({ data: { submissionId: item.id, generation: 1, leaseToken: token, casePosition: 1, receiptId: randomUUID(),
+      executionRuntimeSnapshot: nativeFixture, comparator: 'STDOUT', outcome: 'PASSED', runtimeMs: 1, weight: 1, executionState: 'EXECUTED', isSample: true, actualOutput: 'ok' } });
+    await control.reconcile();
+    expect(await db.gradingCaseCheckpoint.findUnique({ where: { id: checkpoint.id } })).not.toBeNull();
+    expect(await db.gradingExecutionLease.findUnique({ where: { id: prior.id } })).not.toBeNull();
+    // No source was released; a durable terminal resolution retires the synthetic generation.
+    await db.$transaction(async tx => {
+      await tx.submission.update({ where: { id: item.id }, data: { status: 'ERRORED', gradedAt: new Date() } });
+      await tx.gradingExecutionLease.update({ where: { id: current.id }, data: { terminalCommitId: randomUUID(), retiredAt: new Date() } });
+    });
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 61_000);
+    try { await control.reconcile(); } finally { clock.mockRestore(); }
+    expect(await db.gradingCaseCheckpoint.findUnique({ where: { id: checkpoint.id } })).toBeNull();
+    expect((await db.submission.findUniqueOrThrow({ where: { id: item.id } })).status).toBe('ERRORED');
+  });
+  it('publishes healthy saturated readiness, then blocks admission and pauses queues after a real broker cleanup fault', async () => {
+    const control = coordinator();
+    const publisher = new RuntimeReadinessPublisher(manifestFixture, workerGeneration, async () => redis, signal => control.health(signal));
+    const workers = [{ client: Promise.resolve({ status: 'ready' }), pause: vi.fn(async () => undefined), resume: vi.fn() }];
+    const monitor = startJudgeMonitor({ port: 0, bind: '127.0.0.1', guard: true, telemetry: new ExecutionTelemetry(), workers,
+      diagnostics: async () => undefined, brokerHealth: ready => publisher.poll(ready) });
+    try {
+      await monitor.refresh(); expect(monitor.readiness.state()).toMatchObject({ ready: true, supported: true });
+      await assertRuntimeReady(async () => redis, manifestFixture, workerGeneration);
+      const item = await attempt(1), other = await attempt(1);
+      await db.exerciseTestCase.create({ data: { exerciseMaterialId: item.materialId!, position: 1, input: '', expectedOutput: 'ok', visibility: 'SAMPLE' } });
+      const manifestPath = join(directory, 'admission-manifest.json'); await writeFile(manifestPath, JSON.stringify(manifestFixture));
+      const config = new ConfigService({ GRADING_RUNTIME_MANIFEST_PATH: manifestPath, GRADING_WORKER_GENERATION: workerGeneration,
+        GRADING_NATIVE_ENABLED: true, REDIS_URL: redisUrl, PYODIDE_VERSION: '0.27.5', SUBMISSION_RATE_LIMIT: 1000 });
+      const practiceApi = new StaffPracticeService(db, { requirePermission: async () => ({ userId: user, via: 'membership', role: 'MANAGER', roles: ['MANAGER'] }) } as never, config, queue);
+      const request = { academyId: academy, materialId: item.materialId!, code: 'print("ok")', preview: true, requestId: randomUUID() };
+      const accepted = await practiceApi.submit({ authUserId: user } as never, request);
+      expect(practiceSnapshotSchema.parse((await db.staffPracticeAttempt.findUniqueOrThrow({ where: { id: accepted.submissionId } })).snapshot)).toMatchObject({ executionRuntimeSnapshot: compatibilityFixture });
+      const first = (await control.claim({ submissionId: item.id }, { runtime: nativeFixture, kind: 'submission', memoryLimitMb: 128 }))!;
+      const second = (await control.claim({ submissionId: other.id }, { runtime: nativeFixture, kind: 'submission', memoryLimitMb: 128 }))!;
+      await first.engine.reserve(); await second.engine.reserve();
+      await monitor.refresh(); expect(monitor.readiness.state().ready).toBe(true);
+      await assertRuntimeReady(async () => redis, manifestFixture, workerGeneration);
+      removalFault = true;
+      await expect(runCase(first, 1)).rejects.toThrow();
+      await monitor.refresh(); expect(monitor.readiness.state()).toMatchObject({ ready: false, supported: true, reason: 'broker' });
+      expect(workers[0]!.pause).toHaveBeenCalledWith(true);
+      await expect(assertRuntimeReady(async () => redis, manifestFixture, workerGeneration)).rejects.toThrow();
+      const beforeAttempts = await db.staffPracticeAttempt.count(), beforeIntents = await db.gradingDispatchIntent.count();
+      await expect(practiceApi.submit({ authUserId: user } as never, { ...request, requestId: randomUUID() })).rejects.toMatchObject({ code: 'GRADING_UNAVAILABLE' });
+      expect(await db.staffPracticeAttempt.count()).toBe(beforeAttempts);
+      expect(await db.gradingDispatchIntent.count()).toBe(beforeIntents);
+      expect(await practiceApi.submit({ authUserId: user } as never, request)).toEqual(accepted);
+      await expect(control.claim({ submissionId: (await attempt(1)).id }, { runtime: nativeFixture, kind: 'submission', memoryLimitMb: 128 })).rejects.toThrow();
+      expect((await db.submission.findUniqueOrThrow({ where: { id: item.id } })).executionRuntimeSnapshot).toEqual(nativeFixture);
+    } finally { removalFault = false; await monitor.close(); }
   });
 
 });

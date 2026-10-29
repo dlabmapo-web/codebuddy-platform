@@ -142,16 +142,22 @@ def process_identity(item):
 
 def live_guest(state, item, observer):
     identity = process_identity(item)
-    parent = host.group(identity['pid'])
+    # Production prepareLeaf moves the READY init into scope/control. The
+    # exact immutable container scope is that leaf's parent, never the init leaf.
+    control = host.group(identity['pid'])
+    require(control.name == 'control', 'READY init is not in the control leaf')
+    parent = control.parent
     require(item.get('HostConfig', {}).get('ReadonlyRootfs') is True and item['HostConfig'].get('NetworkMode') == 'none' and not item['HostConfig'].get('Binds') and all(x.get('Type') != 'bind' for x in item.get('Mounts', [])), 'Guest root/network/mount isolation changed')
     require(parent.name == 'docker-' + item['Id'] + '.scope' and Path(state['cgroupParent']) in parent.parents, 'Guest escaped exact family')
-    learner = parent / 'learner'; control = parent / 'control'
+    learner = parent / 'learner'
+    require(identity['pid'] in [int(p) for p in (control/'cgroup.procs').read_text().split()], 'READY init control membership changed')
     pids = [int(p) for p in (learner / 'cgroup.procs').read_text().split()]
     # Called for warm guests or source marker; the interpreter is the exec-observed PID.
     observer.drain()
     matches = [p for p in pids if p in observer.execs]
     require(len(matches) == 1, 'Missing or ambiguous gated interpreter')
     pid = matches[0]; event = observer.execs[pid]; gate = observer.gates.get(pid, {})
+    require(host.group(pid) == learner, 'READY interpreter learner membership changed')
     mounts = [line.split() for line in Path(f'/proc/{pid}/mountinfo').read_text().splitlines()]
     for mountpoint in ('/', '/sys/fs/cgroup'):
         rows = [row for row in mounts if row[4] == mountpoint]

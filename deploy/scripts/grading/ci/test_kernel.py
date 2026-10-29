@@ -298,4 +298,98 @@ console.log(JSON.stringify(PHASES.flatMap(phase=>fixtures(phase,'cpython').map(f
         self.assertIn('CapEff:\t0000000000000000',literals)
 
 
+class ReadyLayoutContracts(unittest.TestCase):
+    def guest(self, mutation=None):
+        # Model production prepareLeaf's actual READY layout. This is a local
+        # filesystem/API contract; it does not establish native containment.
+        with tempfile.TemporaryDirectory() as folder:
+            family=Path(folder)/'cove-grading.slice'
+            cid='c'*64; scope=family/('docker-'+cid+'.scope')
+            control=scope/'control'; learner=scope/'learner'
+            control.mkdir(parents=True); learner.mkdir()
+            for path in (family,scope,control,learner):
+                (path/'memory.events.local').write_text('oom 0\noom_kill 0\n')
+            for name,value in {'pids.max':'32','memory.swap.max':'0','memory.max':str(256*2**20)}.items():
+                (scope/name).write_text(value)
+            for name,value in {'cgroup.procs':'22','memory.swap.max':'0','memory.max':str(144*2**20),'memory.stat':'shmem 0\n'}.items():
+                (learner/name).write_text(value)
+            (control/'cgroup.procs').write_text('11')
+            observed_control=control; observed_learner=learner
+            if mutation=='wrong-leaf': observed_control=learner
+            elif mutation=='unprepared-scope': observed_control=scope
+            elif mutation=='wrong-container': observed_control=family/('docker-'+'d'*64+'.scope')/'control'
+            elif mutation=='outside-family': observed_control=Path(folder)/'other'/scope.name/'control'
+            elif mutation=='missing-init': (control/'cgroup.procs').write_text('33')
+            elif mutation=='moved-learner': observed_learner=control
+            item=dict(Id=cid,Image='native',State=dict(Pid=11,Running=True),
+                      HostConfig=dict(ReadonlyRootfs=True,NetworkMode='none',Binds=[]),Mounts=[])
+            state=dict(cgroupParent=str(family),images=[dict(configId='native')])
+            observed_event={**event(),'pid':22}
+            observer=Mock(); observer.execs={22:observed_event}; observer.gates={22:{**observed_event,'kind':'GATE'}}
+            actual_read=Path.read_text
+            proc={'/proc/22/status':'Uid: 101000 101000 101000 101000\n',
+                  '/proc/22/uid_map':'0 100000 65536\n',
+                  '/proc/22/mountinfo': '\n'.join(['1 0 0:1 / / ro - overlay overlay ro',
+                    '2 1 0:2 / /sys/fs/cgroup ro - cgroup2 cgroup ro',
+                    '3 1 0:3 / /tmp rw,nosuid,nodev,noexec - tmpfs tmpfs rw',
+                    '4 1 0:4 / /dev/shm rw,nosuid,nodev,noexec - tmpfs shm rw'])}
+            def read(path,*args,**kwargs):
+                return proc[str(path)] if str(path) in proc else actual_read(path,*args,**kwargs)
+            with patch.object(kernel.host,'group',side_effect=lambda pid: observed_control if pid==11 else observed_learner), \
+                 patch.object(kernel,'start_time',return_value='1234'), \
+                 patch.object(kernel,'cgroup_id',return_value=456), \
+                 patch.object(Path,'read_text',read), \
+                 patch.object(kernel.os,'readlink',side_effect=lambda path: ('host-' if '/proc/1/' in str(path) else 'guest-')+str(path).split('/')[-1]):
+                value=kernel.live_guest(state,item,observer)
+                self.assertEqual(value['parent'],str(scope))
+                self.assertEqual(value['control'],str(control))
+                self.assertEqual(value['leaf'],str(learner))
+                self.assertEqual(value['learner']['pid'],22)
+
+    def test_ready_init_control_and_interpreter_learner_are_accepted(self):
+        self.guest()
+
+    def test_changed_ready_layout_and_membership_are_rejected(self):
+        for mutation in ('wrong-leaf','unprepared-scope','wrong-container','outside-family','missing-init','moved-learner'):
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError): self.guest(mutation)
+
+
+class DescendantPipeContracts(unittest.TestCase):
+    node=CoordinatorContracts.node
+
+    def test_live_detached_fixture_child_does_not_hold_output_pipes(self):
+        # Execute only the generated trusted child branch with exactly one child,
+        # no guest, cgroup, limits or fork-limit test. Proves pipe behavior only.
+        import ast
+        import signal
+        import sys
+        import textwrap
+        source=json.loads(self.node("""
+import {fixtures,sourceFor} from './packages/grading-runtime/test/linux-kernel-smoke.mjs';
+console.log(JSON.stringify(sourceFor(fixtures('limits','cpython').find(x=>x.name==='pids'),'test-token')));
+"""))
+        branch=next(node for node in ast.walk(ast.parse(source)) if isinstance(node,ast.If) and ast.unparse(node.test)=='child == 0')
+        for node in ast.walk(branch):
+            if isinstance(node,ast.Call) and ast.unparse(node.func)=='time.sleep': node.args=[ast.Constant(value=5)]
+        body='\n'.join(ast.unparse(node) for node in branch.body)
+        with tempfile.TemporaryDirectory() as folder:
+            identity=Path(folder)/'owned-child'
+            script='import os,time\nchild=os.fork()\nif child==0:\n'
+            script+=f" with open({str(identity)!r},'x') as f: f.write(str(os.getpid()))\n"
+            script+=textwrap.indent(body,' ')+'\nprint("parent-exit",flush=True)\nos._exit(0)\n'
+            process=subprocess.Popen([sys.executable,'-I','-c',script],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            try:
+                stdout,stderr=process.communicate(timeout=2)
+                self.assertEqual(process.returncode,0)
+                self.assertEqual(stdout,b'parent-exit\n'); self.assertEqual(stderr,b'')
+                child_pid=int(identity.read_text())
+                os.kill(child_pid,0)  # EOF arrived while the detached child lives.
+            finally:
+                if identity.exists():
+                    try: os.kill(int(identity.read_text()),signal.SIGKILL)
+                    except ProcessLookupError: pass
+                if process.poll() is None: process.kill()
+                process.communicate(timeout=3)
+
+
 if __name__ == "__main__": unittest.main()

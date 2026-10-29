@@ -87,6 +87,9 @@ for i in range(40):
   break
  if child == 0:
   os.setsid()
+  # Stay alive for cleanup proof without retaining supervisor output pipes.
+  os.close(1)
+  os.close(2)
   time.sleep(30)
   os._exit(0)
  children.append(child)

@@ -34,6 +34,7 @@ Node 22, Python 3, existing CPython/Pyodide guest and broker images, GitHub Acti
 - `deploy/scripts/grading/ci/test_provision.py`: meaningful ownership, platform, budget, artifact and failure/cleanup tests with no host mutation locally.
 - `packages/grading-runtime/test/linux-kernel-smoke.mjs`: actual unprivileged production-client assertions with bounded machine-readable results; import production modules, never fixture/FakeDriver.
 - `deploy/scripts/grading/ci/kernel.py`: privileged host observation/fixed fault orchestration, coordinator invocation and cleanup verification.
+- `deploy/scripts/grading/ci/exec_observer.py`: bounded read-only kernel exec/OOM observation and cgroup file-handle identity matching.
 - `deploy/scripts/grading/ci/test_kernel.py`: evidence/census/cgroup/fault-result rejection contracts runnable locally.
 - `deploy/scripts/grading/ci/run.sh`: dependency/build/provision/test/cleanup orchestration with error preservation.
 - `deploy/scripts/grading/ci/evidence.py`: allowlisted, no-symlink, bounded sanitized evidence collection with non-success on missing/overflow.
@@ -55,9 +56,10 @@ No caller-supplied command strings or arbitrary cleanup targets are accepted.
 strict artifact tree calculator and locally built `cove-grading-{native,compatibility,broker}:ci`.
 Produces CLI `sudo ... python3 provision.py prepare REPO`,
 `python3 provision.py observe`, `python3 provision.py cleanup`, private state and
-public config at the fixed paths above. These commands are ephemeral-CI-only.
+public config at `/opt/cove/grading/ci/config.json` and private administrator state
+at `/var/lib/cove-grading-ci/state.json`. These commands are ephemeral-CI-only.
 
-- [ ] **Step 1: Add and run failing local refusal/validation tests.**
+- [x] **Step 1: Add and run failing local refusal/validation tests.**
 
 ```python
 def test_non_ci_host_refused():
@@ -74,7 +76,7 @@ Also cover root requirement, existing different account/config refusal, safe
 non-overlapping 65536-entry subordinate IDs, exact owned cleanup and immutable
 image/manifest identity rejection. Pure fixtures are contracts, not native proof.
 
-- [ ] **Step 2: Implement fixed host provisioning and bundle generation.**
+- [x] **Step 2: Implement fixed host provisioning and bundle generation.**
 
 Use an explicit environment guard before the first mutation:
 
@@ -105,7 +107,7 @@ broker env, start existing broker and wait boundedly for actual ready health.
 Create an independent worker-equivalent slice with exact limits. Do not run full
 production `collect_host` against absent app/Turtle services or invent that proof.
 
-- [ ] **Step 3: Implement observation and idempotent exact-owned cleanup.**
+- [x] **Step 3: Implement observation and idempotent exact-owned cleanup.**
 
 Observe actual daemon attestation, image IDs/tree/package identities, relevant
 service PIDs, private socket modes, effective execution/coordinator limits and
@@ -115,7 +117,7 @@ termination, namespace/descendant absence and no unexpected containers. Keep the
 first failure if cleanup also fails. Existing/unowned/changing resources refuse
 cleanup rather than broadening scope. Leave unrelated rootful services intact.
 
-- [ ] **Step 4: Run local checks, self-review and commit.**
+- [x] **Step 4: Run local checks, self-review and commit.**
 
 ```sh
 python3 -m unittest discover -s deploy/scripts/grading/ci -p 'test_provision.py' -v
@@ -130,14 +132,16 @@ No actual local Mac provisioning or push is part of this task.
 ### Task 2: Execute real native kernel and recovery checks
 
 **Files:** Create `packages/grading-runtime/test/linux-kernel-smoke.mjs`,
-`deploy/scripts/grading/ci/kernel.py`, `test_kernel.py`; narrowly fix actual production
+`deploy/scripts/grading/ci/kernel.py`, `exec_observer.py`, `test_kernel.py`; narrowly fix actual production
 runtime defects revealed by genuine kernel evidence without weakening contracts.
 
 **Interfaces:** Consumes Task1 fixed private/public config, production BrokerClient
 and exact owned user units. Produces `python3 kernel.py run` which launches each
 coordinator phase as the distinct worker under its exact cgroup budget, runs fixed
 administrator fault steps, and writes bounded per-case reports to owned evidence.
-Unprivileged CLI uses `--phase NAME --config PATH --result PATH`; phase names form
+The private state is `/var/lib/cove-grading-ci/state.json`; public config is
+`/opt/cove/grading/ci/config.json`. Task1 report binds the concrete observed user,
+slice and service names. Unprivileged CLI uses `--phase NAME --config PATH --result PATH`; phase names form
 a closed enum for functional, isolation, limits, cancellation and recovery.
 
 - [ ] **Step 1: Add failing evidence/cgroup/fault rejection contracts.**
@@ -181,7 +185,18 @@ artifacts. Required cases include:
 
 Host orchestration must verify actual learner-before-interpreter cgroup assignment
 using the existing READY gate and actual process/cgroup state, rather than trusting
-an unverified JSON success field. Read kernel/controller evidence around failures,
+an unverified JSON success field. A host-only exec trace starts before an owned
+broker restart and records the gated launcher at interpreter exec, including
+actual PID, UID, executable and kernel cgroup ID. Match that ID to the actual
+learner cgroup using the kernel file-handle API; an after-READY snapshot alone
+cannot establish pre-init assignment. The official Ubuntu bpftrace package may
+supply this read-only test observer; unsupported tracing fails instead of
+skipping proof. Bound the observer in the separately measured system/headroom
+reserve, retain only required identity events and never argv/environment.
+Use a guest-private scratch marker to prove actual source release before active
+cancellation/restart/OOM faults; the administrator reads it through the exact
+owned guest root. Native learner OOM and parent OOM events must be observed before
+the corresponding cgroup disappears, with actual victim/leaf identity binding. Read kernel/controller evidence around failures,
 classify infrastructure separately, and preserve ambiguous cleanup as failure.
 The coordinator never receives daemon/home/admin authority. The host controller
 performs only fixed observed faults against the private state's exact owned units.
@@ -245,8 +260,11 @@ do not use continue-on-error to label native checks passing.
 
 - [ ] **Step 3: Review, push the authorized feature branch and inspect actual run.**
 
-Run local contract checks and the appropriate runtime tests, perform task and
-whole-change review, then push only `feat/production-native-grading`. Observe the
+Run local contract checks and the appropriate runtime tests; perform the task
+source review before the controller pushes only `feat/production-native-grading`.
+The code implementer does not push. The controller owns actual Linux execution
+and evidence closure; this task remains pending until those finish. The final
+whole-change review follows actual execution and any scoped fixes. Observe the
 new workflow through completion. Download actual evidence. If it exposes a
 defect, preserve that run's failure, fix within the approved contracts, review
 and run a new source revision; never repeatedly rerun unchanged samples to select

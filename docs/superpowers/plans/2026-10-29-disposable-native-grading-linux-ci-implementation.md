@@ -144,7 +144,7 @@ The private state is `/var/lib/cove-grading-ci/state.json`; public config is
 slice and service names. Unprivileged CLI uses `--phase NAME --config PATH --result PATH`; phase names form
 a closed enum for functional, isolation, limits, cancellation and recovery.
 
-- [ ] **Step 1: Add failing evidence/cgroup/fault rejection contracts.**
+- [x] **Step 1: Add failing evidence/cgroup/fault rejection contracts.**
 
 ```python
 def test_missing_required_native_case_fails():
@@ -159,7 +159,7 @@ Add assertions for wrong effective worker/family limits, absent learner pre-init
 proof, PID/census changes, absent actual OOM counters and recovered receipt/source
 identity mismatch. Execute `python3 -m unittest discover -s deploy/scripts/grading/ci -p 'test_kernel.py' -v`.
 
-- [ ] **Step 2: Implement bounded real broker/client cases.**
+- [x] **Step 2: Implement bounded real broker/client cases.**
 
 Use production health/descriptor/reserve/run/receipt/ack/release protocol. BUSY
 may be retried only before release; once a run is pending, poll only its receipt.
@@ -201,7 +201,7 @@ classify infrastructure separately, and preserve ambiguous cleanup as failure.
 The coordinator never receives daemon/home/admin authority. The host controller
 performs only fixed observed faults against the private state's exact owned units.
 
-- [ ] **Step 3: Test result validation and bounded coordinator/source identity.**
+- [x] **Step 3: Test result validation and bounded coordinator/source identity.**
 
 ```sh
 python3 -m unittest discover -s deploy/scripts/grading/ci -p 'test_*.py' -v
@@ -221,14 +221,20 @@ with `test(grading): verify real rootless guests and recovery`.
 `docs/research/2026-10-29-disposable-native-grading-linux-verification.md`.
 
 **Interfaces:** Consumes Task1 provision/observe/cleanup and Task2 kernel run.
-Produces a feature-branch push workflow and at most20MiB sanitized summary artifact.
+Produces a feature-branch push workflow and at most20MiB sanitized summary artifact. Collect the root-owned authoritative report
+`/var/lib/cove-grading-ci/kernel.json` through privileged guarded collection; a
+worker-writable report alone is insufficient host proof. Pass setup-node's actual
+absolute executable as `GRADING_CI_NODE_SOURCE` through narrowly scoped sudo
+environment, not the entire caller PATH/environment.
 
 - [ ] **Step 1: Add failing bounded collector/workflow contracts.**
 
 Test missing evidence, symlink/path escape, forbidden files, size overflow and
 preservation of the original test failure alongside cleanup failures. Test actual
 workflow branch/runner/timeout/permissions, no production environment/secrets/
-untrusted PR trigger, and one-day retention using the repository's YAML tooling.
+untrusted PR trigger, and one-day retention using the frozen web ESLint js-yaml
+parser via Node createRequire, JSON_SCHEMA and duplicate-key rejection; no new
+YAML dependency or hand-written parser is needed.
 
 - [ ] **Step 2: Implement the run and evidence entrypoints.**
 
@@ -253,6 +259,8 @@ jobs:
     timeout-minutes: 45
 ```
 
+Use workflow concurrency with `cancel-in-progress: false` to preserve a running
+first-failure record when a newer source revision is queued.
 Use normal checkout/pnpm/Node22 actions, frozen dependencies, explicit
 `GRADING_DISPOSABLE_CI=1`, no deployment credentials, and always-run bounded
 upload with `retention-days: 1`. Unsupported native capability fails this job;

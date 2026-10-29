@@ -1,9 +1,10 @@
 # Disposable Linux native-grading verification
 
 Date: 2026-10-29, Asia/Seoul.
-Status: proposed test-environment extension; no new workflow or host provisioning
-has been implemented or authorized by this document. The existing isolated CI
-run is separately authorized by the user's request to perform the next steps.
+Status: approved by the user on 2026-10-29 through the disposable Linux CI design
+approval question. Implementation is authorized only within the scope below.
+The existing isolated CI run was separately authorized by the user's request to
+perform the next steps.
 
 ## Purpose and measured starting point
 

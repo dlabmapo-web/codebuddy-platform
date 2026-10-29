@@ -135,19 +135,23 @@ verified local Unix Docker endpoint for creation and cleanup.
 ## Timing evidence and limitations
 
 The [single local ten-case diagnostic](assets/2026-10-29-native-grading-verification/local-ten-case-boundaries.json)
-records actual independent boundaries:
+retains the original diagnostic markers:
 
 | Boundary | Observed |
 | --- | ---: |
 | Browser clock click→visible | 8491.74 ms |
 | Admission handler (monotonic) | 116.69 ms |
-| Admission acknowledgement→final transaction acknowledgement | 8101 ms |
-| Final transaction duration (monotonic) | 121.90 ms |
-| Commit acknowledgement→observed visible read | 382 ms |
+| Admission acknowledgement→original commit marker | 8101 ms |
+| Original commit-span duration (monotonic) | 121.90 ms |
+| Original commit marker→observed visible read | 382 ms |
 | Explicit acknowledged DB transactions in this legacy job | 1 |
 | Twenty loopback SELECT RTTs | 0.262–0.907 ms |
 
-`gradedAt` is not used as a commit acknowledgement. Browser automation and the
+These retained values predate the scoped timing review below: the original
+outer commit marker could include diagnostic writes. They do not establish the
+exact final transaction acknowledgement, and fix round2 supersedes that boundary.
+No corrected historical value is invented. `gradedAt` is not used as a commit
+acknowledgement. Browser automation and the
 observed-visible sample add overhead. This is n=1, ARM64/Darwin, loopback
 PostgreSQL and default Pyodide; it establishes no percentile or production
 latency. External production Supabase RTT/placement may materially change the
@@ -401,6 +405,54 @@ No broad passing browser/API/shared/web suites were repeated. Known Next dev/pg
 Minor diagnostics remain disclosed above. Positive Linux/native execution,
 cohorts/performance/certifications/scans/pilot remain unexecuted; no acceptance
 signature, production enablement or external publication occurred.
+
+## Task6 review fix round2: original final transaction acknowledgement
+
+Rereview found that awaited inner Redis/file diagnostics delayed the outer
+commit marker. The worker now calls shared fixture instrumentation that gives
+each final commit an AsyncLocalStorage span. The transaction wrapper captures its
+original wall/monotonic acknowledgement, duration, transaction UUID and worker
+clock incarnation **before** diagnostic transport. The outer `commit-ack` copies
+that exact snapshot. Nested non-commit telemetry excludes checkpoint/claim
+transactions, and zero or multiple eligible final transactions fail closed.
+The consumer requires matching job/producer, transaction/span/clock identities
+and exact acknowledgement fields; a separate later transaction cannot masquerade
+as the final commit.
+
+Later observer time/span duration remain distinct from the original DB ack.
+The driver also captures saved-result observation before collecting diagnostics,
+records diagnostic collection separately, and retains all raw correlation/clock
+fields. The saved-read-relative-to-ack field is a signed diagnostic: visibility
+can precede the worker receiving the acknowledgement. It is not a browser p95 or
+new latency acceptance result.
+
+Only the timing contracts ran:
+
+```sh
+bash packages/api/scripts/test-native-grading-isolated.sh --timing-contracts
+```
+
+**2/2 passed** (the cross-process transport case overlaps the previous proof).
+The new regression invokes the **same worker fixture instrumentation**, actual
+production `ExecutionTelemetry`, and real owned-loopback PostgreSQL BEGIN/SELECT/
+COMMIT through a small test transaction adapter. Delaying diagnostic writes by
+150 ms left the final transaction at **0.997458 ms**, while later observation was
+**154.286708 ms** after its original acknowledgement. Wall/monotonic ack and
+clock incarnation were identical in the transaction and commit records.
+Claim/checkpoint exclusion, missing/ambiguous final transaction and mismatched
+correlation negatives passed. The values describe this targeted instrumentation
+regression, not grading/native performance.
+[Focused output](assets/2026-10-29-native-grading-verification/fix2-timing-contracts.txt)
+and [current fixture source hashes](assets/2026-10-29-native-grading-verification/fix2-verification-summary.json)
+are retained. The test loader preserves the repository working directory for
+existing artifact-inspection paths while importing the actual TypeScript telemetry.
+
+The initial targeted run also passed2/2; the overlapping final run verified the
+loader/CWD adjustment. Node/shell syntax, E2E TypeScript and whitespace checks
+passed. No product source or immutable image changed, no image was rebuilt, and
+no broad/browser/unit suites were repeated. Earlier artifact IDs and unsupported
+Linux/performance/certification/scan/pilot gates remain as stated above. Owned
+fixtures were cleaned; no deployment/publication/activation occurred.
 
 ## Preserved implementation rulings
 

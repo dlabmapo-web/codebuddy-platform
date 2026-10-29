@@ -5,8 +5,10 @@ import { Redis } from 'ioredis';
 import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
 import { existsSync } from 'node:fs';
-import { fixtureTimings } from './native-grading-e2e-timings.mjs';
-import { performance } from 'node:perf_hooks';
+import {
+  fixtureTimings,
+  instrumentWorkerTimings,
+} from './native-grading-e2e-timings.mjs';
 const compiledRoot = existsSync(
   new URL('../dist/src/judge/grading.service.js', import.meta.url),
 )
@@ -27,6 +29,11 @@ const timings = fixtureTimings(
   process.env.COVE_NATIVE_FIXTURE_ID,
   'worker',
   process.env.COVE_NATIVE_TIMINGS_FILE,
+);
+const instrumentation = instrumentWorkerTimings(
+  ExecutionTelemetry.prototype,
+  timings,
+  executionLogContext,
 );
 // Surface bounded OS-helper diagnostics during this real execution fixture.
 const originalExec = childProcess.execFileSync;
@@ -55,23 +62,7 @@ for (const [prototype, method, kind] of [
 ]) {
   const original = prototype[method];
   prototype[method] = async function (id, ...args) {
-    if (!this.prisma.__nativeTransactionsWrapped) {
-      const transaction = this.prisma.$transaction.bind(this.prisma);
-      this.prisma.$transaction = async (...args) => {
-        const began = performance.now(),
-          context = executionLogContext();
-        const value = await transaction(...args);
-        await timings.record({
-          event: 'db-transaction-ack',
-          ...context,
-          at: Date.now(),
-          ackMonotonicMs: performance.now(),
-          elapsedMs: performance.now() - began,
-        });
-        return value;
-      };
-      this.prisma.__nativeTransactionsWrapped = true;
-    }
+    instrumentation.wrapTransactions(this.prisma);
     const model =
       kind === 'official'
         ? this.prisma?.submission
@@ -94,19 +85,5 @@ for (const [prototype, method, kind] of [
     return original.call(this, id, ...args);
   };
 }
-const originalTime = ExecutionTelemetry.prototype.time;
-ExecutionTelemetry.prototype.time = async function (stage, action, ...args) {
-  const started = performance.now();
-  const value = await originalTime.call(this, stage, action, ...args);
-  await timings.record({
-    event: stage === 'commit' ? 'commit-ack' : 'stage-ack',
-    stage,
-    ...executionLogContext(),
-    at: Date.now(),
-    ackMonotonicMs: performance.now(),
-    elapsedMs: performance.now() - started,
-  });
-  return value;
-};
 process.on('SIGTERM', () => redis.disconnect());
 await import(compiledRoot + 'judge/judge.main.js');

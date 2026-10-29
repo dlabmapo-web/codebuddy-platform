@@ -133,6 +133,15 @@ shared writable filesystem. API and worker may use different or absent optional
 both producers by the actual job ID. Wall/monotonic acknowledgement samples are
 captured before awaited diagnostic transport; the driver retains them. Missing
 admission/worker commit/transaction records fail a sample after a bounded wait.
+The worker uses the same tested commit-scoped instrumentation for both graders.
+A final commit span must contain exactly one eligible transaction. Nested
+checkpoint/claim telemetry cannot nominate it; missing/ambiguous acknowledgements
+fail. Its `commit-ack` copies the transaction's original wall/monotonic timestamp
+and duration before diagnostic Redis/file writes, correlated by transaction UUID,
+commit-span UUID and worker clock incarnation. Later observer/span completion and
+saved-result observation/diagnostic collection remain separate fields. A signed
+saved-read-relative-to-ack interval is diagnostic and may be negative if durable
+visibility precedes the worker's acknowledgement receipt; it is not browser p95.
 No history is trimmed: oversize/overflow rejects, with 4KiB per record,8192 per
 job,4096 job keys and32MiB serialized data per fixture. Keys have a four-hour TTL;
 verified idle phase boundaries clear only that fixture's namespace. Local owned

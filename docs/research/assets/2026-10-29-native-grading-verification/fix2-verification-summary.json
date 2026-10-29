@@ -1,0 +1,39 @@
+{
+  "review": "Task6 fix round2",
+  "finding": "Original final transaction acknowledgement must precede diagnostic transport",
+  "timingContractsPassed": 2,
+  "evidence": [
+    {
+      "evidence": "cross-process-private-files-owned-redis",
+      "records": 3,
+      "producers": 2,
+      "sharedTimingFile": false,
+      "oldFileReaderRejected": true,
+      "overflowRejected": true,
+      "cleanup": true
+    },
+    {
+      "evidence": "actual-nested-worker-instrumentation-pg-commit",
+      "database": "owned-loopback-postgres",
+      "diagnosticDelayMs": 150,
+      "finalTransactionMs": 0.9974579999999378,
+      "postCommitObservationMs": 154.28670799999998,
+      "ackWallUnchanged": true,
+      "ackMonotonicUnchanged": true,
+      "clockIncarnationUnchanged": true,
+      "checkpointAndClaimExcluded": true,
+      "missingAndAmbiguousRejected": true
+    }
+  ],
+  "rulingsPreserved": 21,
+  "productionSourceChanged": false,
+  "imageArtifactsChanged": false,
+  "positiveLinuxAcceptanceExecuted": false,
+  "sourceHashes": {
+    "packages/api/scripts/native-grading-e2e-timings.mjs": "111f701320b3914934727c56dd2047011be59f94edb37d7b505e16e8bec8c54e",
+    "packages/api/scripts/native-grading-e2e-worker.mjs": "e3a4e9d37c06d87cdfb13fdd6ae9fb3d585c4135303a6013a8083d1b6c701ee4",
+    "packages/api/scripts/native-grading-e2e-timings.test.mjs": "f82d25e8a5c1e2fd1dff599fd8bccb9c0b8bc89f86578388aabcab42db325df1",
+    "packages/api/scripts/test-native-grading-isolated.sh": "8f32497d316a4b6df17dfc24fe4b79c8319248aa25844bb01bdf5f370721f12b",
+    "e2e/native-grading-acceptance.mjs": "31586e85c48c36471d4b9f16b977befd58b61ca382a66284ffc418c297922991"
+  }
+}

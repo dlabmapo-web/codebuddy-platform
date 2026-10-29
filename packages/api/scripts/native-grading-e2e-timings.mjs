@@ -1,6 +1,7 @@
 /** Trusted disposable-fixture diagnostics only. Never packaged in app images. */
 import { appendFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 const ttl = 14_400;
 const append = `
 local bytes=tonumber(redis.call('GET',KEYS[2]) or '0')
@@ -90,14 +91,131 @@ export function acknowledgedTimings(rows, id) {
   const commit = selected.find(
     (row) => row.source === 'worker' && row.event === 'commit-ack',
   );
+  const transaction =
+    commit &&
+    selected.find(
+      (row) =>
+        row.source === 'worker' &&
+        row.event === 'db-transaction-ack' &&
+        row.transactionId === commit.transactionId &&
+        row.commitSpanId === commit.commitSpanId &&
+        row.clockId === commit.clockId &&
+        row.producer === commit.producer,
+    );
   if (
     !admission ||
     !commit ||
     commit.at < admission.at ||
-    !selected.some(
-      (row) => row.source === 'worker' && row.event === 'db-transaction-ack',
-    )
+    !transaction ||
+    !/^[a-f0-9-]{36}$/.test(commit.commitSpanId ?? '') ||
+    !/^[a-f0-9-]{36}$/.test(commit.transactionId ?? '') ||
+    !/^[a-f0-9-]{36}$/.test(commit.clockId ?? '') ||
+    ['at', 'ackMonotonicMs', 'elapsedMs', 'clockTimeOriginMs'].some(
+      (key) => transaction[key] !== commit[key],
+    ) ||
+    !Number.isFinite(commit.postCommitObservationMs) ||
+    commit.postCommitObservationMs < 0
   )
     throw new Error('Missing/invalid acknowledged timing boundaries');
   return { admission, commit, rows: selected };
+}
+
+/** The exact fixture instrumentation used by the worker and nested-boundary test. */
+export function instrumentWorkerTimings(
+  prototype,
+  timings,
+  executionLogContext,
+) {
+  const spans = new AsyncLocalStorage(),
+    wrapped = new WeakSet();
+  const clockId = randomUUID(),
+    clockTimeOriginMs = performance.timeOrigin;
+  const originalTime = prototype.time;
+  prototype.time = async function (stage, action, ...args) {
+    const began = performance.now(),
+      context = executionLogContext();
+    const span =
+      stage === 'commit'
+        ? { id: randomUUID(), context, transactions: [], closed: false }
+        : null;
+    let value;
+    try {
+      // A nested checkpoint/claim stage must not inherit a final-commit span.
+      value = await spans.run(span, () =>
+        originalTime.call(this, stage, action, ...args),
+      );
+    } finally {
+      if (span) span.closed = true;
+    }
+    const observedMonotonicMs = performance.now(),
+      observedAt = Date.now();
+    if (span) {
+      if (span.transactions.length !== 1)
+        throw new Error(
+          'Missing/ambiguous final commit transaction acknowledgement',
+        );
+      const ack = span.transactions[0];
+      await timings.record({
+        ...ack,
+        event: 'commit-ack',
+        stage,
+        observedAt,
+        observedMonotonicMs,
+        spanElapsedMs: observedMonotonicMs - began,
+        postCommitObservationMs: observedMonotonicMs - ack.ackMonotonicMs,
+      });
+    } else {
+      await timings.record({
+        event: 'stage-ack',
+        stage,
+        ...context,
+        at: observedAt,
+        ackMonotonicMs: observedMonotonicMs,
+        elapsedMs: observedMonotonicMs - began,
+        clockId,
+        clockTimeOriginMs,
+      });
+    }
+    return value;
+  };
+  return {
+    wrapTransactions(prisma) {
+      if (wrapped.has(prisma)) return;
+      const original = prisma.$transaction.bind(prisma);
+      prisma.$transaction = async (...args) => {
+        const began = performance.now(),
+          context = executionLogContext(),
+          span = spans.getStore();
+        const value = await original(...args);
+        const ackMonotonicMs = performance.now();
+        const active = span && !span.closed;
+        const ack = Object.freeze({
+          event: 'db-transaction-ack',
+          ...context,
+          at: Date.now(),
+          ackMonotonicMs,
+          elapsedMs: ackMonotonicMs - began,
+          transactionId: randomUUID(),
+          commitSpanId: active ? span.id : null,
+          clockId,
+          clockTimeOriginMs,
+        });
+        if (active) {
+          if (
+            context.jobId !== span.context.jobId ||
+            context.kind !== span.context.kind
+          )
+            throw new Error('Final commit transaction context mismatch');
+          // Preserve the original ack before awaiting Redis or local-file transport.
+          span.transactions.push(ack);
+        }
+        await timings.record(ack);
+        return value;
+      };
+      wrapped.add(prisma);
+    },
+    restore() {
+      prototype.time = originalTime;
+    },
+  };
 }

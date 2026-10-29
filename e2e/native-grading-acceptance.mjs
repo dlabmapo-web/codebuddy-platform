@@ -398,6 +398,8 @@ async function submission(entry, cohort) {
       saved.passedCount !== entry.cases
     )
       throw new Error('Unexpected/unfinished verdict');
+    const savedObservedAt = Date.now(),
+      savedObservedMonotonicMs = performance.now();
     row.runtimeEvidence = acceptedRuntimeEvidence(
       saved,
       config.phase,
@@ -420,22 +422,18 @@ async function submission(entry, cohort) {
       throw new Error('Invalid admission clock boundary');
     row.acceptedToCommitAckMs = commit.at - admission.at;
     row.handlerMs = admission.elapsedMs;
-    row.observedSavedMs = performance.now() - began;
+    row.finalTransactionMs = commit.elapsedMs;
+    row.commitPostAckObservationMs = commit.postCommitObservationMs;
+    row.commitSpanIncludingDiagnosticsMs = commit.spanElapsedMs;
+    row.savedObservedAt = savedObservedAt;
+    row.savedReadRelativeToCommitAckMs = savedObservedAt - commit.at;
+    row.observedSavedMs = savedObservedMonotonicMs - began;
+    row.diagnosticCollectionMs = performance.now() - savedObservedMonotonicMs;
     row.runtimeMs = saved.runtimeMs;
     row.acknowledgedTransactionCount = timings.filter(
       (item) => item.event === 'db-transaction-ack',
     ).length;
-    row.stages = timings.map(
-      ({ event, stage, elapsedMs, at, ackMonotonicMs, source, producer }) => ({
-        event,
-        stage,
-        elapsedMs,
-        at,
-        ackMonotonicMs,
-        source,
-        producer,
-      }),
-    );
+    row.stages = timings;
     const state = await get('/fixtures/' + fixture.id);
     const solves = state.points.filter(
       (point) =>

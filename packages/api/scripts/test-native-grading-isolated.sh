@@ -36,11 +36,13 @@ export COVE_NATIVE_TEST_DATABASE_URL="postgresql://postgres:native-fixture@127.0
 export COVE_NATIVE_TEST_REDIS_URL="redis://127.0.0.1:$native_redis_port/0"
 export DATABASE_URL="$COVE_NATIVE_TEST_DATABASE_URL" DIRECT_URL="$COVE_NATIVE_TEST_DATABASE_URL"
 if [ "${1:-}" = "--acceptance-contracts" ]; then
-  COVE_NATIVE_BROKER_TEST_IMAGE="${2:-}" COVE_NATIVE_DOCKER_ENDPOINT="$native_docker_endpoint" node --test --test-concurrency=1 e2e/native-grading-acceptance-authority.test.mjs packages/api/scripts/native-grading-e2e-timings.test.mjs
+  native_ts_loader="$(node -p 'require.resolve("tsx", {paths: [process.cwd()+"/packages/api"]})')"
+  COVE_NATIVE_BROKER_TEST_IMAGE="${2:-}" COVE_NATIVE_DOCKER_ENDPOINT="$native_docker_endpoint" node --import "$native_ts_loader" --test --test-concurrency=1 e2e/native-grading-acceptance-authority.test.mjs packages/api/scripts/native-grading-e2e-timings.test.mjs
   exit
 fi
 if [ "${1:-}" = "--timing-contracts" ]; then
-  node --test packages/api/scripts/native-grading-e2e-timings.test.mjs
+  native_ts_loader="$(node -p 'require.resolve("tsx", {paths: [process.cwd()+"/packages/api"]})')"
+  node --import "$native_ts_loader" --test packages/api/scripts/native-grading-e2e-timings.test.mjs
   exit
 fi
 docker exec -i "$native_pg" psql -U postgres -d cove_native_test -v ON_ERROR_STOP=1 <<'SQL'

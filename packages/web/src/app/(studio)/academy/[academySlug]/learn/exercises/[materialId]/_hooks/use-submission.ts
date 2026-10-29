@@ -45,7 +45,7 @@ export function useSubmission({
   classId: string;
   materialId: string;
   /**
-   * A historical attempt's verdict, shown until this sitting produces one.
+   * An explicitly reviewed or observed accepted verdict, shown until a new action.
    *
    * Entering from Answer records opens the Result tab on the attempt the
    * student chose to review, exactly as it read when they submitted it.
@@ -306,7 +306,10 @@ export function useSubmission({
       request.current = null;
       const location = new URL(window.location.href);
       if (location.pathname.endsWith(`/learn/exercises/${materialId}`)) {
-        location.searchParams.set('submission', accepted.submissionId);
+        // Historical-source review is explicit; observing this result must keep
+        // normal local/server draft hydration even after it becomes terminal.
+        location.searchParams.delete('submission');
+        location.searchParams.set('observeSubmission', accepted.submissionId);
         window.history.replaceState(null, '', location);
       }
       watch(accepted.submissionId, accepted.totalCount, action);

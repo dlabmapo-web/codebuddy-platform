@@ -1,0 +1,60 @@
+Final artifact identities and imports; local ARM64 only, no AMD64 acceptance or registry publication.
+{
+  "api": {
+    "tag": "cove-api:final-review-fix-20261029",
+    "configId": "sha256:838300296d99826755cb56467051ff4f434fccd4815a60be871e3ec6435dff7e",
+    "architecture": "arm64"
+  },
+  "worker": {
+    "tag": "cove-judge:final-review-fix-20261029",
+    "configId": "sha256:1fadc9c3884909b2616f601cfd9d88a3ff9586c747951fa5dc112bf2eeae5bd7",
+    "architecture": "arm64"
+  },
+  "broker": {
+    "tag": "cove-grading-broker:final-review-fix-20261029",
+    "configId": "sha256:ebd305076c56abdc2ae24583e0f972402093496704bc1217f9b213b711595b53",
+    "architecture": "arm64"
+  }
+}
+api artifact-smoke
+api imports, Prisma and production filesystem verified
+
+api warning-audit
+Reviewed dev-only missing-bin names: acorn,browserslist,esbuild,terser,vite,webpack
+
+worker artifact-smoke
+worker imports, Prisma and production filesystem verified
+
+worker warning-audit
+Reviewed dev-only missing-bin names: prisma
+
+broker artifact-smoke
+broker imports, observations/seccomp and production filesystem verified
+
+broker warning-audit
+Reviewed dev-only missing-bin names:
+
+Strict actual stopped broker extraction/tree
+TAP version 13
+# {"evidence":"actual-stopped-broker-artifact-tree","configId":"sha256:ebd305076c56abdc2ae24583e0f972402093496704bc1217f9b213b711595b53","architecture":"arm64","imageTreeIdentity":"dfb9c6e6e90b23653560ddc5ae5d17f661cdf94d93a292cbe768327337d4ba08","changedHostRejected":true,"executionStarted":false}
+# Subtest: real stopped immutable broker carrier matches copied host tree and rejects changed host bytes
+ok 1 - real stopped immutable broker carrier matches copied host tree and rejects changed host bytes
+  ---
+  duration_ms: 3692.5625
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3955.50075
+
+Current web build milestones
+✓ Compiled successfully in 25.3s
+  Finished TypeScript in 7.0s ...
+✓ Generating static pages using 7 workers (42/42) in 438ms
+Build ID: h-n6ie7Su4_Sr2jd0r4Y_

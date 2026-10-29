@@ -32,6 +32,7 @@ beforeEach(() => {
   vi.stubGlobal('EventSource', Source);
   vi.stubGlobal('React', React);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  window.history.replaceState(null, '', '/academy/academy/learn/exercises/material?classId=class');
   rpc.getLatestSubmission.mockResolvedValue(null);
   rpc.submit.mockResolvedValue({ submissionId: 'attempt', totalCount: 1 });
   rpc.getSubmission.mockResolvedValue({
@@ -238,3 +239,15 @@ it.each(['QUEUED', 'RUNNING'] as const)(
     }
   },
 );
+
+it('stores accepted observation separately and leaves explicit historical selection only until a new acceptance', async () => {
+  window.history.replaceState(null, '', '/academy/academy/learn/exercises/material?classId=class&submission=old');
+  const f = await mount();
+  try {
+    await act(async () => { await f.state.submit('print(1)'); });
+    const url = new URL(window.location.href);
+    expect(url.searchParams.get('observeSubmission')).toBe('attempt');
+    expect(url.searchParams.has('submission')).toBe(false);
+    expect(url.searchParams.get('classId')).toBe('class');
+  } finally { await f.close(); }
+});

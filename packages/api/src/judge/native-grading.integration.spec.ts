@@ -1,3 +1,4 @@
+import { admitRuntime } from './runtime-admission.js';
 import { PracticeRunner } from './practice.runner.js';
 import { RegradeRunner } from './regrade.runner.js';
 import { createPracticeAttempt } from '../learn/staff-practice.repository.js';
@@ -92,6 +93,114 @@ describe.skipIf(!databaseUrl || !redisUrl)('native grading durable application i
   async function runCase(session: ExecutionSession, position: number) {
     return session.executionEngine().run({ casePosition: position, code: 'print("ok")', stdin: '', timeLimitMs: 1000, memoryLimitMb: 128 });
   }
+  it('retains terminal and expired public sample private authority in real inventory and every drain check until confirmed retirement', async () => {
+    const manifestPath = join(directory, 'private-inventory-manifest.json'); await writeFile(manifestPath, JSON.stringify(manifestFixture));
+    await redis.del(readinessKey(manifestFixture, workerGeneration));
+    const command = () => promisify(execFile)(process.execPath, ['scripts/grading-inventory.mjs'], { cwd: process.cwd(), env: {
+      PATH: process.env.PATH, HOME: process.env.HOME, DOTENV_CONFIG_PATH: '/dev/null', DATABASE_URL: databaseUrl, REDIS_URL: redisUrl,
+      GRADING_RUNTIME_MANIFEST_PATH: manifestPath, GRADING_WORKER_GENERATION: workerGeneration,
+    } });
+    const drain = (inventory: unknown) => promisify(execFile)('python3', ['-c',
+      "import sys,json,time;sys.path.insert(0,'../../deploy/scripts/grading');from control import drained;from retained import fresh_inventory;v=json.loads(sys.argv[1]);drained(v);fresh_inventory(v,int(time.time()))", JSON.stringify(inventory)], { cwd: process.cwd() });
+    const control = coordinator(), samples = new SampleExecution(async () => redis, control);
+    const id = randomUUID(), key = `cove:grading:sample-lease:${id}`;
+    const beforeExecution = executed;
+    const session = await samples.begin(id, nativeFixture, 128);
+    await session.engine.reserve();
+    await session.engine.run({ casePosition: 1, code: 'print("ok")', stdin: '', timeLimitMs: 1000, memoryLimitMb: 128 });
+    session.abandon(); // simulate worker death after public completion, before private retirement
+    const raw = (await redis.get(key))!;
+    expect(JSON.parse(raw).sourceReleased).toBe(true);
+    try {
+      for (const publicState of ['terminal', 'expired']) {
+        if (publicState === 'terminal') await redis.set(`cove:sample-check:${id}`, JSON.stringify({ status: 'COMPLETED' }));
+        else {
+          await redis.set(`cove:sample-check:${id}`, JSON.stringify({ status: 'COMPLETED' }), 'PX', 1);
+          await new Promise(resolve => setTimeout(resolve, 10));
+          expect(await redis.get(`cove:sample-check:${id}`)).toBeNull();
+        }
+        const inventory = JSON.parse((await command()).stdout);
+        expect(inventory).toMatchObject({ complete: true, pending: 0, recoverable: 1, ephemeralPending: 0, admissionFence: { readinessAbsent: true } });
+        expect(Object.values(inventory.queueBacklog).every(value => value === 0)).toBe(true);
+        expect(await db.gradingExecutionLease.count({ where: { retiredAt: null } })).toBe(0);
+        expect(inventory.references).toContainEqual(nativeFixture);
+        expect(JSON.stringify(inventory)).not.toContain(id);
+        expect(JSON.stringify(inventory)).not.toContain(JSON.parse(raw).lease.leaseToken);
+        // Exercise each production drain consumer independently (the first must not mask the second).
+        await expect(drain(inventory)).rejects.toThrow();
+        const retainedOnly = { ...inventory, pending: 0 };
+        await expect(promisify(execFile)('python3', ['-c', "import sys,json,time;sys.path.insert(0,'../../deploy/scripts/grading');from retained import fresh_inventory;fresh_inventory(json.loads(sys.argv[1]),int(time.time()))", JSON.stringify(retainedOnly)])).rejects.toThrow();
+      }
+      for (const broken of [null, '{}', '{', 'x'.repeat(16385), '{private-source-' + id + '-' + JSON.parse(raw).lease.leaseToken, JSON.stringify({ ...JSON.parse(raw), lease: { ...JSON.parse(raw).lease, attemptId: randomUUID() } }), JSON.stringify({ ...JSON.parse(raw), lease: { ...JSON.parse(raw).lease, runtime: { engine: 'cpython' } } })]) {
+        if (broken === null) await redis.del(key); else await redis.set(key, broken);
+        await expect(command()).rejects.toMatchObject({ stdout: '', stderr: 'Read-only grading inventory failed; no complete evidence produced.\n' });
+      }
+      await redis.set(key, raw);
+      const excess = Array.from({ length: 512 }, () => randomUUID());
+      await redis.sadd('cove:grading:sample-leases', ...excess);
+      try { await expect(command()).rejects.toMatchObject({ stdout: '', stderr: 'Read-only grading inventory failed; no complete evidence produced.\n' }); }
+      finally { await redis.srem('cove:grading:sample-leases', ...excess); }
+      // The actual reconciliation confirms broker cancellation/removal before deleting private authority.
+      await samples.reconcile();
+      expect(await redis.scard('cove:grading:sample-leases')).toBe(0);
+      expect(await redis.get(key)).toBeNull();
+      expect(executed - beforeExecution).toBe(1);
+      const retired = JSON.parse((await command()).stdout);
+      expect(retired.recoverable).toBe(0);
+      await drain(retired);
+      console.log(JSON.stringify({ evidence: 'private-sample-inventory', publicStates: ['terminal', 'expired'], recoverableBeforeRetirement: 1, recoverableAfterRetirement: retired.recoverable, sourceExecutions: executed - beforeExecution, malformedAndMissingCases: 7, overBoundRejected: true }));
+    } finally { await redis.del(key, `cove:sample-check:${id}`); await redis.srem('cove:grading:sample-leases', id); }
+  });
+  it('uses the actual fixture phase control for baseline, candidate and reverse future admissions without rewriting accepted rows', async () => {
+    // Contract-only synthetic manifest/readiness on local owned PG/Redis, not native containment.
+    const path = join(directory, 'phase-manifest.json');
+    const seed = await attempt(1);
+    const acceptedIds = [seed.id];
+    const material = seed.materialId!;
+    await db.submission.updateMany({ where: { materialId: material }, data: { status: 'PASSED' } });
+    const context = { academyId: academy, materialId: material, gradingRevision: 1, context: 'live' as const, memoryLimitMb: 128, timeLimitMs: 1000 };
+    const manifest = { ...manifestFixture, academyAllowances: [{ organizationId: org, academyId: academy }],
+      certifications: [{ ...context, organizationId: org, runtime: nativeFixture, packageProfile: 'standard-library' }] };
+    await writeFile(path, JSON.stringify(manifest));
+    const config = new ConfigService({ GRADING_RUNTIME_MANIFEST_PATH: path, GRADING_NATIVE_ENABLED: false, GRADING_WORKER_GENERATION: workerGeneration });
+    const heartbeat = new RuntimeReadinessPublisher(manifest as never, workerGeneration, async () => redis, async () => ({
+      brokerGeneration: randomUUID(), workerGeneration, capabilities: manifest.capabilities,
+    }));
+    const modulePath = '../../scripts/native-grading-e2e-phase.mjs';
+    const { transitionFixturePhase } = await import(modulePath);
+    const clear = vi.fn(async () => undefined);
+    const transition = (phase: string) => transitionFixturePhase(phase, { allowed: true, db, redis, timings: { clear }, configurations: [config] });
+    const accept = async () => {
+      await heartbeat.poll(true);
+      const runtime = (await admitRuntime(config, db, context, async () => redis))!;
+      const saved = await attempt(1, runtime, material);
+      acceptedIds.push(saved.id);
+      await db.submission.update({ where: { id: saved.id }, data: { status: 'PASSED' } });
+      return saved;
+    };
+    try {
+      expect((await transition('baseline')).status).toBe(200);
+      const baseline = await accept();
+      expect(baseline.executionRuntimeSnapshot).toEqual(compatibilityFixture);
+      expect((await transition('candidate')).status).toBe(200);
+      const candidate = await accept();
+      expect(candidate.executionRuntimeSnapshot).toEqual(nativeFixture);
+      expect((await transition('baseline')).status).toBe(200);
+      const reversed = await accept();
+      expect(reversed.executionRuntimeSnapshot).toEqual(compatibilityFixture);
+      expect((await db.submission.findUniqueOrThrow({ where: { id: baseline.id } })).executionRuntimeSnapshot).toEqual(compatibilityFixture);
+      expect((await db.submission.findUniqueOrThrow({ where: { id: candidate.id } })).executionRuntimeSnapshot).toEqual(nativeFixture);
+      expect(clear).toHaveBeenCalledTimes(3);
+      const pending = await attempt(1, compatibilityFixture, material);
+      acceptedIds.push(pending.id);
+      expect((await transition('candidate')).status).toBe(409);
+      expect(config.get('GRADING_NATIVE_ENABLED')).toBe(false);
+      await db.submission.update({ where: { id: pending.id }, data: { status: 'PASSED' } });
+    } finally {
+      await redis.del(readinessKey(manifest as never, workerGeneration));
+      await db.submission.deleteMany({ where: { id: { in: acceptedIds } } });
+    }
+  });
   it('rolls back attempt and outbox together and retries a lost real Redis queue acknowledgement', async () => {
     const before = await db.gradingDispatchIntent.count();
     await expect(db.$transaction(async tx => { await tx.gradingDispatchIntent.create({ data: { submissionId: randomUUID() } }); })).rejects.toThrow();

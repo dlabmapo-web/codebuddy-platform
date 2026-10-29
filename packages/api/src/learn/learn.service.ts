@@ -192,6 +192,7 @@ export class LearnService {
       academyId: string;
       materialId: string;
       submissionId?: string;
+      observedSubmissionId?: string;
       mode?: "student" | "staff-practice";
       preview?: boolean;
       classId?: string;
@@ -219,20 +220,21 @@ export class LearnService {
           })
         : { classes: [], classId: null };
 
-    // The historical attempt is loaded beside the workspace, not instead of
-    // it. A submission that does not resolve leaves the ordinary workspace
-    // exactly as it was — including whatever draft is already saved.
+    // Both explicit source review and accepted-result observation use the same
+    // owned attempt lookup. Only explicit review supplies historical source;
+    // observation keeps normal local/server draft hydration after any verdict.
+    const requestedSubmissionId = input.submissionId ?? input.observedSubmissionId;
     const [workspace, outline, selectedSubmission] = await Promise.all([
       this.buildWorkspace(material, learner.userId, staff),
       this.curriculum.outlineFor(course, learner.userId, undefined, staff),
-      input.submissionId
+      requestedSubmissionId
         ? this.submissions.findSelected(
             {
               userId: learner.userId,
               academyId: input.academyId,
               scope: learner.scope,
             },
-            { materialId: material.id, submissionId: input.submissionId },
+            { materialId: material.id, submissionId: requestedSubmissionId },
           )
         : Promise.resolve(null),
     ]);
@@ -256,7 +258,10 @@ export class LearnService {
     const canAuthor = rolesHavePermission(roles, "exercises.manage") && (
       learner.via === "membership" || await this.access.requirePermission(identity.authUserId, input.academyId, "exercises.manage").then(() => true, () => false)
     );
-    return { workspace, navigator, selectedSubmission: staff ? null : selectedSubmission, classContext,
+    return { workspace, navigator,
+      selectedSubmission: staff || !input.submissionId ? null : selectedSubmission,
+      observedSubmission: staff || input.submissionId ? null : selectedSubmission?.result ?? null,
+      classContext,
       access: {
         mode: staff ? "staff-practice" : "student",
         preview: Boolean(input.preview),

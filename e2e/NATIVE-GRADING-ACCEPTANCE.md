@@ -117,11 +117,11 @@ the operator-side driver and real production broker enforce rootless/systemd/v2.
 The API/worker receive no daemon authority. This uses the ordinary manifest,
 readiness attestation, descriptor selection, broker and evaluator. It is not a
 production flag or broker bypass. Populate a root-owned, app-nonwritable tmpfs at `/app/scripts` with the trusted
-fixture launcher/helpers (and the packaged inventory helper), then invoke the
+fixture launcher/helpers (including `native-grading-e2e-phase.mjs` and the packaged inventory helper), then invoke the
 launcher against the unchanged compiled dist in the exact prebuilt image. No
 additional host bind mount is permitted by the host verifier. The worker launcher
 resolves the API image and packaged-worker dist layouts explicitly. The driver
-checks actual fixture file hashes/ownership (including the timing helper) through
+checks actual fixture file hashes/ownership (including the timing and phase helpers) through
   the inspected container and records all harness hashes. These fixture files remain excluded from production
 package payloads; instrumentation is declared separately from the tested image. All runtime authority
 and existing queues are real; only provider identities and deliberate timing

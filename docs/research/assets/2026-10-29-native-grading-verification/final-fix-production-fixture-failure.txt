@@ -1,0 +1,39 @@
+Fixture failed to maintain server B through document teardown; editor C was preserved. Fault control then moved to context-level request abortion and explicit sendBeacon(false), without changing any assertion/product/profile. No more-specific browser-interception root cause is established.
+
+  1) e2e/specs/native-grading.spec.ts:370:5 › normal Submit observation reload preserves newer autosaved drafts pending and terminal, explicit history still reviews source
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    - Expected  - 1
+    + Received  + 1
+
+    - # newer saved draft B
+    + # newer local draft C
+      print(input())
+
+      438 |     await passed(page, f);
+      439 |     await expect.poll(editorCode).toBe(localC);
+    > 440 |     expect((await inspect(request, f)).drafts[0].code).toBe(draftB);
+          |                                                        ^
+      441 |     expect(admissions).toBe(1);
+      442 |   } finally {
+      443 |     await control(request, 'queue', { pause: false });
+        at <worktree>/e2e/specs/native-grading.spec.ts:440:56
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/native-1793256170-29248-c213cbff/browser/native-grading-normal-Subm-02bbc-istory-still-reviews-source/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/native-1793256170-29248-c213cbff/browser/native-grading-normal-Subm-02bbc-istory-still-reviews-source/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/native-1793256170-29248-c213cbff/browser/native-grading-normal-Subm-02bbc-istory-still-reviews-source/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/native-1793256170-29248-c213cbff/browser/native-grading-normal-Subm-02bbc-istory-still-reviews-source/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    e2e/specs/native-grading.spec.ts:370:5 › normal Submit observation reload preserves newer autosaved drafts pending and terminal, explicit history still reviews source
+  1 error was not a part of any test, see above for details

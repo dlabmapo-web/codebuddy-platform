@@ -29,6 +29,7 @@ export default async function ExerciseWorkspacePage({
   const { academyId } = await requireAcademyRoute(academySlug);
   const search = await searchParams;
   const submissionId = single(search.submission);
+  const observedSubmissionId = single(search.observeSubmission);
   const requestedClassId = single(search.classId);
   if (!submissionId) {
     let destination: string | undefined;
@@ -59,6 +60,7 @@ export default async function ExerciseWorkspacePage({
       ...(single(search.mode) === "student" ? { mode: "student" as const } : {}),
       ...(isUuid(requestedClassId) ? { classId: requestedClassId } : {}),
       ...(isUuid(submissionId) ? { submissionId } : {}),
+      ...(isUuid(observedSubmissionId) ? { observedSubmissionId } : {}),
     });
   } catch {
     // Unpublished, missing, and out-of-academy are all just "not here" to a
@@ -72,6 +74,7 @@ export default async function ExerciseWorkspacePage({
   if (!staffPractice && !bootstrap.classContext.classId) {
     const choiceQuery = new URLSearchParams();
     if (isUuid(submissionId)) choiceQuery.set('submission', submissionId);
+    if (isUuid(observedSubmissionId)) choiceQuery.set('observeSubmission', observedSubmissionId);
     if (returnTo) choiceQuery.set('returnTo', returnTo);
     const choicePath = routes.academyLearnExercise(
       academySlug,

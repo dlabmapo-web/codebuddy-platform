@@ -454,6 +454,149 @@ no broad/browser/unit suites were repeated. Earlier artifact IDs and unsupported
 Linux/performance/certification/scan/pilot gates remain as stated above. Owned
 fixtures were cleaned; no deployment/publication/activation occurred.
 
+## Final whole-branch review fixes (I1/I2/I3)
+
+The final integration review found three Important defects. This single fix wave
+addresses their cross-component boundaries; one scoped rereview still follows.
+Native production selection remains disabled and all Linux acceptance gates
+listed above remain unexecuted.
+
+**I1 — accepted result observation and drafts.** Normal Submit now writes
+`observeSubmission`, separate from the explicit Answer-record `submission`
+source-review query. The bootstrap accepts `observedSubmissionId` through the
+same authorized `findSelected` user/academy/scope and `sourceMaterialId` lookup,
+then supplies only a public result as `observedSubmission`. It never hands that
+accepted source to draft hydration. This distinction survives terminal results;
+ordinary server/local draft resolution and existing action/scope guards remain.
+The actual browser RED showed source A after B had autosaved and the normal URL
+was reloaded. The final covering case submits A with the real queue paused,
+autosaves B, reloads the actual accepted URL while pending and after the saved
+verdict, and asserts editor B/server B/the same attempt/one Submit. It follows
+the actual Answer-record Review link and sees A without promoting it, returns
+to B, then blocks autosave/beacon and proves a newer owned IndexedDB-only C
+recovers on terminal reload while the database still holds B. **1/1 passed
+(36.6-second case, 52.8-second harness)**; this is correctness evidence, not a
+latency cohort. An earlier covering version passed 1/1 before the local-only
+assertions; the counts overlap.
+
+**I2 — isolated paired phase configuration.** Admission registry cache entries
+now include an immutable captured enabled/path generation. A changed future
+configuration creates a fresh registry promise while accepted descriptors and
+prior immutable registries stay bound. The actual fixture endpoint uses the
+same extracted fixture-only phase control tested by the regression, preserving
+its Linux/environment, reconciled idle-authority, manifest and readiness gates.
+The real owned-PG/Redis contract admits baseline Pyodide, transitions to
+candidate CPython and back to baseline, and rereads original persisted rows to
+prove their descriptors did not change. Its certified manifest and readiness
+producer are explicitly synthetic contract data. This fixes the documented
+same-process fixture workflow; ordinary production activation normally recreates
+the API process. No positive Linux execution/containment is inferred.
+
+**I3 — private sample inventory authority.** The existing packaged CLI atomically
+reads the private `sample-leases` index and every indexed lease with a 512-record
+and 16 KiB-per-record bound. It validates the existing saved lease fields, indexed
+attempt identity, source-release/reservation relationship and complete shared
+runtime descriptor. Each unretired private authority contributes its descriptor
+and increments the existing `recoverable` count consumed by all drain/transition
+checks. Missing/malformed/oversized/over-bound indexed records refuse complete
+evidence with a generic error; IDs, tokens, source and output never enter the
+projection or error text. The admission fence and signed projection fields stay
+consistent. The actual CLI regression holds a source-released private sample
+with a terminal public record, then lets the public TTL really expire: both
+inventories report recoverable=1 with the descriptor despite no DB lease or queue
+backlog. Both production Python drain consumers reject. Seven broken authority
+cases and a 513-member index refuse complete JSON. Actual deterministic-broker
+receipt acknowledgement/cancellation/removal/retirement then permits
+recoverable=0 and drain success, with source executed exactly once. This proves
+the recovery/inventory contract, not native kernel cleanup.
+
+Final focused checks (overlapping prior coverage; no grand total):
+
+| Check | Result |
+| --- | --- |
+| Owned browser A/B/C reload and actual historical Review | 1/1 |
+| Real DB/Redis private inventory, phase control, existing four-queue/fence and affected outbox ordering | 4 selected / 24 filtered |
+| Real Redis sample-store contracts | 11/11 |
+| API learn/submission/admission/registry/readiness selection | 74 in 5 files |
+| Web action/draft-store/draft-queue/history-link/fallback selection | 65 in 5 files |
+| Shared learn contracts | 30 |
+| Shared/API/worker/web/E2E TypeScript and five owned web-file ESLint | passed |
+| Actual production Next webpack/TypeScript/static pages | 42 pages; build ID `h-n6ie7Su4_Sr2jd0r4Y_` |
+
+The original three failing regressions remain retained. Self-review also moved
+the new idle-authority cases ahead of stateful fixture cases and removes only
+their exact owned accepted rows/outbox cascades afterward; the named existing
+dispatcher regression confirms no fixture outbox contamination. The broad
+passing browser/API/shared/runtime suites were not repeated. Known Next dev
+stream-close digest1944899728, pg concurrent-query deprecation and expected
+negative-unit logs remain visible; no stderr suppression or resource/deadline
+relaxation was introduced.
+
+The final actual **production standalone** rerun of this same A/B/C/history
+case also passed **1/1 (16.218-second case, 24.425-second harness)** against the
+current build. The embedded quiz consumer of the shared submission hook receives
+the same result-only bootstrap handoff; its historical source remains selected
+only by explicit review, with no quiz scoring/runtime change. A final web build
+and owned consumer lint/typecheck followed that one-line integration fix.
+
+An initial production-mode run passed A/B/history and recovered editor C but
+failed the final server-stays-B assertion: server B was verified before reload,
+then the server also held C after teardown. The intended local-only fixture
+precondition was not maintained. Its page-level save/beacon interception was
+replaced by context-level request abortion plus explicit `sendBeacon(false)` in
+both documents; the real hook's ordinary-sync fallback is aborted by that same
+transport fault. Every source/attempt/assertion and one-second profile stayed
+unchanged. This was a fixture-fault correction, not a product source-loss fix;
+no more-specific browser interception root cause is claimed. The
+[original fixture failure](assets/2026-10-29-native-grading-verification/final-fix-production-fixture-failure.txt)
+and its [synthetic screenshot](assets/2026-10-29-native-grading-verification/final-fix-production-fixture-red.png)
+remain retained, alongside the [original I1/I2/I3 failures](assets/2026-10-29-native-grading-verification/final-fix-regressions-red.txt).
+
+Final image builds ran serially after focused tests. Broker was rebuilt because
+it packages the changed Shared bootstrap schema; native/compatibility guest
+inputs stayed unchanged and were not rebuilt. All three passed bounded readonly,
+network-disabled imports/Prisma/runtime/filesystem and fixture-exclusion smokes
+(768 MiB, .75 CPU, 64 PIDs). The API smoke executes the **packaged inventory
+imports and schema initialization**, then verifies explicit-environment refusal;
+this resolves actual packaged dependencies without database/network authority.
+The real owned DB/Redis CLI regressions separately exercise inventory data.
+The new phase helper is excluded from production images, and the Linux driver
+now includes it in root-owned instrumentation hash checks/harness hashes.
+
+| Final local artifact | Immutable config ID | Architecture |
+| --- | --- | --- |
+| API | `sha256:838300296d99826755cb56467051ff4f434fccd4815a60be871e3ec6435dff7e` | arm64 |
+| Worker | `sha256:1fadc9c3884909b2616f601cfd9d88a3ff9586c747951fa5dc112bf2eeae5bd7` | arm64 |
+| Broker | `sha256:ebd305076c56abdc2ae24583e0f972402093496704bc1217f9b213b711595b53` | arm64 |
+
+The final broker's actual stopped-carrier strict tree check passed **1/1**,
+identity `dfb9c6e6e90b23653560ddc5ae5d17f661cdf94d93a292cbe768327337d4ba08`;
+changed host bytes were rejected, and the broker carrier never executed. These
+supersede prior local app/broker artifacts for the final packaged source. They
+are local config IDs, not registry digests or AMD64 release evidence. Images
+were built from the precommit worktree with source hashes recorded; no source
+revision label or matching-Linux proof is invented.
+
+API and worker builds retained an optional `msgpackr-extract` prebuild-loader
+`ERR_INVALID_ARG_TYPE`, followed by successful local node-gyp rebuilds. The
+missing-bin audits accepted only the six previously reviewed API dev binaries,
+worker `prisma`, and none for broker. Full logs and failures remain under
+`test-results/native-final-fix-20261029-f3b00486`; no global suppression was used.
+The passing current production standalone run emitted no Next destination-stream
+diagnostic; the pg and expected no-manifest worker diagnostics remained.
+
+[Exact commands](assets/2026-10-29-native-grading-verification/final-fix-commands.txt),
+[focused passing output](assets/2026-10-29-native-grading-verification/final-fix-focused-green.txt),
+[artifact output](assets/2026-10-29-native-grading-verification/final-fix-artifacts.txt)
+and [sanitized summary with final source hashes](assets/2026-10-29-native-grading-verification/final-fix-verification-summary.json)
+preserve this wave. Raw production-browser runs are
+`test-results/native-1793256170-29248-c213cbff` (fixture failure) and
+`test-results/native-1793256341-31168-d9dd4919` (current pass); the actual development
+A/B/C pass is `test-results/native-1793255285-17084-edaa20f4`. All owned processes,
+DB/Redis fixtures and stopped carriers were cleaned. No deployment, activation,
+publication, push or native acceptance occurred; the 21 prior rulings below
+remain verbatim for final adjudication.
+
 ## Preserved implementation rulings
 
 The following 21 decisions preserve the SDD ledger verbatim, including reason

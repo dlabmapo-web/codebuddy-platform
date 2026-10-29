@@ -1,11 +1,21 @@
 // Run only inside the trusted API/worker environment. No dotenv loading.
 // Read-only projection; never emit code, answers, users, credentials or raw jobs.
 import pg from 'pg';
+import { z } from 'zod';
 import { readQueueBacklog } from './grading-inventory-queues.mjs';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { Redis } from 'ioredis';
 import { runtimeDescriptorSchema, runtimeDescriptorIdentity, runtimeManifestSchema } from '@cove/shared';
+// Match SavedSampleLease/ExecutionLeaseIdentity: these private records survive
+// public sample expiry and are removed only after confirmed broker retirement.
+const sampleAuthoritySchema = z.strictObject({
+  lease: z.strictObject({ id: z.uuid(), attemptId: z.uuid(), kind: z.literal('sample'),
+    generation: z.literal(1), leaseToken: z.uuid(), workerGeneration: z.uuid(), brokerGeneration: z.uuid(),
+    reservationId: z.uuid().nullable(), admissionEpoch: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    runtime: runtimeDescriptorSchema, memoryLimitMb: z.number().int().min(16).max(4096) }),
+  sourceReleased: z.boolean(), terminalCommitId: z.uuid().nullable(), receiptId: z.uuid().optional(), checkpointId: z.uuid().optional(),
+});
 if (!process.env.DATABASE_URL || !process.env.REDIS_URL) throw new Error('Explicit trusted application environment required');
 const database=new pg.Client({connectionString:process.env.DATABASE_URL,statement_timeout:15000});
 const redis=new Redis(process.env.REDIS_URL,{lazyConnect:true,maxRetriesPerRequest:0,connectTimeout:2000,commandTimeout:3000,retryStrategy:()=>null});
@@ -47,9 +57,30 @@ try {
       if(['QUEUED','RUNNING','STOPPING'].includes(record.status)) {ephemeralPending++;if(!record.snapshot?.executionRuntimeSnapshot)legacySamples++;}
     }
   } while(cursor!=='0');
+  // Read the bounded index and records atomically: concurrent confirmed
+  // retirement must not appear as a corrupt missing record halfway through.
+  // SampleExecution caps this index at 512; fail closed on any lost authority.
+  const privateSamples=await redis.eval(`
+    if redis.call('SCARD',KEYS[1])>512 then return redis.error_reply('sample authority bound') end
+    local rows={}
+    for _,id in ipairs(redis.call('SMEMBERS',KEYS[1])) do
+      if #id~=36 then return redis.error_reply('sample authority identity') end
+      local key=ARGV[1]..id
+      local size=redis.call('STRLEN',key)
+      if size==0 or size>16384 then return redis.error_reply('sample authority unavailable') end
+      table.insert(rows,{id,redis.call('GET',key)})
+    end
+    return rows
+  `,1,'cove:grading:sample-leases','cove:grading:sample-lease:');
+  for(const [id,raw] of privateSamples) {
+    z.uuid().parse(id);
+    const saved=sampleAuthoritySchema.parse(JSON.parse(raw));
+    if(saved.lease.attemptId!==id || (saved.sourceReleased && !saved.lease.reservationId)) throw new Error('Invalid private sample identity');
+    add(saved.lease.runtime);
+  }
   const queueBacklog=await readQueueBacklog(redis);
   await database.query('COMMIT');
-  console.log(JSON.stringify({version:1,observedAt:Math.floor(Date.now()/1000),complete:true,activeProfiles:profiles.rows,references:[...references.values()].sort((a,b)=>runtimeDescriptorIdentity(a).localeCompare(runtimeDescriptorIdentity(b))),pending:Number(counts.pending),legacyPending:Number(counts.legacy)+legacySamples,recoverable:Number(counts.recoverable),ephemeralPending,queueBacklog,admissionFence}));
+  console.log(JSON.stringify({version:1,observedAt:Math.floor(Date.now()/1000),complete:true,activeProfiles:profiles.rows,references:[...references.values()].sort((a,b)=>runtimeDescriptorIdentity(a).localeCompare(runtimeDescriptorIdentity(b))),pending:Number(counts.pending),legacyPending:Number(counts.legacy)+legacySamples,recoverable:Number(counts.recoverable)+privateSamples.length,ephemeralPending,queueBacklog,admissionFence}));
 } catch {
   process.stderr.write('Read-only grading inventory failed; no complete evidence produced.\n');process.exitCode=1;
 } finally { await database.end().catch(()=>{});redis.disconnect(); }

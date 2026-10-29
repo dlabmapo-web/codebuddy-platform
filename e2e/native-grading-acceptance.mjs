@@ -173,7 +173,7 @@ for (const [role, origin] of [
   if (role === 'api' || role === 'worker') {
     const names =
       role === 'api'
-        ? ['env', 'server', 'seed', 'timings']
+        ? ['env', 'server', 'seed', 'timings', 'phase']
         : ['env', 'worker', 'timings'];
     for (const name of names) {
       const script = 'native-grading-e2e-' + name + '.mjs',
@@ -289,7 +289,7 @@ const harnessFiles = [
   'e2e/native-grading-acceptance-statistics.mjs',
   'e2e/native-grading-acceptance-authority.mjs',
   'e2e/native-grading-broker-tree.py',
-  ...['env', 'server', 'seed', 'worker', 'timings'].map(
+  ...['env', 'server', 'seed', 'worker', 'timings', 'phase'].map(
     (name) => 'packages/api/scripts/native-grading-e2e-' + name + '.mjs',
   ),
 ];

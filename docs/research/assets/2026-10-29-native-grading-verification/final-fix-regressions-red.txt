@@ -1,0 +1,113 @@
+I1 actual browser pending reload after autosaved B (prior product source):
+  1) e2e/specs/native-grading.spec.ts:370:5 › normal Submit observation reload preserves newer autosaved drafts pending and terminal, explicit history still reviews source
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    - Expected  - 1
+    + Received  + 0
+
+    - # newer saved draft B
+      print(input())
+
+    Call Log:
+    - Timeout 60000ms exceeded while waiting on the predicate
+
+      393 |     const acceptedUrl = page.url();
+      394 |     await page.reload();
+    > 395 |     await expect.poll(editorCode).toBe(draftB);
+          |                                   ^
+      396 |     await expect(page.getByRole('button', { name: 'Submit', exact: true })).toBeDisabled();
+      397 |     expect((await inspect(request, f)).drafts[0].code).toBe(draftB);
+      398 |     await control(request, 'queue', { pause: false });
+        at <worktree>/e2e/specs/native-grading.spec.ts:395:35
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/native-1793254858-5591-e84368a7/browser/native-grading-normal-Subm-02bbc-istory-still-reviews-source/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/native-1793254858-5591-e84368a7/browser/native-grading-normal-Subm-02bbc-istory-still-reviews-source/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/native-1793254858-5591-e84368a7/browser/native-grading-normal-Subm-02bbc-istory-still-reviews-source/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/native-1793254858-5591-e84368a7/browser/native-grading-normal-Subm-02bbc-istory-still-reviews-source/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    e2e/specs/native-grading.spec.ts:370:5 › normal Submit observation reload preserves newer autosaved drafts pending and terminal, explicit history still reviews source
+  1 error was not a part of any test, see above for details
+
+I2/I3 explicit prior-source reproduction (restored afterward):
+ FAIL  src/judge/native-grading.integration.spec.ts > native grading durable application integration > uses the actual fixture phase control for baseline, candidate and reverse future admissions without rewriting accepted rows
+AssertionError: expected { engine: 'pyodide', version: 1, …(9) } to deeply equal { version: 1, engine: 'cpython', …(9) }
+
+- Expected
++ Received
+
+  {
+    "architecture": "amd64",
+-   "engine": "cpython",
+-   "engineVersion": "3.12.10",
++   "engine": "pyodide",
++   "engineVersion": "0.27.5",
+    "executionPolicy": "wall-v1",
+-   "imageDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+-   "memoryPolicy": "native-cgroup-growth-v1",
++   "imageDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++   "memoryPolicy": "pyodide-charged-growth-v1",
+    "packageManifestHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "platform": "linux",
+-   "pythonVersion": "3.12.10",
++   "pythonVersion": "3.12.7",
+    "shimVersion": "test-shim-1",
+    "version": 1,
+  }
+
+ ❯ src/judge/native-grading.integration.spec.ts:425:50
+    423|       expect((await transition('candidate')).status).toBe(200);
+    424|       const candidate = await accept();
+    425|       expect(candidate.executionRuntimeSnapshot).toEqual(nativeFixture…
+       |                                                  ^
+    426|       expect((await transition('baseline')).status).toBe(200);
+    427|       const reversed = await accept();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/judge/native-grading.integration.spec.ts > native grading durable application integration > retains terminal and expired public sample private authority in real inventory and every drain check until confirmed retirement
+AssertionError: expected { version: 1, …(10) } to match object { complete: true, pending: +0, …(3) }
+(10 matching properties omitted from actual)
+
+- Expected
++ Received
+
+@@ -3,7 +3,7 @@
+      "readinessAbsent": true,
+    },
+    "complete": true,
+    "ephemeralPending": 0,
+    "pending": 0,
+-   "recoverable": 1,
++   "recoverable": 0,
+  }
+
+ ❯ src/judge/native-grading.integration.spec.ts:456:27
+    454|         else await redis.del(`cove:sample-check:${id}`);
+    455|         const inventory = JSON.parse((await command()).stdout);
+    456|         expect(inventory).toMatchObject({ complete: true, pending: 0, …
+       |                           ^
+    457|         expect(Object.values(inventory.queueBacklog).every(value => va…
+    458|         expect(await db.gradingExecutionLease.count({ where: { retired…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 26 skipped (28)
+   Start at  15:23:25
+   Duration  2.01s (transform 680ms, setup 0ms, import 1.30s, tests 624ms, environment 0ms)
+
+undefined
+<worktree>/packages/api:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/judge/native-grading.integration.spec.ts -t actual fixture phase|terminal and expired public

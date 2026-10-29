@@ -367,28 +367,86 @@ test('lost official admission acknowledgement retries the stable UUID and create
   expect((await inspect(request, f)).submissions).toHaveLength(1);
 });
 
-test('normal Submit URL literal reload while pending recovers saved verdict without a duplicate', async ({
+test('normal Submit observation reload preserves newer autosaved drafts pending and terminal, explicit history still reviews source', async ({
   page,
   request,
 }) => {
   const f = await fixture(request);
+  const sourceA = 'print(input())';
+  const draftB = '# newer saved draft B\nprint(input())';
   await login(page, f);
   await open(page, f);
+  let admissions = 0;
+  page.on('request', r => { if (r.url().endsWith('/api/rpc/learn/submit')) admissions++; });
   await control(request, 'queue', { pause: true });
+  const editorCode = () => page.evaluate(() => (window as unknown as {
+    monaco: { editor: { getModels(): { getValue(): string }[] } };
+  }).monaco?.editor.getModels()[0]?.getValue());
   try {
     await submit(page);
-    await expect
-      .poll(async () => (await inspect(request, f)).submissions.length)
-      .toBe(1);
-    const pending = await inspect(request, f);
-    expect(pending.submissions[0].status).toBe('QUEUED');
-    await expect
-      .poll(() => new URL(page.url()).searchParams.get('submission'))
-      .toBe(pending.submissions[0].id);
+    await expect.poll(async () => (await inspect(request, f)).submissions.length).toBe(1);
+    const pending = (await inspect(request, f)).submissions[0];
+    expect(pending.status).toBe('QUEUED');
+    // Test the actual normal-Submit URL rather than constructing recovery state.
+    await code(page, draftB);
+    await expect.poll(async () => (await inspect(request, f)).drafts[0]?.code).toBe(draftB);
+    const acceptedUrl = page.url();
     await page.reload();
+    await expect.poll(editorCode).toBe(draftB);
+    await expect(page.getByRole('button', { name: 'Submit', exact: true })).toBeDisabled();
+    expect((await inspect(request, f)).drafts[0].code).toBe(draftB);
     await control(request, 'queue', { pause: false });
     await passed(page, f);
-    expect((await inspect(request, f)).submissions).toHaveLength(1);
+    await page.reload();
+    await passed(page, f);
+    await expect.poll(editorCode).toBe(draftB);
+    expect((await inspect(request, f)).drafts[0].code).toBe(draftB);
+    expect(new URL(acceptedUrl).searchParams.get('observeSubmission')).toBe(pending.id);
+    expect(new URL(acceptedUrl).searchParams.has('submission')).toBe(false);
+    // Answer-record links deliberately keep the historical-source query contract.
+    await page.goto('/academy/' + f.academy.slug + '/learn/records');
+    const historyLink = page.locator('a[href*="submission=' + pending.id + '"]').first();
+    await expect(historyLink).toBeVisible();
+    await historyLink.click();
+    await passed(page, f);
+    await expect.poll(editorCode).toBe(sourceA);
+    await page.goto(acceptedUrl);
+    await expect.poll(editorCode).toBe(draftB);
+    const saved = await inspect(request, f);
+    expect(saved.drafts[0].code).toBe(draftB);
+    expect(saved.submissions).toHaveLength(1);
+    expect(saved.submissions[0].id).toBe(pending.id);
+    expect(admissions).toBe(1);
+    // A disconnected autosave leaves a newer owned local draft. Observation
+    // must still run ordinary local recovery, including after terminal result.
+    await page.context().route('**/api/rpc/learn/saveDraft', route => route.abort());
+    await page.context().route('**/api/learn/draft-beacon', route => route.abort());
+    // A page-scoped route can miss a keepalive beacon after document teardown.
+    // Model an explicit failed transport in both documents; the real hook's
+    // sendBeacon(false) fallback still calls ordinary sync, aborted above.
+    const failBeaconTransport = () => {
+      Object.defineProperty(navigator, 'sendBeacon', { configurable: true, value: () => false });
+    };
+    await page.addInitScript(failBeaconTransport);
+    await page.evaluate(failBeaconTransport);
+    const localC = '# newer local draft C\nprint(input())';
+    await code(page, localC);
+    await expect.poll(() => page.evaluate(({ userId, academyId, materialId }) => new Promise<string | null>(resolve => {
+      const request = indexedDB.open('cove-learn', 1);
+      request.onsuccess = () => {
+        const db = request.result;
+        const read = db.transaction('drafts', 'readonly').objectStore('drafts').get(`${userId}:${academyId}:${materialId}`);
+        read.onsuccess = () => { resolve(read.result?.code ?? null); db.close(); };
+        read.onerror = () => { resolve(null); db.close(); };
+      };
+      request.onerror = () => resolve(null);
+    }), { userId: f.users.student!.id, academyId: f.academy.id, materialId: f.materialId })).toBe(localC);
+    expect((await inspect(request, f)).drafts[0].code).toBe(draftB);
+    await page.reload();
+    await passed(page, f);
+    await expect.poll(editorCode).toBe(localC);
+    expect((await inspect(request, f)).drafts[0].code).toBe(draftB);
+    expect(admissions).toBe(1);
   } finally {
     await control(request, 'queue', { pause: false });
   }

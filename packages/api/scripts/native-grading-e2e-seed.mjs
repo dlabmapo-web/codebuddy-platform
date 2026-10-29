@@ -284,5 +284,9 @@ export async function inspectFixture(db, fixture) {
     where: { materialId: fixture.materialId },
     select: { userId: true, attemptCount: true },
   });
-  return { submissions, practice, points, progress, observedAt: Date.now() };
+  const drafts = await db.exerciseDraft.findMany({
+    where: { materialId: fixture.materialId },
+    select: { userId: true, code: true, updatedAt: true },
+  });
+  return { submissions, practice, points, progress, drafts, observedAt: Date.now() };
 }

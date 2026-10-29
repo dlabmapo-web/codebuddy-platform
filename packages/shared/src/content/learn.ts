@@ -419,6 +419,8 @@ export const learnExerciseBootstrapSchema = z.object({
    * the page — the ordinary workspace is still perfectly good.
    */
   selectedSubmission: learnSelectedSubmissionSchema.nullish(),
+  /** Accepted-result observation never supplies historical source for draft hydration. */
+  observedSubmission: submissionResultSchema.nullish(),
   classContext: learningClassContextSchema,
 });
 export type LearnExerciseBootstrap = z.infer<
@@ -469,6 +471,7 @@ export const learnClassInputSchema = learnAcademyInputSchema.extend({
 export const learnExerciseBootstrapInputSchema =
   learnMaterialInputSchema.extend({
     submissionId: z.uuid().optional(),
+    observedSubmissionId: z.uuid().optional(),
     mode: z.enum(["student", "staff-practice"]).optional(),
     preview: z.boolean().optional(),
     classId: z.uuid().optional(),

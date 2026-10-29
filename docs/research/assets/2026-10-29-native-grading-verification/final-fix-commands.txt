@@ -1,0 +1,37 @@
+Commands executed in the isolated feature worktree; no default dotenv. Application tests use explicit fresh owned loopback PG/Redis via the launcher. API units/static type checks used scrubbed env with DOTENV_CONFIG_PATH=/dev/null and synthetic loopback port1 database settings.
+
+bash packages/api/scripts/test-native-grading-isolated.sh --browser --grep 'normal Submit observation'
+bash packages/api/scripts/test-native-grading-isolated.sh --production-browser --grep 'normal Submit observation'
+bash packages/api/scripts/test-native-grading-isolated.sh -t 'actual fixture phase|terminal and expired public|executes the real read-only inventory|rolls back attempt and outbox'
+pnpm --filter @cove/api exec vitest run src/learn/learn.service.spec.ts src/learn/submission.service.spec.ts src/judge/runtime-admission.spec.ts src/judge/runtime-registry.spec.ts src/judge/runtime-readiness.spec.ts --maxWorkers=1 --no-file-parallelism
+pnpm --filter @cove/web exec vitest run src/components/workspace/submission-action.spec.tsx draft-store.spec.ts draft-sync-queue.spec.ts answer-records-view.spec.ts submission-fallback.spec.ts
+pnpm --filter @cove/shared exec vitest run src/content/learn.spec.ts
+pnpm --filter @cove/shared exec tsc --noEmit
+pnpm --filter @cove/api exec tsc --noEmit
+pnpm --filter @cove/judge-worker exec tsc --noEmit
+pnpm --filter @cove/web exec tsc --noEmit
+pnpm typecheck:e2e
+pnpm --filter @cove/web exec eslint 'src/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/page.tsx' 'src/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/workspace.tsx' 'src/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_hooks/use-submission.ts' src/components/workspace/submission-action.spec.tsx
+pnpm --filter @cove/web exec eslint 'src/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/quiz-workspace.tsx'
+env -i PATH="$PATH" HOME="$HOME" DOTENV_CONFIG_PATH=/dev/null NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3409 NEXT_PUBLIC_API_URL=http://127.0.0.1:4419/api/rpc NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:4420 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=local-native-public-key NEXT_PUBLIC_TURNSTILE_SITE_KEY= BFF_SHARED_SECRET=local-native-bff-secret-only-never-production pnpm --filter @cove/web build
+
+Image commands used --host with the verified local Unix Docker endpoint, no remote context, serial after tests/web build:
+docker build -f deploy/docker/api.Dockerfile --target runtime -t cove-api:final-review-fix-20261029 .
+docker build -f deploy/docker/judge-worker.Dockerfile --target runtime -t cove-judge:final-review-fix-20261029 .
+docker build -f packages/grading-runtime/Dockerfile.broker --target runtime -t cove-grading-broker:final-review-fix-20261029 .
+python3 deploy/scripts/grading/audit-build-warnings.py api /tmp/native-final-api-image-build.log
+python3 deploy/scripts/grading/audit-build-warnings.py worker /tmp/native-final-worker-image-build.log
+python3 deploy/scripts/grading/audit-build-warnings.py broker /tmp/native-final-broker-image-build.log
+
+All three immutable config IDs: docker run --rm --label cove.native.final-fix=UNIQUE_OWNED_UUID --network none --read-only --memory 768m --cpus .75 --pids-limit 64 --mount type=bind,source=WORKTREE/deploy/scripts/grading/artifact-smoke.mjs,target=ROOT/artifact-smoke.mjs,readonly --entrypoint node IMAGE_CONFIG_ID artifact-smoke.mjs KIND
+ROOT=/app for API/worker, /opt/grading-runtime for broker. Actual IDs are in final-fix-verification-summary.json.
+
+With explicit uniquely owned COVE_NATIVE_FIXTURE_ID, verified local COVE_NATIVE_DOCKER_ENDPOINT, COVE_NATIVE_BROKER_TEST_IMAGE=cove-grading-broker:final-review-fix-20261029:
+node --test --test-name-pattern 'real stopped immutable broker carrier' e2e/native-grading-acceptance-authority.test.mjs
+
+node --check packages/api/scripts/grading-inventory.mjs
+node --check packages/api/scripts/native-grading-e2e-phase.mjs
+node --check packages/api/scripts/native-grading-e2e-server.mjs
+node --check e2e/native-grading-acceptance.mjs
+node --check deploy/scripts/grading/artifact-smoke.mjs
+git diff --check

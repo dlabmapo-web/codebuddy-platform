@@ -15,13 +15,13 @@ import { ConfigService } from '@nestjs/config';
 import { QueueEvents } from 'bullmq';
 import { PrismaService } from '../dist/src/database/prisma.service.js';
 import { JudgeQueue } from '../dist/src/judge/judge.queue.js';
-import { readQueueBacklog } from './grading-inventory-queues.mjs';
+import { transitionFixturePhase } from './native-grading-e2e-phase.mjs';
 import { seedFixture, inspectFixture } from './native-grading-e2e-seed.mjs';
 const origin = 'http://127.0.0.1:4420',
   studio = 'http://127.0.0.1:3409';
 const jwtSecret = 'local-native-jwt-secret-only-never-production';
 // Only the synthetic Linux fixture can change its future-admission phase.
-// ConfigService.set uses the ordinary validated admission flag; accepted
+// ConfigService.set creates a new future-admission cache generation; accepted
 // descriptors, manifest/readiness and broker execution are never substituted.
 const configurationInstances = new Set();
 const originalConfigGet = ConfigService.prototype.get;
@@ -345,38 +345,11 @@ const server = createServer(async (req, res) => {
     }
     if (path === '/controls/phase' && req.method === 'POST') {
       const input = await body(req);
-      if (
-        !process.env.COVE_NATIVE_ACCEPTANCE_ENV ||
-        process.platform !== 'linux' ||
-        process.arch !== 'x64' ||
-        !['baseline', 'candidate'].includes(input.phase)
-      )
-        return json(res, { error: 'isolated_linux_acceptance_only' }, 403);
-      const backlog = await readQueueBacklog(redis);
-      const pending =
-        (await db.submission.count({
-          where: { status: { in: ['QUEUED', 'RUNNING'] } },
-        })) +
-        (await db.staffPracticeAttempt.count({
-          where: { status: { in: ['QUEUED', 'RUNNING'] } },
-        }));
-      if (
-        pending ||
-        Object.values(backlog).some((count) => count !== 0) ||
-        (await db.gradingExecutionLease.count({
-          where: { retiredAt: null },
-        })) ||
-        (await redis.scard('cove:grading:sample-leases'))
-      )
-        return json(
-          res,
-          { error: 'phase_requires_reconciled_idle_authority' },
-          409,
-        );
-      await timings.clear(); // idle phase boundary; only this fixture's diagnostics
-      for (const config of configurationInstances)
-        config.set('GRADING_NATIVE_ENABLED', input.phase === 'candidate');
-      return json(res, { phase: input.phase });
+      const result = await transitionFixturePhase(input.phase, {
+        allowed: Boolean(process.env.COVE_NATIVE_ACCEPTANCE_ENV) && process.platform === 'linux' && process.arch === 'x64',
+        db, redis, timings, configurations: configurationInstances,
+      });
+      return json(res, result.body, result.status);
     }
     if (path === '/controls/queue' && req.method === 'POST') {
       const input = await body(req);

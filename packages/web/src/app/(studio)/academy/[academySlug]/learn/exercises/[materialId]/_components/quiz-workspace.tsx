@@ -55,7 +55,7 @@ export function QuizWorkspace({
     materialId: exercise.materialId,
     solveSessionId: session.solveSessionId,
     reopenSolveSession: session.reopen,
-    initialResult: selectedSubmission?.result ?? null,
+    initialResult: selectedSubmission?.result ?? bootstrap.observedSubmission ?? null,
   });
   const [dismissedResult, setDismissedResult] = React.useState<string | null>(
     null,

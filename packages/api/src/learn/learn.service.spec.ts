@@ -612,6 +612,19 @@ describe("getExerciseBootstrap with a selected submission", () => {
     );
   });
 
+  it.each(['QUEUED', 'PASSED'] as const)('observes an accepted %s result without handing its source to draft hydration', async status => {
+    const { service, submissions } = createService({
+      draft: { code: 'newer draft B', updatedAt: new Date('2026-08-12T09:01:00Z') },
+      selectedSubmission: { ...selected, result: { ...selected.result, status } },
+    });
+    const bootstrap = await service.getExerciseBootstrap(identity, { academyId, materialId, observedSubmissionId: submissionId });
+    expect(bootstrap.selectedSubmission).toBeNull();
+    expect(bootstrap.observedSubmission).toMatchObject({ submissionId, status });
+    expect(bootstrap.observedSubmission).not.toHaveProperty('code');
+    expect(bootstrap.workspace.draft?.code).toBe('newer draft B');
+    expect(submissions.findSelected).toHaveBeenCalledWith(expect.objectContaining({ userId, academyId }), { materialId, submissionId });
+  });
+
   it("does not read a submission when the route did not name one", async () => {
     const { service, submissions } = createService();
 

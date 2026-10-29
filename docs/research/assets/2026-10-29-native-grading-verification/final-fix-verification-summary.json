@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "date": "2026-10-29",
+  "baseRevision": "d4cad35cc7d1c99c03655e5c1a10f886dfcfa6d0",
+  "scope": "One consolidated final I1/I2/I3 fix wave; scoped rereview follows. Local evidence only.",
+  "runtimeAcceptance": "Linux AMD64 rootless positive containment/resource/performance/cohorts/scans/certification/pilot unrun; native production selection disabled.",
+  "sourceBinding": "Images built from precommit worktree; no revision label claim. Later excluded web/fixture/docs edits do not alter packaged API/worker/broker source. Final web rebuilt after quiz consumer handoff.",
+  "checks": {
+    "apiAffected": {
+      "files": 5,
+      "passed": 74
+    },
+    "webAffected": {
+      "files": 5,
+      "passed": 65
+    },
+    "sharedLearn": {
+      "passed": 30
+    },
+    "durableFocused": {
+      "selectedPassed": 4,
+      "filtered": 24,
+      "driver": "deterministic, real broker/PG/Redis; no native isolation claim"
+    },
+    "redisSampleStore": {
+      "passed": 11
+    },
+    "browserDevelopment": {
+      "passed": 1,
+      "caseMs": 36628,
+      "harnessMs": 52809.886999999995,
+      "run": "test-results/native-1793255285-17084-edaa20f4"
+    },
+    "browserProductionStandalone": {
+      "passed": 1,
+      "caseMs": 16218,
+      "harnessMs": 24424.747,
+      "run": "test-results/native-1793256341-31168-d9dd4919"
+    },
+    "types": "Shared/API/worker/web/E2E passed; final quiz consumer web types and final fixture E2E types passed",
+    "lint": "five owned web files passed",
+    "syntax": "changed MJS and git diff --check passed"
+  },
+  "web": {
+    "buildId": "h-n6ie7Su4_Sr2jd0r4Y_",
+    "staticPages": 42,
+    "mode": "actual Next production standalone; synthetic loopback public/BFF env, empty inherited env"
+  },
+  "images": {
+    "api": {
+      "tag": "cove-api:final-review-fix-20261029",
+      "configId": "sha256:838300296d99826755cb56467051ff4f434fccd4815a60be871e3ec6435dff7e",
+      "architecture": "arm64"
+    },
+    "worker": {
+      "tag": "cove-judge:final-review-fix-20261029",
+      "configId": "sha256:1fadc9c3884909b2616f601cfd9d88a3ff9586c747951fa5dc112bf2eeae5bd7",
+      "architecture": "arm64"
+    },
+    "broker": {
+      "tag": "cove-grading-broker:final-review-fix-20261029",
+      "configId": "sha256:ebd305076c56abdc2ae24583e0f972402093496704bc1217f9b213b711595b53",
+      "architecture": "arm64"
+    }
+  },
+  "brokerTree": {
+    "identity": "dfb9c6e6e90b23653560ddc5ae5d17f661cdf94d93a292cbe768327337d4ba08",
+    "passed": 1,
+    "kind": "actual stopped immutable ARM64 carrier strict extraction; changed host tree rejected; broker not started"
+  },
+  "imageSmokes": "All three passed readonly network-none 768MiB/.75CPU/64PIDs imports/filesystem checks; API additionally executes packaged inventory imports/schema and requires explicit-env refusal. New phase helper absent from app images.",
+  "buildDiagnostics": "API and worker msgpackr-extract prebuild loader ERR_INVALID_ARG_TYPE fell back to successful local node-gyp rebuild. Missing-bin audits: API six reviewed dev bins; worker prisma; broker none. Raw logs retained.",
+  "inventoryRegression": {
+    "publicStates": [
+      "terminal",
+      "actual TTL expiry"
+    ],
+    "recoverableBeforeRetirement": 1,
+    "recoverableAfterRetirement": 0,
+    "sourceExecutions": 1,
+    "missingMalformedOversizedCases": 7,
+    "privateIndexMaximum": 512,
+    "overBoundTestMembers": 513,
+    "drainConsumers": [
+      "control.drained",
+      "retained.fresh_inventory"
+    ]
+  },
+  "failuresRetained": [
+    {
+      "kind": "I1 prior normal Submit URL regression",
+      "run": "test-results/native-1793254858-5591-e84368a7",
+      "observed": "autosaved B reloaded A"
+    },
+    {
+      "kind": "I2/I3 explicit prior-source reproduction after an initial overlapping-edit execution passed",
+      "log": "native-final-i2-i3-red.log",
+      "failed": 2,
+      "observed": "candidate stayed Pyodide; private authority omitted/recoverable0"
+    },
+    {
+      "kind": "production local-only fixture precondition failure",
+      "run": "test-results/native-1793256170-29248-c213cbff",
+      "observed": "B before reload; editor C preserved after reload but server also C. Corrected fault transport only; no product bug/root-cause claim beyond observation."
+    }
+  ],
+  "knownDiagnostics": "Next development destination stream digest1944899728 retained; pg concurrent-query deprecation and expected no-manifest development worker/negative unit logs retained. Final passing production run had no Next destination-stream diagnostic.",
+  "preservedRulings": 21,
+  "rawEvidenceDirectory": "test-results/native-final-fix-20261029-f3b00486",
+  "sourceHashes": {
+    "deploy/scripts/grading/artifact-smoke.mjs": "sha256:cabf4436b39c5f1c92488c4324ba243211c87452b5d418e6f2cedac6bedf1798",
+    "e2e/native-grading-acceptance.mjs": "sha256:ac0084f029a48e74115301f657bf850a3ccf6f2f78163875b1ac35aa6e85bfce",
+    "e2e/specs/native-grading.spec.ts": "sha256:badbc44ebad76ad9dd1c8510fc9c20bf729a80510a9e8ee9f29290da9e8e358b",
+    "packages/api/scripts/grading-inventory.mjs": "sha256:3cb6658b65bf864c2a376d36b8fb8a7d8086b66e3882db6f0eeb75d13bf8c0f3",
+    "packages/api/scripts/native-grading-e2e-phase.mjs": "sha256:e173a0179b495068afc07a427b850721e769c115da21169d746a8b4160bb429f",
+    "packages/api/scripts/native-grading-e2e-seed.mjs": "sha256:2933bcaeeabd64179ac4c52cd81068adba9f77faefcbfe9818b24f85468b55df",
+    "packages/api/scripts/native-grading-e2e-server.mjs": "sha256:a4620e5f4c82506083eebb160c21d4fece458da861597d6c7632a36e93a2eb1e",
+    "packages/api/src/judge/native-grading.integration.spec.ts": "sha256:342a0cb860f81e0fd43b65aceebe5544d4b4711a4e4a0125140d1fb8ee84dede",
+    "packages/api/src/judge/runtime-admission.ts": "sha256:413768a1f462b39f8f27b8d93355ed2663f996f08b0153203bdb368206703673",
+    "packages/api/src/learn/learn.service.spec.ts": "sha256:8b4fb7a3d9fd397cd430980daaabbdae50a18e8df67ce1aedbc5ebfb3c2113fe",
+    "packages/api/src/learn/learn.service.ts": "sha256:315edb1bea42e626b9457f4ff9d0f94aaca61f0b712c3dd43454ee9c742802d7",
+    "packages/shared/src/content/learn.ts": "sha256:d3d6d406428e79b4327d8e75898a017a1442e950f2f86943163804e1598d39a0",
+    "packages/web/src/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/quiz-workspace.tsx": "sha256:4f334ada8a5f6a06e79f86e13c011284ba97e41d336725fa4c568c790623de92",
+    "packages/web/src/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/workspace.tsx": "sha256:08892aaaeb0c274737c85c8f57ea70c7573e8882a44bd6e0981367686421e803",
+    "packages/web/src/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_hooks/use-submission.ts": "sha256:156f2f1e9b7ab7ef23e65471c4dadbbee9745cfe6b9d22c69aa7e678707166e1",
+    "packages/web/src/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/page.tsx": "sha256:4f9524612b59322561067395d6fdb61591d3749e0787af4ef2724cadeb3109c8",
+    "packages/web/src/components/workspace/submission-action.spec.tsx": "sha256:21250e8e8db2f659b207d29ad5d816e1e1852f0548ed278d163d589b1259e71b",
+    "deploy/docker/api.Dockerfile": "sha256:4ace0def433544d8c5ddb73d1782e81fcbb8ec48db90fa472e27de19dceb1506",
+    "deploy/docker/judge-worker.Dockerfile": "sha256:87447f811aed023f27ec216979ccc318964d29354c9466ab03dc7980d19c3988",
+    "packages/grading-runtime/Dockerfile.broker": "sha256:8a4a834942b2caf4b7281e8333152968412e0c61238d99e38740e894bac3def7",
+    "pnpm-lock.yaml": "sha256:4ad71e0beb79dade4081e2faa76de38418af91573a96c0cc151c5585b65c508d",
+    "packages/api/package.json": "sha256:1c2f4d0a030c7d5e8f6aba53d43fec4c2dada8c0228dfa1836da09afce4f1e8b",
+    "packages/shared/package.json": "sha256:0220af12ff410309a8923fbf95933fd9a25e11aa09f5fa6b139195ef9732f2d4",
+    "packages/web/.next/standalone/packages/web/server.js": "sha256:cde5deee47710efad30d20692401ecc65f20818a253eff4d47645e3e0333dd89"
+  }
+}

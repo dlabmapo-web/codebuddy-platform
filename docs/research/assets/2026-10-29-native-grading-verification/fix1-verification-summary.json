@@ -1,0 +1,64 @@
+{
+  "review": "Task6 fix round1",
+  "importantFindingsAddressed": [
+    "I1 cross-process timing",
+    "I2 actual artifact/runtime identity"
+  ],
+  "rulingsPreserved": 21,
+  "contractCasesPassed": 4,
+  "contracts": [
+    {
+      "evidence": "actual-stopped-broker-artifact-tree",
+      "configId": "sha256:59ebe6a39abf529dcf099e4f6756d15727d97e4ed25acc98f3bb2d00f991d10c",
+      "architecture": "arm64",
+      "imageTreeIdentity": "e487bc158b0cfd0c0b475d168537b1aae85f561f171cbb711f1d922b474e8a58",
+      "changedHostRejected": true,
+      "executionStarted": false
+    },
+    {
+      "evidence": "cross-process-private-files-owned-redis",
+      "records": 3,
+      "producers": 2,
+      "sharedTimingFile": false,
+      "oldFileReaderRejected": true,
+      "overflowRejected": true,
+      "cleanup": true
+    }
+  ],
+  "weightedBrowser": {
+    "path": "test-results/native-1793252690-70913-4072d16c",
+    "stats": {
+      "startTime": "2026-10-29T05:45:22.291Z",
+      "duration": 27861.756999999998,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "assertedPersistedAndPublicResult": {
+      "status": "FAILED",
+      "score": 33,
+      "earnedWeight": 1,
+      "possibleWeight": 3,
+      "passedCount": 1,
+      "totalCount": 2
+    },
+    "timeLimitMs": 1000
+  },
+  "brokerSmoke": "readonly/network-none import/filesystem passed",
+  "runtimeCasesPassed": 41,
+  "supersededBrokerConfigId": "sha256:4a0146e4dec3c284ca37a7793ba6f6c4efce0685c4dd2e504f730e5a4154a9c8",
+  "supersededReason": "strict extraction rejects exact unused external build-workspace symlink",
+  "newBrokerConfigId": "sha256:59ebe6a39abf529dcf099e4f6756d15727d97e4ed25acc98f3bb2d00f991d10c",
+  "architecture": "arm64",
+  "published": false,
+  "positiveLinuxAcceptanceExecuted": false,
+  "apiWorkerImagesUnchanged": true,
+  "sourceHashes": {
+    "packages/grading-runtime/Dockerfile.broker": "8a4a834942b2caf4b7281e8333152968412e0c61238d99e38740e894bac3def7",
+    "e2e/native-grading-acceptance.mjs": "76f6871b23cd132592fd9c40d35941a7cebe000ec9a25f1fe8044ee13cfb71f6",
+    "e2e/native-grading-acceptance-authority.mjs": "dc76e544027308871b6a3c5d2406b77937f12a2a2725e94a86cac4123449e6b4",
+    "e2e/native-grading-broker-tree.py": "be24132bcd6a97369367fd155defcd96af437fbb7c01bdcba39bb07dc0b77db6",
+    "packages/api/scripts/native-grading-e2e-timings.mjs": "757bc1c4c1027afd7c969eb186d755ea55c0f63c7a09bbbb7004cdd53a51d824"
+  }
+}

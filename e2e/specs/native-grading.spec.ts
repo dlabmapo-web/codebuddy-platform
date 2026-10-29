@@ -587,6 +587,36 @@ test('frozen revision and weighted prompt-ignore Unicode comparisons survive a m
     expect(saved.submissions[0]).toMatchObject({
       gradingRevision: 1,
       status: 'PASSED',
+      score: 100,
+      earnedWeight: 3,
+      possibleWeight: 3,
+    });
+    // Revision two changes only the weight-two hidden answer. Equal weighting
+    // would produce 50; the real weighted result must be exactly 33 (1/3).
+    await submit(page);
+    await expect(
+      page.getByRole('heading', { name: 'Check your output', exact: true }),
+    ).toBeVisible();
+    const partial = (await inspect(request, f)).submissions.find(
+      (row: { gradingRevision: number }) => row.gradingRevision === 2,
+    );
+    expect(partial).toMatchObject({
+      status: 'FAILED',
+      score: 33,
+      passedCount: 1,
+      totalCount: 2,
+      earnedWeight: 1,
+      possibleWeight: 3,
+    });
+    const publicPartial = await rpc(page, 'learn/getSubmission', {
+      academyId: f.academy.id,
+      submissionId: partial.id,
+    });
+    expect(publicPartial.ok()).toBe(true);
+    expect((await publicPartial.json()).json).toMatchObject({
+      score: 33,
+      earnedWeight: 1,
+      possibleWeight: 3,
     });
   } finally {
     await control(request, 'queue', { pause: false });

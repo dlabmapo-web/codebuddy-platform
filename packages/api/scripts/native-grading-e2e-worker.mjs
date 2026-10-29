@@ -4,7 +4,8 @@ fixtureEnvironment();
 import { Redis } from 'ioredis';
 import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
-import { appendFileSync, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { fixtureTimings } from './native-grading-e2e-timings.mjs';
 import { performance } from 'node:perf_hooks';
 const compiledRoot = existsSync(
   new URL('../dist/src/judge/grading.service.js', import.meta.url),
@@ -21,6 +22,12 @@ const { ExecutionTelemetry, executionLogContext } = await import(
   compiledRoot + 'judge/execution-telemetry.js'
 );
 const redis = new Redis(process.env.REDIS_URL);
+const timings = fixtureTimings(
+  redis,
+  process.env.COVE_NATIVE_FIXTURE_ID,
+  'worker',
+  process.env.COVE_NATIVE_TIMINGS_FILE,
+);
 // Surface bounded OS-helper diagnostics during this real execution fixture.
 const originalExec = childProcess.execFileSync;
 childProcess.execFileSync = function (file, args, options) {
@@ -54,16 +61,13 @@ for (const [prototype, method, kind] of [
         const began = performance.now(),
           context = executionLogContext();
         const value = await transaction(...args);
-        if (process.env.COVE_NATIVE_TIMINGS_FILE)
-          appendFileSync(
-            process.env.COVE_NATIVE_TIMINGS_FILE,
-            JSON.stringify({
-              event: 'db-transaction-ack',
-              ...context,
-              at: Date.now(),
-              elapsedMs: performance.now() - began,
-            }) + '\n',
-          );
+        await timings.record({
+          event: 'db-transaction-ack',
+          ...context,
+          at: Date.now(),
+          ackMonotonicMs: performance.now(),
+          elapsedMs: performance.now() - began,
+        });
         return value;
       };
       this.prisma.__nativeTransactionsWrapped = true;
@@ -94,17 +98,14 @@ const originalTime = ExecutionTelemetry.prototype.time;
 ExecutionTelemetry.prototype.time = async function (stage, action, ...args) {
   const started = performance.now();
   const value = await originalTime.call(this, stage, action, ...args);
-  if (process.env.COVE_NATIVE_TIMINGS_FILE)
-    appendFileSync(
-      process.env.COVE_NATIVE_TIMINGS_FILE,
-      JSON.stringify({
-        event: stage === 'commit' ? 'commit-ack' : 'stage-ack',
-        stage,
-        ...executionLogContext(),
-        at: Date.now(),
-        elapsedMs: performance.now() - started,
-      }) + '\n',
-    );
+  await timings.record({
+    event: stage === 'commit' ? 'commit-ack' : 'stage-ack',
+    stage,
+    ...executionLogContext(),
+    at: Date.now(),
+    ackMonotonicMs: performance.now(),
+    elapsedMs: performance.now() - started,
+  });
   return value;
 };
 process.on('SIGTERM', () => redis.disconnect());

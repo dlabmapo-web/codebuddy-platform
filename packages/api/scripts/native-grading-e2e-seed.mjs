@@ -255,6 +255,8 @@ export async function inspectFixture(db, fixture) {
       passedCount: true,
       totalCount: true,
       score: true,
+      earnedWeight: true,
+      possibleWeight: true,
       runtimeMs: true,
     },
   });

@@ -48,6 +48,7 @@ const result = {
   performanceCohortsPassed: gates.every((gate) => gate.passed),
   gates,
   productionAcceptancePassed: false,
+  baselineUnrecordedRuntimeSamples: baseline.unrecordedRuntimeSamples ?? null,
   remaining: [
     'Independent containment/compatibility/recovery/certification/scans evidence',
     'Browser p95 and commit-to-visible boundary across a sufficient visible-browser cohort',

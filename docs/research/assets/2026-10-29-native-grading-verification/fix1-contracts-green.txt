@@ -1,0 +1,36 @@
+TAP version 13
+# Subtest: measured artifacts bind full manifest/application/host image authority before workload
+ok 1 - measured artifacts bind full manifest/application/host image authority before workload
+  ---
+  duration_ms: 6.3925
+  type: 'test'
+  ...
+# Subtest: accepted complete image/package/shim identity must match; unrecorded baseline stays explicitly unrecorded
+ok 2 - accepted complete image/package/shim identity must match; unrecorded baseline stays explicitly unrecorded
+  ---
+  duration_ms: 0.575125
+  type: 'test'
+  ...
+# {"evidence":"actual-stopped-broker-artifact-tree","configId":"sha256:59ebe6a39abf529dcf099e4f6756d15727d97e4ed25acc98f3bb2d00f991d10c","architecture":"arm64","imageTreeIdentity":"e487bc158b0cfd0c0b475d168537b1aae85f561f171cbb711f1d922b474e8a58","changedHostRejected":true,"executionStarted":false}
+# Subtest: real stopped immutable broker carrier matches copied host tree and rejects changed host bytes
+ok 3 - real stopped immutable broker carrier matches copied host tree and rejects changed host bytes
+  ---
+  duration_ms: 5487.357
+  type: 'test'
+  ...
+# {"evidence":"cross-process-private-files-owned-redis","records":3,"producers":2,"sharedTimingFile":false,"oldFileReaderRejected":true,"overflowRejected":true,"cleanup":true}
+# Subtest: separate API/worker processes and private timing paths merge acknowledged records through owned Redis
+ok 4 - separate API/worker processes and private timing paths merge acknowledged records through owned Redis
+  ---
+  duration_ms: 159.192042
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6074.733042

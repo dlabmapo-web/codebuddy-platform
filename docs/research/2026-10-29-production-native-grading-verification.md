@@ -312,10 +312,100 @@ unexecuted. Independent scoped
 Task6 and whole-branch reviews still follow; no positive Linux or production
 acceptance is inferred from this self-review.
 
+## Task6 review fixes: cross-process evidence and exercised artifact identity
+
+Scoped review found two executable Linux-harness defects. They were fixed in
+round1 without claiming positive Linux acceptance:
+
+- **I1:** The separate API/worker filesystems could not share `/timings` through
+  a common filename. Fixture records now use the existing private owned Redis,
+  keyed by fixture/job identity and producer. Actual wall/monotonic acknowledgement
+  samples are captured before awaited transport; optional local logs may have
+  different paths or be absent. The API returns both producers, and the driver
+  retains timestamp/source/producer records. Missing admission/worker commit or
+  transaction acknowledgements fail after bounded waiting. No records are trimmed;
+  oversize/overflow fails with explicit record/job/total-data bounds, four-hour TTL
+  and owned idle-phase cleanup. No extra writable bind or API daemon power was added.
+- **I2:** Unique claimed roles now bind to host application references, the full
+  shared-schema-validated manifest and actual guest image/package authority. The
+  API fixture checks the actual worker readiness against that complete manifest
+  before phase/seed/admission. A bounded, labelled, stopped broker carrier supplies
+  actual image artifact bytes; secure extraction and the existing strict
+  `artifact.py` tree identity bind them to the live broker entrypoint tree. Its
+  code never runs, and exact ownership/stopped-state checks precede cleanup.
+  Accepted candidate/v4 runtime descriptors must match every identity field,
+  including image/package/version/shim/policies, rather than engine alone.
+  Explicit unrecorded historical baseline mode retains null recorded provenance
+  and separately identifies the actual adapter; it never invents an old image
+  hash. Full manifest/broker authority is checked again after measurement.
+
+`bash packages/api/scripts/test-native-grading-isolated.sh --acceptance-contracts cove-grading-broker:task6-fix1`
+passed **4/4** focused checks. Two are metadata/schema substitution contracts
+(doubles); one is an actual stopped ARM64 image/tree check, and one runs **two
+real OS processes** with different local timing paths over owned Redis. The API
+collector receives no worker-file path: the old API-file-only negative control
+cannot find its commit, while Redis returns both producer acknowledgements.
+Missing records and overflow reject; retention/cleanup are checked. This proves
+the cross-process transport contract, not separate-container/native isolation.
+Swapped installed-unused native/compatibility IDs, changed broker tree, duplicate
+roles, alternate app authority, changed full runtime descriptors and missing
+candidate provenance reject. The actual carrier proof also rejects changed host
+bytes. [Focused output](assets/2026-10-29-native-grading-verification/fix1-contracts-green.txt)
+and [sanitized summary](assets/2026-10-29-native-grading-verification/fix1-verification-summary.json)
+retain the distinction.
+
+The first real artifact extraction exposed a producer defect in the prior
+Task5-fix1 broker image
+`sha256:4a0146e4dec3c284ca37a7793ba6f6c4efce0685c4dd2e504f730e5a4154a9c8`:
+its unused pnpm self-workspace symlink escaped to the build checkout. Docker
+refused extraction. Actual bounded tar metadata confirmed exactly one external
+link, `node_modules/.pnpm/node_modules/@cove/grading-runtime` →
+`../../../../../build/packages/grading-runtime`; runtime JS has no self-package
+imports. [Original3-pass/1-fail output](assets/2026-10-29-native-grading-verification/fix1-contracts-red.txt)
+and [link metadata](assets/2026-10-29-native-grading-verification/old-broker-link-metadata.json)
+remain preserved. The broker producer now asserts that exact unused link/target
+and absence of runtime self-imports before removing only that link. Consumer
+symlink/mount/tree policies remain strict.
+
+Only the broker image was rebuilt once after this necessary packaging fix:
+
+```sh
+docker build -f packages/grading-runtime/Dockerfile.broker --target runtime -t cove-grading-broker:task6-fix1 .
+```
+
+Its new local **ARM64** config ID is
+`sha256:59ebe6a39abf529dcf099e4f6756d15727d97e4ed25acc98f3bb2d00f991d10c`,
+strict extracted tree identity
+`e487bc158b0cfd0c0b475d168537b1aae85f561f171cbb711f1d922b474e8a58`.
+This supersedes the unextractable prior broker artifact. Bounded readonly,
+network-disabled broker imports/filesystem smoke passed; **41/41** runtime
+contracts and the broker build-warning audit (no missing-bin names) passed.
+API/worker/web product code and their tested artifact identities were unchanged;
+those image/build suites were not repeated. This new broker ID needs its own
+AMD64 build, scans and acceptance before any deployment.
+
+The weighted browser flow now performs a second real submission against the
+changed revision: the weight-one sample passes, weight-two hidden case fails,
+and both persistence and authorized public result report exactly **33/100,
+earned1/possible3, passed1/total2** (equal weights would yield50). The first
+submission still proves frozen revision/prompt-ignore/Unicode at100/100.
+Only that covering flow ran, **1/1 in27.9s**, with its original one-second policy.
+An initial fixture assertion confused a case outcome with the submission's
+`FAILED` status; its screenshot/trace remains retained, and correcting only that
+assertion yielded the passing result. An earlier new timing test used the wrong
+child-process module-resolution directory and failed before Redis transport;
+its corrected API-package cwd then passed. Neither was a product defect.
+
+E2E TypeScript, owned MJS/Python/shell syntax and whitespace checks passed.
+No broad passing browser/API/shared/web suites were repeated. Known Next dev/pg
+Minor diagnostics remain disclosed above. Positive Linux/native execution,
+cohorts/performance/certifications/scans/pilot remain unexecuted; no acceptance
+signature, production enablement or external publication occurred.
+
 ## Preserved implementation rulings
 
-The following 19 decisions preserve the SDD ledger verbatim, including each
-reason and cost. Later review decisions may be appended before scratch cleanup.
+The following 21 decisions preserve the SDD ledger verbatim, including reason
+and cost. Later review decisions may be appended before scratch cleanup.
 
 Ruling: Execute in a new isolated feature worktree without an extra permission question — reversible workspace setup is implied by the implementation request and the developer autonomy instructions — cost if wrong: local worktree/branch cleanup only.
 
@@ -354,3 +444,7 @@ Ruling: Warm and validate the actual charged-memory telemetry helper during boun
 Ruling: Add exact Docker-context exclusions and synthetic maximal-COPY guards for .env-backups/ and e2e/.auth/ before final builds — .gitignore explicitly identifies these as sensitive but the new Docker exclusions/canaries omitted them, while builder COPY . . accepts arbitrary backup/auth JSON basenames — cost if wrong: two additional excluded local-only directories and focused packaging checks; no real backup/auth contents are read. Task6implementer notified, parent metadata/source-onlycheck.
 
 Ruling: Give only the four transport-correctness fixtures an explicit two-second exercise profile after preserving a real 1029-ms/one-second time-limit outcome — those tests isolate event replay, while the timeout case and matching-Linux simple performance cohorts keep their one-second policies; the Mac root cause is not established — cost if wrong: transport coverage does not prove one-second grading performance, and the original failure remains a disclosed diagnostic limitation rather than being excluded from acceptance evidence. No production deadline changes.
+
+Ruling: Leave the disclosed Next development destination-stream digest and pg client-query deprecation as non-blocking Minor diagnostics — actual production standalone abort/navigation remained healthy with zero listeners, and unrelated framework/driver cleanup supplies no additional grading correctness proof in this fix — cost if wrong: development stderr noise and a future dependency investigation remain; no global suppression or claim of a proven root cause.
+
+Ruling: Fix the exact unused build-only self-workspace symlink in broker packaging and rebuild only that artifact — the new real extraction/tree test exposed a concrete producer defect preventing the required strict artifact verification, so the consumer fix cannot finish honestly without repairing its artifact — cost if wrong: a superseding broker config ID and narrow rebuild/import/tree validation; existing symlink/mount/identity policy stays strict, API/worker images remain unchanged, and the prior failed artifact is disclosed.

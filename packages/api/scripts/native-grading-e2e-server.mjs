@@ -4,7 +4,10 @@ fixtureEnvironment();
 import { createServer } from 'node:http';
 import { randomUUID, createHmac, timingSafeEqual } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
-import { readFileSync, appendFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { fixtureTimings } from './native-grading-e2e-timings.mjs';
+import { runtimeManifestSchema } from '@cove/shared';
+import { assertRuntimeReady } from '../dist/src/judge/runtime-readiness.js';
 import { SubmissionService } from '../dist/src/learn/submission.service.js';
 import { StaffPracticeService } from '../dist/src/learn/staff-practice.service.js';
 import { Redis } from 'ioredis';
@@ -30,6 +33,12 @@ const db = new PrismaService(
   new ConfigService({ DATABASE_URL: process.env.DATABASE_URL }),
 );
 const redis = new Redis(process.env.REDIS_URL);
+const timings = fixtureTimings(
+  redis,
+  process.env.COVE_NATIVE_FIXTURE_ID,
+  'api',
+  process.env.COVE_NATIVE_TIMINGS_FILE,
+);
 const fixtures = new Map(),
   authUsers = new Map(),
   hashes = new Map(),
@@ -76,17 +85,14 @@ for (const [prototype, kind] of [
   prototype.submit = async function (...args) {
     const began = performance.now();
     const result = await original.apply(this, args);
-    if (process.env.COVE_NATIVE_TIMINGS_FILE)
-      appendFileSync(
-        process.env.COVE_NATIVE_TIMINGS_FILE,
-        JSON.stringify({
-          event: 'admission-ack',
-          kind,
-          jobId: result.submissionId,
-          at: Date.now(),
-          elapsedMs: performance.now() - began,
-        }) + '\n',
-      );
+    await timings.record({
+      event: 'admission-ack',
+      kind,
+      jobId: result.submissionId,
+      at: Date.now(),
+      ackMonotonicMs: performance.now(),
+      elapsedMs: performance.now() - began,
+    });
     return result;
   };
 }
@@ -224,12 +230,24 @@ const server = createServer(async (req, res) => {
     if (path === '/timings')
       return json(
         res,
-        readFileSync(process.env.COVE_NATIVE_TIMINGS_FILE, 'utf8')
-          .trim()
-          .split('\n')
-          .filter(Boolean)
-          .map((line) => JSON.parse(line)),
+        await timings.read(url.searchParams.get('jobId') ?? undefined),
       );
+    if (path === '/authority') {
+      const manifest = runtimeManifestSchema.parse(
+        JSON.parse(
+          readFileSync(process.env.GRADING_RUNTIME_MANIFEST_PATH, 'utf8'),
+        ),
+      );
+      await assertRuntimeReady(
+        async () => redis,
+        manifest,
+        process.env.GRADING_WORKER_GENERATION,
+      );
+      return json(res, {
+        manifest,
+        workerGeneration: process.env.GRADING_WORKER_GENERATION,
+      });
+    }
     if (path === '/diagnostics') {
       const rtt = [];
       for (let i = 0; i < 20; i++) {
@@ -355,6 +373,7 @@ const server = createServer(async (req, res) => {
           { error: 'phase_requires_reconciled_idle_authority' },
           409,
         );
+      await timings.clear(); // idle phase boundary; only this fixture's diagnostics
       for (const config of configurationInstances)
         config.set('GRADING_NATIVE_ENABLED', input.phase === 'candidate');
       return json(res, { phase: input.phase });

@@ -8,6 +8,12 @@ import { resolve, dirname, isAbsolute } from 'node:path';
 import { cpus, platform, arch, release } from 'node:os';
 import { chromium } from '@playwright/test';
 import {
+  bindAcceptanceAuthority,
+  acceptedRuntimeEvidence,
+  inspectBrokerArtifact,
+} from './native-grading-acceptance-authority.mjs';
+import { acknowledgedTimings } from '../packages/api/scripts/native-grading-e2e-timings.mjs';
+import {
   summarize,
   assertContinuity,
   assertObservationContinuity,
@@ -58,7 +64,9 @@ if (
   !config.referencePath.startsWith('/') ||
   config.referencePath.startsWith('//')
 )
-  throw new Error('Drawing/reference targets must stay on the isolated web origin');
+  throw new Error(
+    'Drawing/reference targets must stay on the isolated web origin',
+  );
 const get = async (path) => {
   const response = await fetch(config.fixtureOrigin + path, {
     signal: AbortSignal.timeout(15000),
@@ -164,7 +172,9 @@ for (const [role, origin] of [
     );
   if (role === 'api' || role === 'worker') {
     const names =
-      role === 'api' ? ['env', 'server', 'seed'] : ['env', 'worker'];
+      role === 'api'
+        ? ['env', 'server', 'seed', 'timings']
+        : ['env', 'worker', 'timings'];
     for (const name of names) {
       const script = 'native-grading-e2e-' + name + '.mjs',
         wanted = createHash('sha256')
@@ -241,6 +251,18 @@ for (const [role, origin] of [
         role,
     );
 }
+const authority = bindAcceptanceAuthority(
+  config,
+  hostConfig,
+  JSON.parse(await readFile(hostConfig.manifestPath, 'utf8')),
+  await get('/authority'),
+  inspectBrokerArtifact(
+    config.artifacts.find((a) => a.role === 'broker'),
+    config.fixtureId,
+    hostConfig.brokerEntrypoint,
+  ),
+);
+await write('runtime-authority.json', authority);
 const clock = [];
 for (let i = 0; i < 10; i++) {
   const began = Date.now(),
@@ -265,7 +287,9 @@ await write('artifacts.json', images);
 const harnessFiles = [
   'e2e/native-grading-acceptance.mjs',
   'e2e/native-grading-acceptance-statistics.mjs',
-  ...['env', 'server', 'seed', 'worker'].map(
+  'e2e/native-grading-acceptance-authority.mjs',
+  'e2e/native-grading-broker-tree.py',
+  ...['env', 'server', 'seed', 'worker', 'timings'].map(
     (name) => 'packages/api/scripts/native-grading-e2e-' + name + '.mjs',
   ),
 ];
@@ -374,19 +398,26 @@ async function submission(entry, cohort) {
       saved.passedCount !== entry.cases
     )
       throw new Error('Unexpected/unfinished verdict');
-    const expected = config.phase === 'candidate' ? 'cpython' : 'pyodide';
-    if (saved.executionRuntimeSnapshot?.engine !== expected)
-      throw new Error('Wrong frozen runtime engine');
-    const timings = (await get('/timings')).filter((item) => item.jobId === id);
-    const commit = timings.find((item) => item.event === 'commit-ack'),
-      admission = timings.find((item) => item.event === 'admission-ack');
-    if (
-      !commit ||
-      !admission ||
-      commit.at < admission.at ||
-      admission.at < wall - 1000
-    )
-      throw new Error('Missing/invalid acknowledged timing boundaries');
+    row.runtimeEvidence = acceptedRuntimeEvidence(
+      saved,
+      config.phase,
+      authority,
+      config.baselineProvenance,
+    );
+    let boundaries;
+    const timingDeadline = performance.now() + 5000;
+    do {
+      try {
+        boundaries = acknowledgedTimings(await get('/timings?jobId=' + id), id);
+        break;
+      } catch (error) {
+        if (performance.now() >= timingDeadline) throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    } while (true);
+    const { commit, admission, rows: timings } = boundaries;
+    if (admission.at < wall - 1000)
+      throw new Error('Invalid admission clock boundary');
     row.acceptedToCommitAckMs = commit.at - admission.at;
     row.handlerMs = admission.elapsedMs;
     row.observedSavedMs = performance.now() - began;
@@ -394,11 +425,17 @@ async function submission(entry, cohort) {
     row.acknowledgedTransactionCount = timings.filter(
       (item) => item.event === 'db-transaction-ack',
     ).length;
-    row.stages = timings.map(({ event, stage, elapsedMs }) => ({
-      event,
-      stage,
-      elapsedMs,
-    }));
+    row.stages = timings.map(
+      ({ event, stage, elapsedMs, at, ackMonotonicMs, source, producer }) => ({
+        event,
+        stage,
+        elapsedMs,
+        at,
+        ackMonotonicMs,
+        source,
+        producer,
+      }),
+    );
     const state = await get('/fixtures/' + fixture.id);
     const solves = state.points.filter(
       (point) =>
@@ -674,6 +711,25 @@ if (
   throw new Error('Wall/monotonic clock continuity lost');
 const after = host(),
   observationAfter = await observation();
+const finalAuthority = bindAcceptanceAuthority(
+  config,
+  hostConfig,
+  JSON.parse(await readFile(hostConfig.manifestPath, 'utf8')),
+  await get('/authority'),
+  {
+    ...authority.brokerTrees,
+    hostTreeIdentity: execFileSync(
+      'python3',
+      [
+        'deploy/scripts/grading/artifact.py',
+        dirname(dirname(hostConfig.brokerEntrypoint)),
+      ],
+      { encoding: 'utf8', timeout: 30000 },
+    ).trim(),
+  },
+);
+if (JSON.stringify(finalAuthority) !== JSON.stringify(authority))
+  throw new Error('Runtime authority changed during measurement');
 await write('host-after.json', after);
 await write('observations-after.json', observationAfter);
 assertContinuity(before, after);
@@ -698,6 +754,9 @@ await write('summary.json', {
     'Unsigned measurement only; compare paired evidence and complete all independent acceptance gates',
   cohorts,
   allFailures: rows.filter((row) => row.error),
+  unrecordedRuntimeSamples: rows.filter(
+    (row) => row.runtimeEvidence?.provenance === 'unrecorded',
+  ).length,
   source: execFileSync('git', ['rev-parse', 'HEAD'], {
     encoding: 'utf8',
   }).trim(),

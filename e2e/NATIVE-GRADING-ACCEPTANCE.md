@@ -69,6 +69,16 @@ Each JSON config has:
   workload. `artifacts` contains all six roles `api,worker,web,broker,native,
   compatibility`, each with `reference` (`registry/name@sha256:...`), actual
   `configId`, explicit absolute local Unix `daemonSocket` path, and `containerId` for app listener roles.
+  The roles are unique. Native/compatibility references and config IDs must match
+  the full validated host manifest and host image/package inventory; API/worker
+  references must match the host application authority. Before phase/seed/admission,
+  the fixture also validates the actual worker readiness against its full manifest.
+  The broker carrier is inspected through a uniquely owned **stopped** bounded
+  container, never executing its code: a bounded tar archive of `/opt/grading-runtime`
+  is securely extracted and hashed with the existing strict `artifact.py` policy,
+  then compared to the live broker entrypoint tree. Carrier cleanup verifies its
+  exact ID/ownership/stopped state. A different installed but unused artifact
+  cannot label the run. Python 3.12+ is required for secure tar extraction.
   No mutable tag substitution/build/publication occurs. A rebuild with a new
   config ID needs new evidence even when its source revision matches.
 - `placement`: human-readable host/storage/DB placement and differences from
@@ -100,7 +110,8 @@ Each JSON config has:
   Failed requests/read errors remain failures; no queue/result stub is used.
 
 The test-only provider/worker launchers support `COVE_NATIVE_ACCEPTANCE_ENV`
-pointing at the same absolute config file. Its `runtime` contains
+pointing at a trusted local copy of the phase config in each private container
+filesystem; this does not require a shared config/timing mount. Its `runtime` contains
 `manifestPath`, `socketPath`, `workerGeneration`. The script requires Linux AMD64;
 the operator-side driver and real production broker enforce rootless/systemd/v2.
 The API/worker receive no daemon authority. This uses the ordinary manifest,
@@ -110,11 +121,42 @@ fixture launcher/helpers (and the packaged inventory helper), then invoke the
 launcher against the unchanged compiled dist in the exact prebuilt image. No
 additional host bind mount is permitted by the host verifier. The worker launcher
 resolves the API image and packaged-worker dist layouts explicitly. The driver
-checks actual fixture file hashes/ownership through the inspected container and
-records all harness hashes. These fixture files remain excluded from production
+checks actual fixture file hashes/ownership (including the timing helper) through
+  the inspected container and records all harness hashes. These fixture files remain excluded from production
 package payloads; instrumentation is declared separately from the tested image. All runtime authority
 and existing queues are real; only provider identities and deliberate timing
 faults are synthetic.
+
+Timing records travel through the already private, owned fixture Redis, not a
+shared writable filesystem. API and worker may use different or absent optional
+`COVE_NATIVE_TIMINGS_FILE` diagnostic paths. The API `/timings?jobId=UUID` merges
+both producers by the actual job ID. Wall/monotonic acknowledgement samples are
+captured before awaited diagnostic transport; the driver retains them. Missing
+admission/worker commit/transaction records fail a sample after a bounded wait.
+No history is trimmed: oversize/overflow rejects, with 4KiB per record,8192 per
+job,4096 job keys and32MiB serialized data per fixture. Keys have a four-hour TTL;
+verified idle phase boundaries clear only that fixture's namespace. Local owned
+Redis cleanup removes the whole disposable store. No daemon authority or extra
+writable app mount is added.
+
+Every new candidate/v4 row must match the **complete** selected runtime descriptor,
+including image/package hashes, versions, shim and policies. Recorded baseline
+rows have the same check against compatibility. If an explicitly declared
+`baselineProvenance:"unrecorded"` historical baseline genuinely has no snapshot,
+the evidence retains a null descriptor and original engine version and labels the
+separately verified actual compatibility adapter; it does not invent historical
+image/package provenance. That gap remains in raw rows and the summary. Manifest,
+broker tree and host authority are checked again after measurement.
+
+Focused isolated contracts (the optional image must already exist locally):
+
+```sh
+bash packages/api/scripts/test-native-grading-isolated.sh --acceptance-contracts cove-grading-broker:task6-fix1
+```
+
+These test two real OS processes with private timing files over owned Redis,
+negative artifact/descriptor substitutions, and actual stopped-carrier tree
+identity. They are not positive Linux/native execution acceptance.
 
 Each phase executes 600 sequential submissions (100 first plus 100 repeat per
 1/5/10-case group), a two-in-flight pair and a ten-client burst. It retains each

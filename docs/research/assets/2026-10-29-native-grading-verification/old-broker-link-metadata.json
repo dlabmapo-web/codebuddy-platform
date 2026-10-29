@@ -1,0 +1,9 @@
+{
+  "image": "sha256:4a0146e4dec3c284ca37a7793ba6f6c4efce0685c4dd2e504f730e5a4154a9c8",
+  "externalLinks": [
+    {
+      "name": "./node_modules/.pnpm/node_modules/@cove/grading-runtime",
+      "target": "../../../../../build/packages/grading-runtime"
+    }
+  ]
+}

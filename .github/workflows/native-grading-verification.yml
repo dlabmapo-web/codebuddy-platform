@@ -21,7 +21,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm prepare:grading
-      - run: node --test e2e/native-grading-acceptance-statistics.test.mjs packages/api/scripts/native-grading-e2e-env.test.mjs
+      - run: node --test e2e/native-grading-acceptance-statistics.test.mjs e2e/native-grading-acceptance-authority.test.mjs packages/api/scripts/native-grading-e2e-env.test.mjs
+      - run: bash packages/api/scripts/test-native-grading-isolated.sh --timing-contracts
       # Dedicated config has no general development-Supabase globalSetup.
       - run: bash packages/api/scripts/test-native-grading-isolated.sh --browser
       - if: always()
@@ -66,6 +67,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:grading
       - name: Measure already prepared baseline
         env:
           CONFIG: ${{ vars.GRADING_ISOLATED_BASELINE_CONFIG }}

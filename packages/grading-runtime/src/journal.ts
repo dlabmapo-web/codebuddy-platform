@@ -3,7 +3,8 @@ import { join, isAbsolute } from "node:path";
 import { serialize, deserialize } from "node:v8";
 import { invariant } from "./errors.js";
 // Old snapshot + atomic replacement are both charged to the 64 MiB disk quota.
-const QUOTA = 32 * 1024 * 1024;
+export const JOURNAL_SNAPSHOT_MAX_BYTES = 32 * 1024 * 1024;
+const QUOTA = JOURNAL_SNAPSHOT_MAX_BYTES;
 // Store captures as UTF-8 bytes. V8 otherwise uses two bytes for an entire
 // mostly-ASCII string containing a single non-Latin-1 character.
 function pack(value: unknown, key = ""): unknown {
@@ -77,6 +78,9 @@ export class Journal<T> {
     } finally {
       await f.close();
     }
+  }
+  encodedSize(value: unknown): number {
+    return serialize({ format: "utf8-capture-v1", data: pack(value) }).length;
   }
   write(value: T): Promise<void> {
     const data = serialize({ format: "utf8-capture-v1", data: pack(value) });

@@ -50,11 +50,34 @@ export class BrokerClient {
             response.requestId === request.requestId,
             "Response request mismatch",
           );
+          if (request.type === "seal" && response.type !== "error") {
+            invariant(response.type === "sealed", "Unexpected seal response");
+            invariant(
+              response.brokerGeneration === request.brokerGeneration &&
+                response.workerGeneration === request.workerGeneration &&
+                response.admissionEpoch === request.admissionEpoch &&
+                response.nextAdmissionEpoch === request.admissionEpoch + 1 &&
+                response.reconciliationId === request.reconciliationId,
+              "Seal acknowledgement mismatch",
+            );
+          }
           if (
             request.type !== "health" &&
+            request.type !== "seal" &&
             response.type !== "error" &&
             response.type !== "health"
           ) {
+            invariant(response.type !== "sealed", "Unexpected seal response");
+            if (request.type === "reserve" && response.type === "reserved")
+              invariant(
+                response.admissionEpoch === request.admissionEpoch,
+                "Reservation epoch mismatch",
+              );
+            if (request.type === "retire" && response.type === "retired")
+              invariant(
+                response.terminalCommitId === request.terminalCommitId,
+                "Terminal acknowledgement mismatch",
+              );
             const bound =
               response.type === "receipt" ? response.receipt : response;
             invariant(

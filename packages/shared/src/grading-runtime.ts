@@ -121,25 +121,30 @@ export const executionReceiptSchema = z.strictObject({
 });
 export type ExecutionReceipt = Readonly<z.infer<typeof executionReceiptSchema>>;
 const envelope = { protocol: z.literal(GRADING_BROKER_PROTOCOL_VERSION), requestId: z.uuid() };
+const admissionEpochSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 const bound = { brokerGeneration: z.uuid(), context: executionAttemptContextSchema, runtime: runtimeDescriptorSchema };
 const reserved = { ...bound, reservationId: z.uuid() };
 export const brokerRequestSchema = z.discriminatedUnion("type", [
   z.strictObject({ ...envelope, type: z.literal("health") }),
-  z.strictObject({ ...envelope, ...bound, type: z.literal("reserve"), memoryLimitMb: z.number().int().min(16).max(4096) }),
+  z.strictObject({ ...envelope, ...bound, type: z.literal("reserve"), admissionEpoch: admissionEpochSchema, memoryLimitMb: z.number().int().min(16).max(4096) }),
   z.strictObject({ ...envelope, ...reserved, type: z.literal("run"), input: brokerExecutionInputSchema }),
   z.strictObject({ ...envelope, ...reserved, type: z.literal("receipt") }),
   z.strictObject({ ...envelope, ...reserved, type: z.literal("ack"), receiptId: z.uuid(), checkpointId: z.uuid() }),
   z.strictObject({ ...envelope, ...reserved, type: z.literal("release") }),
+  z.strictObject({ ...envelope, ...reserved, type: z.literal("retire"), terminalCommitId: z.uuid() }),
+  z.strictObject({ ...envelope, type: z.literal("seal"), brokerGeneration: z.uuid(), workerGeneration: z.uuid(), admissionEpoch: admissionEpochSchema, reconciliationId: z.uuid() }),
   z.strictObject({ ...envelope, ...bound, reservationId: z.uuid().optional(), type: z.literal("cancel") }),
 ]);
 export type BrokerRequest = z.infer<typeof brokerRequestSchema>;
 export const brokerResponseSchema = z.discriminatedUnion("type", [
-  z.strictObject({ ...envelope, type: z.literal("health"), brokerGeneration: z.uuid(), workerGeneration: z.uuid().nullable(), capabilities: brokerCapabilityManifestSchema }),
-  z.strictObject({ ...envelope, ...reserved, type: z.literal("reserved") }),
+  z.strictObject({ ...envelope, type: z.literal("health"), brokerGeneration: z.uuid(), workerGeneration: z.uuid().nullable(), admissionEpoch: admissionEpochSchema, capabilities: brokerCapabilityManifestSchema }),
+  z.strictObject({ ...envelope, ...reserved, type: z.literal("reserved"), admissionEpoch: admissionEpochSchema }),
   z.strictObject({ ...envelope, type: z.literal("receipt"), receipt: executionReceiptSchema }),
   z.strictObject({ ...envelope, ...reserved, type: z.literal("pending"), state: z.enum(["reserved", "running", "uncertain", "acknowledged"]) }),
   z.strictObject({ ...envelope, ...reserved, type: z.literal("acknowledged"), receiptId: z.uuid() }),
   z.strictObject({ ...envelope, ...bound, reservationId: z.uuid().nullable(), type: z.literal("released"), cleanup: z.literal("removed") }),
+  z.strictObject({ ...envelope, ...reserved, type: z.literal("retired"), terminalCommitId: z.uuid() }),
+  z.strictObject({ ...envelope, type: z.literal("sealed"), brokerGeneration: z.uuid(), workerGeneration: z.uuid(), admissionEpoch: admissionEpochSchema, nextAdmissionEpoch: admissionEpochSchema, reconciliationId: z.uuid() }),
   z.strictObject({ ...envelope, type: z.literal("error"), code: z.enum(["BUSY", "UNSUPPORTED", "IDENTITY_MISMATCH", "STALE_GENERATION", "UNCERTAIN", "NOT_FOUND", "INFRASTRUCTURE"]), message: z.string().max(512) }),
 ]);
 export type BrokerResponse = z.infer<typeof brokerResponseSchema>;

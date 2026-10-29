@@ -40,12 +40,27 @@ describe("immutable grading contracts", () => {
   });
   it("requires the frozen whole-job memory profile on reserve", () => {
     const id = "10000000-0000-4000-8000-000000000004";
-    const request = { protocol: 1, requestId: id, brokerGeneration: id, type: "reserve", runtime: nativeFixture,
+    const request = { protocol: 1, requestId: id, brokerGeneration: id, type: "reserve", admissionEpoch: 1, runtime: nativeFixture,
       context: { attemptId: id, kind: "submission", caseId: "1", generation: 1, leaseToken: id, workerGeneration: id } };
     expect(brokerRequestSchema.safeParse(request).success).toBe(false);
     expect(brokerRequestSchema.safeParse({ ...request, memoryLimitMb: 128 }).success).toBe(true);
+    expect(brokerRequestSchema.safeParse({ ...request, memoryLimitMb: 128, admissionEpoch: undefined }).success).toBe(false);
     expect(brokerRequestSchema.safeParse({ ...request, runtime: compatibilityFixture, memoryLimitMb: 4096 }).success).toBe(true);
     expect(brokerRequestSchema.safeParse({ ...request, memoryLimitMb: 4097 }).success).toBe(false);
+  });
+  it("requires bounded epochs and strict terminal reconciliation authority", () => {
+    const id = "10000000-0000-4000-8000-000000000004";
+    const seal = { protocol: 1, requestId: id, type: "seal", brokerGeneration: id, workerGeneration: id, admissionEpoch: 1, reconciliationId: id };
+    expect(brokerRequestSchema.safeParse(seal).success).toBe(true);
+    for (const admissionEpoch of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) expect(brokerRequestSchema.safeParse({ ...seal, admissionEpoch }).success).toBe(false);
+    expect(brokerRequestSchema.safeParse({ ...seal, reconciliationId: undefined }).success).toBe(false);
+    expect(brokerRequestSchema.safeParse({ ...seal, runtime: nativeFixture }).success).toBe(false);
+    const { type: _type, ...envelope } = seal;
+    expect(brokerResponseSchema.safeParse({ ...envelope, type: "sealed", nextAdmissionEpoch: 2 }).success).toBe(true);
+    const retired = { protocol: 1, requestId: id, brokerGeneration: id, runtime: nativeFixture, context: { attemptId: id, kind: "submission", caseId: "1", generation: 1, leaseToken: id, workerGeneration: id }, reservationId: id, terminalCommitId: id };
+    expect(brokerRequestSchema.safeParse({ ...retired, type: "retire" }).success).toBe(true);
+    expect(brokerRequestSchema.safeParse({ ...retired, type: "retire", terminalCommitId: undefined }).success).toBe(false);
+    expect(brokerResponseSchema.safeParse({ ...retired, type: "retired" }).success).toBe(true);
   });
   it("preserves compatibility budgets and effective sub-100ms execution limits", () => {
     const input = { code: "pass", stdin: "", inputPromptPolicy: "IGNORE", timeLimitMs: 1, memoryLimitMb: 4096, outputLimitBytes: 8388608 };

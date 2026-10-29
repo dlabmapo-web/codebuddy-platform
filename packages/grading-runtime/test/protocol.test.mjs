@@ -93,6 +93,7 @@ test("Unix RPC transports full escaped stdin and stdout bounds with a determinis
   };
   const reserved = await client.request({
     type: "reserve",
+    admissionEpoch: 1,
     ...bound,
     memoryLimitMb: 128,
   });
@@ -120,4 +121,52 @@ test("Unix RPC transports full escaped stdin and stdout bounds with a determinis
     f.driver.events.find((e) => e[0] === "execute")[2].stdin.length,
     8388608,
   );
+});
+test("Unix client validates terminal retirement and epoch seal acknowledgement", async (t) => {
+  const { randomUUID } = await import("node:crypto");
+  const { native } = await import("./fixtures.mjs");
+  const f = await fixture(t);
+  const path = join(f.directory, "terminal.sock");
+  const server = await serve(path, (r) => f.broker.handle(r));
+  t.after(() => new Promise((r) => server.close(r)));
+  const client = new BrokerClient(path);
+  const bound = {
+    brokerGeneration: f.broker.generation,
+    context: f.context,
+    runtime: native,
+  };
+  const reserved = await client.request({
+    type: "reserve",
+    ...bound,
+    admissionEpoch: 1,
+    memoryLimitMb: 128,
+  });
+  assert.equal(reserved.admissionEpoch, 1);
+  const reservationId = reserved.reservationId;
+  assert.equal(
+    (await client.request({ type: "release", ...bound, reservationId })).type,
+    "released",
+  );
+  const terminalCommitId = randomUUID();
+  assert.equal(
+    (
+      await client.request({
+        type: "retire",
+        ...bound,
+        reservationId,
+        terminalCommitId,
+      })
+    ).terminalCommitId,
+    terminalCommitId,
+  );
+  const reconciliationId = randomUUID();
+  const sealed = await client.request({
+    type: "seal",
+    brokerGeneration: f.broker.generation,
+    workerGeneration: f.worker,
+    admissionEpoch: 1,
+    reconciliationId,
+  });
+  assert.equal(sealed.type, "sealed");
+  assert.equal(sealed.nextAdmissionEpoch, 2);
 });

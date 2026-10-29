@@ -14,7 +14,7 @@ import {
   type BrokerExecutionInput,
 } from "@cove/shared";
 import { ResourceBank, guestBudget, type Funding } from "./resource-bank.js";
-import { Journal } from "./journal.js";
+import { Journal, JOURNAL_SNAPSHOT_MAX_BYTES } from "./journal.js";
 import { registered, freeze } from "./manifest.js";
 import { BrokerError, invariant } from "./errors.js";
 import type { Allocation, GuestDriver } from "./driver.js";
@@ -42,11 +42,18 @@ type RecordEntry = {
   released: boolean;
   memoryLimitMb: number;
   cases: Case[];
+  terminalCommitId?: string;
 };
 type Disk = {
   version: 1;
   records: RecordEntry[];
   prepared?: Allocation[];
+  admissionEpoch: number;
+  lastSeal?: {
+    admissionEpoch: number;
+    nextAdmissionEpoch: number;
+    reconciliationId: string;
+  };
 };
 export type WarmProfile = {
   runtime: RuntimeDescriptor;
@@ -70,6 +77,9 @@ export class Broker {
   readonly generation = randomUUID();
   readonly bank = new ResourceBank();
   private records: RecordEntry[] = [];
+  private admissionEpoch = 1;
+  private lastSeal: Disk["lastSeal"];
+  private closing = new Set<string>();
   private durableReceipts = new Set<string>();
   private active = new Map<
     string,
@@ -111,12 +121,52 @@ export class Broker {
       await this.journal.write({
         version: 1,
         records: this.records,
+        admissionEpoch: this.admissionEpoch,
+        lastSeal: this.lastSeal,
         prepared: this.prepared.map((p) => p.allocation),
       });
     } catch (e) {
       this.faulted = true;
       throw e;
     }
+  }
+  private requireJournalHeadroom(records = this.records) {
+    const metadata: Disk = {
+      version: 1,
+      admissionEpoch: this.admissionEpoch,
+      lastSeal: this.lastSeal,
+      prepared: this.prepared.map((p) => p.allocation),
+      records: records.map((r) => ({
+        ...r,
+        cases: r.cases.map((c) =>
+          c.receipt
+            ? {
+                ...c,
+                receipt: {
+                  ...c.receipt,
+                  result: { ...c.receipt.result, stdout: "", stderr: "" },
+                },
+              }
+            : c,
+        ),
+      })),
+    };
+    // Exact serialized metadata size plus both maximum UTF-8 captures. The
+    // extra 128 KiB covers two pending receipt envelopes and bounded allocation
+    // facts/case transitions until the next serialized admission check.
+    const reserve =
+      2 *
+        (this.manifest.capabilities.stdoutBytes +
+          this.manifest.capabilities.stderrBytes) +
+      128 * 1024;
+    if (
+      this.journal.encodedSize(metadata) + reserve >
+      JOURNAL_SNAPSHOT_MAX_BYTES
+    )
+      throw new BrokerError(
+        "BUSY",
+        "Journal headroom requires terminal retirement before admission",
+      );
   }
   private lock<T>(work: () => Promise<T>): Promise<T> {
     const result = this.serial.then(work);
@@ -136,6 +186,18 @@ export class Broker {
           old.records.length <= 10000,
         "Invalid journal",
       );
+      this.admissionEpoch = old.admissionEpoch ?? 1;
+      invariant(
+        Number.isSafeInteger(this.admissionEpoch) && this.admissionEpoch > 0,
+        "Invalid admission epoch",
+      );
+      this.lastSeal = old.lastSeal;
+      if (this.lastSeal)
+        invariant(
+          this.lastSeal.nextAdmissionEpoch === this.admissionEpoch &&
+            this.lastSeal.admissionEpoch === this.admissionEpoch - 1,
+          "Invalid sealed epoch history",
+        );
       this.records = old.records;
       for (const r of this.records) {
         registered(this.manifest, r.runtime);
@@ -225,6 +287,8 @@ export class Broker {
   census() {
     const cases = this.records.flatMap((r) => r.cases);
     return {
+      records: this.records.length,
+      admissionEpoch: this.admissionEpoch,
       active: this.records.filter((r) => !r.released).length,
       quarantined:
         cases.filter((c) => c.state === "QUARANTINED").length +
@@ -240,7 +304,7 @@ export class Broker {
     request: Exclude<
       BrokerRequest,
       {
-        type: "health";
+        type: "health" | "seal";
       }
     >,
   ) {
@@ -254,7 +318,7 @@ export class Broker {
     request: Exclude<
       BrokerRequest,
       {
-        type: "health" | "reserve";
+        type: "health" | "reserve" | "seal";
       }
     >,
   ): RecordEntry {
@@ -279,27 +343,98 @@ export class Broker {
     const request = brokerRequestSchema.parse(value);
     const envelope = { protocol: 1 as const, requestId: request.requestId };
     try {
-      if (request.type === "health") {
-        if (!this.accepting || this.faulted)
-          throw new BrokerError("INFRASTRUCTURE", "Broker is not ready");
-        return {
-          ...envelope,
-          type: "health",
-          brokerGeneration: this.generation,
-          workerGeneration: this.workerGeneration,
-          capabilities: brokerCapabilityManifestSchema.parse(
-            this.manifest.capabilities,
-          ),
-        };
-      }
+      if (request.type === "health")
+        return await this.lock(async () => {
+          if (!this.accepting || this.faulted)
+            throw new BrokerError("INFRASTRUCTURE", "Broker is not ready");
+          return {
+            ...envelope,
+            type: "health",
+            brokerGeneration: this.generation,
+            workerGeneration: this.workerGeneration,
+            admissionEpoch: this.admissionEpoch,
+            capabilities: brokerCapabilityManifestSchema.parse(
+              this.manifest.capabilities,
+            ),
+          };
+        });
       if (request.brokerGeneration !== this.generation)
         throw new BrokerError(
           "STALE_GENERATION",
           "Broker generation changed; reconcile",
         );
+      if (request.type === "seal")
+        return await this.lock(async () => {
+          if (this.faulted)
+            throw new BrokerError(
+              "INFRASTRUCTURE",
+              "Journal durability requires restart reconciliation",
+            );
+          if (request.workerGeneration !== this.workerGeneration)
+            throw new BrokerError(
+              "STALE_GENERATION",
+              "Inactive terminal reconciliation worker",
+            );
+          if (request.admissionEpoch !== this.admissionEpoch) {
+            if (
+              this.lastSeal?.admissionEpoch === request.admissionEpoch &&
+              this.lastSeal.reconciliationId === request.reconciliationId
+            )
+              return {
+                ...envelope,
+                type: "sealed",
+                brokerGeneration: this.generation,
+                workerGeneration: this.workerGeneration,
+                ...this.lastSeal,
+              };
+            throw new BrokerError(
+              "STALE_GENERATION",
+              "Admission epoch already sealed or unknown",
+            );
+          }
+          if (
+            this.faulted ||
+            this.closing.size ||
+            this.active.size ||
+            this.acquisitions.size ||
+            this.replenishments.size ||
+            this.retirements.size ||
+            this.prepared.some((p) => p.state !== "READY_UNUSED") ||
+            this.records.some((r) => !r.released || !r.terminalCommitId)
+          )
+            throw new BrokerError(
+              "BUSY",
+              "Epoch requires quiescent cleanup and durable terminal reconciliation of every reservation",
+            );
+          invariant(
+            this.admissionEpoch < Number.MAX_SAFE_INTEGER,
+            "Admission epoch exhausted",
+          );
+          this.lastSeal = {
+            admissionEpoch: this.admissionEpoch,
+            nextAdmissionEpoch: this.admissionEpoch + 1,
+            reconciliationId: request.reconciliationId,
+          };
+          this.admissionEpoch++;
+          this.records = [];
+          this.durableReceipts.clear();
+          await this.persist();
+          return {
+            ...envelope,
+            type: "sealed",
+            brokerGeneration: this.generation,
+            workerGeneration: this.workerGeneration,
+            ...this.lastSeal,
+          };
+        });
       registered(this.manifest, request.runtime);
       if (request.type === "reserve") {
         const reservation = await this.lock(async () => {
+          if (request.admissionEpoch !== this.admissionEpoch)
+            throw new BrokerError(
+              "STALE_GENERATION",
+              "Admission epoch sealed; never replay a retired admission in a newer epoch",
+            );
           if (!this.accepting || this.faulted)
             throw new BrokerError(
               "INFRASTRUCTURE",
@@ -314,6 +449,16 @@ export class Broker {
             (r) => r.context.attemptId === request.context.attemptId,
           );
           if (existing) {
+            if (existing.terminalCommitId)
+              throw new BrokerError(
+                "STALE_GENERATION",
+                "Attempt durably retired",
+              );
+            if (this.closing.has(existing.id))
+              throw new BrokerError(
+                "BUSY",
+                "Reservation cleanup transition is fenced",
+              );
             if (
               existing.memoryLimitMb !== request.memoryLimitMb ||
               runtimeDescriptorIdentity(existing.runtime) !==
@@ -376,10 +521,10 @@ export class Broker {
               live.some((r) => r.context.kind !== "submission"))
           )
             throw new BrokerError("BUSY", "Execution slots occupied");
-          if (this.records.length >= 10000)
+          if (this.records.length >= 1024)
             throw new BrokerError(
               "BUSY",
-              "Reconciliation metadata full; operator retirement required",
+              "Admission epoch full; retire terminal reservations and seal the epoch",
             );
           const r: RecordEntry = {
             id: randomUUID(),
@@ -395,32 +540,69 @@ export class Broker {
               "UNSUPPORTED",
               "Profile cannot fit physical execution bank",
             );
+          this.requireJournalHeadroom([...this.records, r]);
           this.records.push(r);
           await this.persist();
           return r;
         });
-        // Funding/initialization never holds the ledger mutex: a larger waiting
-        // profile must not prevent the current owner from running/releasing.
-        if (
-          !this.active.has(reservation.id) &&
-          !this.replenishments.has(reservation.id)
-        )
-          await this.acquire(reservation);
-        if (reservation.released)
-          throw new BrokerError(
-            "INFRASTRUCTURE",
-            "Reservation cancelled during preparation",
-          );
-        return {
-          ...envelope,
-          type: "reserved",
-          ...this.bound(request),
-          reservationId: reservation.id,
-        };
+        // Fence preparation ownership before launching side effects, while
+        // retaining the nonblocking funding path outside the ledger mutex.
+        const preparation = await this.lock(async () => {
+          if (
+            request.admissionEpoch !== this.admissionEpoch ||
+            !sameLease(reservation.context, request.context)
+          )
+            throw new BrokerError(
+              "IDENTITY_MISMATCH",
+              "Reservation changed before preparation",
+            );
+          if (this.closing.has(reservation.id) || reservation.released)
+            throw new BrokerError("BUSY", "Reservation closing");
+          return {
+            done:
+              !this.active.has(reservation.id) &&
+              !this.replenishments.has(reservation.id)
+                ? this.acquire(reservation)
+                : Promise.resolve(),
+          };
+        });
+        await preparation.done;
+        return await this.lock(async () => {
+          if (
+            request.admissionEpoch !== this.admissionEpoch ||
+            !sameLease(reservation.context, request.context)
+          )
+            throw new BrokerError(
+              "IDENTITY_MISMATCH",
+              "Reservation changed during preparation",
+            );
+          if (reservation.released || this.closing.has(reservation.id))
+            throw new BrokerError(
+              "INFRASTRUCTURE",
+              "Reservation cancelled during preparation",
+            );
+          return {
+            ...envelope,
+            type: "reserved",
+            ...this.bound(request),
+            reservationId: reservation.id,
+            admissionEpoch: this.admissionEpoch,
+          };
+        });
       }
-      const r = this.resolve(request);
       if (request.type === "run") {
         await this.lock(async () => {
+          const r = this.resolve(request);
+          if (r.terminalCommitId)
+            throw new BrokerError(
+              "STALE_GENERATION",
+              "Attempt durably retired",
+            );
+          if (this.closing.has(r.id))
+            throw new BrokerError(
+              "BUSY",
+              "Reservation cleanup transition is fenced",
+            );
           if (r.cases.some((c) => c.context.caseId === request.context.caseId))
             return;
           if (this.active.has(r.id) || this.replenishments.has(r.id))
@@ -443,6 +625,11 @@ export class Broker {
             );
           guestBudget(request.runtime.engine, request.input.memoryLimitMb);
           const next: Case = { context: request.context, state: "RESERVED" };
+          this.requireJournalHeadroom(
+            this.records.map((v) =>
+              v === r ? { ...r, cases: [...r.cases, next] } : v,
+            ),
+          );
           r.cases.push(next);
           await this.persist();
           const abort = new AbortController();
@@ -456,38 +643,65 @@ export class Broker {
             .catch(() => {});
         });
       }
-      const current = r.cases.find(
-        (c) => c.context.caseId === request.context.caseId,
-      );
-      if (request.type === "receipt" || request.type === "run") {
-        if (
-          current?.receipt &&
-          this.durableReceipts.has(current.receipt.receiptId)
-        )
-          return brokerResponseSchema.parse({
-            ...envelope,
-            type: "receipt",
-            receipt: current.receipt,
-          });
-        if (current?.uncertain || current?.state === "QUARANTINED")
-          throw new BrokerError(
-            "UNCERTAIN",
-            "Known execution is uncertain; never rerun",
+      if (request.type === "receipt" || request.type === "run")
+        return await this.lock(async () => {
+          const r = this.resolve(request);
+          const current = r.cases.find(
+            (c) => c.context.caseId === request.context.caseId,
           );
-        return {
-          ...envelope,
-          type: "pending",
-          ...this.bound(request),
-          reservationId: r.id,
-          state: current?.checkpointId
-            ? "acknowledged"
-            : current
-              ? "running"
-              : "reserved",
-        };
-      }
+          if (r.terminalCommitId)
+            return {
+              ...envelope,
+              type: "retired",
+              ...this.bound(request),
+              reservationId: r.id,
+              terminalCommitId: r.terminalCommitId,
+            };
+          if (
+            current?.receipt &&
+            this.durableReceipts.has(current.receipt.receiptId)
+          )
+            return brokerResponseSchema.parse({
+              ...envelope,
+              type: "receipt",
+              receipt: current.receipt,
+            });
+          if (current?.uncertain || current?.state === "QUARANTINED")
+            throw new BrokerError(
+              "UNCERTAIN",
+              "Known execution is uncertain; never rerun",
+            );
+          return {
+            ...envelope,
+            type: "pending",
+            ...this.bound(request),
+            reservationId: r.id,
+            state: current?.checkpointId
+              ? "acknowledged"
+              : current
+                ? "running"
+                : "reserved",
+          };
+        });
       if (request.type === "ack")
         return await this.lock(async () => {
+          const r = this.resolve(request);
+          const current = r.cases.find(
+            (c) => c.context.caseId === request.context.caseId,
+          );
+          if (this.closing.has(r.id))
+            throw new BrokerError(
+              "BUSY",
+              "Reservation cleanup transition is fenced",
+            );
+          if (r.terminalCommitId)
+            return {
+              ...envelope,
+              type: "retired",
+              ...this.bound(request),
+              reservationId: r.id,
+              terminalCommitId: r.terminalCommitId,
+            };
           if (
             !current ||
             current.receiptId !== request.receiptId ||
@@ -502,6 +716,7 @@ export class Broker {
             throw new BrokerError("IDENTITY_MISMATCH", "Checkpoint mismatch");
           current.checkpointId = request.checkpointId;
           delete current.receipt;
+          this.durableReceipts.delete(request.receiptId);
           await this.persist();
           return {
             ...envelope,
@@ -511,70 +726,48 @@ export class Broker {
             receiptId: request.receiptId,
           };
         });
-      if (request.type === "cancel" || request.type === "release") {
-        const acquisition = this.acquisitions.get(r.id);
-        if (acquisition) {
-          if (request.type === "release")
-            throw new BrokerError("BUSY", "Guest preparation is active");
-          acquisition.abort.abort();
-          await acquisition.done.catch(() => {});
-        }
-        const active = this.active.get(r.id);
-        if (active) {
+      if (request.type === "retire")
+        return await this.lock(async () => {
+          const r = this.resolve(request);
           if (
-            request.type === "release" &&
-            r.cases.some((c) => c.state !== "REMOVED" || c.receipt)
+            this.closing.has(r.id) ||
+            this.active.has(r.id) ||
+            this.acquisitions.has(r.id) ||
+            !r.released ||
+            r.cases.some(
+              (c) =>
+                c.state !== "REMOVED" ||
+                c.receipt ||
+                (!c.checkpointId && !c.uncertain),
+            )
           )
             throw new BrokerError(
               "BUSY",
-              "Case is still active or unacknowledged",
+              "Terminal retirement requires release, removed cases and durable checkpoint acknowledgement",
             );
-          active.abort.abort();
-          await active.done;
-        }
-        return await this.lock(async () => {
-          if (r.cases.some((c) => c.state !== "REMOVED"))
+          if (
+            r.terminalCommitId &&
+            r.terminalCommitId !== request.terminalCommitId
+          )
             throw new BrokerError(
-              "UNCERTAIN",
-              "Cleanup or execution remains uncertain",
+              "IDENTITY_MISMATCH",
+              "Terminal commit acknowledgement changed",
             );
-          if (r.cases.some((c) => c.receipt))
-            throw new BrokerError(
-              "BUSY",
-              "Receipt must be durably acknowledged",
-            );
-          // Future unused preparation is broker inventory, not current-case
-          // cleanup. Its cancellation/removal must not delay committed feedback.
-          const replacement = this.replenishments.get(r.id);
-          const fundedReplacement = this.prepared.some(
-            (p) => p.reservationId === r.id,
-          );
-          const configured = this.warmProfiles.some(
-            (p) =>
-              p.memoryLimitMb === r.memoryLimitMb &&
-              runtimeDescriptorIdentity(p.runtime) ===
-                runtimeDescriptorIdentity(r.runtime),
-          );
-          if (replacement && (!configured || !fundedReplacement))
-            replacement.abort.abort();
-          const idle = this.prepared.find(
-            (p) => p.reservationId === r.id && p.state === "READY_UNUSED",
-          );
-          if (idle) {
-            delete idle.reservationId;
-            if (!this.shouldKeepWarm(idle)) this.retireLater(idle);
-          }
-          r.released = true;
+          r.terminalCommitId = request.terminalCommitId;
+          for (const c of r.cases)
+            if (c.receiptId) this.durableReceipts.delete(c.receiptId);
+          r.cases = [];
           await this.persist();
           return {
             ...envelope,
-            type: "released",
+            type: "retired",
             ...this.bound(request),
             reservationId: r.id,
-            cleanup: "removed",
+            terminalCommitId: request.terminalCommitId,
           };
         });
-      }
+      if (request.type === "cancel" || request.type === "release")
+        return await this.closeReservation(request, envelope);
       throw new BrokerError("UNSUPPORTED", "Unknown command");
     } catch (e) {
       return {
@@ -586,6 +779,76 @@ export class Broker {
             ? e.message
             : "Broker operation failed; reconcile private state",
       };
+    }
+  }
+  private async closeReservation(
+    request: Extract<BrokerRequest, { type: "cancel" | "release" }>,
+    envelope: { protocol: 1; requestId: string },
+  ): Promise<BrokerResponse> {
+    const pending = await this.lock(async () => {
+      const r = this.resolve(request);
+      if (this.closing.has(r.id))
+        throw new BrokerError(
+          "BUSY",
+          "Reservation cleanup transition is fenced",
+        );
+      const acquisition = this.acquisitions.get(r.id);
+      const active = this.active.get(r.id);
+      if (
+        request.type === "release" &&
+        (acquisition ||
+          (active && r.cases.some((c) => c.state !== "REMOVED" || c.receipt)))
+      )
+        throw new BrokerError("BUSY", "Case is still active or unacknowledged");
+      this.closing.add(r.id);
+      acquisition?.abort.abort();
+      active?.abort.abort();
+      return {
+        id: r.id,
+        done: Promise.all([acquisition?.done.catch(() => {}), active?.done]),
+      };
+    });
+    try {
+      await pending.done;
+      return await this.lock(async () => {
+        const r = this.resolve(request);
+        if (r.cases.some((c) => c.state !== "REMOVED"))
+          throw new BrokerError(
+            "UNCERTAIN",
+            "Cleanup or execution remains uncertain",
+          );
+        if (r.cases.some((c) => c.receipt))
+          throw new BrokerError("BUSY", "Receipt must be durably acknowledged");
+        const replacement = this.replenishments.get(r.id);
+        const funded = this.prepared.some((p) => p.reservationId === r.id);
+        const configured = this.warmProfiles.some(
+          (p) =>
+            p.memoryLimitMb === r.memoryLimitMb &&
+            runtimeDescriptorIdentity(p.runtime) ===
+              runtimeDescriptorIdentity(r.runtime),
+        );
+        if (replacement && (!configured || !funded)) replacement.abort.abort();
+        const idle = this.prepared.find(
+          (p) => p.reservationId === r.id && p.state === "READY_UNUSED",
+        );
+        if (idle) {
+          delete idle.reservationId;
+          if (!this.shouldKeepWarm(idle)) this.retireLater(idle);
+        }
+        r.released = true;
+        await this.persist();
+        return {
+          ...envelope,
+          type: "released",
+          ...this.bound(request),
+          reservationId: r.id,
+          cleanup: "removed",
+        };
+      });
+    } finally {
+      await this.lock(async () => {
+        this.closing.delete(pending.id);
+      });
     }
   }
   private shouldKeepWarm(p: Prepared) {
@@ -680,9 +943,17 @@ export class Broker {
       await this.persist();
       await this.driver.create(allocation, signal);
       allocation.creationState = "created";
+      invariant(
+        this.journal.encodedSize(allocation) <= 16 * 1024,
+        "Allocation facts exceed journal transition budget",
+      );
       await this.persist();
       await this.driver.ready(allocation, signal);
       allocation.creationState = "ready";
+      invariant(
+        this.journal.encodedSize(allocation) <= 16 * 1024,
+        "Allocation facts exceed journal transition budget",
+      );
       await this.persist();
       signal.throwIfAborted();
       p.state = "READY_UNUSED";
@@ -772,6 +1043,7 @@ export class Broker {
       c.state = "READY_UNUSED";
       await this.persist();
       signal.throwIfAborted();
+      await this.lock(async () => this.requireJournalHeadroom());
       c.state = "RUNNING";
       await this.persist();
       const result = await this.driver.execute(allocation, input, signal);
@@ -795,6 +1067,14 @@ export class Broker {
         result,
         cleanup: "removed",
       });
+      invariant(
+        this.journal.encodedSize({
+          ...receipt,
+          result: { ...receipt.result, stdout: "", stderr: "" },
+        }) <=
+          16 * 1024,
+        "Receipt metadata exceeds journal transition budget",
+      );
       c.receipt = receipt;
       c.receiptId = receipt.receiptId;
       await this.persist();

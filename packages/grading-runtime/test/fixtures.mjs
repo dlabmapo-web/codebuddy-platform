@@ -136,6 +136,7 @@ export async function fixture(t, options = {}) {
       protocol: 1,
       requestId: randomUUID(),
       type,
+      ...(type === "reserve" ? { admissionEpoch: 1 } : {}),
       ...(type === "health"
         ? {}
         : { brokerGeneration: broker.generation, context, runtime: native }),

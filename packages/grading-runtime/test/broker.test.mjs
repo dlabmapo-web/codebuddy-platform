@@ -421,3 +421,49 @@ test("release acknowledges current cleanup without awaiting future warm preparat
     finish();
   }
 });
+test("concurrent takeover rejects an old run before source is released", async (t) => {
+  const f = await fixture(t);
+  const first = await f.send("reserve", { memoryLimitMb: 128 });
+  const next = { ...f.context, generation: 2, leaseToken: randomUUID() };
+  const [taken, stale] = await Promise.all([
+    f.send("reserve", { memoryLimitMb: 128, context: next }),
+    f.send("run", { reservationId: first.reservationId, input }),
+  ]);
+  assert.equal(taken.type, "reserved");
+  assert.equal(stale.code, "IDENTITY_MISMATCH");
+  assert.equal(f.driver.events.filter((e) => e[0] === "execute").length, 0);
+});
+for (const operation of ["ack", "release", "cancel"])
+  test(`concurrent takeover rejects stale ${operation} inside the mutation fence`, async (t) => {
+    const f = await fixture(t);
+    const first = await f.send("reserve", { memoryLimitMb: 128 });
+    await f.send("run", { reservationId: first.reservationId, input });
+    const result = await receipt(f.send, first.reservationId);
+    const checkpointId = randomUUID();
+    await f.send("ack", {
+      reservationId: first.reservationId,
+      receiptId: result.receipt.receiptId,
+      checkpointId,
+    });
+    await f.send("release", { reservationId: first.reservationId });
+    const next = { ...f.context, generation: 2, leaseToken: randomUUID() };
+    const extra =
+      operation === "ack"
+        ? { receiptId: result.receipt.receiptId, checkpointId }
+        : {};
+    const [taken, stale] = await Promise.all([
+      f.send("reserve", { memoryLimitMb: 128, context: next }),
+      f.send(operation, { reservationId: first.reservationId, ...extra }),
+    ]);
+    assert.equal(taken.type, "reserved");
+    assert.equal(stale.code, "IDENTITY_MISMATCH");
+    assert.equal(
+      (
+        await f.send("release", {
+          reservationId: first.reservationId,
+          context: next,
+        })
+      ).type,
+      "released",
+    );
+  });

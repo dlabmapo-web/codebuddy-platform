@@ -28,6 +28,7 @@ for (const runtime of health.capabilities.runtimes) {
   const bound = { brokerGeneration: health.brokerGeneration, context, runtime };
   const reserved = await client.request({
     type: "reserve",
+    admissionEpoch: health.admissionEpoch,
     ...bound,
     memoryLimitMb: 128,
   });

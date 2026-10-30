@@ -1,0 +1,26 @@
+{
+  "runId": 41013987237,
+  "sourceCommit": "6e1cea33a8f494051f1830a5f1de9edfd652c1c2",
+  "url": "https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/41013987237",
+  "status": "completed",
+  "conclusion": "success",
+  "browserCasesPassed": 17,
+  "databaseTimingContractsPassed": 2,
+  "jobs": [
+    {
+      "name": "local-browser",
+      "conclusion": "success"
+    },
+    {
+      "name": "rootless-capability",
+      "conclusion": "success"
+    },
+    {
+      "name": "paired-linux-acceptance",
+      "conclusion": "skipped"
+    }
+  ],
+  "nativeAcceptanceExecuted": false,
+  "productionEquivalent": false,
+  "controllerVerifiedOn": "2026-10-30 Asia/Seoul"
+}

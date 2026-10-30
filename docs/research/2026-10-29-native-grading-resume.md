@@ -1,4 +1,74 @@
-# Native grading resume checkpoint — 2026-10-29
+# Native grading resume checkpoint
+
+## Current state — 2026-10-30, Asia/Seoul
+
+The user resumed the work. The prior paused state below is historical; use this
+section and the current verification report for next steps. No production
+service/account/resource, grading flag or original IDE checkout changed.
+
+- Worktree/branch unchanged: `/Users/jurabeksamiev/Developer/codebuddy-platform-native-grading`,
+  `feat/production-native-grading`. Original checkout remains
+  `feat/public-turtle-browser-pilot`.
+- Latest reviewed, pushed and actually tested source:
+  `6e1cea33a8f494051f1830a5f1de9edfd652c1c2`. Subsequent documentation-only
+  checkpoint is local; do not push it merely to save notes.
+- Safe prerequisite selection is fixed: matching official Docker CE/rootless
+  extras, all protected package versions pinned/verified, removal/change guard
+  preserved and bounded diagnostics retained.
+- Dedicated user-manager runtime environment is fixed and actually verified.
+  The incorrect intermediate transient `%t` probe and its failed run/review
+  remain recorded; the corrected actual RuntimeDirectory probe passed Linux.
+- Real dedicated rootless Docker28.0.4 starts, is attested, and loads both
+  immutable guest images. Production broker startup is still blocked.
+- Final diagnostic [run41013987308](https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/41013987308)
+  fails production driver verification with `EACCES` / `stat` / daemon process
+  executable. Broker, daemon and host user namespaces differ. Systemd255 source
+  shows the broker's mount protections implicitly create a separate userns.
+  Actual observations support this mechanism; they are not a causal
+  counterfactual or positive containment acceptance.
+- All six failed source records are preserved. **0/24 required guest cases
+  executed; exact cleanup succeeded for every record.** No unchanged sample was
+  rerun to select success.
+- Final-source [ordinary run41013987237](https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/41013987237)
+  succeeded:17 browser cases and2 actual DB timing contracts; paired native
+  acceptance skipped. Local87 CI contracts,41 runtime tests, actual synthetic
+  BuildKit export, syntax/compile/whitespace passed.
+- Final independent whole-extension review approved CI source and failed-evidence
+  bookkeeping, retaining a HIGH inherited production integration blocker.
+  Task3 source/run inspection/evidence are closed with FAILED outcome; the
+  positive24-case verification goal is incomplete. Tasks1/2 and original product
+  plan are not to be redispatched.
+
+## Current records and next work
+
+Read `docs/research/2026-10-29-disposable-native-grading-linux-verification.md`,
+its assets `run-index.json`, six summaries, scoped reviews and
+`whole-extension-review.md`. Durable current SDD ledger snapshot:
+`assets/2026-10-29-disposable-native-grading-linux-verification/progress-2026-10-30.md`.
+The ignored SDD workspace remains available. Raw ignored downloads are under
+`test-results/native-linux-run<runId>/`.
+
+A concrete proposed repair is written in
+`docs/superpowers/specs/2026-10-30-native-grading-daemon-attestor-design.md`.
+It retains broker hardening and full live kernel identity checks using a small
+unprivileged initial-userns native attestor and credential client, root-owned
+proof and strict IPC/lifecycle/resource controls. **It is not approved or
+implemented.** This changes the production service arrangement beyond the
+approved CI-only extension; obtain the user's design decision before dependent
+implementation. After approval, create a separate implementation plan and
+reviews, then new source-revision disposable runs. Do not weaken executable
+identity, drop broker hardening, substitute a CI guest driver, or rerun failed
+unchanged samples. Audit later protected guest observations before growing any
+helper API.
+
+No merge/tag/deployment, production SSH, paid runner/server purchase, activation
+or production resource handover is authorized. Complete native app E2E, paired
+100-sample cohorts, mixed-load p95, host equivalence and release/activation gates
+remain unverified.
+
+---
+
+# Historical paused checkpoint — 2026-10-29
 
 Paused explicitly at the user’s request. Continue only after the user resumes.
 No production service, account, grading flag or VPS resource allocation changed.

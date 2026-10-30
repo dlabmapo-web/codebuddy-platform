@@ -4,10 +4,19 @@
 
 **Goal:** Execute initial real rootless Linux native-runtime checks on a disposable standard GitHub VM without changing production.
 
-**Execution checkpoint:** Paused at the user’s request on2026-10-29. Tasks1/2 and
-Task3 code/review are complete. The first actual Linux run failed in prerequisite
-preparation before guest execution. Resume from
-`docs/research/2026-10-29-native-grading-resume.md`; do not restart completed tasks.
+**Execution checkpoint:** Resumed on2026-10-30. Tasks1/2 and Task3 source
+reviews are complete. Latest reviewed/pushed source6e1cea33 ran as41013987308.
+Actual execution still fails before required guests: the hardened broker gets
+EACCES/stat on the daemon executable; broker/daemon/host user namespaces differ.
+All six failed source records and successful exact cleanup receipts are retained.
+No positive kernel acceptance is claimed (0/24). The production arrangement
+requires a separate design decision, proposed in
+`docs/superpowers/specs/2026-10-30-native-grading-daemon-attestor-design.md`.
+That proposal is not approved or implemented. Final whole-extension review
+approved CI source/evidence with the HIGH product integration blocker retained.
+Source, run inspection and evidence closure finish with a FAILED outcome; the
+positive24-case goal remains incomplete. Original completed tasks are not
+redispatched.
 
 **Architecture:** A guarded administrator harness prepares the existing dedicated
 grading units and immutable local artifacts. A distinct bounded unprivileged
@@ -220,6 +229,9 @@ with `test(grading): verify real rootless guests and recovery`.
 
 ### Task 3: Wire disposable CI, run it and preserve truthful evidence
 
+Actual execution is recorded with a failing outcome. The positive24-case gate
+remains unmet and is not converted to completion by source/test review.
+
 **Files:** Create `deploy/scripts/grading/ci/run.sh`, `evidence.py`,
 `.github/workflows/native-grading-kernel.yml`, evidence collector tests in
 `deploy/scripts/grading/ci/test_kernel.py`, and
@@ -277,7 +289,7 @@ Use normal checkout/pnpm/Node22 actions, frozen dependencies, explicit
 upload with `retention-days: 1`. Unsupported native capability fails this job;
 do not use continue-on-error to label native checks passing.
 
-- [ ] **Step 3: Review, push the authorized feature branch and inspect actual run.**
+- [x] **Step 3: Review, push the authorized feature branch and inspect actual run.**
 
 Run local contract checks and the appropriate runtime tests; perform the task
 source review before the controller pushes only `feat/production-native-grading`.
@@ -290,7 +302,11 @@ and run a new source revision; never repeatedly rerun unchanged samples to selec
 passing evidence. An actual runner limitation must remain an explicit failed or
 unexecuted native result. No paid runner escalation or production changes.
 
-- [ ] **Step 4: Record actual outcomes and finish.**
+- [x] **Step 4: Record actual outcomes and finish.**
+
+Recorded failed Linux outcome,0/24 guest cases, six exact cleanup successes and
+final independent review. This checkbox closes evidence bookkeeping, not native
+acceptance or the plan’s positive verification goal.
 
 Record run URLs, exact commits, actual required case results, effective limits,
 daemon/guest/tree/package identity, cleanup and failure dispositions. Keep the

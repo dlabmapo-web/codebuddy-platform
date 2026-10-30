@@ -1,9 +1,10 @@
-# Proposed native grading live identity attestor design — 2026-10-30
+# Native grading live identity attestor design — 2026-10-30
 
-Status: proposed for user approval; no production implementation or deployment
-is authorized by this document. No production code or host resources were changed while writing
-this advisory. Actual namespace evidence from run `41013987308` was incorporated
-after drafting.
+Status: approved by the user on2026-10-30: “okay i will approve and do what is
+needed”. Approval authorizes the scoped source implementation, reviews and
+disposable Linux CI evidence below. Production SSH, deployment, resource
+handover and native activation remain excluded. The historical observed
+namespace evidence is retained.
 
 ## Decision and alternatives
 
@@ -19,7 +20,7 @@ production deployment and native activation remain separate release gates.
 | System-manager non-root broker and common-family migration | Allows direct host-namespace kernel inspection with filesystem hardening | Broader cgroup, lifecycle, unit and proof migration; not selected |
 | Preserve current inactive feature and failure record | No additional implementation | Leaves0/24 kernel cases and production eligibility unresolved |
 
-The approved scope would cover source changes, reviews, new source-revision
+The approved scope covers source changes, reviews, new source-revision
 disposable runs and evidence for this repair. It includes no production SSH,
 resource handover, deployment, activation, merge, tag or purchase.
 
@@ -272,8 +273,8 @@ not a solution on systemd 255; removing those directives would remove hardening.
 - Kernel executable-link access:
   <https://man7.org/linux/man-pages/man5/proc_pid_exe.5.html>
 
-Decision requested: approve this scoped native-attestor design for a separate
-implementation plan. A source review and actual Linux evidence are required
+Decision: the user approved this scoped native-attestor design; implement its
+separate task plan. A source review and actual Linux evidence are required
 before implementation closure. Approval would not authorize deployment or native
 activation.
 

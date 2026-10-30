@@ -72,6 +72,47 @@ def user_command(state, *args, timeout=60):
                     'PATH=/opt/cove/bin:/usr/local/bin:/usr/bin:/bin', *args], timeout=timeout)
 
 
+def normalize_user_manager(state):
+    """Normalize only the newly owned manager, then verify a real service launch.
+
+    A correctly addressed systemctl client does not establish the environment
+    that an already-started user manager supplies to its services.
+    """
+    uid=state['uid']; runtime=Path('/run/user')/str(uid)
+    info=runtime.lstat()
+    require(stat.S_ISDIR(info.st_mode) and info.st_uid==uid and stat.S_IMODE(info.st_mode)==0o700,'Dedicated user runtime directory identity differs')
+    bus=(runtime/'bus').lstat()
+    require(stat.S_ISSOCK(bus.st_mode) and bus.st_uid==uid,'Dedicated user bus identity differs')
+    unit='cove-grading-ci-environment.service'
+    require(user_command(state,'systemctl','--user','show',unit,'--property=LoadState','--value')=='not-found','Existing user environment probe unit refused')
+    expected=dict(uid=uid,home=str(HOME),runtimeDirectory=str(runtime),busAddress='unix:path='+str(runtime/'bus'),runtimeSpecifier=str(runtime))
+    user_command(state,'systemctl','--user','set-environment','HOME='+expected['home'],
+                 'XDG_RUNTIME_DIR='+expected['runtimeDirectory'],'DBUS_SESSION_BUS_ADDRESS='+expected['busAddress'])
+    # Use a transient SERVICE, never --scope/--setenv: its process must receive
+    # the manager's environment rather than the correctly addressed client's.
+    # Independently check %t: changing the manager's service environment alone
+    # need not repair a runtime prefix captured during manager initialization.
+    probe="import json,os; print(json.dumps(dict(uid=os.getuid(),home=os.environ.get('HOME'),runtimeDirectory=os.environ.get('XDG_RUNTIME_DIR'),busAddress=os.environ.get('DBUS_SESSION_BUS_ADDRESS'),runtimeSpecifier=os.environ.get('GRADING_CI_RUNTIME_SPECIFIER'))))"
+    def stop_probe():
+        if user_command(state,'systemctl','--user','show',unit,'--property=LoadState','--value')!='not-found':
+            user_command(state,'systemctl','--user','stop',unit,timeout=20)
+    try:
+        result=user_command(state,'systemd-run','--user','--quiet','--wait','--pipe','--collect',
+                            '--unit='+unit,'--property=RuntimeMaxSec=15',
+                            '--property=MemoryMax=32M','--property=TasksMax=16',
+                            '--property=Environment=GRADING_CI_RUNTIME_SPECIFIER=%t','/usr/bin/python3','-I','-c',probe,timeout=30)
+    except BaseException:
+        # Preserve the launch failure. The lifecycle trap still stops this
+        # exact owned manager if the immediate bounded unit stop also fails.
+        try: stop_probe()
+        except (OSError,ValueError,subprocess.SubprocessError): pass
+        raise
+    stop_probe()
+    require(len(result)<=4096,'User manager environment probe bound exceeded')
+    require(json.loads(result)==expected,'Dedicated user manager service environment differs')
+    return expected
+
+
 def docker(state, *args, rootful=False, timeout=60):
     endpoint = ROOTFUL if rootful else 'unix://'+state['daemonSocket']
     return command(['docker','--host',endpoint,*args], timeout=timeout)
@@ -340,6 +381,7 @@ def prepare(repo):
     os.chown(host_config,uid,account.pw_gid); host_config.chmod(0o600)
     state['ownedFiles'][str(host_config)]=snapshot(host_config)
     user_command(state,'systemctl','--user','daemon-reload')
+    normalize_user_manager(state)
     user_command(state,'systemctl','--user','start','cove-grading.slice')
     family_group=user_command(state,'systemctl','--user','show','cove-grading.slice','--property=ControlGroup','--value')
     manager_group=f'/user.slice/user-{uid}.slice/user@{uid}.service/'

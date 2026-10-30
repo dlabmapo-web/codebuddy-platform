@@ -179,6 +179,65 @@ assert.throws(()=>bundle(n,n));
         result=subprocess.run(['node','--input-type=module','-e',script],cwd=root,capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr)
 
+class UserManagerEnvironmentTests(unittest.TestCase):
+    def exercise(self,result=None,runtime_mode=0o40700,runtime_uid=10000,bus_mode=0o140666,bus_uid=10000):
+        import json
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        expected=dict(uid=10000,home=str(ci.HOME),runtimeDirectory='/run/user/10000',busAddress='unix:path=/run/user/10000/bus',runtimeSpecifier='/run/user/10000')
+        with patch.object(ci.Path,'lstat',side_effect=[SimpleNamespace(st_mode=runtime_mode,st_uid=runtime_uid),SimpleNamespace(st_mode=bus_mode,st_uid=bus_uid)]),patch.object(ci,'user_command',side_effect=['not-found','',json.dumps(expected if result is None else result),'not-found']) as command:
+            failure=None
+            try: ci.normalize_user_manager(dict(uid=10000))
+            except Exception as error: failure=error
+        return command.call_args_list,failure
+
+    def test_owned_manager_environment_is_set_and_probed_through_service(self):
+        calls,failure=self.exercise()
+        self.assertIsNone(failure)
+        normalization=calls[1].args
+        self.assertEqual(normalization[1:4],('systemctl','--user','set-environment'))
+        self.assertEqual(set(normalization[4:]),{'HOME='+str(ci.HOME),'XDG_RUNTIME_DIR=/run/user/10000','DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/10000/bus'})
+        probe=calls[2].args
+        self.assertEqual(probe[1],'systemd-run')
+        for required in ('--user','--wait','--pipe','--collect','--unit=cove-grading-ci-environment.service','--property=RuntimeMaxSec=15','--property=MemoryMax=32M','--property=TasksMax=16'): self.assertIn(required,probe)
+        self.assertNotIn('--scope',probe)
+        self.assertFalse(any(str(value).startswith('--setenv') for value in probe))
+        self.assertEqual([value for value in probe if str(value).startswith('--property=Environment=')],['--property=Environment=GRADING_CI_RUNTIME_SPECIFIER=%t'])
+
+    def test_wrong_runtime_directory_or_bus_refused_before_manager_mutation(self):
+        for changes in [dict(runtime_uid=1001),dict(runtime_mode=0o40755),dict(runtime_mode=0o120777),dict(bus_uid=1001),dict(bus_mode=0o100600)]:
+            with self.subTest(changes=changes):
+                calls,failure=self.exercise(**changes)
+                self.assertIsInstance(failure,ValueError)
+                self.assertEqual(calls,[])
+
+    def test_service_inheriting_runner_runtime_or_wrong_identity_is_refused(self):
+        correct=dict(uid=10000,home=str(ci.HOME),runtimeDirectory='/run/user/10000',busAddress='unix:path=/run/user/10000/bus',runtimeSpecifier='/run/user/10000')
+        for change in [dict(uid=1001),dict(home='/home/runner'),dict(runtimeDirectory='/run/user/1001'),dict(busAddress='unix:path=/run/user/1001/bus'),dict(runtimeSpecifier='/run/user/1001')]:
+            with self.subTest(change=change):
+                _,failure=self.exercise(result={**correct,**change})
+                self.assertRegex(str(failure),'service environment differs')
+
+    def test_probe_launch_failure_stops_only_its_exact_unit_and_preserves_primary(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        import subprocess
+        failure=subprocess.CalledProcessError(17,['systemd-run'])
+        for stop in ['',subprocess.CalledProcessError(23,['systemctl'])]:
+            with self.subTest(stop=stop),patch.object(ci.Path,'lstat',side_effect=[SimpleNamespace(st_mode=0o40700,st_uid=10000),SimpleNamespace(st_mode=0o140666,st_uid=10000)]),patch.object(ci,'user_command',side_effect=['not-found','',failure,'loaded',stop]) as command:
+                with self.assertRaises(subprocess.CalledProcessError) as raised: ci.normalize_user_manager(dict(uid=10000))
+                self.assertIs(raised.exception,failure)
+                self.assertEqual(command.call_args.args[1:],('systemctl','--user','stop','cove-grading-ci-environment.service'))
+
+    def test_normalization_follows_last_user_reload_and_precedes_grading_start(self):
+        # Ordering matters because a user environment generator may repopulate
+        # the manager's launch environment during daemon-reload.
+        import inspect
+        source=inspect.getsource(ci.prepare)
+        self.assertLess(source.rindex("'--user','daemon-reload'"),source.index('normalize_user_manager(state)'))
+        self.assertLess(source.index('normalize_user_manager(state)'),source.index("'--user','start','cove-grading.slice'"))
+
+
 class PrerequisitePackageTests(unittest.TestCase):
     version='5:28.5.1-1~ubuntu.24.04~noble'
 

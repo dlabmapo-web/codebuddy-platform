@@ -21,6 +21,7 @@
   "files": [
     "dist",
     "guest/seccomp.json",
-    "README.md"
+    "README.md",
+    "host/bin"
   ]
 }

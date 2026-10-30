@@ -671,15 +671,20 @@ console.log(JSON.stringify(yaml.load(readFileSync('.github/workflows/native-grad
         step=matches[0]
         self.assertEqual(step['if'],'always()')
         self.assertNotIn('${{',step['run'])
-        ids=['checkout','pnpm','node','install','prepare','contracts','build_context','kernel']
-        self.assertEqual([s['id'] for s in steps[:8]],ids)
+        ids=['checkout','pnpm','node','install','prepare','contracts','build_context','native_contracts','kernel']
+        self.assertEqual([s['id'] for s in steps[:9]],ids)
+        native=next(s for s in steps if s.get('id')=='native_contracts')
+        self.assertIn('host/Dockerfile.test',native['run'])
+        for bound in ('--network=none','--cgroupns=host','--cap-add=SYS_PTRACE','--memory=256m','--cpus=1','--pids-limit=64'):
+            self.assertIn(bound,native['run'])
+        self.assertNotIn('--privileged',native['run'])
         self.assertEqual(step['env'],{'SOURCE_COMMIT':'${{ github.sha }}',**{'OUTCOME_'+key.upper():'${{ steps.'+key+'.outcome }}' for key in ids}})
         self.assertEqual(steps[-1]['if'],"always() && steps.evidence_summary.outputs.uploadable == 'true'")
         return step
 
     def run_fallback(self, folder, failed='install', wrapper='skipped'):
         step=self.fallback_step()
-        ids=['checkout','pnpm','node','install','prepare','contracts','build_context','kernel']
+        ids=['checkout','pnpm','node','install','prepare','contracts','build_context','native_contracts','kernel']
         outcomes={key:('success' if ids.index(key)<ids.index(failed) else 'failure' if key==failed else 'skipped') for key in ids}
         outcomes['kernel']=wrapper
         env={**os.environ,'SOURCE_COMMIT':'c'*40,'GITHUB_OUTPUT':str(folder/'outputs'),**{'OUTCOME_'+key.upper():value for key,value in outcomes.items()},'UNRELATED_SECRET':'RAW_SECRET_CANARY'}
@@ -687,7 +692,7 @@ console.log(JSON.stringify(yaml.load(readFileSync('.github/workflows/native-grad
         return result,outcomes
 
     def test_prerequisite_failures_without_checkout_leave_uploadable_unexecuted_summary(self):
-        for stage in ('checkout','pnpm','node','install','prepare','contracts','build_context'):
+        for stage in ('checkout','pnpm','node','install','prepare','contracts','build_context','native_contracts'):
             with self.subTest(stage=stage),tempfile.TemporaryDirectory() as directory:
                 folder=Path(directory).resolve()
                 result,outcomes=self.run_fallback(folder,stage)

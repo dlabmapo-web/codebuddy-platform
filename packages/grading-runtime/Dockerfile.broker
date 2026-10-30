@@ -1,3 +1,9 @@
+# Native artifact is built by the immutable reviewed Linux AMD64 toolchain.
+FROM --platform=linux/amd64 gcc:14.3.0-bookworm@sha256:5e927c284bf55a7dc796262e311a0703344f62f41f5621eb56843111b1d37e15 AS native
+WORKDIR /native
+COPY packages/grading-runtime/host .
+RUN make clean all manifest
+
 # Broker runtime artifact only; production runs in the delegated host user service
 # so it can inspect host PIDs/cgroups. Do not mount a host daemon into this image.
 FROM node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS build
@@ -6,6 +12,7 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/shared packages/shared
 COPY packages/grading-runtime packages/grading-runtime
+COPY --from=native /native/bin /build/packages/grading-runtime/host/bin
 RUN pnpm install --frozen-lockfile --ignore-scripts --filter @cove/grading-runtime... && pnpm --filter @cove/shared build && pnpm --filter @cove/grading-runtime build && pnpm --filter @cove/grading-runtime deploy --prod /artifact
 # pnpm deploy retains one unused self-workspace link to the build checkout.
 # It is not a runtime dependency and makes the strict artifact tree unextractable.

@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "dependencies": [
+    {
+      "name": "mbedtls",
+      "version": "3.6.7",
+      "commit": "068ff080b369adfac81509f9b57b2afabaf82dc5",
+      "repository": "https://github.com/Mbed-TLS/mbedtls",
+      "license": "Apache-2.0",
+      "files": {
+        "vendor/mbedtls/LICENSE": "9b405ef4c89342f5eae1dd828882f931747f71001cfba7d114801039b52ad09b",
+        "vendor/mbedtls/include/mbedtls/build_info.h": "4bb715278f3199298220b930514ace4f461ed0e9ff27b656d6e2616a1ca3287f",
+        "vendor/mbedtls/include/mbedtls/check_config.h": "66696df9cc3f7cbbe84786046937242b18140963b94c34347404f7827c428efa",
+        "vendor/mbedtls/include/mbedtls/config_adjust_legacy_crypto.h": "f404960e2878c21c22a5d67caba6cd1d29f382b3d913a56ce856931dd15b2886",
+        "vendor/mbedtls/include/mbedtls/config_adjust_ssl.h": "2d37a7552566e9fbd8a5a8b3e6cf6d4e21125a5e48a7e24ca30f3c683d141871",
+        "vendor/mbedtls/include/mbedtls/config_adjust_x509.h": "92909d91c59340f13eb2b447cf44e0075a0ee742a18f22fb7843f6a18c5af5dc",
+        "vendor/mbedtls/include/mbedtls/error.h": "ddcb14c1bf9d6fd2f2f1d2eb62117ce9bf05a0f9430c6931d7555b23f9ed3ddb",
+        "vendor/mbedtls/include/mbedtls/platform.h": "e6e1edc99d90698acf751d5d837c9b59898d7277deb993bcbf7473172b7a3523",
+        "vendor/mbedtls/include/mbedtls/platform_util.h": "1237d849e96bc15b479e8086160e4568c1de86563bb51c60eead45b99ad1b4ac",
+        "vendor/mbedtls/include/mbedtls/private_access.h": "c897213b3e534e8d5db83629177f9c01d90461ed6fea57906836262dba87056d",
+        "vendor/mbedtls/include/mbedtls/sha256.h": "a2ee050ca15b7598a8d227cac0e0ec9fd6c38615b817737a8007e90b3feab0d9",
+        "vendor/mbedtls/include/mbedtls/threading.h": "5688b2bef81fa61b9d29bca9383931db26b7dcb8a96785dbc957b95e01292b72",
+        "vendor/mbedtls/library/alignment.h": "e97b8844abfadc4cc2fecce5b040d58cd53f549c42712205a267e00e372efd3d",
+        "vendor/mbedtls/library/common.h": "adfd493f8ecb11f87f7e75f270a97cbd05d1902345ef32db51d39c076e4f8fde",
+        "vendor/mbedtls/library/platform_util.c": "83051fddcd37171831ff5706613dc3d336b2e53c42e6515f2f14ac0f8aa649f1",
+        "vendor/mbedtls/library/sha256.c": "632672d0c954d8bc0e20fdc8370c9f1725f3ffc5fcdaacc14949e42a1b5424d7"
+      }
+    },
+    {
+      "name": "jsmn",
+      "version": "1.1.0",
+      "commit": "fdcef3ebf886fa210d14956d3c068a653e76a24e",
+      "repository": "https://github.com/zserge/jsmn",
+      "license": "MIT",
+      "files": {
+        "vendor/jsmn/LICENSE": "4675b94a50d2afe811c52785463c854f1156056632cce17cc7133939eac8ed55",
+        "vendor/jsmn/jsmn.h": "1ed6154dedf009212a08a397e9c4ed50a0ce31d5a8301bb294e137ae3188c13b"
+      }
+    },
+    {
+      "name": "gcc-notices",
+      "version": "14.3.0",
+      "commit": "c9cd41fba9ebd288c4f101e4b99da934bcb96a11",
+      "repository": "https://github.com/gcc-mirror/gcc",
+      "license": "GPL-3.0-with-GCC-exception",
+      "files": {
+        "vendor/gcc-notices/COPYING.RUNTIME": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74",
+        "vendor/gcc-notices/COPYING3": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+      }
+    }
+  ],
+  "notes": [
+    "Vendor files are exact upstream bytes; local minimal SHA256 configuration is mbedtls_config.h.",
+    "Only Mbed TLS SHA256/platform_util are compiled. jsmn tokens are bounded and a strict application grammar/schema gate rejects unsupported JSON.",
+    "GCC runtime notices accompany static libgcc; glibc notices and exact installed package/library hashes are captured from the pinned compiler image by build_manifest.py."
+  ]
+}

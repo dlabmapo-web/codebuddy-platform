@@ -31,6 +31,12 @@ jobs:
         run: python3 -m unittest discover -s deploy/scripts/grading/ci -p 'test_*.py' -q
       - id: build_context
         run: python3 -m unittest discover -s deploy/scripts/grading/tests -p test_build_context.py -v
+      # Real AMD64 host-tool contracts precede disposable learner observations.
+      # SYS_PTRACE belongs only to the isolated root bootstrap observer.
+      - id: native_contracts
+        run: |
+          docker build --platform linux/amd64 -f packages/grading-runtime/host/Dockerfile.test -t cove-attestor-contract:local .
+          docker run --rm --network=none --cgroupns=host --cap-add=SYS_PTRACE --memory=256m --cpus=1 --pids-limit=64 cove-attestor-contract:local
       - id: kernel
         run: bash deploy/scripts/grading/ci/run.sh
       # Stdlib-only fallback still runs when checkout, Node or pnpm failed.
@@ -46,6 +52,7 @@ jobs:
           OUTCOME_PREPARE: ${{ steps.prepare.outcome }}
           OUTCOME_CONTRACTS: ${{ steps.contracts.outcome }}
           OUTCOME_BUILD_CONTEXT: ${{ steps.build_context.outcome }}
+          OUTCOME_NATIVE_CONTRACTS: ${{ steps.native_contracts.outcome }}
           OUTCOME_KERNEL: ${{ steps.kernel.outcome }}
         run: |
           python3 - <<'PY'
@@ -57,7 +64,7 @@ jobs:
           import sys
 
           MAXIMUM = 20 * 2**20
-          STAGES = ('checkout','pnpm','node','install','prepare','contracts','build_context','kernel')
+          STAGES = ('checkout','pnpm','node','install','prepare','contracts','build_context','native_contracts','kernel')
           STATUSES = {'primary','observation','cleanup','infrastructure','collection','finalization'}
           source = os.environ.get('SOURCE_COMMIT','')
           if not re.fullmatch(r'[0-9a-f]{40}',source): raise ValueError('Invalid source revision')

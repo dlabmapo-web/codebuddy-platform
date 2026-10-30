@@ -1,0 +1,6 @@
+# Fixture host-tool contracts only; never learner/rootless containment evidence.
+FROM gcc:14.3.0-bookworm@sha256:5e927c284bf55a7dc796262e311a0703344f62f41f5621eb56843111b1d37e15
+WORKDIR /fixture/host
+COPY packages/grading-runtime/host .
+RUN make clean all bin/fixtures manifest
+CMD ["python3", "test_native.py"]

@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/random.h>
-#include <sys/un.h>
 #include <unistd.h>
 static int serve(int fd, const Config *config, const char config_hash[65], const char instance[65],
                  const char boot[37]) {
@@ -84,11 +83,8 @@ int main(int argc, char **argv) {
     if (executable_identity(getpid(), config.attestorExecutable, config.attestorExecutableSha256, 0,
                             &executable, &d))
         return fail("ATTESTOR_EXECUTABLE");
-    struct sockaddr_un address = {.sun_family = AF_UNIX};
-    strcpy(address.sun_path, config.attestorSocket);
-    umask(0077);
-    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
-    if (fd < 0 || bind(fd, (struct sockaddr *)&address, sizeof(address)))
+    int fd = bind_attestor_socket(&config);
+    if (fd < 0)
         return fail("ATTESTOR_BIND");
     /* Never remove a stale socket automatically: root lifecycle owns cleanup. */
     if (policy_install() || listen(fd, 3))

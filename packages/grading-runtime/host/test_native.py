@@ -9,6 +9,8 @@ import socket
 import struct
 import time
 import multiprocessing
+import stat
+import tempfile
 import subprocess
 import unittest
 from pathlib import Path
@@ -74,7 +76,7 @@ class NativeContracts(unittest.TestCase):
         for key in proof:
             missing=dict(proof); del missing[key]
             self.assertNotEqual(self.fixture('proof',data=json.dumps(missing).encode()).returncode,0)
-        for key, value in [('unknown',1),('helperPid',2**31),('helperUid',0),('socketMode',438),
+        for key, value in [('unknown',1),('helperPid',2**31),('helperUid',0),('socketMode',438),('socketMode',448),
                            ('dumpable',2),('seccomp',0),('noNewPrivs',0),('instance','Z'*64),
                            ('helperStartTime','001'),('bootId','garbage')]:
             changed={**proof,key:value}
@@ -89,6 +91,20 @@ class NativeContracts(unittest.TestCase):
             self.assertFalse(binary['elf']['hasInterpreter'])
             self.assertFalse(binary['elf']['executableStack'])
             self.assertEqual(binary['elf']['neededLibraries'],[])
+
+    def test_attestor_bind_exact_private_mode_and_no_adoption(self):
+        # Exercise the production startup bind, without simulating seccomp readiness.
+        with tempfile.TemporaryDirectory(prefix='cove-bind-') as folder:
+            path = Path(folder) / 'attestor.sock'
+            result = self.fixture('bind-attestor', str(path))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, b'384 1 1\n')  # 0600, nonblocking, CLOEXEC.
+            self.assertFalse(path.exists())
+            path.write_bytes(b'EXISTING_PATH_MUST_REMAIN')
+            before = path.stat()
+            self.assertNotEqual(self.fixture('bind-attestor', str(path)).returncode, 0)
+            self.assertEqual(path.read_bytes(), b'EXISTING_PATH_MUST_REMAIN')
+            self.assertEqual(path.stat().st_ino, before.st_ino)
 
     def test_seccomp_real_denials(self):
         self.assertEqual(self.fixture('exec-unfiltered').returncode, 0)
@@ -120,7 +136,7 @@ def forged_server(path, mode, ready):
     os.setgroups([])
     os.setgid(GID)
     os.setuid(UID)
-    os.umask(0o077)
+    os.umask(0o177)
     listener = socket.socket(socket.AF_UNIX)
     listener.bind(str(path))
     listener.listen(1)
@@ -186,6 +202,7 @@ class LiveContracts(unittest.TestCase):
         self.daemon = self.launch_daemon()
         self.attestor = self.launch(self.helper)
         self.wait_socket(RUNTIME / 'attestor.sock', self.attestor)
+        self.assertEqual(stat.S_IMODE((RUNTIME / 'attestor.sock').lstat().st_mode), 0o600)
         result = self.run_client(bootstrap=True)
         self.assertEqual(result.returncode, 0, result.stderr.decode())
         self.proof = json.loads(result.stdout)
@@ -244,13 +261,15 @@ class LiveContracts(unittest.TestCase):
             user=0 if bootstrap else UID, group=0 if bootstrap else GID, extra_groups=[],
             capture_output=True, timeout=3, env=env)
 
-    def reject(self):
+    def reject(self, classification=None):
         started = time.monotonic()
         result = self.run_client()
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout, b'')
         self.assertNotIn(b'success', result.stdout)
         self.assertRegex(result.stderr, rb'^ATTESTOR_CLIENT_[A-Z]+\n$')
+        if classification is not None:
+            self.assertEqual(result.stderr, (classification + '\n').encode())
         self.assertLess(time.monotonic() - started, 2)
 
     def store_proof(self, proof):
@@ -406,11 +425,12 @@ class LiveContracts(unittest.TestCase):
         self.attestor.kill(); self.attestor.wait()
         base = dict(version=1, instance=self.proof['instance'], configSha256=digest(CONFIG),
                     bootId=self.proof['bootId'], daemon=good)
-        cases = ['wrong-peer', 'timeout', 'oversized', {'payload': b'{}'},
-                 {'payload': json.dumps(base).encode(), 'nonce': True},
-                 {'payload': json.dumps(base).encode(), 'trailing': True},
-                 {'payload': json.dumps({**base, 'instance': '0' * 64}).encode()}]
-        for mode in cases:
+        cases = [('wrong-peer', 'PEER'), ('timeout', 'PROTOCOL'), ('oversized', 'PROTOCOL'),
+                 ({'payload': b'{}'}, 'PROTOCOL'),
+                 ({'payload': json.dumps(base).encode(), 'nonce': True}, 'PROTOCOL'),
+                 ({'payload': json.dumps(base).encode(), 'trailing': True}, 'PROTOCOL'),
+                 ({'payload': json.dumps({**base, 'instance': '0' * 64}).encode()}, 'CHANGED')]
+        for mode, classification in cases:
             with self.subTest(mode=str(mode)[:60]):
                 (RUNTIME / 'attestor.sock').unlink(missing_ok=True)
                 receiving, sending = multiprocessing.Pipe(duplex=False)
@@ -418,6 +438,7 @@ class LiveContracts(unittest.TestCase):
                     args=(RUNTIME / 'attestor.sock', mode, sending))
                 child.start(); self.children.append(child)
                 self.assertTrue(receiving.poll(2)); pid = receiving.recv()
+                self.assertEqual(stat.S_IMODE((RUNTIME / 'attestor.sock').lstat().st_mode), 0o600)
                 proof = dict(self.proof)
                 if mode != 'wrong-peer':
                     # Root-forged fixture proof isolates framing checks beyond peer auth.
@@ -425,7 +446,7 @@ class LiveContracts(unittest.TestCase):
                     proof.update(helperPid=pid, helperStartTime=start_time(pid),
                         socketDevice=socket_stat.st_dev, socketInode=socket_stat.st_ino)
                 self.store_proof(proof)
-                self.reject()
+                self.reject('ATTESTOR_CLIENT_' + classification)
                 if child.is_alive(): child.kill()
                 child.join(timeout=2)
                 receiving.close(); sending.close()

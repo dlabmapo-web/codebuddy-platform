@@ -262,7 +262,7 @@ to root PID1 namespace links. Root bootstrap independently compares that tuple
 to both PID1 and the live helper. The ordinary client never dereferences PID1.
 The helper verifies configured UID/GID, zero permitted/effective/
 ambient capabilities, safe supplemental groups, cgroup ancestry and its own
-executable. It binds a fresh socket with umask 077, installs NNP/dumpable0 and
+executable. It binds a fresh socket with umask 0177 (permission bits 0600), installs NNP/dumpable0 and
 seccomp, then listens. It never unlinks an existing socket. Administrator cleanup
 owns the exact socket; a stale one intentionally prevents startup.
 

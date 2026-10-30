@@ -87,6 +87,7 @@ int process_cgroup(pid_t pid, const Config *config, char out[PATH_MAXIMUM],
                    const Deadline *deadline);
 int same_stat(const struct stat *a, const struct stat *b);
 int socket_stat(const char *path, uid_t uid, struct stat *result);
+int bind_attestor_socket(const Config *config);
 int connect_peer(const char *path, uid_t uid, int *pidfd, struct ucred *peer, struct stat *socket,
                  const Deadline *deadline);
 int pid_alive(int pidfd);

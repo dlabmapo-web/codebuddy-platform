@@ -126,6 +126,25 @@ int main(int argc, char **argv) {
         return policy_test(argv[2], 1);
     if (!strcmp(argv[1], "fd-export-unfiltered"))
         return policy_test("sendmsg", 0);
+    if (argc == 3 && !strcmp(argv[1], "bind-attestor")) {
+        Config config = {0};
+        if (strlen(argv[2]) >= sizeof(config.attestorSocket))
+            return 2;
+        strcpy(config.attestorSocket, argv[2]);
+        int fd = bind_attestor_socket(&config);
+        if (fd < 0)
+            return 2;
+        struct stat metadata;
+        int flags = fcntl(fd, F_GETFL), descriptor_flags = fcntl(fd, F_GETFD);
+        if (lstat(config.attestorSocket, &metadata) || flags < 0 || descriptor_flags < 0) {
+            close(fd);
+            return 2;
+        }
+        printf("%u %u %u\n", (unsigned)(metadata.st_mode & 07777), (unsigned)!!(flags & O_NONBLOCK),
+               (unsigned)!!(descriptor_flags & FD_CLOEXEC));
+        close(fd);
+        return unlink(config.attestorSocket) ? 2 : 0;
+    }
     if (!strcmp(argv[1], "daemon"))
         return daemon_fixture(argc, argv);
     Deadline d;

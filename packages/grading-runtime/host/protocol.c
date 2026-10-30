@@ -102,6 +102,23 @@ int pid_alive(int fd) {
     struct pollfd p = {.fd = fd, .events = POLLIN};
     return poll(&p, 1, 0) == 0 ? 0 : -1;
 }
+/* Startup-only bind: policy must be installed before the caller listens. */
+int bind_attestor_socket(const Config *config) {
+    struct sockaddr_un address = {.sun_family = AF_UNIX};
+    if (strlen(config->attestorSocket) >= sizeof(address.sun_path))
+        return -1;
+    strcpy(address.sun_path, config->attestorSocket);
+    /* Linux bind starts with 0777: also mask owner execute to create exactly 0600. */
+    umask(0177);
+    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+    if (fd < 0)
+        return -1;
+    if (bind(fd, (struct sockaddr *)&address, sizeof(address))) {
+        close(fd);
+        return -1;
+    }
+    return fd;
+}
 int connect_peer(const char *path, uid_t uid, int *pidfd, struct ucred *peer, struct stat *before,
                  const Deadline *d) {
     int fd = -1;

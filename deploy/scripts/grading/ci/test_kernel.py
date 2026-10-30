@@ -401,6 +401,29 @@ import shutil
 
 
 class CollectorContracts(unittest.TestCase):
+    def test_prerequisite_failure_retains_only_bounded_package_transaction_diagnostics(self):
+        version='5:28.5.1-1~ubuntu.24.04~noble'
+        diagnostic=dict(version=1,authority='diagnostic-only',installedProtected={'docker-ce:amd64':version},selectedRootlessVersion=version,officialOrigin=True,simulation=dict(exitCode=100,transactions=[dict(action='Inst',package='docker-ce:amd64',previousVersion=version,version='5:29.0.0-1~ubuntu.24.04~noble',stderr='RAW_SECRET_CANARY')],stderr='RAW_SECRET_CANARY'),environment='RAW_SECRET_CANARY')
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve()
+            (root/'prerequisite-packages.json').write_text(json.dumps(diagnostic))
+            value=evidence.collect(root,dict(primary=1,observation=1,cleanup=0),'prepare',owner=os.getuid())
+        self.assertFalse(value['success'])
+        retained=value['evidence']['prerequisite-packages.json']
+        self.assertEqual(retained['installedProtected'],diagnostic['installedProtected'])
+        self.assertEqual(retained['simulation']['exitCode'],100)
+        self.assertEqual(retained['simulation']['transactions'][0]['package'],'docker-ce:amd64')
+        self.assertNotIn('RAW_SECRET_CANARY',json.dumps(value))
+
+    def test_prerequisite_diagnostic_rejects_unbounded_or_nonidentity_values(self):
+        import copy
+        original=dict(version=1,authority='diagnostic-only',installedProtected={'docker-ce:amd64':'5:28.5.1'},selectedRootlessVersion='5:28.5.1',officialOrigin=False,simulation=None)
+        evidence.project_prerequisites(original)
+        changes=[dict(installedProtected={'unrelated:amd64':'1.0'}),dict(installedProtected={'docker-ce:amd64':'token=secret'}),dict(selectedRootlessVersion='raw payload'),dict(simulation=dict(exitCode=100,transactions=[dict(action='Inst',package='uidmap',previousVersion=None,version='1.0')]*129)),dict(simulation=dict(exitCode=100,transactions=[dict(action='Inst',package='../escape',version='1.0')]))]
+        for change in changes:
+            value=copy.deepcopy(original);value.update(change)
+            with self.subTest(change=change),self.assertRaises(ValueError): evidence.project_prerequisites(value)
+
     def test_missing_authoritative_report_never_success(self):
         with tempfile.TemporaryDirectory() as directory:
             value = evidence.collect(Path(directory).resolve(), dict(primary=0, observation=0, cleanup=0), 'kernel', owner=os.getuid())

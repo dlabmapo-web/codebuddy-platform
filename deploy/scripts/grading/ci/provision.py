@@ -45,6 +45,9 @@ TAGS = ['cove-grading-native:ci', 'cove-grading-compatibility:ci', 'cove-grading
 FAMILY_LIMITS = dict(memoryBytes=1280*2**20, cpus=1.5, pids=256, swapBytes=0)
 WORKER_LIMITS = dict(memoryBytes=768*2**20, cpus=.75, pids=256, swapBytes=0)
 SYSTEM_FILES = [Path('/etc/apt/keyrings/cove-grading-ci.asc'), Path('/etc/apt/sources.list.d/cove-grading-ci.sources'), Path('/etc/systemd/system/cove-grading-ci-worker.slice')]
+PROTECTED_PACKAGES = {'docker-ce','docker-ce-cli','docker.io','moby-engine','moby-cli','containerd','containerd.io','runc'}
+PACKAGE_NAME = re.compile(r'[a-z0-9][a-z0-9+.-]{0,95}(?::[a-z0-9][a-z0-9-]{0,31})?')
+PACKAGE_VERSION = re.compile(r'[A-Za-z0-9.+:~_-]{1,128}')
 
 
 def require_ephemeral_host(env, system, architecture, euid):
@@ -380,20 +383,64 @@ def verify_rootful(state):
     require(info['ID']==state['rootfulBaseline']['id'] and sorted(docker(state,'ps','-q','--no-trunc',rootful=True).split())==state['rootfulBaseline']['runningIds'],'Unrelated rootful daemon/workload inventory changed')
 
 
-def official_rootless_candidate(policy):
-    candidate=next((row.split(':',1)[1].strip() for row in policy.splitlines() if row.strip().startswith('Candidate:')),None)
-    if not candidate or candidate=='(none)': return False
-    selected=False
+def official_rootless_version(policy, version):
+    """Check the selected version's origin, independently of apt's newest candidate."""
+    selected=False; official=False; other=False
     for row in policy.splitlines():
         fields=row.strip().removeprefix('*** ').split()
-        if len(fields)==2 and fields[1].isdecimal() and ':' in fields[0]:
-            selected=fields[0]==candidate
-        if selected and 'https://download.docker.com/linux/ubuntu noble/stable amd64 Packages' in row:
-            return True
-    return False
+        if len(fields)==2 and fields[1].isdecimal():
+            selected=fields[0]==version
+            continue
+        if selected and fields and fields[0].isdecimal():
+            if fields[1:]==['https://download.docker.com/linux/ubuntu','noble/stable','amd64','Packages']: official=True
+            elif fields[1:]!=['/var/lib/dpkg/status']: other=True
+    # Apt can choose any source advertising an identical version. Merely finding
+    # one official row does not establish the download origin in a mixed table.
+    return official and not other
+
+
+def installed_packages():
+    # Query the installed database once: absent package names must not make
+    # dpkg-query fail before we can preserve a useful, bounded diagnostic.
+    raw=command(['dpkg-query','-W','-f=${Package}\t${Architecture}\t${db:Status-Status}\t${Version}\n'])
+    require(len(raw)<=2*2**20,'Installed package database bound exceeded')
+    result={}
+    for row in raw.splitlines():
+        fields=row.split('\t')
+        require(len(fields)==4,'Invalid installed package projection')
+        name,architecture,status,version=fields
+        if name not in PROTECTED_PACKAGES | {'docker-ce-rootless-extras'} or status!='installed': continue
+        key=name+':'+architecture
+        require(PACKAGE_NAME.fullmatch(key) and PACKAGE_VERSION.fullmatch(version) and key not in result,'Invalid installed engine package identity')
+        result[key]=version
+    require(len(result)<=16,'Installed engine package count bound exceeded')
+    return result
+
+
+def prerequisite_plan(raw):
+    """Discard apt prose, origins and stderr; retain only package transactions."""
+    require(len(raw)<=256*1024,'APT simulation output bound exceeded')
+    result=[]
+    for row in raw.splitlines():
+        if not row.startswith(('Inst ','Remv ','Conf ')): continue
+        match=re.fullmatch(r'(Inst|Remv|Conf) (\S+)(?: \[([^\]]+)\])?(?: \((\S+)(?: [^\r\n]*)?\))?',row)
+        require(match is not None,'Invalid APT transaction projection')
+        action,package,previous,version=match.groups()
+        require(PACKAGE_NAME.fullmatch(package) and all(PACKAGE_VERSION.fullmatch(v) for v in (previous,version) if v is not None),'Invalid APT transaction identity')
+        result.append(dict(action=action,package=package,previousVersion=previous,version=version))
+    require(len(result)<=128,'APT transaction count bound exceeded')
+    return result
 
 
 def install_prerequisites(state):
+    installed=installed_packages()
+    protected={name:version for name,version in installed.items() if name.split(':')[0] in PROTECTED_PACKAGES}
+    diagnostic=dict(version=1,authority='diagnostic-only',installedProtected=protected,selectedRootlessVersion=None,officialOrigin=False,simulation=None)
+    def record(): atomic_json(STATE_DIR/'prerequisite-packages.json',diagnostic)
+    record()
+    version=installed.get('docker-ce:amd64')
+    require(version is not None,'Installed Docker CE AMD64 package required for matching rootless extras')
+    diagnostic['selectedRootlessVersion']=version; record()
     # Reuse an existing official Docker apt source when present; adding the same
     # URI with a different Signed-By key would make apt reject the runner's setup.
     policy=command(['apt-cache','policy','docker-ce-rootless-extras'])
@@ -405,13 +452,21 @@ def install_prerequisites(state):
         write_owned(state,SYSTEM_FILES[1],'Types: deb\nURIs: https://download.docker.com/linux/ubuntu\nSuites: noble\nComponents: stable\nArchitectures: amd64\nSigned-By: /etc/apt/keyrings/cove-grading-ci.asc\n')
     command(['apt-get','update'],timeout=180)
     policy=command(['apt-cache','policy','docker-ce-rootless-extras'])
-    require(official_rootless_candidate(policy),'Official Docker noble AMD64 rootless extras candidate required')
-    packages=['uidmap','dbus-user-session','slirp4netns','apparmor','docker-ce-rootless-extras']
-    simulation=command(['apt-get','--simulate','install','--no-install-recommends',*packages])
-    protected={'docker-ce','docker-ce-cli','docker.io','moby-engine','moby-cli','containerd','containerd.io','runc'}
-    require(not any(row.startswith('Remv ') or (row.startswith('Inst ') and row.split()[1] in protected) for row in simulation.splitlines()),'Rootless prerequisites would alter rootful engine; refused')
+    diagnostic['officialOrigin']=official_rootless_version(policy,version); record()
+    require(diagnostic['officialOrigin'],'Matching official Docker noble AMD64 rootless extras version required')
+    packages=['uidmap','dbus-user-session','slirp4netns','apparmor','docker-ce-rootless-extras:amd64='+version,*[name+'='+value for name,value in sorted(protected.items())]]
+    simulation_status=0
+    try: simulation=command(['apt-get','--simulate','install','--no-install-recommends',*packages])
+    except subprocess.CalledProcessError as error:
+        simulation_status=error.returncode; simulation=error.stdout or ''
+    diagnostic['simulation']=dict(exitCode=simulation_status,transactions=prerequisite_plan(simulation)); record()
+    require(simulation_status==0,'Matching rootless prerequisite transaction could not be resolved')
+    require(not any(row['action']=='Remv' or (row['action']=='Inst' and row['package'].split(':')[0] in PROTECTED_PACKAGES) for row in diagnostic['simulation']['transactions']),'Rootless prerequisites would alter rootful engine; refused')
     dockerd_before=file_hash(shutil.which('dockerd'))
-    command(['apt-get','install','-y','--no-install-recommends',*packages],timeout=240)
+    command(['apt-get','install','-y','--no-remove','--no-install-recommends',*packages],timeout=240)
+    after=installed_packages()
+    require({name:version for name,version in after.items() if name.split(':')[0] in PROTECTED_PACKAGES}==protected,'Protected rootful engine package identity changed')
+    require(after.get('docker-ce-rootless-extras:amd64')==version,'Installed rootless extras version differs from selection')
     require(file_hash(shutil.which('dockerd'))==dockerd_before,'Rootful engine executable changed')
     verify_rootful(state)
     rootlesskit=Path(shutil.which('rootlesskit')).resolve(strict=True)

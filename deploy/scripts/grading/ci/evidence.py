@@ -170,6 +170,7 @@ def collect(root, statuses, stage, owner=0):
         if projected['success']: kernel.validate_results(projected)
         return projected
     read('infrastructure.json',128*1024,project_infrastructure,required=bool(statuses.get('infrastructure')))
+    read('prerequisite-packages.json',65536,project_prerequisites,required=False)
     authoritative=read('kernel.json',2*2**20,report)
     observation=lambda value: project({k:v for k,v in value.items() if k in OBSERVATION})
     read('prepare-observation.json',2**20,observation)
@@ -197,6 +198,30 @@ def collect(root, statuses, stage, owner=0):
     result['statuses']['collection']=int(bool(failures))
     result['success']=bool(authoritative and authoritative['success'] and not failures and not any(statuses.values()))
     encode(result)
+    return result
+
+
+def project_prerequisites(value):
+    require(value.get('version')==1 and value.get('authority')=='diagnostic-only','Invalid prerequisite diagnostic')
+    installed=value.get('installedProtected')
+    require(isinstance(installed,dict) and len(installed)<=16,'Installed prerequisite diagnostic bound')
+    for name,version in installed.items():
+        require(kernel.host.PACKAGE_NAME.fullmatch(name) and name.split(':')[0] in kernel.host.PROTECTED_PACKAGES and isinstance(version,str) and kernel.host.PACKAGE_VERSION.fullmatch(version),'Invalid installed prerequisite diagnostic')
+    selected=value.get('selectedRootlessVersion')
+    require(selected is None or isinstance(selected,str) and kernel.host.PACKAGE_VERSION.fullmatch(selected),'Invalid selected prerequisite version')
+    require(type(value.get('officialOrigin')) is bool,'Invalid prerequisite origin result')
+    result=dict(version=1,authority='diagnostic-only',installedProtected=dict(installed),selectedRootlessVersion=selected,officialOrigin=value['officialOrigin'],simulation=None)
+    simulation=value.get('simulation')
+    if simulation is not None:
+        require(isinstance(simulation,dict) and type(simulation.get('exitCode')) is int and 0<=simulation['exitCode']<=255,'Invalid prerequisite simulation status')
+        rows=simulation.get('transactions'); require(isinstance(rows,list) and len(rows)<=128,'Prerequisite transaction bound')
+        transactions=[]
+        for row in rows:
+            require(isinstance(row,dict) and row.get('action') in ('Inst','Remv','Conf') and isinstance(row.get('package'),str) and kernel.host.PACKAGE_NAME.fullmatch(row['package']),'Invalid prerequisite transaction')
+            for field in ('version','previousVersion'):
+                require(row.get(field) is None or isinstance(row[field],str) and kernel.host.PACKAGE_VERSION.fullmatch(row[field]),'Invalid prerequisite transaction version')
+            transactions.append({key:row.get(key) for key in ('action','package','previousVersion','version')})
+        result['simulation']=dict(exitCode=simulation['exitCode'],transactions=transactions)
     return result
 
 

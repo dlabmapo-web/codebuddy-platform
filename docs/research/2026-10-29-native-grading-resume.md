@@ -11,16 +11,32 @@ Current plan: `docs/superpowers/plans/2026-10-30-native-grading-daemon-attestor-
 Current ledger: `.superpowers/sdd/2026-10-30-native-grading-daemon-attestor-implementation/progress.md`.
 Task1 native static helper/client source is committed in8b8a078a, with the
 reviewed packaging fix in134c54b3. Independent source review is approved;
-actual AMD64 contracts are pending. Pure native5, CI87,
+actual AMD64 run41038461369 on published3ea3e796 failed native bootstrap.
+Six native methods passed, including real policy enforcement; all13 live methods
+failed shared setup with ATTESTOR_CLIENT_PEER. Root cause: producer umask0077
+creates0700 while the strict bootstrap requires0600. Fix round2 changes the
+producer to0177, preserves the verifier and adds a shared-production bind
+regression in9475775d. Round3 fixture0257fc29 holds the forged peer alive and
+uses valid/instance-only-mutation/valid controls with unchanged proof/PID/socket.
+Independent source rereview is approved; actual new-source CI is next.
+No unchanged rerun or Task2 dispatch before the actual native gate passes.
+Pure native5, CI87,
 runtime41 and real BuildKit1 local checks pass; the static broker artifact was
 extracted and inspected. The full local native suite fails under Desktop
 AMD64 emulation: an independent minimal seccomp filter returns EINVAL and
 close_range returns ENOSYS. These are retained failures, not policy passes.
 Packaging canary regressions now pass BuildKit2/2, package and actual extracted
 broker probes; native hashes are unchanged and artifact tree identity is
-8cadb5fec7e50efecfc6661e4602eb2ca5f127d1898ae5373b53b6b5c73520b5.
-The reviewed branch CI will run mandatory real AMD64 native contracts before
-Task2; do not skip unsupported cases or weaken the production filter.
+8cadb5fec7e50efecfc6661e4602eb2ca5f127d1898ae5373b53b6b5c73520b5
+for the historical packaging-only source. The rebuilt socket-fix artifact is
+fb5e4a385a598408585f8a9cab9c94740511123fe62ddf47232e69624548ddb2;
+fixture-only0257fc29 does not change its runtime binaries or package.
+The failed run's kernel wrapper was skipped,0/24 guest cases, wrapper cleanup
+unexecuted. Ordinary41038461105 passed17 browser and2 actual DB timing contracts;
+paired native acceptance skipped. Read the new report
+`2026-10-30-native-grading-attestor-verification.md` and its source-bound assets.
+Branch CI must pass mandatory real AMD64 native contracts before Task2; do not
+skip unsupported cases or weaken the production filter.
 Read this plan's ledger before any redispatch. Task2 is root bootstrap/production
 transport/lifecycle; Task3 is actual disposable Linux integration/evidence.
 The earlier CI extension below is a historical failed baseline, not a reason

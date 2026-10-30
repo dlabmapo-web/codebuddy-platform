@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "runs": [
+    {
+      "runId": 41038461369,
+      "sourceCommit": "3ea3e796c3a6035d33450e1e150bfff4f215b2eb",
+      "url": "https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/41038461369",
+      "conclusion": "failure",
+      "stage": "native_contracts",
+      "nativeContractMethods": {
+        "total": 19,
+        "passed": 6,
+        "failedSetup": 13
+      },
+      "nativeKernelCasesExecuted": 0,
+      "nativeKernelResult": "unexecuted",
+      "cleanupResult": "unexecuted",
+      "summary": {
+        "path": "run41038461369-summary.json",
+        "sha256": "63d02a20d2e6363fff0bcb59e7f0fdb3849a88f7725ece7a5f62ab050defa7b2"
+      },
+      "nativeContractLog": {
+        "path": "run41038461369-native-contracts.txt",
+        "sha256": "446b762e08314590170f8e243b568a75689426decee37c31b6b4b576494f6459",
+        "normalization": "Native step projection with ANSI sequences and trailing whitespace removed; exact original projection preserved in gzip."
+      },
+      "diagnosis": "Producer umask0077 creates0700 socket; bootstrap requires0600. Source correction and further actual Linux validation pending.",
+      "artifact": {
+        "id": 12969241189,
+        "name": "disposable-native-kernel-3ea3e796c3a6035d33450e1e150bfff4f215b2eb",
+        "archiveSha256": "524f6248a5fb55a9abbe9f81914d94dc84c8117c400bf38344ba11545d3b9d91",
+        "sizeBytes": 503,
+        "expiresAt": "2026-10-31T10:08:50Z"
+      },
+      "rawNativeContractLog": {
+        "path": "run41038461369-native-contracts.txt.gz",
+        "sha256": "5570320ff5e4a5b0c5703e751e2e7382fe8991833123cce581cf0f5ddb95e004",
+        "uncompressedSha256": "8993cc5a0bbd9ebcdbd9ada625588e4fc4f2e768e76e00867d3414b0329cb867",
+        "uncompressedBytes": 23330
+      }
+    }
+  ]
+}

@@ -1,0 +1,243 @@
+﻿2026-10-30T10:08:27.4127828Z ##[group]Run docker build --platform linux/amd64 -f packages/grading-runtime/host/Dockerfile.test -t cove-attestor-contract:local .
+2026-10-30T10:08:27.4128930Z ^[[36;1mdocker build --platform linux/amd64 -f packages/grading-runtime/host/Dockerfile.test -t cove-attestor-contract:local .^[[0m
+2026-10-30T10:08:27.4130422Z ^[[36;1mdocker run --rm --network=none --cgroupns=host --cap-add=SYS_PTRACE --memory=256m --cpus=1 --pids-limit=64 cove-attestor-contract:local^[[0m
+2026-10-30T10:08:27.4155847Z shell: /usr/bin/bash -e {0}
+2026-10-30T10:08:27.4156511Z env:
+2026-10-30T10:08:27.4156873Z   GRADING_DISPOSABLE_CI: 1
+2026-10-30T10:08:27.4157604Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-10-30T10:08:27.4158156Z ##[endgroup]
+2026-10-30T10:08:27.7492118Z #0 building with "default" instance using docker driver
+2026-10-30T10:08:27.7492596Z
+2026-10-30T10:08:27.7492996Z #1 [internal] load build definition from Dockerfile.test
+2026-10-30T10:08:27.7493640Z #1 transferring dockerfile: 356B done
+2026-10-30T10:08:27.7494191Z #1 DONE 0.0s
+2026-10-30T10:08:27.7494397Z
+2026-10-30T10:08:27.7494837Z #2 [auth] library/gcc:pull token for registry-1.docker.io
+2026-10-30T10:08:27.9000873Z #2 DONE 0.0s
+2026-10-30T10:08:27.9001077Z
+2026-10-30T10:08:27.9001767Z #3 [internal] load metadata for docker.io/library/gcc:14.3.0-bookworm@sha256:5e927c284bf55a7dc796262e311a0703344f62f41f5621eb56843111b1d37e15
+2026-10-30T10:08:28.2441066Z #3 DONE 0.6s
+2026-10-30T10:08:28.3653538Z
+2026-10-30T10:08:28.3656542Z #4 [internal] load .dockerignore
+2026-10-30T10:08:28.3657430Z #4 transferring context: 1.01kB done
+2026-10-30T10:08:28.3657945Z #4 DONE 0.0s
+2026-10-30T10:08:28.3658157Z
+2026-10-30T10:08:28.3659036Z #5 [1/4] FROM docker.io/library/gcc:14.3.0-bookworm@sha256:5e927c284bf55a7dc796262e311a0703344f62f41f5621eb56843111b1d37e15
+2026-10-30T10:08:28.3660766Z #5 resolve docker.io/library/gcc:14.3.0-bookworm@sha256:5e927c284bf55a7dc796262e311a0703344f62f41f5621eb56843111b1d37e15 0.1s done
+2026-10-30T10:08:28.5147051Z #5 ...
+2026-10-30T10:08:28.5147978Z
+2026-10-30T10:08:28.5148952Z #6 [internal] load build context
+2026-10-30T10:08:28.5149709Z #6 transferring context: 415.45kB 0.0s done
+2026-10-30T10:08:28.5150175Z #6 DONE 0.1s
+2026-10-30T10:08:28.5150330Z
+2026-10-30T10:08:28.5151005Z #5 [1/4] FROM docker.io/library/gcc:14.3.0-bookworm@sha256:5e927c284bf55a7dc796262e311a0703344f62f41f5621eb56843111b1d37e15
+2026-10-30T10:08:28.5152408Z #5 sha256:5e927c284bf55a7dc796262e311a0703344f62f41f5621eb56843111b1d37e15 7.64kB / 7.64kB done
+2026-10-30T10:08:28.5153743Z #5 sha256:a689e29bc3adf4663ef9a141d23081252764d1319c63f591a027bd6fd676f4c1 2.49kB / 2.49kB done
+2026-10-30T10:08:28.5154788Z #5 sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 24.02MB / 24.02MB 0.2s
+2026-10-30T10:08:28.5156174Z #5 sha256:f3d916a4884034b89cb6148781f07d8c92d94b6c6dc1b74dcbec3475d16400da 7.34kB / 7.34kB done
+2026-10-30T10:08:28.5157823Z #5 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 48.49MB / 48.49MB 0.2s
+2026-10-30T10:08:28.5159181Z #5 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 41.94MB / 64.40MB 0.2s
+2026-10-30T10:08:28.7142226Z #5 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 64.40MB / 64.40MB 0.4s
+2026-10-30T10:08:28.9166895Z #5 sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 24.02MB / 24.02MB 0.3s done
+2026-10-30T10:08:28.9171928Z #5 sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 48.49MB / 48.49MB 0.6s done
+2026-10-30T10:08:28.9176621Z #5 sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 64.40MB / 64.40MB 0.6s done
+2026-10-30T10:08:28.9182718Z #5 sha256:873a4c80287477653c01b20948fc34bb1bacf0f826bcc2ddc3bd2fe25b342d45 1.05MB / 211.36MB 0.6s
+2026-10-30T10:08:28.9188057Z #5 sha256:cb5a73f350df833520583b55ef32e4e2dac35764096a7ac3a323270feddc41c5 0B / 157.84MB 0.6s
+2026-10-30T10:08:28.9191288Z #5 sha256:13389305062dc769148c32e0f488c061f24c7e3020f7b786b55d4c561ae50b91 0B / 2.81MB 0.6s
+2026-10-30T10:08:29.0202187Z #5 sha256:873a4c80287477653c01b20948fc34bb1bacf0f826bcc2ddc3bd2fe25b342d45 29.36MB / 211.36MB 0.7s
+2026-10-30T10:08:29.0207454Z #5 sha256:cb5a73f350df833520583b55ef32e4e2dac35764096a7ac3a323270feddc41c5 28.31MB / 157.84MB 0.7s
+2026-10-30T10:08:29.0211229Z #5 sha256:13389305062dc769148c32e0f488c061f24c7e3020f7b786b55d4c561ae50b91 2.81MB / 2.81MB 0.7s done
+2026-10-30T10:08:29.0215314Z #5 sha256:9288ebdd9645ff1b67a11b23e245cc1aff6f8f7448f6b23ed250786bd80b85a6 0B / 9.59kB 0.7s
+2026-10-30T10:08:29.0218219Z #5 extracting sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f
+2026-10-30T10:08:29.1294751Z #5 sha256:873a4c80287477653c01b20948fc34bb1bacf0f826bcc2ddc3bd2fe25b342d45 69.21MB / 211.36MB 0.8s
+2026-10-30T10:08:29.1296269Z #5 sha256:cb5a73f350df833520583b55ef32e4e2dac35764096a7ac3a323270feddc41c5 72.35MB / 157.84MB 0.8s
+2026-10-30T10:08:29.1299048Z #5 sha256:9288ebdd9645ff1b67a11b23e245cc1aff6f8f7448f6b23ed250786bd80b85a6 9.59kB / 9.59kB 0.7s done
+2026-10-30T10:08:29.1302993Z #5 sha256:26bfb03bfcf4cda9ade76e118c1239bccf4546bf626329aebac61b3ce8da0287 1.78kB / 1.78kB 0.7s done
+2026-10-30T10:08:29.2400254Z #5 sha256:873a4c80287477653c01b20948fc34bb1bacf0f826bcc2ddc3bd2fe25b342d45 114.29MB / 211.36MB 0.9s
+2026-10-30T10:08:29.2407045Z #5 sha256:cb5a73f350df833520583b55ef32e4e2dac35764096a7ac3a323270feddc41c5 113.25MB / 157.84MB 0.9s
+2026-10-30T10:08:29.3545317Z #5 sha256:873a4c80287477653c01b20948fc34bb1bacf0f826bcc2ddc3bd2fe25b342d45 161.48MB / 211.36MB 1.0s
+2026-10-30T10:08:29.3546883Z #5 sha256:cb5a73f350df833520583b55ef32e4e2dac35764096a7ac3a323270feddc41c5 152.04MB / 157.84MB 1.0s
+2026-10-30T10:08:29.4613014Z #5 sha256:873a4c80287477653c01b20948fc34bb1bacf0f826bcc2ddc3bd2fe25b342d45 206.57MB / 211.36MB 1.1s
+2026-10-30T10:08:29.5642036Z #5 sha256:cb5a73f350df833520583b55ef32e4e2dac35764096a7ac3a323270feddc41c5 157.84MB / 157.84MB 1.1s done
+2026-10-30T10:08:30.1102081Z #5 sha256:873a4c80287477653c01b20948fc34bb1bacf0f826bcc2ddc3bd2fe25b342d45 211.36MB / 211.36MB 1.6s done
+2026-10-30T10:08:30.8526791Z #5 extracting sha256:ebed137c7c18cb1906fb8314eabc10611ddf49a281f8c1b5eab987a7137f749f 1.8s done
+2026-10-30T10:08:31.0192707Z #5 extracting sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 0.1s
+2026-10-30T10:08:31.5495883Z #5 extracting sha256:c2e76af9483f2d17a3e370639403df2c53a3da1480d533116a8694cd91f15d5a 0.5s done
+2026-10-30T10:08:31.6296075Z #5 extracting sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553
+2026-10-30T10:08:33.8870676Z #5 extracting sha256:37f838b71c6b82c581b7543a313255b8c99c23cc9d96c1ad6f9f5f208c942553 2.1s done
+2026-10-30T10:08:34.0243785Z #5 extracting sha256:873a4c80287477653c01b20948fc34bb1bacf0f826bcc2ddc3bd2fe25b342d45
+2026-10-30T10:08:39.1168820Z #5 extracting sha256:873a4c80287477653c01b20948fc34bb1bacf0f826bcc2ddc3bd2fe25b342d45 5.1s
+2026-10-30T10:08:39.3337714Z #5 extracting sha256:873a4c80287477653c01b20948fc34bb1bacf0f826bcc2ddc3bd2fe25b342d45 5.2s done
+2026-10-30T10:08:40.4672815Z #5 extracting sha256:13389305062dc769148c32e0f488c061f24c7e3020f7b786b55d4c561ae50b91
+2026-10-30T10:08:40.6587783Z #5 extracting sha256:13389305062dc769148c32e0f488c061f24c7e3020f7b786b55d4c561ae50b91 0.1s done
+2026-10-30T10:08:40.6589245Z #5 extracting sha256:cb5a73f350df833520583b55ef32e4e2dac35764096a7ac3a323270feddc41c5 0.1s
+2026-10-30T10:08:43.1471565Z #5 extracting sha256:cb5a73f350df833520583b55ef32e4e2dac35764096a7ac3a323270feddc41c5 2.4s done
+2026-10-30T10:08:43.9525505Z #5 extracting sha256:9288ebdd9645ff1b67a11b23e245cc1aff6f8f7448f6b23ed250786bd80b85a6
+2026-10-30T10:08:44.1574527Z #5 extracting sha256:9288ebdd9645ff1b67a11b23e245cc1aff6f8f7448f6b23ed250786bd80b85a6 done
+2026-10-30T10:08:44.1575932Z #5 extracting sha256:26bfb03bfcf4cda9ade76e118c1239bccf4546bf626329aebac61b3ce8da0287 done
+2026-10-30T10:08:44.1576769Z #5 DONE 15.7s
+2026-10-30T10:08:44.1577018Z
+2026-10-30T10:08:44.1577878Z #7 [2/4] WORKDIR /fixture/host
+2026-10-30T10:08:44.1578349Z #7 DONE 0.0s
+2026-10-30T10:08:44.1578566Z
+2026-10-30T10:08:44.1578872Z #8 [3/4] COPY packages/grading-runtime/host .
+2026-10-30T10:08:44.1588080Z #8 DONE 0.0s
+2026-10-30T10:08:44.1588488Z
+2026-10-30T10:08:44.1588907Z #9 [4/4] RUN make clean all bin/fixtures manifest
+2026-10-30T10:08:44.1589505Z #9 0.132 rm -rf bin
+2026-10-30T10:08:44.3110385Z #9 0.134 mkdir -p bin
+2026-10-30T10:08:44.3113015Z #9 0.135 gcc -I. -Ivendor/mbedtls/include -DMBEDTLS_CONFIG_FILE='"mbedtls_config.h"' -std=c11 -O2 -fPIE -Wall -Wextra -Werror -fstack-protector-strong -D_FORTIFY_SOURCE=3 attestor.c config.c identity.c protocol.c policy.c vendor/mbedtls/library/sha256.c vendor/mbedtls/library/platform_util.c -static-pie -Wl,-z,relro,-z,now,-z,noexecstack -o bin/attestor
+2026-10-30T10:08:45.2256715Z #9 1.200 gcc -I. -Ivendor/mbedtls/include -DMBEDTLS_CONFIG_FILE='"mbedtls_config.h"' -std=c11 -O2 -fPIE -Wall -Wextra -Werror -fstack-protector-strong -D_FORTIFY_SOURCE=3 attestor-client.c config.c identity.c protocol.c policy.c vendor/mbedtls/library/sha256.c vendor/mbedtls/library/platform_util.c -static-pie -Wl,-z,relro,-z,now,-z,noexecstack -o bin/attestor-client
+2026-10-30T10:08:46.3246257Z #9 2.299 gcc -I. -Ivendor/mbedtls/include -DMBEDTLS_CONFIG_FILE='"mbedtls_config.h"' -std=c11 -O2 -fPIE -Wall -Wextra -Werror -fstack-protector-strong -D_FORTIFY_SOURCE=3 fixtures.c config.c identity.c protocol.c policy.c vendor/mbedtls/library/sha256.c vendor/mbedtls/library/platform_util.c -static-pie -Wl,-z,relro,-z,now,-z,noexecstack -o bin/fixtures
+2026-10-30T10:08:47.4076780Z #9 3.382 python3 build_manifest.py
+2026-10-30T10:08:47.5421900Z #9 3.517 {"binaries": {"attestor": {"elf": {"architecture": "x86_64", "bindNow": true, "elfClass": 64, "executableStack": false, "hasInterpreter": false, "neededLibraries": [], "relro": true, "staticPie": true}, "sha256": "a256ab2a8776d91fa3d697e38cdfa62cf2b18f28f088520ba232e6874820886e", "size": 1210224}, "attestor-client": {"elf": {"architecture": "x86_64", "bindNow": true, "elfClass": 64, "executableStack": false, "hasInterpreter": false, "neededLibraries": [], "relro": true, "staticPie": true}, "sha256": "ed199aa1c92804f8743d9062f6020742db7032e978723471b8355a1b5394dbff", "size": 1210240}}, "binutils": "GNU ld (GNU Binutils for Debian) 2.40", "compiler": "gcc (GCC) 14.3.0"}
+2026-10-30T10:08:47.7106831Z #9 DONE 3.5s
+2026-10-30T10:08:47.7107676Z
+2026-10-30T10:08:47.7107958Z #10 exporting to image
+2026-10-30T10:08:47.7108422Z #10 exporting layers
+2026-10-30T10:08:48.9538746Z #10 exporting layers 1.4s done
+2026-10-30T10:08:48.9698731Z #10 writing image sha256:794f6edfcb11507392def5d2ee0d4a5edf8209b5da1c0d6e6a184302708ddca0 done
+2026-10-30T10:08:48.9700612Z #10 naming to docker.io/library/cove-attestor-contract:local done
+2026-10-30T10:08:48.9701384Z #10 DONE 1.4s
+2026-10-30T10:08:49.2328414Z test_changed_proof_bindings (__main__.LiveContracts.test_changed_proof_bindings) ... FAIL
+2026-10-30T10:08:49.2749414Z test_client_and_daemon_executable_inode_substitution (__main__.LiveContracts.test_client_and_daemon_executable_inode_substitution) ... FAIL
+2026-10-30T10:08:49.3166758Z test_config_link_and_writable_parent_rejected (__main__.LiveContracts.test_config_link_and_writable_parent_rejected) ... FAIL
+2026-10-30T10:08:49.3589019Z test_config_proof_schema_rejections (__main__.LiveContracts.test_config_proof_schema_rejections) ... FAIL
+2026-10-30T10:08:49.4007654Z test_daemon_pid_change_is_observed_for_broker_freeze (__main__.LiveContracts.test_daemon_pid_change_is_observed_for_broker_freeze) ... FAIL
+2026-10-30T10:08:49.4428230Z test_daemon_wrong_config_and_executable (__main__.LiveContracts.test_daemon_wrong_config_and_executable) ... FAIL
+2026-10-30T10:08:49.4847757Z test_forged_same_uid_listener_and_malformed_replies (__main__.LiveContracts.test_forged_same_uid_listener_and_malformed_replies) ... FAIL
+2026-10-30T10:08:49.5267114Z test_good_live_identity_and_ambient_environment (__main__.LiveContracts.test_good_live_identity_and_ambient_environment) ... FAIL
+2026-10-30T10:08:49.5687651Z test_helper_restart_stale_proof (__main__.LiveContracts.test_helper_restart_stale_proof) ... FAIL
+2026-10-30T10:08:49.6106994Z test_immutable_proof_and_parent (__main__.LiveContracts.test_immutable_proof_and_parent) ... FAIL
+2026-10-30T10:08:49.6534300Z test_incomplete_daemon_observation (__main__.LiveContracts.test_incomplete_daemon_observation) ... FAIL
+2026-10-30T10:08:49.6953420Z test_malformed_requests_and_deadline (__main__.LiveContracts.test_malformed_requests_and_deadline) ... FAIL
+2026-10-30T10:08:49.7375287Z test_nonroot_bootstrap_rejected (__main__.LiveContracts.test_nonroot_bootstrap_rejected) ... FAIL
+2026-10-30T10:08:49.7538712Z test_config_parser_exact_schema_and_bounds (__main__.NativeContracts.test_config_parser_exact_schema_and_bounds) ... ok
+2026-10-30T10:08:49.7741547Z test_proof_parser_exact_schema_and_bounds (__main__.NativeContracts.test_proof_parser_exact_schema_and_bounds) ... ok
+2026-10-30T10:08:49.7870563Z test_seccomp_real_denials (__main__.NativeContracts.test_seccomp_real_denials) ... ok
+2026-10-30T10:08:49.7999003Z test_sha256_known_and_streaming_vectors (__main__.NativeContracts.test_sha256_known_and_streaming_vectors) ... ok
+2026-10-30T10:08:49.8014716Z test_static_artifact_manifest (__main__.NativeContracts.test_static_artifact_manifest) ... ok
+2026-10-30T10:08:49.8066836Z test_strict_json_grammar (__main__.NativeContracts.test_strict_json_grammar) ... ok
+2026-10-30T10:08:49.8067820Z
+2026-10-30T10:08:49.8068197Z ======================================================================
+2026-10-30T10:08:49.8069176Z FAIL: test_changed_proof_bindings (__main__.LiveContracts.test_changed_proof_bindings)
+2026-10-30T10:08:49.8070346Z ----------------------------------------------------------------------
+2026-10-30T10:08:49.8071028Z Traceback (most recent call last):
+2026-10-30T10:08:49.8071610Z   File "/fixture/host/test_native.py", line 190, in setUp
+2026-10-30T10:08:49.8072376Z     self.assertEqual(result.returncode, 0, result.stderr.decode())
+2026-10-30T10:08:49.8073104Z AssertionError: 1 != 0 : ATTESTOR_CLIENT_PEER
+2026-10-30T10:08:49.8073446Z
+2026-10-30T10:08:49.8073456Z
+2026-10-30T10:08:49.8073782Z ======================================================================
+2026-10-30T10:08:49.8075095Z FAIL: test_client_and_daemon_executable_inode_substitution (__main__.LiveContracts.test_client_and_daemon_executable_inode_substitution)
+2026-10-30T10:08:49.8076310Z ----------------------------------------------------------------------
+2026-10-30T10:08:49.8076933Z Traceback (most recent call last):
+2026-10-30T10:08:49.8077747Z   File "/fixture/host/test_native.py", line 190, in setUp
+2026-10-30T10:08:49.8078512Z     self.assertEqual(result.returncode, 0, result.stderr.decode())
+2026-10-30T10:08:49.8079228Z AssertionError: 1 != 0 : ATTESTOR_CLIENT_PEER
+2026-10-30T10:08:49.8079564Z
+2026-10-30T10:08:49.8079574Z
+2026-10-30T10:08:49.8079882Z ======================================================================
+2026-10-30T10:08:49.8081052Z FAIL: test_config_link_and_writable_parent_rejected (__main__.LiveContracts.test_config_link_and_writable_parent_rejected)
+2026-10-30T10:08:49.8082180Z ----------------------------------------------------------------------
+2026-10-30T10:08:49.8082804Z Traceback (most recent call last):
+2026-10-30T10:08:49.8083371Z   File "/fixture/host/test_native.py", line 190, in setUp
+2026-10-30T10:08:49.8084081Z     self.assertEqual(result.returncode, 0, result.stderr.decode())
+2026-10-30T10:08:49.8084789Z AssertionError: 1 != 0 : ATTESTOR_CLIENT_PEER
+2026-10-30T10:08:49.8085119Z
+2026-10-30T10:08:49.8085129Z
+2026-10-30T10:08:49.8085432Z ======================================================================
+2026-10-30T10:08:49.8086740Z FAIL: test_config_proof_schema_rejections (__main__.LiveContracts.test_config_proof_schema_rejections)
+2026-10-30T10:08:49.8088099Z ----------------------------------------------------------------------
+2026-10-30T10:08:49.8088760Z Traceback (most recent call last):
+2026-10-30T10:08:49.8089331Z   File "/fixture/host/test_native.py", line 190, in setUp
+2026-10-30T10:08:49.8090044Z     self.assertEqual(result.returncode, 0, result.stderr.decode())
+2026-10-30T10:08:49.8090751Z AssertionError: 1 != 0 : ATTESTOR_CLIENT_PEER
+2026-10-30T10:08:49.8091343Z
+2026-10-30T10:08:49.8091361Z
+2026-10-30T10:08:49.8091704Z ======================================================================
+2026-10-30T10:08:49.8093017Z FAIL: test_daemon_pid_change_is_observed_for_broker_freeze (__main__.LiveContracts.test_daemon_pid_change_is_observed_for_broker_freeze)
+2026-10-30T10:08:49.8094260Z ----------------------------------------------------------------------
+2026-10-30T10:08:49.8094932Z Traceback (most recent call last):
+2026-10-30T10:08:49.8095561Z   File "/fixture/host/test_native.py", line 190, in setUp
+2026-10-30T10:08:49.8096357Z     self.assertEqual(result.returncode, 0, result.stderr.decode())
+2026-10-30T10:08:49.8097136Z AssertionError: 1 != 0 : ATTESTOR_CLIENT_PEER
+2026-10-30T10:08:49.8097737Z
+2026-10-30T10:08:49.8097750Z
+2026-10-30T10:08:49.8098068Z ======================================================================
+2026-10-30T10:08:49.8099169Z FAIL: test_daemon_wrong_config_and_executable (__main__.LiveContracts.test_daemon_wrong_config_and_executable)
+2026-10-30T10:08:49.8100230Z ----------------------------------------------------------------------
+2026-10-30T10:08:49.8100796Z Traceback (most recent call last):
+2026-10-30T10:08:49.8101361Z   File "/fixture/host/test_native.py", line 190, in setUp
+2026-10-30T10:08:49.8102119Z     self.assertEqual(result.returncode, 0, result.stderr.decode())
+2026-10-30T10:08:49.8102951Z AssertionError: 1 != 0 : ATTESTOR_CLIENT_PEER
+2026-10-30T10:08:49.8103304Z
+2026-10-30T10:08:49.8103323Z
+2026-10-30T10:08:49.8103655Z ======================================================================
+2026-10-30T10:08:49.8104945Z FAIL: test_forged_same_uid_listener_and_malformed_replies (__main__.LiveContracts.test_forged_same_uid_listener_and_malformed_replies)
+2026-10-30T10:08:49.8106260Z ----------------------------------------------------------------------
+2026-10-30T10:08:49.8106966Z Traceback (most recent call last):
+2026-10-30T10:08:49.8107902Z   File "/fixture/host/test_native.py", line 190, in setUp
+2026-10-30T10:08:49.8108748Z     self.assertEqual(result.returncode, 0, result.stderr.decode())
+2026-10-30T10:08:49.8109562Z AssertionError: 1 != 0 : ATTESTOR_CLIENT_PEER
+2026-10-30T10:08:49.8109941Z
+2026-10-30T10:08:49.8109952Z
+2026-10-30T10:08:49.8110287Z ======================================================================
+2026-10-30T10:08:49.8111580Z FAIL: test_good_live_identity_and_ambient_environment (__main__.LiveContracts.test_good_live_identity_and_ambient_environment)
+2026-10-30T10:08:49.8112855Z ----------------------------------------------------------------------
+2026-10-30T10:08:49.8113507Z Traceback (most recent call last):
+2026-10-30T10:08:49.8114119Z   File "/fixture/host/test_native.py", line 190, in setUp
+2026-10-30T10:08:49.8114810Z     self.assertEqual(result.returncode, 0, result.stderr.decode())
+2026-10-30T10:08:49.8115495Z AssertionError: 1 != 0 : ATTESTOR_CLIENT_PEER
+2026-10-30T10:08:49.8115859Z
+2026-10-30T10:08:49.8115870Z
+2026-10-30T10:08:49.8116223Z ======================================================================
+2026-10-30T10:08:49.8117494Z FAIL: test_helper_restart_stale_proof (__main__.LiveContracts.test_helper_restart_stale_proof)
+2026-10-30T10:08:49.8118570Z ----------------------------------------------------------------------
+2026-10-30T10:08:49.8119269Z Traceback (most recent call last):
+2026-10-30T10:08:49.8119906Z   File "/fixture/host/test_native.py", line 190, in setUp
+2026-10-30T10:08:49.8120629Z     self.assertEqual(result.returncode, 0, result.stderr.decode())
+2026-10-30T10:08:49.8121496Z AssertionError: 1 != 0 : ATTESTOR_CLIENT_PEER
+2026-10-30T10:08:49.8121864Z
+2026-10-30T10:08:49.8121876Z
+2026-10-30T10:08:49.8122195Z ======================================================================
+2026-10-30T10:08:49.8123167Z FAIL: test_immutable_proof_and_parent (__main__.LiveContracts.test_immutable_proof_and_parent)
+2026-10-30T10:08:49.8124144Z ----------------------------------------------------------------------
+2026-10-30T10:08:49.8124983Z Traceback (most recent call last):
+2026-10-30T10:08:49.8125570Z   File "/fixture/host/test_native.py", line 190, in setUp
+2026-10-30T10:08:49.8126315Z     self.assertEqual(result.returncode, 0, result.stderr.decode())
+2026-10-30T10:08:49.8127072Z AssertionError: 1 != 0 : ATTESTOR_CLIENT_PEER
+2026-10-30T10:08:49.8127639Z
+2026-10-30T10:08:49.8127652Z
+2026-10-30T10:08:49.8127983Z ======================================================================
+2026-10-30T10:08:49.8129017Z FAIL: test_incomplete_daemon_observation (__main__.LiveContracts.test_incomplete_daemon_observation)
+2026-10-30T10:08:49.8130218Z ----------------------------------------------------------------------
+2026-10-30T10:08:49.8130842Z Traceback (most recent call last):
+2026-10-30T10:08:49.8131404Z   File "/fixture/host/test_native.py", line 190, in setUp
+2026-10-30T10:08:49.8132147Z     self.assertEqual(result.returncode, 0, result.stderr.decode())
+2026-10-30T10:08:49.8132883Z AssertionError: 1 != 0 : ATTESTOR_CLIENT_PEER
+2026-10-30T10:08:49.8133239Z
+2026-10-30T10:08:49.8133249Z
+2026-10-30T10:08:49.8133594Z ======================================================================
+2026-10-30T10:08:49.8134649Z FAIL: test_malformed_requests_and_deadline (__main__.LiveContracts.test_malformed_requests_and_deadline)
+2026-10-30T10:08:49.8135691Z ----------------------------------------------------------------------
+2026-10-30T10:08:49.8136324Z Traceback (most recent call last):
+2026-10-30T10:08:49.8136922Z   File "/fixture/host/test_native.py", line 190, in setUp
+2026-10-30T10:08:49.8137895Z     self.assertEqual(result.returncode, 0, result.stderr.decode())
+2026-10-30T10:08:49.8138642Z AssertionError: 1 != 0 : ATTESTOR_CLIENT_PEER
+2026-10-30T10:08:49.8138994Z
+2026-10-30T10:08:49.8139005Z
+2026-10-30T10:08:49.8139334Z ======================================================================
+2026-10-30T10:08:49.8140317Z FAIL: test_nonroot_bootstrap_rejected (__main__.LiveContracts.test_nonroot_bootstrap_rejected)
+2026-10-30T10:08:49.8141333Z ----------------------------------------------------------------------
+2026-10-30T10:08:49.8141975Z Traceback (most recent call last):
+2026-10-30T10:08:49.8142566Z   File "/fixture/host/test_native.py", line 190, in setUp
+2026-10-30T10:08:49.8143325Z     self.assertEqual(result.returncode, 0, result.stderr.decode())
+2026-10-30T10:08:49.8144064Z AssertionError: 1 != 0 : ATTESTOR_CLIENT_PEER
+2026-10-30T10:08:49.8144420Z
+2026-10-30T10:08:49.8144430Z
+2026-10-30T10:08:49.8144803Z ----------------------------------------------------------------------
+2026-10-30T10:08:49.8145421Z Ran 19 tests in 0.620s
+2026-10-30T10:08:49.8145654Z
+2026-10-30T10:08:49.8145832Z FAILED (failures=13)
+2026-10-30T10:08:49.8710324Z ##[error]Process completed with exit code 1.

@@ -117,6 +117,19 @@ has installed its mandatory restrictions. Root bootstrap must control launch
 causality and check the loaded unit/overrides; it must not turn discovery of an
 arbitrary account-owned listener into authorization.
 
+Launch causality also protects the interval before native startup sets dumpable0:
+normal exec resets dumpability to1 ([Linux execve](https://man7.org/linux/man-pages/man2/execve.2.html)).
+Before a genuinely fresh trusted launch, root must require host Yama
+`ptrace_scope` in1..3 and keep that precondition through readiness; missing or0
+fails closed, with no sysctl mutation ([kernel Yama](https://docs.kernel.org/admin-guide/LSM/Yama.html)).
+The helper stays in the initial user namespace, and its launch chain must have
+no attacker-controlled ancestor/ptracer exception or host CAP_SYS_PTRACE holder.
+An existing user manager requires a prior root-controlled trusted launch record;
+current MainPID/PPid/executable/TracerPid checks alone do not establish its history.
+Otherwise bootstrap must refuse adoption and require a fresh fenced trusted
+manager/launch. Root observes TracerPid0 before publication as corroboration,
+not as proof that no earlier attach-and-detach occurred.
+
 For every broker check, the pinned native client opens the root proof safely,
 connects only to its fixed attestor socket, obtains kernel `SO_PEERCRED`, and
 matches PID/UID/GID to that proof. It reads the helper's public start-time field

@@ -1,6 +1,33 @@
 # Native grading resume checkpoint
 
-## Current state — 2026-10-30, Asia/Seoul
+## Approved repair implementation in progress — 2026-10-30
+
+The user explicitly approved the attestor design: “okay i will approve and do
+what is needed”. No further approval of that same scoped repair is required.
+Approved spec and new implementation plan were committed in1fe39720, with
+canonical-release/evidence clarifications in90bf52ef.
+
+Current plan: `docs/superpowers/plans/2026-10-30-native-grading-daemon-attestor-implementation.md`.
+Current ledger: `.superpowers/sdd/2026-10-30-native-grading-daemon-attestor-implementation/progress.md`.
+Task1 native static helper/client source is committed in8b8a078a, with the
+reviewed packaging fix in134c54b3. Independent source review is approved;
+actual AMD64 contracts are pending. Pure native5, CI87,
+runtime41 and real BuildKit1 local checks pass; the static broker artifact was
+extracted and inspected. The full local native suite fails under Desktop
+AMD64 emulation: an independent minimal seccomp filter returns EINVAL and
+close_range returns ENOSYS. These are retained failures, not policy passes.
+Packaging canary regressions now pass BuildKit2/2, package and actual extracted
+broker probes; native hashes are unchanged and artifact tree identity is
+8cadb5fec7e50efecfc6661e4602eb2ca5f127d1898ae5373b53b6b5c73520b5.
+The reviewed branch CI will run mandatory real AMD64 native contracts before
+Task2; do not skip unsupported cases or weaken the production filter.
+Read this plan's ledger before any redispatch. Task2 is root bootstrap/production
+transport/lifecycle; Task3 is actual disposable Linux integration/evidence.
+The earlier CI extension below is a historical failed baseline, not a reason
+to ask for the already-granted attestor design approval again. Production
+deployment/SSH/resource handover/activation remain excluded.
+
+## Prior failed verification checkpoint — 2026-10-30, Asia/Seoul
 
 The user resumed the work. The prior paused state below is historical; use this
 section and the current verification report for next steps. No production
@@ -39,7 +66,7 @@ service/account/resource, grading flag or original IDE checkout changed.
   positive24-case verification goal is incomplete. Tasks1/2 and original product
   plan are not to be redispatched.
 
-## Current records and next work
+## Prior verification records
 
 Read `docs/research/2026-10-29-disposable-native-grading-linux-verification.md`,
 its assets `run-index.json`, six summaries, scoped reviews and
@@ -48,15 +75,13 @@ its assets `run-index.json`, six summaries, scoped reviews and
 The ignored SDD workspace remains available. Raw ignored downloads are under
 `test-results/native-linux-run<runId>/`.
 
-A concrete proposed repair is written in
+A concrete repair is written in
 `docs/superpowers/specs/2026-10-30-native-grading-daemon-attestor-design.md`.
 It retains broker hardening and full live kernel identity checks using a small
 unprivileged initial-userns native attestor and credential client, root-owned
-proof and strict IPC/lifecycle/resource controls. **It is not approved or
-implemented.** This changes the production service arrangement beyond the
-approved CI-only extension; obtain the user's design decision before dependent
-implementation. After approval, create a separate implementation plan and
-reviews, then new source-revision disposable runs. Do not weaken executable
+proof and strict IPC/lifecycle/resource controls. **The user subsequently
+approved this repair; its implementation is in progress as recorded above.**
+Use the new plan and reviews, then new source-revision disposable runs. Do not weaken executable
 identity, drop broker hardening, substitute a CI guest driver, or rerun failed
 unchanged samples. Audit later protected guest observations before growing any
 helper API.

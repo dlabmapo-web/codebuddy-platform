@@ -22,6 +22,15 @@
     "dist",
     "guest/seccomp.json",
     "README.md",
-    "host/bin"
+    "host/bin/attestor",
+    "host/bin/attestor-client",
+    "host/bin/manifest.json",
+    "host/bin/licenses/STATIC-LINKING.txt",
+    "host/bin/licenses/gcc-COPYING.RUNTIME.txt",
+    "host/bin/licenses/gcc-COPYING3.txt",
+    "host/bin/licenses/glibc-LGPL-2.1.txt",
+    "host/bin/licenses/glibc-copyright.txt",
+    "host/bin/licenses/jsmn-MIT.txt",
+    "host/bin/licenses/mbedtls-Apache-2.0.txt"
   ]
 }

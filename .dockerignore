@@ -29,6 +29,8 @@ packages/api/prototypes
 **/*.spec.ts
 **/*.test.ts
 packages/grading-runtime/test
+# Native runtime tools are rebuilt in the pinned compiler stage, never copied locally.
+packages/grading-runtime/host/bin
 deploy/scripts/grading/tests
 deploy/scripts/grading/ci
 # Local deployment credentials/state must never enter any COPY layer, including migration.

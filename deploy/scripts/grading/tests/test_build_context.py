@@ -21,4 +21,28 @@ class BuildContextTests(unittest.TestCase):
             for name in secrets:self.assertFalse((output/'context'/name).exists(),name)
             for path in (output/'context').rglob('*'):
                 if path.is_file():self.assertNotIn(b'SYNTHETIC_PRIVATE_CANARY_',path.read_bytes())
+    def test_generated_native_tools_never_enter_copy_layers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);context=root/'context';context.mkdir();output=root/'output'
+            (context/'.dockerignore').write_bytes((ROOT/'.dockerignore').read_bytes())
+            generated=['packages/grading-runtime/host/bin/fixtures',
+                       'packages/grading-runtime/host/bin/cove-packaging-canary',
+                       'packages/grading-runtime/host/bin/licenses/cove-license-canary']
+            for name in generated:
+                path=context/name;path.parent.mkdir(parents=True,exist_ok=True)
+                path.write_text('SYNTHETIC_GENERATED_NATIVE_CANARY')
+            sources=['packages/grading-runtime/host/attestor.c',
+                     'packages/grading-runtime/host/Makefile',
+                     'packages/grading-runtime/host/vendor/mbedtls/library/sha256.c']
+            for name in sources:
+                path=context/name;path.parent.mkdir(parents=True,exist_ok=True)
+                path.write_text('SYNTHETIC_REQUIRED_NATIVE_SOURCE')
+            (context/'Dockerfile').write_text('FROM scratch\nCOPY . /context/\n')
+            subprocess.run(['docker','build','--output','type=local,dest='+str(output),str(context)],
+                           check=True,capture_output=True,text=True,timeout=90)
+            for name in generated:self.assertFalse((output/'context'/name).exists(),name)
+            for name in sources:
+                self.assertEqual((output/'context'/name).read_text(),'SYNTHETIC_REQUIRED_NATIVE_SOURCE')
+            for path in (output/'context').rglob('*'):
+                if path.is_file():self.assertNotIn(b'SYNTHETIC_GENERATED_NATIVE_CANARY',path.read_bytes())
 if __name__=='__main__':unittest.main()

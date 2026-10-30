@@ -13,12 +13,21 @@ Task1 native static helper/client source is committed in8b8a078a, with the
 reviewed packaging fix in134c54b3. Independent source review is approved;
 actual AMD64 run41038461369 on published3ea3e796 failed native bootstrap.
 Six native methods passed, including real policy enforcement; all13 live methods
-failed shared setup with ATTESTOR_CLIENT_PEER. Root cause: producer umask0077
-creates0700 while the strict bootstrap requires0600. Fix round2 changes the
+failed shared setup with ATTESTOR_CLIENT_PEER. Source diagnosis found an
+independent defect: producer umask0077 creates0700 while bootstrap requires0600.
+The generic error did not identify the first rejected guard. Fix round2 changes the
 producer to0177, preserves the verifier and adds a shared-production bind
 regression in9475775d. Round3 fixture0257fc29 holds the forged peer alive and
 uses valid/instance-only-mutation/valid controls with unchanged proof/PID/socket.
-Independent source rereview is approved; actual new-source CI is next.
+Independent source rereview was approved; subsequent actual run41053652099 on
+e4ba318c passed10/25 methods (including socket0600, policy and fixture lifecycle)
+but all15 live setups still fail PEER. Fresh fixround4 implementer is correcting
+another definite guard defect: Linux exempts0555 proc process directories from
+dumpability-based ownership, so root evidence must use fixed regular status-file
+FD ownership in7bb8f43e. Shared old-predicate RED0/0/0 versus expected0/1/0 and
+rebuilt GREEN7/7 are recorded; extracted broker checks and independent source
+review passed. A new actual26-method run is next. Earlier
+and later bootstrap guards remain unverified until full actual contracts pass.
 No unchanged rerun or Task2 dispatch before the actual native gate passes.
 Pure native5, CI87,
 runtime41 and real BuildKit1 local checks pass; the static broker artifact was
@@ -30,7 +39,9 @@ broker probes; native hashes are unchanged and artifact tree identity is
 8cadb5fec7e50efecfc6661e4602eb2ca5f127d1898ae5373b53b6b5c73520b5
 for the historical packaging-only source. The rebuilt socket-fix artifact is
 fb5e4a385a598408585f8a9cab9c94740511123fe62ddf47232e69624548ddb2;
-fixture-only0257fc29 does not change its runtime binaries or package.
+fixture-only0257fc29 does not change its runtime binaries or package. Latest
+locally verified artifact after7bb8f43e is
+43a2eb6c4ccbf8a382c8150b4df6ab4103acbb6bb6a88305bfa343e0c3fecc7a.
 The failed run's kernel wrapper was skipped,0/24 guest cases, wrapper cleanup
 unexecuted. Ordinary41038461105 passed17 browser and2 actual DB timing contracts;
 paired native acceptance skipped. Read the new report

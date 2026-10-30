@@ -145,6 +145,13 @@ passed to another process while retaining creator credentials, and `exec` retain
 PID and start time. Therefore, before readiness, the helper must:
 
 - Set `PR_SET_DUMPABLE=0` to reject same-account tracing/memory/FD manipulation.
+  Root corroborates this using ownership of the fixed regular
+  `/proc/<helperPID>/status` file opened without following a symlink. Linux
+  exempts0555 process directories from dumpability-based ownership, so their
+  owner is not this evidence ([kernel task_dump_owner](https://github.com/torvalds/linux/blob/v6.8/fs/proc/base.c#L1814)).
+  Status-file ownership alone cannot distinguish dumpable0 from2; mandatory
+  native SET/GET_DUMPABLE0 and the causally bound immutable executable remain
+  necessary, with post-ready prctl forbidden.
 - Install a reviewed seccomp allowlist that permits its fixed read-only file and
   Unix-socket workload but forbids `execve/execveat`, fork/clone/vfork/clone3,
   namespace changes, ptrace/process-memory writes, executable mappings, and

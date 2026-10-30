@@ -351,3 +351,81 @@ Both remain static PIE x86_64 ELF64, no interpreter/NEEDED libraries, non-execut
 Reviewed every forged response path for EOF-before-release, live peer assertion, bounded wait/cleanup and correct expected failure class. The positive/negative/positive native control shares one immutable test proof and changes only the response instance. Cleanup covers parent assertion failure as well as successful consumption; no test-mode production bypass, policy change, broad capability, privileged container, push, SSH, subagent or production action was introduced.
 
 Local lifecycle GREEN does not establish that the ordinary native-client positive controls pass. Desktop emulation still cannot support the mandatory native close_range/seccomp path, and the unchanged unsupported full suite was not rerun or relabelled green. Source re-review and execution of all new native-client controls on actual AMD64 remain controller-owned gates. Run41038461369 stays failed with all13 live setups failed and their assertions unexecuted; its passing policy result and retained log are unchanged. Further native bootstrap/client failures remain possible until the new actual result exists; Task1 and the downstream learner acceptance remain open.
+
+## Fix round4 — observe dumpability ownership on the proc status file
+
+Status: DONE_WITH_CONCERNS. Source commit `7bb8f43e03e10d4e69f4e3e26830d51e7393cda1` (`fix(grading): observe dumpability on proc status file`), based on `e4ba318cedac37fc5188689be2d458c8956cb785`. Exactly five Task1 files changed: host/identity.c, common.h, fixtures.c, test_native.py and PROTOCOL.md. Parent-owned docs/assets/spec/plan changes were left unstaged. No push, remote execution, SSH, deployment, merge, tag, privileged container, host setting mutation, paid resource or subagent was used.
+
+### Actual failed evidence and concrete diagnosis
+
+Actual AMD64 run41053652099 on source e4ba318 remains failed: 25 test methods, 10 passed (3 forged-peer lifecycle methods and 7 native methods, including actual production-filter denials and exact0600 bind), all 15 LiveContracts failed in their shared root bootstrap setup with `ATTESTOR_CLIENT_PEER`. The new actual-helper socket 0600 assertion passed first. No later live assertions ran; the kernel wrapper was skipped and learner execution remained0/24. Original retained log: `test-results/native-attestor-run41053652099/native-contracts.log`, SHA256 `35ef0df5d7c295a6dc07355723072bf87882ba4701e1461115d9488b26e50347`.
+
+`bootstrap_snapshot` required stat(`/proc/<helperPid>`) to return root UID/GID. That directory is mode 0555, and Linux deliberately preserves the task EUID/EGID on such directories regardless of dumpability. Upstream [Linux v6.8 fs/proc/base.c](https://raw.githubusercontent.com/torvalds/linux/v6.8/fs/proc/base.c), `task_dump_owner` physical source lines 1814–1870 and `pid_getattr` lines 1957–1983, implements that exception; ordinary proc files receive the namespace-root owner when dumpability is not 1. Thus the prior directory check necessarily rejects the intended nonroot dumpable 0 helper. This identifies a concrete bad bootstrap guard; the coarse actual failure class does not prove that all earlier or later bootstrap guards succeeded.
+
+Before editing, this isolated Linux control confirmed the distinction with real PR_SET/GET_DUMPABLE and filesystem metadata:
+
+```sh
+docker run --rm --platform linux/amd64 --network=none --memory=256m --cpus=1 --pids-limit=64 cove-attestor-contract:local python3 -c 'import ctypes,os,json; os.setgroups([]); os.setgid(23001); os.setuid(23001); c=ctypes.CDLL(None,use_errno=True); result=c.prctl(4,0,0,0,0); observed=c.prctl(3,0,0,0,0); directory=os.stat("/proc/self"); status=os.stat("/proc/self/status"); print(json.dumps(dict(setDumpable=result,observedDumpable=observed,directoryOwner=[directory.st_uid,directory.st_gid],statusOwner=[status.st_uid,status.st_gid])))'
+```
+
+Exit0, exact output:
+
+```json
+{"setDumpable": 0, "observedDumpable": 0, "directoryOwner": [23001, 23001], "statusOwner": [0, 0]}
+```
+
+The same bounded control was retained at `task-1-round4-kernel-owner-control.log`. It is proc-ownership evidence on Desktop's Linux kernel, not a successful AMD64 seccomp/helper/bootstrap run. Diagnosis, source evidence and the minimal proposed correction were sent to the controller before edits; the controller confirmed the correction remains within the approved trust model.
+
+### Narrow correction and regression
+
+The shared internal `process_status_root_owned` predicate now opens only `/proc/<kernel-peer-PID>/status` with O_RDONLY/O_CLOEXEC/O_NONBLOCK/O_NOFOLLOW, fstats the held descriptor, requires a regular file and UID/GID 0, and closes it. Both existing bootstrap snapshots call it. This preserves root-owner evidence while using the proc object to which the kernel rule actually applies. The independent kernel peer/status UID/GID checks, initial host-userns check, exact executable checks, socket 0600 check and all before/after checks remain intact.
+
+The proof schema and `native-prctl-and-proc-owner` evidencekind are unchanged. Ownership alone still cannot distinguish dumpable 0 from 2. The authenticated immutable native code still mandates PR_SET_DUMPABLE=0 and verifies PR_GET_DUMPABLE=0 before filtering/listening; the unchanged policy forbids later prctl. PROTOCOL explicitly distinguishes status-file ownership from the 0555 process directory and retains the 0-vs-2 limitation. There is no new production argument, environment hook, target selector, diagnostic mode, wire operation or error output.
+
+The separate, unshipped fixture runs as UID/GID 23001 with empty supplementary groups. It performs actual dumpable 1 → 0 → 1 transitions and confirms each with PR_GET_DUMPABLE, independently verifies that `/proc/self` remains account-owned, and calls the same production ownership predicate after each transition. Only categorical acceptance booleans are printed. The test requires rejection, acceptance, rejection; an always-accept or missing root-owner check would fail its negative controls. This test does not install seccomp or purport to perform complete bootstrap.
+
+### RED and GREEN commands/results
+
+First the old directory guard was extracted unchanged into the shared predicate and the regression was added. Then:
+
+```sh
+docker build --platform linux/amd64 -f packages/grading-runtime/host/Dockerfile.test -t cove-attestor-contract:local .
+docker run --rm --platform linux/amd64 --network=none --memory=256m --cpus=1 --pids-limit=64 cove-attestor-contract:local python3 -m unittest -v test_native.NativeContracts.test_proc_owner_evidence_tracks_dumpability_without_directory_assumption
+```
+
+Build exit0. RED test exit1: `AssertionError: b'0 0 0\n' != b'0 1 0\n'`; `Ran 1 test in 0.010s; FAILED (failures=1)`. The confirmed dumpable 0 state was rejected by the old production guard. Logs: `task-1-round4-red-build.log`, `task-1-round4-owner-red.log`.
+
+After the fixed status-file observation, rebuild and run:
+
+```sh
+docker build --platform linux/amd64 -f packages/grading-runtime/host/Dockerfile.test -t cove-attestor-contract:local .
+docker run --rm --platform linux/amd64 --network=none --cgroupns=host --memory=256m --cpus=1 --pids-limit=64 cove-attestor-contract:local python3 -m unittest -v test_native.NativeContracts.test_proc_owner_evidence_tracks_dumpability_without_directory_assumption test_native.NativeContracts.test_attestor_bind_exact_private_mode_and_no_adoption test_native.NativeContracts.test_sha256_known_and_streaming_vectors test_native.NativeContracts.test_strict_json_grammar test_native.NativeContracts.test_config_parser_exact_schema_and_bounds test_native.NativeContracts.test_proof_parser_exact_schema_and_bounds test_native.NativeContracts.test_static_artifact_manifest
+python3 -m py_compile packages/grading-runtime/host/test_native.py
+git diff --cached --check
+```
+
+All exit0. GREEN `Ran 7 tests in 0.579s; OK`. Current native C compiles under warnings-as-errors with no compiler warnings; current binary hashes and static-ELF assertions pass. Logs: `task-1-round4-build.log`, `task-1-round4-native-green.log`. The correctly fixed bind and proof 0600 rejection remain covered. No unchanged unsupported full suite, workflow, runtime or lifecycle suites were repeated or relabelled green.
+
+### Current production artifact and provenance
+
+```sh
+docker build --platform linux/amd64 -f packages/grading-runtime/Dockerfile.broker -t cove-attestor-broker:local .
+python3 .superpowers/sdd/2026-10-30-native-grading-daemon-attestor-implementation/task-1-verify-artifact.py
+```
+
+Both exit0. Logs: `task-1-round4-broker-build.log`, `task-1-round4-artifact.log`. Actual extraction verifies exact native runtime inventory (two tools, manifest, licenses), original archive UID/GID 0, binary mode 0555/nlink1, no native symlink/hardlink, matching binary hashes and strict tree identity, and self-workspace-symlink removal. The stopped inspection container is removed. The tar data filter adds owner-write on local extracted copies; original archive modes are verified separately. Docker's constant-platform lint advisory remains the sole build advisory; it is not a C compiler warning.
+
+Current artifactTreeIdentity: `43a2eb6c4ccbf8a382c8150b4df6ab4103acbb6bb6a88305bfa343e0c3fecc7a`.
+
+* attestor SHA256 `af80bb817ec41016ba46c7234ba15a6896cfa1559c3d72785e25ab959198ebae`, size 1,210,320.
+* attestor-client SHA256 `b7cab3cde67b319f6a89a3e33503355a5f43e38039bc67ce675bb698b897eafc`, size 1,210,448.
+
+Both are ELF64 x86_64 static PIE, no PT_INTERP, no DT_NEEDED, non-executable stack, RELRO and BIND_NOW. Compiler image remains exactly `gcc:14.3.0-bookworm@sha256:5e927c284bf55a7dc796262e311a0703344f62f41f5621eb56843111b1d37e15`; actual GCC 14.3.0 and GNU binutils 2.40, Debian binutils 2.40-2 and libc6/libc6-dev 2.36-9+deb12u10. Reviewed Mbed TLS 3.6.7 and jsmn 1.1.0 upstream bytes/hashes, runtime notices and relink provenance are unchanged. Updated manifest/source/binary hashes are retained in the extracted artifact and ignored host/bin.
+
+### Self-review and unresolved actual gate
+
+Reviewed the five-file diff for exact fixed proc path, held-descriptor O_NOFOLLOW/fstat, regular-file/root-owner rejection, fd closure, unchanged one-second deadline/no added loop, both bootstrap snapshot call sites, strict peer/status UID semantics, and unchanged dumpability/NNP/seccomp/initial-userns/executable trust bindings. The regression exercises real kernel transitions and the production predicate, with both negative controls and no privilege relaxation. No policy.c, helper privileges, resource allocation, broker hardening, daemon policy, identity schema or endpoint capability changed. Previous socket and forged-peer fixes remain intact.
+
+Desktop AMD64 emulation still cannot run mandatory close_range/seccomp and therefore cannot close the full native positive path. This local owner regression does not claim earlier/later bootstrap, daemon attestation or ordinary-client positives succeed. The controller must independently review this fix diff, then execute current-source real AMD64 native contracts (now 26 methods) and retain every result before Task1 closure. Run41053652099 remains failed, the kernel wrapper remains skipped, and learner execution remains0/24 until new actual evidence exists. Task1, later hardened-broker/guest acceptance, host equivalence and latency/control-reserve gates remain open.
+
+Controller citation note: corrected web-normalized display offsets to actual raw/GitHub physical line numbers after independent review; source logic/evidence is unchanged.

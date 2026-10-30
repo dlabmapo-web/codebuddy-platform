@@ -38,6 +38,44 @@
         "uncompressedSha256": "8993cc5a0bbd9ebcdbd9ada625588e4fc4f2e768e76e00867d3414b0329cb867",
         "uncompressedBytes": 23330
       }
+    },
+    {
+      "runId": 41053652099,
+      "sourceCommit": "e4ba318cedac37fc5188689be2d458c8956cb785",
+      "url": "https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/41053652099",
+      "conclusion": "failure",
+      "stage": "native_contracts",
+      "nativeContractMethods": {
+        "total": 25,
+        "passed": 10,
+        "failedSetup": 15
+      },
+      "nativeKernelCasesExecuted": 0,
+      "nativeKernelResult": "unexecuted",
+      "cleanupResult": "unexecuted",
+      "summary": {
+        "path": "run41053652099-summary.json",
+        "sha256": "b64f5f3e7dc5b0c0aaf8e34ec6db9d9056f8d9e33bac0be3dcb1cd6a8a9bbbd3"
+      },
+      "nativeContractLog": {
+        "path": "run41053652099-native-contracts.txt",
+        "sha256": "8fe535495556835e13b09d6cf1635692309483eeeb80057fd86886188c97b600",
+        "normalization": "Native step projection with ANSI sequences and trailing whitespace removed; exact original projection preserved in gzip."
+      },
+      "rawNativeContractLog": {
+        "path": "run41053652099-native-contracts.txt.gz",
+        "sha256": "13130f94c5d6ae45de47563e7dce786f5160a16d07ddad871c73a75b9eb0822a",
+        "uncompressedSha256": "35ef0df5d7c295a6dc07355723072bf87882ba4701e1461115d9488b26e50347",
+        "uncompressedBytes": 25724
+      },
+      "artifact": {
+        "id": 12975333655,
+        "name": "disposable-native-kernel-e4ba318cedac37fc5188689be2d458c8956cb785",
+        "archiveSha256": "41ad5f66c6292b8735fb0832d42eb8c6fbfacba50cc38b7c7c484ed8914946fd",
+        "sizeBytes": 502,
+        "expiresAt": "2026-10-31T12:13:56Z"
+      },
+      "diagnosis": "Actual socket0600 passes, but bootstrap requires root ownership of exempt0555 proc directory. Kernel/control establish fixed status-file ownership is required; correction and further actual Linux validation pending."
     }
   ]
 }

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "evidenceKind": "workflow-log-projection",
+  "runId": 41053652120,
+  "sourceCommit": "e4ba318cedac37fc5188689be2d458c8956cb785",
+  "url": "https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/41053652120",
+  "conclusion": "success",
+  "browserCasesPassed": 17,
+  "actualDatabaseTimingContractsPassed": 2,
+  "pairedNativeAcceptance": "skipped",
+  "productionEquivalent": false,
+  "nativeAcceptanceExecuted": false
+}

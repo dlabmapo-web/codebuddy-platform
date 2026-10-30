@@ -171,6 +171,7 @@ def collect(root, statuses, stage, owner=0):
         return projected
     read('infrastructure.json',128*1024,project_infrastructure,required=bool(statuses.get('infrastructure')))
     read('prerequisite-packages.json',65536,project_prerequisites,required=False)
+    read('broker-preflight.json',4096,kernel.host.project_broker_preflight,required=False)
     authoritative=read('kernel.json',2*2**20,report)
     observation=lambda value: project({k:v for k,v in value.items() if k in OBSERVATION})
     read('prepare-observation.json',2**20,observation)

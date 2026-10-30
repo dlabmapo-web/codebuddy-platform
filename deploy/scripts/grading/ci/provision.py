@@ -48,6 +48,12 @@ SYSTEM_FILES = [Path('/etc/apt/keyrings/cove-grading-ci.asc'), Path('/etc/apt/so
 PROTECTED_PACKAGES = {'docker-ce','docker-ce-cli','docker.io','moby-engine','moby-cli','containerd','containerd.io','runc'}
 PACKAGE_NAME = re.compile(r'[a-z0-9][a-z0-9+.-]{0,95}(?::[a-z0-9][a-z0-9-]{0,31})?')
 PACKAGE_VERSION = re.compile(r'[A-Za-z0-9.+:~_-]{1,128}')
+PREFLIGHT_FIELDS = dict(stage={'configuration','imports','manifest','daemon-sidecar','driver-construction','driver-verify','complete'},
+    type={'BrokerError','Error','TypeError','SyntaxError','ZodError','Unknown'},
+    code={'EACCES','EPERM','ENOENT','ESRCH','ENOTDIR','ELOOP','EIO','ENOMEM','EMFILE','ENFILE','ETIMEDOUT','INFRASTRUCTURE','UNKNOWN'},
+    syscall={'open','read','readlink','stat','lstat','realpath','scandir','spawn docker','unknown'},
+    pathRole={'daemon-pid','daemon-sidecar','daemon-executable','daemon-proc-executable','daemon-proc-starttime','daemon-proc-directory','daemon-socket','family','family-controllers','family-memory','family-swap','family-pids','family-cpu','broker-proc-cgroup','daemon-proc-cgroup','manifest','unknown'},
+    reason={'owner','socket-config','slice-config','daemon-identity-size','daemon-identity-schema','daemon-pid-sidecar','daemon-uid','daemon-continuity','daemon-binary','daemon-restarted','daemon-rootless','daemon-config','socket-owner','socket-replaced','broker-platform','family-path','family-symlink','family-controllers','family-memory','family-swap','family-pids','family-cpu','family-membership','image-identity','image-package','docker-timeout','docker-output','docker-command','manifest-path','manifest-file','manifest-size','unclassified'})
 
 
 def require_ephemeral_host(env, system, architecture, euid):
@@ -138,6 +144,71 @@ print(json.dumps(facts))
 def docker(state, *args, rootful=False, timeout=60):
     endpoint = ROOTFUL if rootful else 'unix://'+state['daemonSocket']
     return command(['docker','--host',endpoint,*args], timeout=timeout)
+
+
+def project_broker_preflight(value):
+    require(isinstance(value,dict) and value.get('version')==1 and value.get('authority')=='diagnostic-only' and type(value.get('success')) is bool,'Invalid broker preflight diagnostic')
+    result=dict(version=1,authority='diagnostic-only',success=value['success'])
+    for name in ('stage',) if value['success'] else PREFLIGHT_FIELDS:
+        require(isinstance(value.get(name),str) and value[name] in PREFLIGHT_FIELDS[name],'Invalid broker preflight identity')
+        result[name]=value[name]
+    require((result['stage']=='complete')==result['success'],'Invalid broker preflight completion')
+    return result
+
+
+def broker_preflight_properties(content,uid):
+    """Copy the current renderer's actual broker sandbox, resolving fixed paths.
+
+    Transient D-Bus properties do not expand unit-file specifiers. Resolve only
+    the exact %h/%t meanings already verified for this dedicated manager.
+    """
+    service={}; section=None
+    for line in content.splitlines():
+        if line.startswith('['): section=line; continue
+        if section!='[Service]' or '=' not in line: continue
+        name,value=line.split('=',1); service.setdefault(name,[]).append(value)
+    require(service.get('ExecStart')==['/opt/cove/bin/node /opt/cove/grading/current/dist/main.js'],'Broker preflight Node entrypoint differs')
+    require(service.get('Environment')==['PATH=/usr/local/bin:/usr/bin:/bin','NODE_OPTIONS=--max-old-space-size=128'],'Broker preflight environment policy differs')
+    names=('Environment','EnvironmentFile','WorkingDirectory','Slice','UMask','NoNewPrivileges','PrivateTmp','ProtectSystem','ReadWritePaths')
+    require(set(service)<=set(names)|{'Type','ExecStartPre','ExecStart','Restart','RestartSec','TimeoutStopSec','KillMode'},'Unsupported broker preflight sandbox directive')
+    result=[]
+    for name in names:
+        values=service.get(name,[])
+        require(len(values)==(2 if name=='Environment' else 1),'Broker preflight sandbox policy incomplete')
+        for value in values:
+            value=value.replace('%h',str(HOME)).replace('%t',f'/run/user/{uid}')
+            require('%' not in value,'Unknown broker preflight policy specifier')
+            result.append('--property='+name+'='+value)
+    return result
+
+
+def broker_preflight(state,repo,content):
+    unit='cove-grading-ci-broker-preflight.service'
+    require(user_command(state,'systemctl','--user','show',unit,'--property=LoadState','--value')=='not-found','Existing broker preflight unit refused')
+    for path in [HOME/'.config/systemd/user/cove-grading-broker.service',HOME/'.config/cove-grading/broker.env']:
+        validate_owned(path,state['ownedFiles'][str(path)])
+    source=repo/'deploy/scripts/grading/ci/broker-preflight.mjs'
+    target=OPT/'grading/ci/broker-preflight.mjs'
+    require(not os.path.lexists(target),'Broker preflight script target occupied')
+    shutil.copyfile(source,target); target.chmod(0o644)
+    require(target.stat().st_uid==0 and file_hash(target)==file_hash(source),'Broker preflight script identity differs')
+    properties=broker_preflight_properties(content,state['uid'])
+    def stop_probe():
+        if user_command(state,'systemctl','--user','show',unit,'--property=LoadState','--value')!='not-found':
+            user_command(state,'systemctl','--user','stop',unit,timeout=20)
+    try:
+        result=user_command(state,'systemd-run','--user','--quiet','--wait','--pipe','--collect','--unit='+unit,
+                            '--property=RuntimeMaxSec=60',*properties,'/opt/cove/bin/node',str(target),
+                            str(state['daemonIdentity']['pid']),state['daemonExecutable'],timeout=75)
+    except BaseException:
+        try: stop_probe()
+        except (OSError,ValueError,subprocess.SubprocessError): pass
+        raise
+    stop_probe()
+    require(len(result)<=4096,'Broker preflight diagnostic bound exceeded')
+    diagnostic=project_broker_preflight(json.loads(result))
+    atomic_json(STATE_DIR/'broker-preflight.json',diagnostic)
+    require(diagnostic['success'],'Production broker driver verification preflight failed')
 
 
 def require_absent(paths, users, groups):
@@ -432,6 +503,7 @@ def prepare(repo):
     env_path.write_text(''.join(k+'='+v+'\n' for k,v in broker_env.items())); env_path.chmod(0o600); os.chown(env_path,uid,account.pw_gid)
     command(['python3',scripts/'broker-env.py',env_path])
     state['ownedFiles'][str(env_path)]=snapshot(env_path)
+    broker_preflight(state,repo,rendered[HOME/'.config/systemd/user/cove-grading-broker.service'])
     state['phase']='broker-starting'; save(state)
     user_command(state,'systemctl','--user','start','cove-grading-broker.service')
     wait_for(lambda:health(state),120,'Real mixed broker readiness unavailable')

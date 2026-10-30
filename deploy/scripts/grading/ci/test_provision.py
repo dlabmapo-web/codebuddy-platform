@@ -179,6 +179,45 @@ assert.throws(()=>bundle(n,n));
         result=subprocess.run(['node','--input-type=module','-e',script],cwd=root,capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr)
 
+class BrokerPreflightTests(unittest.TestCase):
+    def test_probe_derives_actual_production_broker_policy_with_concrete_paths(self):
+        content=ci.render(ci.HOME,10000,'/usr/bin/dockerd-rootless.sh','/opt/cove/bin/node')[ci.HOME/'.config/systemd/user/cove-grading-broker.service']
+        properties=ci.broker_preflight_properties(content,10000)
+        for value in ['Slice=cove-grading.slice','NoNewPrivileges=yes','PrivateTmp=yes','ProtectSystem=strict','UMask=0007','WorkingDirectory=/opt/cove/grading/current','EnvironmentFile=/home/cove-grading/.config/cove-grading/broker.env','Environment=NODE_OPTIONS=--max-old-space-size=128','Environment=PATH=/usr/local/bin:/usr/bin:/bin','ReadWritePaths=/home/cove-grading/.local/share/cove-grading /run/cove-grading-control /run/user/10000/cove-grading /sys/fs/cgroup']:
+            self.assertIn('--property='+value,properties)
+        self.assertFalse(any('%' in value for value in properties))
+        for bad in [content+'ProtectHome=yes\n',content.replace('PrivateTmp=yes\n',''),content.replace('ProtectSystem=strict','ProtectSystem=%unknown'),content.replace('/opt/cove/bin/node /opt/cove/grading/current/dist/main.js','/usr/bin/node /opt/cove/grading/current/dist/main.js')]:
+            with self.subTest(content=bad),self.assertRaises(ValueError): ci.broker_preflight_properties(bad,10000)
+
+    def test_actual_probe_projects_errno_and_exact_path_role_without_payloads(self):
+        import json
+        import subprocess
+        script=r'''
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {errorProjection,configuredPaths,invariantReasons,stages,types,codes,syscalls,pathRoles} from './deploy/scripts/grading/ci/broker-preflight.mjs';
+const env={GRADING_DAEMON_PID_FILE:'/run/user/10000/cove-grading/host-docker.pid',GRADING_DAEMON_SOCKET:'/run/user/10000/cove-grading/docker.sock',GRADING_CGROUP_PARENT:'/sys/fs/cgroup/cove.slice/cove-grading.slice',GRADING_RUNTIME_MANIFEST_PATH:'/opt/cove/grading/ci/manifest.json'};
+const paths=configuredPaths(env,123,456,'/usr/bin/dockerd');
+const error={name:'Error',code:'EACCES',syscall:'readlink',path:'/proc/123/exe',message:'token=RAW_SECRET_CANARY',stack:'RAW_SECRET_CANARY'};
+assert.deepEqual(errorProjection(error,paths),{type:'Error',code:'EACCES',syscall:'readlink',pathRole:'daemon-proc-executable',reason:'unclassified'});
+assert.equal(errorProjection({...error,path:'/proc/123/exe/RAW_SECRET_CANARY'},paths).pathRole,'unknown');
+assert.equal(errorProjection({...error,path:env.GRADING_DAEMON_PID_FILE+'.identity.json',code:'ENOENT',syscall:'open'},paths).pathRole,'daemon-sidecar');
+assert.equal(errorProjection({...error,path:env.GRADING_CGROUP_PARENT+'/memory.max'},paths).pathRole,'family-memory');
+assert.equal(errorProjection({...error,path:'/usr/bin/dockerd'},paths).pathRole,'daemon-executable');
+assert.equal(errorProjection({...error,message:'Daemon identity too large'},paths).reason,'daemon-identity-size');
+assert.deepEqual(errorProjection({name:'RAW_SECRET_CANARY',code:'RAW_SECRET_CANARY',syscall:'RAW_SECRET_CANARY',path:'RAW_SECRET_CANARY',message:'RAW_SECRET_CANARY'},paths),{type:'Unknown',code:'UNKNOWN',syscall:'unknown',pathRole:'unknown',reason:'unclassified'});
+const source=(await Promise.all(['rootless-driver.ts','daemon-identity.ts','cgroup.ts','manifest.ts'].map(file=>readFile('./packages/grading-runtime/src/'+file,'utf8')))).join('\n');
+for(const literal of invariantReasons.keys()) assert(source.includes(JSON.stringify(literal)) || source.includes("'"+literal+"'"),literal+' not a production literal');
+const probe=await readFile('./deploy/scripts/grading/ci/broker-preflight.mjs','utf8');
+assert(probe.includes("import('/opt/cove/grading/current/dist/rootless-driver.js')"));
+assert.deepEqual([...probe.matchAll(/\bdriver\.([A-Za-z]+)\(/g)].map(m=>m[1]),['verify']);
+console.log(JSON.stringify({stage:stages,type:types,code:codes,syscall:syscalls,pathRole:pathRoles,reason:[...invariantReasons.values(),'unclassified']}));
+'''
+        result=subprocess.run(['node','--input-type=module','-e',script],cwd=Path(__file__).resolve().parents[4],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual({key:set(values) for key,values in json.loads(result.stdout).items()},ci.PREFLIGHT_FIELDS)
+
+
 class UserManagerEnvironmentTests(unittest.TestCase):
     def exercise(self,result=None,runtime_mode=0o40700,runtime_uid=10000,bus_mode=0o140666,bus_uid=10000):
         import json

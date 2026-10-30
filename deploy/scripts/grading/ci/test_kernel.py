@@ -401,6 +401,21 @@ import shutil
 
 
 class CollectorContracts(unittest.TestCase):
+    def test_broker_preflight_is_optional_diagnostic_only_and_strictly_projected(self):
+        diagnostic=dict(version=1,authority='diagnostic-only',success=False,stage='driver-verify',type='Error',code='EACCES',syscall='readlink',pathRole='daemon-proc-executable',reason='unclassified',path='/raw/secret',stack='RAW_SECRET_CANARY',environment='RAW_SECRET_CANARY')
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve();(root/'broker-preflight.json').write_text(json.dumps(diagnostic))
+            value=evidence.collect(root,dict(primary=1,observation=1,cleanup=0),'prepare',owner=os.getuid())
+        self.assertFalse(value['success'])
+        retained=value['evidence']['broker-preflight.json']
+        self.assertEqual(retained['pathRole'],'daemon-proc-executable')
+        self.assertEqual(retained['code'],'EACCES')
+        self.assertNotIn('RAW_SECRET_CANARY',json.dumps(value))
+        self.assertNotIn('/raw/secret',json.dumps(value))
+        for name in ('stage','type','code','syscall','pathRole','reason'):
+            with self.subTest(name=name),self.assertRaises(ValueError): kernel.host.project_broker_preflight({**diagnostic,name:'RAW_SECRET_CANARY'})
+        self.assertEqual(kernel.host.project_broker_preflight(dict(version=1,authority='diagnostic-only',success=True,stage='complete',payload='RAW_SECRET_CANARY')),dict(version=1,authority='diagnostic-only',success=True,stage='complete'))
+
     def test_prerequisite_failure_retains_only_bounded_package_transaction_diagnostics(self):
         version='5:28.5.1-1~ubuntu.24.04~noble'
         diagnostic=dict(version=1,authority='diagnostic-only',installedProtected={'docker-ce:amd64':version},selectedRootlessVersion=version,officialOrigin=True,simulation=dict(exitCode=100,transactions=[dict(action='Inst',package='docker-ce:amd64',previousVersion=version,version='5:29.0.0-1~ubuntu.24.04~noble',stderr='RAW_SECRET_CANARY')],stderr='RAW_SECRET_CANARY'),environment='RAW_SECRET_CANARY')

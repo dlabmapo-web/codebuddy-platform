@@ -13,6 +13,7 @@ import stat
 import tempfile
 import subprocess
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -131,38 +132,174 @@ def start_time(pid):
     return Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()[19]
 
 
-def forged_server(path, mode, ready):
-    """Only test harness can forge root proof; production has no simulation mode."""
+def send_forged_response(connection, mode):
+    request = b''
+    while len(request) < 48:
+        chunk = connection.recv(48 - len(request))
+        if not chunk:
+            assert mode == 'wrong-peer', 'Client closed before its fixed request'
+            return
+        request += chunk
+    nonce = request[8:40]
+    if mode == 'timeout':
+        time.sleep(2)
+        return
+    if mode == 'oversized':
+        connection.sendall(b'COVEAR01' + nonce + struct.pack('!II', 0, 8192))
+        return
+    payload = mode['payload']
+    if mode.get('nonce'):
+        nonce = b'X' * 32
+    response = b'COVEAR01' + nonce + struct.pack('!II', 0, len(payload)) + payload
+    connection.sendall(response)
+    if mode.get('trailing'):
+        connection.sendall(b'x')
+
+
+def forged_server(path, modes, ready, release):
+    """Only the root fixture writes a forged proof; production has no simulation mode."""
+    assert 1 <= len(modes) <= 3
     os.setgroups([])
     os.setgid(GID)
     os.setuid(UID)
     os.umask(0o177)
-    listener = socket.socket(socket.AF_UNIX)
-    listener.bind(str(path))
-    listener.listen(1)
-    ready.send(os.getpid())
-    connection, _ = listener.accept()
-    with connection:
-        request = b''
-        while len(request) < 48:
-            chunk = connection.recv(48 - len(request))
-            if not chunk:
-                return
-            request += chunk
-        nonce = request[8:40]
-        if mode == 'timeout':
-            time.sleep(2)
-            return
-        if mode == 'oversized':
-            connection.sendall(b'COVEAR01' + nonce + struct.pack('!II', 0, 8192))
-            return
-        payload = mode['payload'] if isinstance(mode, dict) else b'{}'
-        if isinstance(mode, dict) and mode.get('nonce'):
-            nonce = b'X' * 32
-        response = b'COVEAR01' + nonce + struct.pack('!II', 0, len(payload)) + payload
-        connection.sendall(response)
-        if isinstance(mode, dict) and mode.get('trailing'):
-            connection.sendall(b'x')
+    with socket.socket(socket.AF_UNIX) as listener:
+        listener.settimeout(3)
+        listener.bind(str(path))
+        listener.listen(1)
+        ready.send(os.getpid())
+        for index, mode in enumerate(modes):
+            connection, _ = listener.accept()
+            with connection:
+                connection.settimeout(3)
+                send_forged_response(connection, mode)
+            # EOF belongs to the accepted stream. Keep its kernel peer alive while
+            # the native client performs all subsequent start/cgroup/pidfd checks.
+            ready.send(('closed', index))
+            assert release.wait(10), 'Parent did not release the completed forged exchange'
+            release.clear()
+
+
+@contextmanager
+def running_forged_server(path, modes):
+    """Test-only peer with explicit ownership and bounded cleanup."""
+    receiving, sending = multiprocessing.Pipe(duplex=False)
+    release = multiprocessing.Event()
+    child = multiprocessing.Process(target=forged_server, args=(path, modes, sending, release))
+    child.start()
+    sending.close()
+    try:
+        assert receiving.poll(2), 'Forged listener did not become ready'
+        assert receiving.recv() == child.pid, 'Forged listener PID changed'
+        yield child, receiving, release
+    finally:
+        release.set()
+        child.join(timeout=2)
+        if child.is_alive():
+            child.kill()
+            child.join(timeout=2)
+        receiving.close()
+        assert not child.is_alive(), 'Forged fixture cleanup incomplete'
+
+
+def finish_forged_response(child, receiving, release, index):
+    """Caller invokes only after the client has finished all identity checks."""
+    assert receiving.poll(3), 'Forged response stream did not close'
+    assert receiving.recv() == ('closed', index), 'Unexpected forged response barrier'
+    assert child.is_alive(), 'Forged PID exited before the parent finished the client'
+    release.set()
+
+
+class ForgedListenerContracts(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if HERE != Path('/fixture/host') or os.geteuid() != 0:
+            raise RuntimeError('Forged peer contracts require isolated Dockerfile.test root setup')
+
+    def test_every_response_closes_stream_but_holds_peer_until_release(self):
+        payload = b'{"instance":"' + b'a'*64 + b'"}'
+        cases = [('valid', {'payload': payload}), ('wrong-peer', 'wrong-peer'),
+                 ('timeout', 'timeout'), ('oversized', 'oversized'),
+                 ('malformed', {'payload': b'{}'}),
+                 ('nonce', {'payload': payload, 'nonce': True}),
+                 ('trailing', {'payload': payload, 'trailing': True}),
+                 ('instance', {'payload': payload.replace(b'a'*64, b'b'*64)})]
+        for name, mode in cases:
+            with self.subTest(case=name), tempfile.TemporaryDirectory(prefix='cove-forge-') as folder:
+                os.chown(folder, UID, GID)
+                path = Path(folder) / 'attestor.sock'
+                with running_forged_server(path, [mode]) as (child, receiving, release):
+                    before = start_time(child.pid)
+                    with socket.socket(socket.AF_UNIX) as connection:
+                        connection.settimeout(3)
+                        connection.connect(str(path))
+                        peer = struct.unpack('3i', connection.getsockopt(socket.SOL_SOCKET,
+                            socket.SO_PEERCRED, struct.calcsize('3i')))
+                        self.assertEqual(peer, (child.pid, UID, GID))
+                        nonce = b'N'*32
+                        if name != 'wrong-peer':
+                            connection.sendall(b'COVEAT01' + nonce + struct.pack('!II', 1, 0))
+                        connection.shutdown(socket.SHUT_WR)
+                        response = b''
+                        while True:
+                            chunk = connection.recv(8192)
+                            if not chunk:
+                                break
+                            response += chunk
+                    if name in ('timeout', 'wrong-peer'):
+                        self.assertEqual(response, b'')
+                    elif name == 'oversized':
+                        self.assertEqual(response, b'COVEAR01' + nonce + struct.pack('!II', 0, 8192))
+                    else:
+                        expected_nonce = b'X'*32 if name == 'nonce' else nonce
+                        expected = b'COVEAR01' + expected_nonce + struct.pack('!II', 0, len(mode['payload'])) + mode['payload']
+                        self.assertEqual(response, expected + (b'x' if name == 'trailing' else b''))
+                    child.join(timeout=0.05)
+                    self.assertTrue(child.is_alive(), 'Response EOF must not terminate its peer')
+                    self.assertEqual(start_time(child.pid), before)
+                    finish_forged_response(child, receiving, release, 0)
+                self.assertEqual(child.exitcode, 0)
+
+
+    def test_multiple_exchanges_preserve_one_peer_and_socket(self):
+        payloads = [b'{"instance":"' + value*64 + b'"}' for value in (b'a', b'b', b'a')]
+        with tempfile.TemporaryDirectory(prefix='cove-forge-') as folder:
+            os.chown(folder, UID, GID)
+            path = Path(folder) / 'attestor.sock'
+            with running_forged_server(path, [{'payload': value} for value in payloads]) as (child, receiving, release):
+                before = start_time(child.pid)
+                inode = path.stat().st_ino
+                for index, payload in enumerate(payloads):
+                    with socket.socket(socket.AF_UNIX) as connection:
+                        connection.settimeout(3)
+                        connection.connect(str(path))
+                        peer = struct.unpack('3i', connection.getsockopt(socket.SOL_SOCKET,
+                            socket.SO_PEERCRED, struct.calcsize('3i')))
+                        self.assertEqual(peer, (child.pid, UID, GID))
+                        nonce = bytes([index])*32
+                        connection.sendall(b'COVEAT01' + nonce + struct.pack('!II', 1, 0))
+                        connection.shutdown(socket.SHUT_WR)
+                        response = b''
+                        while True:
+                            chunk = connection.recv(8192)
+                            if not chunk:
+                                break
+                            response += chunk
+                    self.assertEqual(response, b'COVEAR01' + nonce + struct.pack('!II', 0, len(payload)) + payload)
+                    self.assertEqual(path.stat().st_ino, inode)
+                    self.assertEqual(start_time(child.pid), before)
+                    finish_forged_response(child, receiving, release, index)
+            self.assertEqual(child.exitcode, 0)
+
+    def test_parent_abort_has_bounded_owned_process_cleanup(self):
+        with tempfile.TemporaryDirectory(prefix='cove-forge-') as folder:
+            os.chown(folder, UID, GID)
+            started = time.monotonic()
+            with self.assertRaisesRegex(RuntimeError, 'synthetic parent abort'):
+                with running_forged_server(Path(folder) / 'attestor.sock', ['wrong-peer']) as (child, _, _):
+                    raise RuntimeError('synthetic parent abort')
+            self.assertFalse(child.is_alive())
+            self.assertLess(time.monotonic() - started, 4.5)
 
 
 class LiveContracts(unittest.TestCase):
@@ -420,36 +557,86 @@ class LiveContracts(unittest.TestCase):
             self.assertLess(time.monotonic() - started, 1.5)
         self.assertEqual(self.run_client().returncode, 0)
 
-    def test_forged_same_uid_listener_and_malformed_replies(self):
-        good = json.loads(self.run_client().stdout)['daemon']
+    def forged_response_base(self):
+        result = self.run_client()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        good = json.loads(result.stdout)['daemon']
         self.attestor.kill(); self.attestor.wait()
-        base = dict(version=1, instance=self.proof['instance'], configSha256=digest(CONFIG),
+        (RUNTIME / 'attestor.sock').unlink()
+        return dict(version=1, instance=self.proof['instance'], configSha256=digest(CONFIG),
                     bootId=self.proof['bootId'], daemon=good)
+
+    def store_forged_peer_proof(self, pid):
+        # Intentionally root-forged test authority isolates the ordinary client's
+        # protocol checks. Root bootstrap independently rejects this Python peer.
+        metadata = (RUNTIME / 'attestor.sock').stat()
+        self.assertEqual(stat.S_IMODE(metadata.st_mode), 0o600)
+        proof = dict(self.proof)
+        proof.update(helperPid=pid, helperStartTime=start_time(pid),
+                     socketDevice=metadata.st_dev, socketInode=metadata.st_ino)
+        self.store_proof(proof)
+        return PROOF.read_bytes()
+
+    def assert_forged_control(self, base, proof_bytes):
+        result = self.run_client()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stderr, b'')
+        self.assertEqual(json.loads(result.stdout), dict(version=1,
+            proofSha256=hashlib.sha256(proof_bytes).hexdigest(), daemon=base['daemon']))
+        self.assertEqual(PROOF.read_bytes(), proof_bytes)
+
+    def test_forged_same_uid_listener_and_malformed_replies(self):
+        base = self.forged_response_base()
+        valid = {'payload': json.dumps(base).encode()}
         cases = [('wrong-peer', 'PEER'), ('timeout', 'PROTOCOL'), ('oversized', 'PROTOCOL'),
                  ({'payload': b'{}'}, 'PROTOCOL'),
                  ({'payload': json.dumps(base).encode(), 'nonce': True}, 'PROTOCOL'),
-                 ({'payload': json.dumps(base).encode(), 'trailing': True}, 'PROTOCOL'),
-                 ({'payload': json.dumps({**base, 'instance': '0' * 64}).encode()}, 'CHANGED')]
+                 ({'payload': json.dumps(base).encode(), 'trailing': True}, 'PROTOCOL')]
         for mode, classification in cases:
             with self.subTest(mode=str(mode)[:60]):
                 (RUNTIME / 'attestor.sock').unlink(missing_ok=True)
-                receiving, sending = multiprocessing.Pipe(duplex=False)
-                child = multiprocessing.Process(target=forged_server,
-                    args=(RUNTIME / 'attestor.sock', mode, sending))
-                child.start(); self.children.append(child)
-                self.assertTrue(receiving.poll(2)); pid = receiving.recv()
-                self.assertEqual(stat.S_IMODE((RUNTIME / 'attestor.sock').lstat().st_mode), 0o600)
-                proof = dict(self.proof)
-                if mode != 'wrong-peer':
-                    # Root-forged fixture proof isolates framing checks beyond peer auth.
-                    socket_stat = (RUNTIME / 'attestor.sock').stat()
-                    proof.update(helperPid=pid, helperStartTime=start_time(pid),
-                        socketDevice=socket_stat.st_dev, socketInode=socket_stat.st_ino)
-                self.store_proof(proof)
-                self.reject('ATTESTOR_CLIENT_' + classification)
-                if child.is_alive(): child.kill()
-                child.join(timeout=2)
-                receiving.close(); sending.close()
+                modes = [mode] if mode == 'wrong-peer' else [valid, mode]
+                with running_forged_server(RUNTIME / 'attestor.sock', modes) as (child, receiving, release):
+                    self.assertEqual(stat.S_IMODE((RUNTIME / 'attestor.sock').lstat().st_mode), 0o600)
+                    if mode == 'wrong-peer':
+                        self.store_proof(self.proof)
+                    else:
+                        proof_bytes = self.store_forged_peer_proof(child.pid)
+                        self.assert_forged_control(base, proof_bytes)
+                        finish_forged_response(child, receiving, release, 0)
+                    self.reject('ATTESTOR_CLIENT_' + classification)
+                    finish_forged_response(child, receiving, release, len(modes) - 1)
+                self.assertEqual(child.exitcode, 0)
+
+    def test_wrong_instance_isolated_by_same_live_peer_and_proof_controls(self):
+        base = self.forged_response_base()
+        changed = ('0' if base['instance'][0] != '0' else '1') + base['instance'][1:]
+        valid = {'payload': json.dumps(base).encode()}
+        invalid = {'payload': json.dumps({**base, 'instance': changed}).encode()}
+        # One PID, socket, immutable proof and daemon payload for all three calls.
+        # Only the middle response's instance differs; both adjacent controls must pass.
+        with running_forged_server(RUNTIME / 'attestor.sock', [valid, invalid, valid]) as (child, receiving, release):
+            proof_bytes = self.store_forged_peer_proof(child.pid)
+            for index in range(3):
+                if index == 1:
+                    self.reject('ATTESTOR_CLIENT_CHANGED')
+                else:
+                    self.assert_forged_control(base, proof_bytes)
+                self.assertEqual(PROOF.read_bytes(), proof_bytes)
+                finish_forged_response(child, receiving, release, index)
+        self.assertEqual(child.exitcode, 0)
+
+    def test_root_bootstrap_rejects_forged_listener_while_peer_alive(self):
+        self.forged_response_base()
+        original_proof = PROOF.read_bytes()
+        with running_forged_server(RUNTIME / 'attestor.sock', ['wrong-peer']) as (child, receiving, release):
+            result = self.run_client(bootstrap=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.stdout, b'')
+            self.assertEqual(result.stderr, b'ATTESTOR_CLIENT_PEER\n')
+            self.assertEqual(PROOF.read_bytes(), original_proof)
+            finish_forged_response(child, receiving, release, 0)
+        self.assertEqual(child.exitcode, 0)
 
 
 if __name__ == '__main__':

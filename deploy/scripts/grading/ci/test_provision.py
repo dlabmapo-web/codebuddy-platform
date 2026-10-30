@@ -180,6 +180,20 @@ assert.throws(()=>bundle(n,n));
         self.assertEqual(result.returncode,0,result.stderr)
 
 class BrokerPreflightTests(unittest.TestCase):
+    def test_kernel_namespace_reads_use_only_attested_endpoint_and_preserve_continuity(self):
+        from unittest.mock import patch
+        identity=dict(pid=123,uid=10000,startTime='456')
+        state=dict(daemonIdentity=identity)
+        with patch.object(ci,'attest_daemon',return_value=identity) as attest,patch.object(ci.os,'readlink',side_effect=['user:[10]','user:[20]']) as readlink:
+            self.assertEqual(ci.broker_preflight_namespaces(state),('user:[10]','user:[20]'))
+            self.assertEqual([call.args[0] for call in readlink.call_args_list],['/proc/1/ns/user','/proc/123/ns/user'])
+            self.assertEqual(attest.call_count,2)
+        for identities in [[{**identity,'startTime':'changed'}],[identity,{**identity,'startTime':'changed'}]]:
+            with self.subTest(identities=identities),patch.object(ci,'attest_daemon',side_effect=identities),patch.object(ci.os,'readlink',side_effect=['user:[10]','user:[20]']):
+                with self.assertRaises(ValueError): ci.broker_preflight_namespaces(state)
+        with patch.object(ci,'attest_daemon',return_value=identity),patch.object(ci.os,'readlink',side_effect=['user:[10]','RAW_SECRET_CANARY']):
+            with self.assertRaises(ValueError): ci.broker_preflight_namespaces(state)
+
     def test_probe_derives_actual_production_broker_policy_with_concrete_paths(self):
         content=ci.render(ci.HOME,10000,'/usr/bin/dockerd-rootless.sh','/opt/cove/bin/node')[ci.HOME/'.config/systemd/user/cove-grading-broker.service']
         properties=ci.broker_preflight_properties(content,10000)
@@ -195,7 +209,11 @@ class BrokerPreflightTests(unittest.TestCase):
         script=r'''
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {errorProjection,configuredPaths,invariantReasons,stages,types,codes,syscalls,pathRoles} from './deploy/scripts/grading/ci/broker-preflight.mjs';
+import {errorProjection,configuredPaths,invariantReasons,stages,types,codes,syscalls,pathRoles,namespaceProjection} from './deploy/scripts/grading/ci/broker-preflight.mjs';
+assert.deepEqual(namespaceProjection('user:[30]','user:[10]','user:[20]'),{brokerMatchesHost:false,brokerMatchesDaemon:false,daemonMatchesHost:false});
+assert.deepEqual(namespaceProjection('user:[10]','user:[10]','user:[20]'),{brokerMatchesHost:true,brokerMatchesDaemon:false,daemonMatchesHost:false});
+assert.deepEqual(namespaceProjection('user:[20]','user:[10]','user:[20]'),{brokerMatchesHost:false,brokerMatchesDaemon:true,daemonMatchesHost:false});
+assert.throws(()=>namespaceProjection('RAW_SECRET_CANARY','user:[10]','user:[20]'));
 const env={GRADING_DAEMON_PID_FILE:'/run/user/10000/cove-grading/host-docker.pid',GRADING_DAEMON_SOCKET:'/run/user/10000/cove-grading/docker.sock',GRADING_CGROUP_PARENT:'/sys/fs/cgroup/cove.slice/cove-grading.slice',GRADING_RUNTIME_MANIFEST_PATH:'/opt/cove/grading/ci/manifest.json'};
 const paths=configuredPaths(env,123,456,'/usr/bin/dockerd');
 const error={name:'Error',code:'EACCES',syscall:'readlink',path:'/proc/123/exe',message:'token=RAW_SECRET_CANARY',stack:'RAW_SECRET_CANARY'};

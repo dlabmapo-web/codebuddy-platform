@@ -402,7 +402,7 @@ import shutil
 
 class CollectorContracts(unittest.TestCase):
     def test_broker_preflight_is_optional_diagnostic_only_and_strictly_projected(self):
-        diagnostic=dict(version=1,authority='diagnostic-only',success=False,stage='driver-verify',type='Error',code='EACCES',syscall='readlink',pathRole='daemon-proc-executable',reason='unclassified',path='/raw/secret',stack='RAW_SECRET_CANARY',environment='RAW_SECRET_CANARY')
+        diagnostic=dict(version=1,authority='diagnostic-only',success=False,stage='driver-verify',type='Error',code='EACCES',syscall='readlink',pathRole='daemon-proc-executable',reason='unclassified',namespaces=dict(brokerMatchesHost=False,brokerMatchesDaemon=False,daemonMatchesHost=False),path='/raw/secret',stack='RAW_SECRET_CANARY',environment='RAW_SECRET_CANARY')
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory).resolve();(root/'broker-preflight.json').write_text(json.dumps(diagnostic))
             value=evidence.collect(root,dict(primary=1,observation=1,cleanup=0),'prepare',owner=os.getuid())
@@ -410,10 +410,13 @@ class CollectorContracts(unittest.TestCase):
         retained=value['evidence']['broker-preflight.json']
         self.assertEqual(retained['pathRole'],'daemon-proc-executable')
         self.assertEqual(retained['code'],'EACCES')
+        self.assertEqual(retained['namespaces'],diagnostic['namespaces'])
         self.assertNotIn('RAW_SECRET_CANARY',json.dumps(value))
         self.assertNotIn('/raw/secret',json.dumps(value))
         for name in ('stage','type','code','syscall','pathRole','reason'):
             with self.subTest(name=name),self.assertRaises(ValueError): kernel.host.project_broker_preflight({**diagnostic,name:'RAW_SECRET_CANARY'})
+        for namespaces in [dict(brokerMatchesHost='RAW_SECRET_CANARY',brokerMatchesDaemon=False,daemonMatchesHost=False),dict(brokerMatchesHost=False,brokerMatchesDaemon=False),dict(brokerMatchesHost=False,brokerMatchesDaemon=False,daemonMatchesHost=False,raw='user:[10]')]:
+            with self.subTest(namespaces=namespaces),self.assertRaises(ValueError): kernel.host.project_broker_preflight({**diagnostic,'namespaces':namespaces})
         self.assertEqual(kernel.host.project_broker_preflight(dict(version=1,authority='diagnostic-only',success=True,stage='complete',payload='RAW_SECRET_CANARY')),dict(version=1,authority='diagnostic-only',success=True,stage='complete'))
 
     def test_prerequisite_failure_retains_only_bounded_package_transaction_diagnostics(self):

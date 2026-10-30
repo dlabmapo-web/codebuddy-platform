@@ -1,5 +1,6 @@
 /** Read-only CI diagnostic; never creates, discovers or removes a guest. */
 import { pathToFileURL } from 'node:url';
+import { readlink } from 'node:fs/promises';
 
 // Reviewed literal messages from the production verification modules only.
 // Convert them to closed identifiers; no arbitrary error text leaves the probe.
@@ -29,6 +30,10 @@ export const types = ['BrokerError','Error','TypeError','SyntaxError','ZodError'
 export const codes = ['EACCES','EPERM','ENOENT','ESRCH','ENOTDIR','ELOOP','EIO','ENOMEM','EMFILE','ENFILE','ETIMEDOUT','INFRASTRUCTURE','UNKNOWN'];
 export const syscalls = ['open','read','readlink','stat','lstat','realpath','scandir','spawn docker','unknown'];
 export const pathRoles = ['daemon-pid','daemon-sidecar','daemon-executable','daemon-proc-executable','daemon-proc-starttime','daemon-proc-directory','daemon-socket','family','family-controllers','family-memory','family-swap','family-pids','family-cpu','broker-proc-cgroup','daemon-proc-cgroup','manifest','unknown'];
+export function namespaceProjection(broker, host, daemon) {
+  if (![broker,host,daemon].every(value=>typeof value==='string' && /^user:\[\d+\]$/.test(value))) throw new Error();
+  return {brokerMatchesHost:broker===host,brokerMatchesDaemon:broker===daemon,daemonMatchesHost:daemon===host};
+}
 export function errorProjection(error, paths) {
   return {
     type: types.includes(error?.name) ? error.name : 'Unknown',
@@ -50,13 +55,14 @@ export function configuredPaths(env, daemonPid, brokerPid, daemonExecutable) {
   ]);
 }
 async function main() {
-  let stage='configuration'; let paths=new Map();
+  let stage='configuration'; let paths=new Map(); let namespaces;
   let result;
   try {
     const env=process.env;
     const daemonPid=Number(process.argv[2]);
     const daemonExecutable=process.argv[3];
-    if (!Number.isSafeInteger(daemonPid) || daemonPid<=0 || process.argv.length!==4 || !daemonExecutable.startsWith('/') || daemonExecutable.length>4096) throw new Error();
+    if (!Number.isSafeInteger(daemonPid) || daemonPid<=0 || process.argv.length!==6 || !daemonExecutable.startsWith('/') || daemonExecutable.length>4096) throw new Error();
+    namespaces=namespaceProjection(await readlink('/proc/self/ns/user'),process.argv[4],process.argv[5]);
     for (const name of ['GRADING_DAEMON_PID_FILE','GRADING_DAEMON_SOCKET','GRADING_CGROUP_PARENT','GRADING_SYSTEMD_PARENT','GRADING_DAEMON_ID','GRADING_DAEMON_DATA_ROOT','GRADING_BROKER_OWNER','GRADING_RUNTIME_MANIFEST_PATH'])
       if (!env[name] || env[name].length>4096) throw new Error();
     paths=configuredPaths(env,daemonPid,process.pid,daemonExecutable);
@@ -76,6 +82,7 @@ async function main() {
   } catch (error) {
     result={version:1,authority:'diagnostic-only',success:false,stage,...errorProjection(error,paths)};
   }
+  if (namespaces) result.namespaces=namespaces;
   // Always exit normally so the root controller can preserve the bounded result
   // before refusing preparation; this diagnostic never determines acceptance.
   process.stdout.write(JSON.stringify(result)+'\n');

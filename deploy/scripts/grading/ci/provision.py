@@ -153,7 +153,22 @@ def project_broker_preflight(value):
         require(isinstance(value.get(name),str) and value[name] in PREFLIGHT_FIELDS[name],'Invalid broker preflight identity')
         result[name]=value[name]
     require((result['stage']=='complete')==result['success'],'Invalid broker preflight completion')
+    if 'namespaces' in value:
+        namespaces=value['namespaces']
+        require(isinstance(namespaces,dict) and set(namespaces)=={'brokerMatchesHost','brokerMatchesDaemon','daemonMatchesHost'} and all(type(v) is bool for v in namespaces.values()),'Invalid broker preflight namespace diagnostic')
+        result['namespaces']=dict(namespaces)
     return result
+
+
+def broker_preflight_namespaces(state):
+    # Bind these two fixed kernel reads to the already-attested endpoint before
+    # and after. The service receives identifiers, never arbitrary proc paths.
+    require(attest_daemon(state)==state['daemonIdentity'],'Daemon changed before preflight namespace observation')
+    host=os.readlink('/proc/1/ns/user')
+    daemon=os.readlink(f'/proc/{state["daemonIdentity"]["pid"]}/ns/user')
+    require(all(re.fullmatch(r'user:\[[0-9]+\]',value) for value in (host,daemon)),'Invalid preflight kernel user namespace identity')
+    require(attest_daemon(state)==state['daemonIdentity'],'Daemon changed during preflight namespace observation')
+    return host,daemon
 
 
 def broker_preflight_properties(content,uid):
@@ -193,13 +208,14 @@ def broker_preflight(state,repo,content):
     shutil.copyfile(source,target); target.chmod(0o644)
     require(target.stat().st_uid==0 and file_hash(target)==file_hash(source),'Broker preflight script identity differs')
     properties=broker_preflight_properties(content,state['uid'])
+    namespaces=broker_preflight_namespaces(state)
     def stop_probe():
         if user_command(state,'systemctl','--user','show',unit,'--property=LoadState','--value')!='not-found':
             user_command(state,'systemctl','--user','stop',unit,timeout=20)
     try:
         result=user_command(state,'systemd-run','--user','--quiet','--wait','--pipe','--collect','--unit='+unit,
                             '--property=RuntimeMaxSec=60',*properties,'/opt/cove/bin/node',str(target),
-                            str(state['daemonIdentity']['pid']),state['daemonExecutable'],timeout=75)
+                            str(state['daemonIdentity']['pid']),state['daemonExecutable'],*namespaces,timeout=75)
     except BaseException:
         try: stop_probe()
         except (OSError,ValueError,subprocess.SubprocessError): pass

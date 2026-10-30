@@ -224,12 +224,16 @@ to `/proc/1/ns/user`; the administrator must itself be in the real initial host
 user/PID namespaces, not a container pretending to be the host.
 
 Modern proc status does not expose `Dumpable`. Bootstrap confirms the nonroot
-peer/status credentials, root-owned `/proc/PID` directory, observed NNP/seccomp,
+peer/status credentials, root-owned regular `/proc/PID/status` file opened with
+`O_NOFOLLOW` and checked with `fstat`, observed NNP/seccomp,
 and exact immutable native executable. That executable mandatorily executes
 `PR_SET_DUMPABLE=0` and confirms `PR_GET_DUMPABLE==0` before installing seccomp
 and listening; its policy then forbids every prctl, so dumpability cannot change.
-Proc directory ownership alone does **not** distinguish dumpable 0 from 2. The
-fixed evidence field explicitly records this combined code/kernel evidence.
+Linux deliberately keeps the world-readable/executable `/proc/PID` directory
+owned by the process UID/GID regardless of dumpability; the directory cannot
+supply this evidence. Status-file ownership alone does **not** distinguish
+dumpable 0 from 2. The fixed evidence field explicitly records this combined
+code/kernel evidence.
 
 The normal client never reads the helper's protected executable or namespace
 link. It verifies proof, config, own native executable, current boot, kernel peer

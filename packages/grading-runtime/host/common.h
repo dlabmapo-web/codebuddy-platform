@@ -97,6 +97,7 @@ int daemon_attest(const Config *config, Daemon *daemon, const Deadline *deadline
 int bootstrap_snapshot(const Config *config, const struct ucred *peer, const struct stat *socket,
                        Proof *proof, const Deadline *deadline);
 int helper_self_check(const Config *config, const Deadline *deadline);
+int process_status_root_owned(pid_t pid);
 int policy_install(void);
 int close_inherited(void);
 #endif

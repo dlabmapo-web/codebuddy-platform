@@ -116,6 +116,14 @@ class NativeContracts(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(int(result.stdout), errno.EPERM)
 
+    def test_proc_owner_evidence_tracks_dumpability_without_directory_assumption(self):
+        # Actual PR_SET/GET_DUMPABLE transitions exercise the shared bootstrap guard.
+        # This isolated guard test does not claim that seccomp/bootstrap can run here.
+        result = subprocess.run([str(HERE / 'bin/fixtures'), 'dumpability-owner'],
+            user=UID, group=GID, extra_groups=[], capture_output=True, timeout=4)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, b'0 1 0\n')  # Reject dumpable1, accept0, reject1.
+
 
 UID = GID = 23001
 PROFILE = Path('/opt/cove/grading/fixture')

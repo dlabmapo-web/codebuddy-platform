@@ -104,6 +104,25 @@ static int daemon_fixture(int argc, char **argv) {
 int main(int argc, char **argv) {
     if (argc < 2)
         return 2;
+    if (argc == 2 && !strcmp(argv[1], "dumpability-owner")) {
+        if (getuid() == 0 || geteuid() != getuid() || getgid() == 0 || getegid() != getgid())
+            return 2;
+        const int states[] = {1, 0, 1};
+        int accepted[3];
+        for (size_t i = 0; i < sizeof(states) / sizeof(states[0]); i++) {
+            if (prctl(PR_SET_DUMPABLE, states[i], 0, 0, 0) ||
+                prctl(PR_GET_DUMPABLE, 0, 0, 0, 0) != states[i])
+                return 2;
+            /* Linux keeps the 0555 process directory task-owned in every state. */
+            struct stat directory;
+            if (stat("/proc/self", &directory) || directory.st_uid != getuid() ||
+                directory.st_gid != getgid())
+                return 2;
+            accepted[i] = process_status_root_owned(getpid()) == 0;
+        }
+        printf("%d %d %d\n", accepted[0], accepted[1], accepted[2]);
+        return 0;
+    }
     if (!strcmp(argv[1], "policy-environment")) {
         int nnp = prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0), nnp_error = errno;
         int dump = prctl(PR_SET_DUMPABLE, 0, 0, 0, 0), dump_error = errno;

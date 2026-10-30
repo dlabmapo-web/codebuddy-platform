@@ -287,10 +287,24 @@ int helper_self_check(const Config *c, const Deadline *d) {
     }
     return 0;
 }
+int process_status_root_owned(pid_t pid) {
+    struct stat proc;
+    char path[80];
+    /* task_dump_owner exempts 0555 directories such as /proc/PID. The fixed
+     * status file reflects dumpability; ownership alone cannot distinguish 0/2. */
+    int n = snprintf(path, sizeof(path), "/proc/%ld/status", (long)pid);
+    if (n < 0 || (size_t)n >= sizeof(path))
+        return -1;
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOFOLLOW);
+    if (fd < 0)
+        return -1;
+    int bad = fstat(fd, &proc) || !S_ISREG(proc.st_mode) || proc.st_uid != 0 || proc.st_gid != 0;
+    close(fd);
+    return bad ? -1 : 0;
+}
 int bootstrap_snapshot(const Config *c, const struct ucred *peer, const struct stat *socket,
                        Proof *p, const Deadline *d) {
-    struct stat host, ns, exe, client, proc;
-    char path[80];
+    struct stat host, ns, exe, client;
     if (geteuid() != 0 || peer->uid != c->uid || peer->gid != c->gid)
         return -1;
     if (namespace_stat(1, &host) || namespace_stat(peer->pid, &ns) || host.st_dev != ns.st_dev ||
@@ -304,9 +318,7 @@ int bootstrap_snapshot(const Config *c, const struct ucred *peer, const struct s
         executable_identity(getpid(), c->clientExecutable, c->clientExecutableSha256, 0, &client,
                             d))
         return -1;
-    int n = snprintf(path, sizeof(path), "/proc/%ld", (long)peer->pid);
-    if (n < 0 || (size_t)n >= sizeof(path) || stat(path, &proc) || proc.st_uid != 0 ||
-        proc.st_gid != 0)
+    if (process_status_root_owned(peer->pid))
         return -1;
     if ((socket->st_mode & 07777) != 0600 || socket->st_uid != c->uid || socket->st_gid != c->gid)
         return -1;

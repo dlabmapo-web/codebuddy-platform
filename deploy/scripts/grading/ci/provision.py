@@ -85,14 +85,25 @@ def normalize_user_manager(state):
     require(stat.S_ISSOCK(bus.st_mode) and bus.st_uid==uid,'Dedicated user bus identity differs')
     unit='cove-grading-ci-environment.service'
     require(user_command(state,'systemctl','--user','show',unit,'--property=LoadState','--value')=='not-found','Existing user environment probe unit refused')
-    expected=dict(uid=uid,home=str(HOME),runtimeDirectory=str(runtime),busAddress='unix:path='+str(runtime/'bus'),runtimeSpecifier=str(runtime))
+    require(not os.path.lexists(runtime/'cove-grading-ci-environment'),'Existing user environment probe runtime directory refused')
+    expected=dict(uid=uid,home=str(HOME),runtimeDirectory=str(runtime),busAddress='unix:path='+str(runtime/'bus'))
     user_command(state,'systemctl','--user','set-environment','HOME='+expected['home'],
                  'XDG_RUNTIME_DIR='+expected['runtimeDirectory'],'DBUS_SESSION_BUS_ADDRESS='+expected['busAddress'])
     # Use a transient SERVICE, never --scope/--setenv: its process must receive
     # the manager's environment rather than the correctly addressed client's.
-    # Independently check %t: changing the manager's service environment alone
-    # need not repair a runtime prefix captured during manager initialization.
-    probe="import json,os; print(json.dumps(dict(uid=os.getuid(),home=os.environ.get('HOME'),runtimeDirectory=os.environ.get('XDG_RUNTIME_DIR'),busAddress=os.environ.get('DBUS_SESSION_BUS_ADDRESS'),runtimeSpecifier=os.environ.get('GRADING_CI_RUNTIME_SPECIFIER'))))"
+    # RuntimeDirectory exercises the manager's actual runtime prefix. Transient
+    # Environment properties store literal %t, so they cannot probe expansion.
+    # Only fixed booleans leave the service; arbitrary inherited values do not.
+    probe="""import json,os,stat,sys
+uid=int(sys.argv[1]); home=sys.argv[2]; runtime=sys.argv[3]
+path=runtime+'/cove-grading-ci-environment'
+facts=dict(uidMatches=os.getuid()==uid,homeMatches=os.environ.get('HOME')==home,runtimeEnvironmentMatches=os.environ.get('XDG_RUNTIME_DIR')==runtime,busMatches=os.environ.get('DBUS_SESSION_BUS_ADDRESS')=='unix:path='+runtime+'/bus',runtimePathMatches=os.environ.get('RUNTIME_DIRECTORY')==path,runtimeDirectoryExists=False,runtimeDirectoryOwned=False,runtimeDirectoryMode=False)
+try:
+    info=os.lstat(path)
+    facts.update(runtimeDirectoryExists=stat.S_ISDIR(info.st_mode),runtimeDirectoryOwned=info.st_uid==uid,runtimeDirectoryMode=stat.S_IMODE(info.st_mode)==0o700)
+except FileNotFoundError: pass
+print(json.dumps(facts))
+"""
     def stop_probe():
         if user_command(state,'systemctl','--user','show',unit,'--property=LoadState','--value')!='not-found':
             user_command(state,'systemctl','--user','stop',unit,timeout=20)
@@ -100,7 +111,8 @@ def normalize_user_manager(state):
         result=user_command(state,'systemd-run','--user','--quiet','--wait','--pipe','--collect',
                             '--unit='+unit,'--property=RuntimeMaxSec=15',
                             '--property=MemoryMax=32M','--property=TasksMax=16',
-                            '--property=Environment=GRADING_CI_RUNTIME_SPECIFIER=%t','/usr/bin/python3','-I','-c',probe,timeout=30)
+                            '--property=RuntimeDirectory=cove-grading-ci-environment','--property=RuntimeDirectoryMode=0700',
+                            '/usr/bin/python3','-I','-c',probe,str(uid),str(HOME),str(runtime),timeout=30)
     except BaseException:
         # Preserve the launch failure. The lifecycle trap still stops this
         # exact owned manager if the immediate bounded unit stop also fails.
@@ -109,7 +121,17 @@ def normalize_user_manager(state):
         raise
     stop_probe()
     require(len(result)<=4096,'User manager environment probe bound exceeded')
-    require(json.loads(result)==expected,'Dedicated user manager service environment differs')
+    facts=json.loads(result)
+    fields={'uidMatches','homeMatches','runtimeEnvironmentMatches','busMatches','runtimePathMatches','runtimeDirectoryExists','runtimeDirectoryOwned','runtimeDirectoryMode'}
+    require(isinstance(facts,dict) and set(facts)==fields and all(type(v) is bool for v in facts.values()),'Invalid user manager environment probe schema')
+    require(facts['uidMatches'],'Dedicated user manager service UID differs')
+    require(facts['homeMatches'],'Dedicated user manager service HOME differs')
+    require(facts['runtimeEnvironmentMatches'],'Dedicated user manager service XDG runtime differs')
+    require(facts['busMatches'],'Dedicated user manager service bus address differs')
+    require(facts['runtimePathMatches'],'Dedicated user manager runtime prefix differs')
+    require(facts['runtimeDirectoryExists'],'Dedicated user manager runtime directory was not created')
+    require(facts['runtimeDirectoryOwned'],'Dedicated user manager runtime directory owner differs')
+    require(facts['runtimeDirectoryMode'],'Dedicated user manager runtime directory mode differs')
     return expected
 
 

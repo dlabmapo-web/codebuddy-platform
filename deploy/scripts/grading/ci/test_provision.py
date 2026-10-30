@@ -184,8 +184,8 @@ class UserManagerEnvironmentTests(unittest.TestCase):
         import json
         from types import SimpleNamespace
         from unittest.mock import patch
-        expected=dict(uid=10000,home=str(ci.HOME),runtimeDirectory='/run/user/10000',busAddress='unix:path=/run/user/10000/bus',runtimeSpecifier='/run/user/10000')
-        with patch.object(ci.Path,'lstat',side_effect=[SimpleNamespace(st_mode=runtime_mode,st_uid=runtime_uid),SimpleNamespace(st_mode=bus_mode,st_uid=bus_uid)]),patch.object(ci,'user_command',side_effect=['not-found','',json.dumps(expected if result is None else result),'not-found']) as command:
+        expected={key:True for key in ('uidMatches','homeMatches','runtimeEnvironmentMatches','busMatches','runtimePathMatches','runtimeDirectoryExists','runtimeDirectoryOwned','runtimeDirectoryMode')}
+        with patch.object(ci.Path,'lstat',side_effect=[SimpleNamespace(st_mode=runtime_mode,st_uid=runtime_uid),SimpleNamespace(st_mode=bus_mode,st_uid=bus_uid)]),patch.object(ci.os.path,'lexists',return_value=False),patch.object(ci,'user_command',side_effect=['not-found','',json.dumps(expected if result is None else result),'not-found']) as command:
             failure=None
             try: ci.normalize_user_manager(dict(uid=10000))
             except Exception as error: failure=error
@@ -202,7 +202,9 @@ class UserManagerEnvironmentTests(unittest.TestCase):
         for required in ('--user','--wait','--pipe','--collect','--unit=cove-grading-ci-environment.service','--property=RuntimeMaxSec=15','--property=MemoryMax=32M','--property=TasksMax=16'): self.assertIn(required,probe)
         self.assertNotIn('--scope',probe)
         self.assertFalse(any(str(value).startswith('--setenv') for value in probe))
-        self.assertEqual([value for value in probe if str(value).startswith('--property=Environment=')],['--property=Environment=GRADING_CI_RUNTIME_SPECIFIER=%t'])
+        self.assertFalse(any(str(value).startswith('--property=Environment=') for value in probe))
+        self.assertIn('--property=RuntimeDirectory=cove-grading-ci-environment',probe)
+        self.assertIn('--property=RuntimeDirectoryMode=0700',probe)
 
     def test_wrong_runtime_directory_or_bus_refused_before_manager_mutation(self):
         for changes in [dict(runtime_uid=1001),dict(runtime_mode=0o40755),dict(runtime_mode=0o120777),dict(bus_uid=1001),dict(bus_mode=0o100600)]:
@@ -212,11 +214,45 @@ class UserManagerEnvironmentTests(unittest.TestCase):
                 self.assertEqual(calls,[])
 
     def test_service_inheriting_runner_runtime_or_wrong_identity_is_refused(self):
-        correct=dict(uid=10000,home=str(ci.HOME),runtimeDirectory='/run/user/10000',busAddress='unix:path=/run/user/10000/bus',runtimeSpecifier='/run/user/10000')
-        for change in [dict(uid=1001),dict(home='/home/runner'),dict(runtimeDirectory='/run/user/1001'),dict(busAddress='unix:path=/run/user/1001/bus'),dict(runtimeSpecifier='/run/user/1001')]:
-            with self.subTest(change=change):
-                _,failure=self.exercise(result={**correct,**change})
-                self.assertRegex(str(failure),'service environment differs')
+        correct={key:True for key in ('uidMatches','homeMatches','runtimeEnvironmentMatches','busMatches','runtimePathMatches','runtimeDirectoryExists','runtimeDirectoryOwned','runtimeDirectoryMode')}
+        for key,message in [('uidMatches','service UID differs'),('homeMatches','service HOME differs'),('runtimeEnvironmentMatches','service XDG runtime differs'),('busMatches','service bus address differs'),('runtimePathMatches','runtime prefix differs'),('runtimeDirectoryExists','runtime directory was not created'),('runtimeDirectoryOwned','runtime directory owner differs'),('runtimeDirectoryMode','runtime directory mode differs')]:
+            with self.subTest(key=key):
+                _,failure=self.exercise(result={**correct,key:False})
+                self.assertIn(message,str(failure))
+
+    def test_probe_uses_real_runtime_directory_and_ignores_literal_transient_specifier(self):
+        import json
+        import os
+        import subprocess
+        import sys
+        import tempfile
+        calls,_=self.exercise()
+        args=calls[2].args
+        probe=args[args.index('-c')+1]
+        with tempfile.TemporaryDirectory() as folder:
+            runtime=Path(folder).resolve(); child=runtime/'cove-grading-ci-environment';child.mkdir(mode=0o700)
+            env=dict(HOME=folder,XDG_RUNTIME_DIR=str(runtime),DBUS_SESSION_BUS_ADDRESS='unix:path='+str(runtime/'bus'),RUNTIME_DIRECTORY=str(child),GRADING_CI_RUNTIME_SPECIFIER='%t')
+            def execute():
+                result=subprocess.run([sys.executable,'-I','-c',probe,str(os.getuid()),folder,str(runtime)],env=env,capture_output=True,text=True,check=True)
+                return json.loads(result.stdout)
+            self.assertTrue(all(execute().values()))
+            child.chmod(0o755)
+            self.assertFalse(execute()['runtimeDirectoryMode'])
+            child.chmod(0o700)
+            env['RUNTIME_DIRECTORY']='/run/user/1001/cove-grading-ci-environment'
+            self.assertFalse(execute()['runtimePathMatches'])
+            env['RUNTIME_DIRECTORY']=str(child);child.rmdir()
+            facts=execute()
+            self.assertFalse(facts['runtimeDirectoryExists'])
+            self.assertFalse(facts['runtimeDirectoryOwned'])
+            self.assertFalse(facts['runtimeDirectoryMode'])
+
+    def test_preexisting_probe_directory_cannot_substitute_for_manager_creation(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        with patch.object(ci.Path,'lstat',side_effect=[SimpleNamespace(st_mode=0o40700,st_uid=10000),SimpleNamespace(st_mode=0o140666,st_uid=10000)]),patch.object(ci.os.path,'lexists',return_value=True),patch.object(ci,'user_command',return_value='not-found') as command:
+            with self.assertRaisesRegex(ValueError,'Existing user environment probe runtime directory refused'): ci.normalize_user_manager(dict(uid=10000))
+            self.assertEqual(command.call_count,1)
 
     def test_probe_launch_failure_stops_only_its_exact_unit_and_preserves_primary(self):
         from types import SimpleNamespace
@@ -224,7 +260,7 @@ class UserManagerEnvironmentTests(unittest.TestCase):
         import subprocess
         failure=subprocess.CalledProcessError(17,['systemd-run'])
         for stop in ['',subprocess.CalledProcessError(23,['systemctl'])]:
-            with self.subTest(stop=stop),patch.object(ci.Path,'lstat',side_effect=[SimpleNamespace(st_mode=0o40700,st_uid=10000),SimpleNamespace(st_mode=0o140666,st_uid=10000)]),patch.object(ci,'user_command',side_effect=['not-found','',failure,'loaded',stop]) as command:
+            with self.subTest(stop=stop),patch.object(ci.Path,'lstat',side_effect=[SimpleNamespace(st_mode=0o40700,st_uid=10000),SimpleNamespace(st_mode=0o140666,st_uid=10000)]),patch.object(ci.os.path,'lexists',return_value=False),patch.object(ci,'user_command',side_effect=['not-found','',failure,'loaded',stop]) as command:
                 with self.assertRaises(subprocess.CalledProcessError) as raised: ci.normalize_user_manager(dict(uid=10000))
                 self.assertIs(raised.exception,failure)
                 self.assertEqual(command.call_args.args[1:],('systemctl','--user','stop','cove-grading-ci-environment.service'))

@@ -13,6 +13,7 @@ export LD_LIBRARY_PATH="$native_artifact/launcher-lib"
 "$native_node" "$native_artifact/tools/validate-deployment.mjs" "$native_work/config.json" "$native_work/config.json.deployment.json"
 # Same UID for the 0600 socket, worker capabilities explicitly dropped below.
 "$native_node" "$native_repo/deploy/native/kernel-qualification.mjs" "$native_artifact" "$native_work/config.json" > "$native_work/evidence/kernel.jsonl" 2>&1
+if [ "${4:-full}" = kernel-only ]; then exit 0; fi
 # Crash probe leaves empty stale groups intentionally. Unit-wide stop/kill reaps all descendants.
 "$native_node" "$native_artifact/worker/node_modules/@cove/grading-runtime/dist/main.js" "$native_work/config.json" > "$native_work/evidence/launcher.log" 2>&1 & native_launcher=$!
 native_next=''

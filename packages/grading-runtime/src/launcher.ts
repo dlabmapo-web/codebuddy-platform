@@ -298,6 +298,7 @@ export class NsJailBackend implements NativeBackend {
       | Promise<{ code: number | null; signal: string | null }>
       | undefined;
     let child: ReturnType<typeof spawn> | undefined;
+    let startupStderr: ByteCapture | undefined;
     const executionCallStarted = performance.now();
     let cleanupStarted: number | undefined;
     let completedResult: NativeExecutionResult | undefined;
@@ -375,6 +376,7 @@ export class NsJailBackend implements NativeBackend {
           request.outputLimitBytes ?? gradingDataLimits.stdoutBytes,
         ),
         stderr = new ByteCapture(gradingDataLimits.stderrBytes);
+      startupStderr = stderr;
       child.stdout!.on("data", (chunk) => stdout.append(chunk));
       child.stderr!.on("data", (chunk) => stderr.append(chunk));
       child.stdin!.on("error", () => {});
@@ -468,9 +470,18 @@ export class NsJailBackend implements NativeBackend {
       return completedResult;
     } catch (cause) {
       if (started === undefined && directory) {
+        // EOF on the control pipe may arrive before stderr/exit notifications.
+        // Keep diagnostics bounded without delaying cleanup indefinitely.
+        let diagnosticTimer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            processClosed?.catch(() => {}),
+            new Promise<void>(resolve => { diagnosticTimer = setTimeout(resolve, 100); }),
+          ]);
+        } finally { clearTimeout(diagnosticTimer); }
         throw new NativeInfrastructureError(
           cause instanceof NativeInfrastructureError ? cause.message : "Native launcher failure",
-          { cause: { startupLog: await readStartupLog(join(directory, "nsjail.log")), original: cause } },
+          { cause: { startupLog: await readStartupLog(join(directory, "nsjail.log")), startupStderr: startupStderr?.text().slice(0, 8192), original: cause } },
         );
       }
       if (cause instanceof NativeInfrastructureError) throw cause;

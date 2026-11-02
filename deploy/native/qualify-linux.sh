@@ -43,6 +43,25 @@ docker cp "$native_container:/opt/cove" "$native_artifact"
 setpriv --reuid=65534 --regid=65534 --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs \
  /usr/bin/test -r "$native_artifact/rootfs/opt/cove/bootstrap.py"
 mkdir -m 700 "$native_work/evidence"
+# Prove the real kernel boundary before preparing DB/browser resources. Both
+# phases use this same protected unit configuration and resource envelope.
+run_native_unit() {
+systemd-run --unit="$native_unit" --wait --pipe --collect \
+ --property='Delegate=cpu memory pids' --property=MemoryMax=2560M --property=MemorySwapMax=0 \
+ --property=CPUQuota=200% --property=TasksMax=256 --property=RuntimeMaxSec=900 \
+ --property=KillMode=control-group --property=TimeoutStopSec=25 \
+ --property=CapabilityBoundingSet='CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_SETUID CAP_SETGID CAP_SYS_RESOURCE CAP_DAC_OVERRIDE CAP_CHOWN CAP_SETPCAP' \
+ --property=ProtectSystem=strict --property="ReadOnlyPaths=$native_artifact $native_repo" \
+ --property="ReadWritePaths=$native_work /sys/fs/cgroup/system.slice/$native_unit.service" \
+ --property=NoNewPrivileges=yes --property=PrivateTmp=yes \
+ /usr/bin/env -i PATH="$PATH" HOME=/nonexistent DOTENV_CONFIG_PATH=/dev/null \
+ "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:?Explicit fixture browser installation path required}" "COVE_NATIVE_AUTH_PORT=${native_auth_port:-}" "COVE_NATIVE_API_PORT=${native_api_port:-}" "COVE_NATIVE_NEXT_ORIGIN=${native_web_origin:-}" "COVE_NATIVE_NEXT_BUILD_ID=${native_next_id:-}" "COVE_NATIVE_FIXTURE_ID=$COVE_NATIVE_FIXTURE_ID" "DATABASE_URL=${native_db:-}" "REDIS_URL=${native_redis_url:-}" \
+ /bin/bash "$native_repo/deploy/native/qualify-unit.sh" "$native_work" "$native_repo" "$native_artifact" "$1" \
+ 2>&1 | tee "$native_evidence/unit-$1.log"
+}
+native_unit="cove-$native_project-kernel"
+run_native_unit kernel-only
+native_unit="cove-$native_project"
 compose up -d --wait --wait-timeout 60
 native_pg="$(compose ps -q postgres)"; native_redis="$(compose ps -q redis)"
 for native_try in {1..60}; do if docker exec "$native_pg" pg_isready -U postgres >/dev/null 2>&1; then break; fi; sleep .5; done
@@ -65,15 +84,4 @@ env -i PATH="$PATH" HOME="$HOME" DOTENV_CONFIG_PATH=/dev/null pnpm --dir "$nativ
 bash "$native_repo/deploy/native/build-next-fixture.sh" "$native_work/next-source" "$native_auth_origin" "$native_api_origin" "$native_web_origin" > "$native_evidence/next-build.log" 2>&1
 native_next_id="sha256:$(sha256sum "$native_work/next-source/packages/web/.next/BUILD_ID" | cut -d' ' -f1)"
 # Unit source/learner artifacts are immutable. Only this owned cgroup subtree and work dir are writable.
-systemd-run --unit="$native_unit" --wait --pipe --collect \
- --property='Delegate=cpu memory pids' --property=MemoryMax=2560M --property=MemorySwapMax=0 \
- --property=CPUQuota=200% --property=TasksMax=256 --property=RuntimeMaxSec=900 \
- --property=KillMode=control-group --property=TimeoutStopSec=25 \
- --property=CapabilityBoundingSet='CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_SETUID CAP_SETGID CAP_SYS_RESOURCE CAP_DAC_OVERRIDE CAP_CHOWN CAP_SETPCAP' \
- --property=ProtectSystem=strict --property="ReadOnlyPaths=$native_artifact $native_repo" \
- --property="ReadWritePaths=$native_work /sys/fs/cgroup/system.slice/$native_unit.service" \
- --property=NoNewPrivileges=yes --property=PrivateTmp=yes \
- /usr/bin/env -i PATH="$PATH" HOME=/nonexistent DOTENV_CONFIG_PATH=/dev/null \
- "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:?Explicit fixture browser installation path required}" "COVE_NATIVE_AUTH_PORT=$native_auth_port" "COVE_NATIVE_API_PORT=$native_api_port" "COVE_NATIVE_NEXT_ORIGIN=$native_web_origin" "COVE_NATIVE_NEXT_BUILD_ID=$native_next_id" "COVE_NATIVE_FIXTURE_ID=$COVE_NATIVE_FIXTURE_ID" "DATABASE_URL=$native_db" "REDIS_URL=$native_redis_url" \
- /bin/bash "$native_repo/deploy/native/qualify-unit.sh" "$native_work" "$native_repo" "$native_artifact" \
- 2>&1 | tee "$native_evidence/unit.log"
+run_native_unit full

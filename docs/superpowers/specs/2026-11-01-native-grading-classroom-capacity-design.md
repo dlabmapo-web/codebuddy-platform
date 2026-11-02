@@ -1,8 +1,8 @@
 # Native grading for a 200-student classroom burst
 
 Date: 2026-11-01 (Asia/Seoul).
-Status: proposed design for user review; implementation, hardware purchases,
-production load tests and deployment are not authorized by this document.
+Status: source implementation approved by the user's 2026-11-02 request.
+Hardware purchases, production load tests and deployment remain unauthorized.
 
 ## 1. User requirement and decision
 

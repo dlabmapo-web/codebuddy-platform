@@ -1,11 +1,17 @@
 # Native grading Linux qualification — 2026-11-02
 
-The disposable AMD64 Linux qualification **passed** on source
+The disposable AMD64 containment, grading correctness and crash qualification
+**passed** on source
 `53ba52c171e9b79590f3a73294aa1b01faf6bb78`:
 [GitHub Actions run 41420002243](https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/41420002243).
 The user authorized pushing `feat/native-grading-classroom-capacity` and running
 this workflow. Production admission remains disabled. This result is not
 200-student capacity acceptance or approval to merge/deploy.
+
+**The five-second speed target is not consistently met.** A fresh repeat passed
+correctness but its two browser results took 5.007 and 5.533 seconds. The green
+smoke workflow does not enforce the full classroom speed gate; see the repeat
+results below. Production admission must remain disabled pending release gates.
 
 ## What actually passed
 
@@ -39,11 +45,11 @@ Application timing starts before service admission and ends at a committed read.
 Browser timing starts at the actual trusted Submit click and ends after the
 expected changed result heading is visible; page/auth preparation is separate.
 
-| Simultaneous students | Cases per program | Service maximum |
-| --- | --- | --- |
-| 1 | 1 / 5 / 10 | 0.294 / 0.547 / 1.055 s |
-| 2 | 1 / 5 / 10 | 0.255 / 0.846 / 1.377 s |
-| 4 | 1 / 5 / 10 | 0.431 / 1.707 / 3.068 s |
+| Simultaneous students | Cases per program | First service maximum | Repeat service maximum |
+| --- | --- | --- | --- |
+| 1 | 1 / 5 / 10 | 0.294 / 0.547 / 1.055 s | 0.343 / 0.702 / 1.329 s |
+| 2 | 1 / 5 / 10 | 0.255 / 0.846 / 1.377 s | 0.379 / 1.081 / 1.620 s |
+| 4 | 1 / 5 / 10 | 0.431 / 1.707 / 3.068 s | 0.563 / 2.005 / 3.682 s |
 
 The two browser results took **4.642 and 4.694 s**. The second was an intentionally
 wrong program with the expected FAILED/WRONG_OUTPUT grade, not an infrastructure
@@ -89,6 +95,28 @@ The image was built and measured on the disposable runner, not published to a
 production registry. A later deployment must promote and verify its intended
 immutable artifact; a mutable tag or separately rebuilt image is not this image.
 
+## Fresh-host repeat
+
+[Run 41421692433](https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/41421692433)
+on `fabf591d24f1de895a241cfcd2c8fab886b4995a` repeated the complete gate after a
+documentation-only commit. All 32 containment checks, 21 service results, two
+visible committed browser results, execution-marker/crash recovery and owned
+container/network cleanup passed again. The runtime descriptor is identical.
+
+Its browser results took **5.007 and 5.533 s**: `allUnder5s: false`. Trusted clicks
+arrived 101.75 ms apart with alignment within 0.58 ms. The smoke intentionally
+runs without `--assert-slo`; PASS means grading/containment correctness, not the
+five-burst/200-client latency certificate. These numbers establish timing
+variation and an already-missed two-browser threshold in the co-located 2-CPU
+fixture. They cannot justify claiming all 200 students will finish within 5 s.
+
+Repeat image: `sha256:75ed472c02a34e8b58f6dd98a561e4de3ba0a7e6523ed62780bc3e2d03cb142b`. Repeat Next BUILD_ID:
+`sha256:b3877b1d8fa4bc3ab2e37631d6674354c1f5c0d2e9ddf3f6b76e32949d319d33`. Its recorded parent memory peak was
+1,596,293,120 bytes. Raw results are retained separately from the first run;
+no failed timing observation was dropped. The next capacity experiment needs
+separately bounded generator resources and production-equivalent grader/platform
+budgets before staged larger cohorts. No additional load or deployment was run.
+
 ## Fixes supported by failing execution and regression checks
 
 - Relocate pnpm's known worker self-link out of the vanished build source;
@@ -129,7 +157,8 @@ honest exit 78; actual kernel/browser proof comes from the linked Linux run.
 
 ## Remaining release gates
 
-There is **no 200-student/five-second claim**. The approved specification still
+There is **no 200-student/five-second claim**, and even the two-browser threshold
+was not consistent across these two hosts. The approved specification still
 requires five complete mixed-corpus bursts, all 200 distinct users arriving within
 one second and every expected committed result visibly displayed under five
 seconds. This run has one two-browser burst, four service clients at most and a

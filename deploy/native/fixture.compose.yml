@@ -1,4 +1,4 @@
-# Used only by fixture-services.sh with a random owner project and loopback ports.
+# Used only with a random owner project and explicit host-loopback ports.
 services:
   postgres:
     image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
@@ -19,4 +19,6 @@ services:
     pids_limit: 64
     tmpfs: ['/data:rw,nosuid,nodev,size=64m']
 networks:
-  default: {internal: true}
+  # Host-run API/worker need published loopback ports. An internal-only bridge
+  # does not create those mappings. Learners retain their separate empty netns.
+  default: {driver: bridge}

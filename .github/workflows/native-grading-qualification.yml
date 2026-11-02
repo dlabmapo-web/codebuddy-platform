@@ -27,6 +27,8 @@ jobs:
       - run: corepack enable && corepack prepare pnpm@9.15.9 --activate
       - run: pnpm install --frozen-lockfile
       - run: node --test packages/api/scripts/benchmark-native-classroom.test.mjs deploy/native/deployment-contract.test.mjs deploy/native/worker-closure.test.mjs
+      - name: Verify disposable database host connectivity
+        run: bash deploy/native/fixture-services-smoke.sh
       - run: pnpm exec playwright install --with-deps chromium
       - run: bash deploy/native/build-image.sh > native-image-build.log 2>&1
       - name: Actual kernel and private full application qualification

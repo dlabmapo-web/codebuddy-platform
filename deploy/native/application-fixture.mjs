@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Explicit synthetic qualification application. Never imported by production boot.
 import { nextAuthFixture } from './next-auth-fixture.mjs';
+import { loopbackApplication } from './loopback-application.mjs';
 import { classroomCorpus } from './corpus.mjs';
 import { createServer } from 'node:http';
 import { randomUUID, randomBytes } from 'node:crypto';
@@ -157,7 +158,7 @@ try {
         globalThis.fetch = (input, init) => { const url = new URL(typeof input === 'string' ? input : input.url ?? input.toString()); return realFetch(url.origin === 'https://native-fixture-provider.invalid' ? origin + url.pathname + url.search : input, init); };
         const { NestFactory } = await load('/node_modules/@nestjs/core/index.js');
         const create = NestFactory.create.bind(NestFactory);
-        NestFactory.create = async (...args) => { const app = await create(...args), listen = app.listen.bind(app); app.listen = async port => { const server = await listen(port, '127.0.0.1'); nativeApiReady = true; return server; }; return app; };
+        NestFactory.create = async (...args) => loopbackApplication(await create(...args), () => { nativeApiReady = true; });
         process.chdir(dirname(authorityPath));
         await load('/dist/src/main.js');
     }

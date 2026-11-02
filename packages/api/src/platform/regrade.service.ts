@@ -556,7 +556,8 @@ export class RegradeService {
       }),
     );
 
-    let dispatched = 0;
+    const intents: Array<{ submissionId: string; descriptor: NativeRuntimeDescriptor | null }> = [];
+    // Finish every durable chunk before touching Redis. An outage must not erase the later work.
     for (let index = 0; index < stale.length; index += CREATE_CHUNK) {
       const chunk = stale.slice(index, index + CREATE_CHUNK);
       const created = await snapshotTransaction(this.prisma, async tx => {
@@ -564,18 +565,27 @@ export class RegradeService {
         await tx.platformOperationRun.update({ where: { id: run.id }, data: { dispatchedCount: { increment: rows.length } } });
         return rows;
       });
-      for (const { submissionId, descriptor } of created) {
-        await dispatch({
-          runId: run.id,
-          submissionId,
-          requestId: run.requestId,
-        }, descriptor);
-        dispatched += 1;
-      }
+      intents.push(...created);
     }
 
+    let dispatched = 0;
+    const deadline = Date.now() + 5_000;
+    for (const { submissionId, descriptor } of intents) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      let timer: NodeJS.Timeout | undefined;
+      try {
+        await Promise.race([
+          dispatch({ runId: run.id, submissionId, requestId: run.requestId }, descriptor),
+          new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("Regrade dispatch deadline")), remaining); }),
+        ]);
+        dispatched += 1;
+      } catch {
+        // Stable BullMQ IDs dedupe late acknowledgements; persisted intents are recovered by the matching family.
+      } finally { clearTimeout(timer); }
+    }
     this.logger.log(
-      `[${run.requestId ?? "-"}] regrade ${run.id}: dispatched ${dispatched}`,
+      `[${run.requestId ?? "-"}] regrade ${run.id}: recorded ${intents.length} repair intents, ${dispatched} enqueue acknowledgements`,
     );
     return this.run(identity, { runId: run.id });
   }
@@ -764,7 +774,7 @@ export class RegradeService {
         const academyId = (await tx.course.findUniqueOrThrow({ where: { id: original.courseId }, select: { academyId: true } })).academyId;
         descriptor = await this.native().retain(origin, {
           academyId, materialId: original.materialId, gradingRevision: exercise.gradingRevision, context: "live", kind: "regrade",
-        }, exercise);
+        }, exercise, tx);
       }
       const snapshot = gradingSnapshotFor(exercise, { engineVersion, descriptor });
 

@@ -1,9 +1,10 @@
 'use client';
-import { buildCaseCells, isTerminalStatus, submissionResultSchema, type SubmissionResult } from '@cove/shared';
+import { buildCaseCells, isTerminalStatus, type SubmissionResult } from '@cove/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 import { orpc } from '@/lib/orpc';
 import { useLatestSubmission } from '@/components/workspace/use-latest-submission';
+import { observePracticeSubmission } from '../_lib/practice-submission-stream';
 
 /** Personal practice uses its authorized stream plus bounded read recovery. */
 export function usePracticeSubmission(academyId: string, materialId: string, preview = false, gradingRevision?: number, enabled = true, userId = "") {
@@ -29,17 +30,12 @@ export function usePracticeSubmission(academyId: string, materialId: string, pre
   });
   React.useEffect(() => {
     if (!submissionId) return;
-    const source = new EventSource(`/api/learn/practice-submissions/${submissionId}/stream?academyId=${encodeURIComponent(academyId)}`);
-    const onResult = (event: MessageEvent<string>) => {
-      try {
-        const parsed = submissionResultSchema.safeParse(JSON.parse(event.data));
-        if (!parsed.success || parsed.data.submissionId !== submissionId) return;
-        client.setQueryData<SubmissionResult>(['staff-practice', userId, academyId, 'result', submissionId], previous => previous && isTerminalStatus(previous.status) ? previous : parsed.data);
-        if (isTerminalStatus(parsed.data.status)) source.close();
-      } catch { /* Existing bounded polling recovers a malformed or dropped stream. */ }
-    };
-    source.addEventListener('result', onResult);
-    return () => source.close();
+    return observePracticeSubmission({
+      url: `/api/learn/practice-submissions/${submissionId}/stream?academyId=${encodeURIComponent(academyId)}`,
+      submissionId, acceptedAt: acceptedAt.current,
+      onResult: next => client.setQueryData<SubmissionResult>(['staff-practice', userId, academyId, 'result', submissionId], previous => previous && isTerminalStatus(previous.status) ? previous : next),
+      recover: () => client.refetchQueries({ queryKey: ['staff-practice', userId, academyId, 'result', submissionId], exact: true }),
+    });
   }, [academyId, client, submissionId, userId]);
   const history = useQuery({
     queryKey: ['staff-practice', userId, academyId, materialId, preview, gradingRevision, 'history'],

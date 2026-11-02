@@ -1,3 +1,5 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -265,4 +267,87 @@ describe.skipIf(!databaseUrl || !redisUrl)("native application launcher-contract
     const after = await db.studentExerciseProgress.findUniqueOrThrow({ where: { userId_materialId: { userId: ids.student, materialId: ids.material } } });
     expect(after.attemptCount).toBe(before.attemptCount + 1); expect(after.bestScore).toBe(100);
   });
+  it("review regression: admits official and staff work with one connection under concurrent requests", async () => {
+    if (!worker) worker = await boot();
+    settings.NATIVE_GRADING_ENABLED = true;
+    const limited = new PrismaService(new ConfigService({ DATABASE_URL: databaseUrl, DATABASE_POOL_MAX: 1 }) as never);
+    try {
+      const access = new AcademyAccessService(limited, new SupportGrantResolver(limited));
+      const official = new SubmissionService(limited, access, config as never, new LearningClassContextService(limited), queue);
+      const personal = new StaffPracticeService(limited, access, config, queue);
+      const first = await official.submit(identity("student"), input());
+      expect((await limited.submission.findUniqueOrThrow({ where: { id: first.submissionId } })).executionRuntimeSnapshot).toEqual(manifest.descriptor);
+      await terminal(first.submissionId);
+      const [student, other, staff] = await Promise.all([
+        official.submit(identity("student"), input()),
+        official.submit(identity("other"), input("fixture:correct", "other")),
+        personal.submit(identity("manager"), { academyId: ids.academy, materialId: ids.material, code: "fixture:correct", requestId: randomUUID() }),
+      ]);
+      await Promise.all([terminal(student.submissionId), terminal(other.submissionId, "other"),
+        until(() => personal.get(identity("manager"), { academyId: ids.academy, submissionId: staff.submissionId }), value => isTerminalStatus(value.status))]);
+      for (const id of [student.submissionId, other.submissionId]) expect((await limited.submission.findUniqueOrThrow({ where: { id } })).executionQueue).toBe(runtimeQueueName("official", manifest.descriptor));
+      expect((await limited.staffPracticeAttempt.findUniqueOrThrow({ where: { id: staff.submissionId } })).executionQueue).toBe(runtimeQueueName("practice", manifest.descriptor));
+    } finally { await limited.$disconnect(); }
+  });
+
+  it("review regression: persists all 101 native repairs during an owned Redis outage and recovers exactly once", async () => {
+    if (!worker) worker = await boot();
+    const materialId = randomUUID();
+    await db.material.create({ data: { id: materialId, lectureId: ids.lecture, type: "PROGRAMMING_EXERCISE", title: "Repair outage fixture", position: 2, isVisible: true,
+      programmingExercise: { create: { externalKey: randomUUID(), difficulty: "EASY", starterCode: "", memoryLimitMb: 128, timeLimitMs: 1000, gradingRevision: 2,
+        gradingMode: "ELICE_STDIO", gradingSemanticVersion: "elice-v1", continuationPolicy: "CONTINUE_WITHIN_BUDGET", exitStatusPolicy: "FAIL_ON_RUNTIME_ERROR",
+        totalTimeLimitMs: 60000, comparatorTimeLimitMs: 100, materialMaximumHundredths: 10000, materialScorePolicy: "PROPORTIONAL",
+        testCases: { create: [{ position: 1, input: "sample", expectedOutput: "ok", visibility: "SAMPLE", weight: 30 },
+          { position: 2, input: "hidden", expectedOutput: "(?P<word>ok)", comparator: "STDOUT_REGEX", visibility: "HIDDEN", weight: 70 }] } } } } });
+    manifest.eligibility.push({ ...manifest.eligibility[0]!, materialId, gradingRevision: 2 });
+    await writeFile(manifestPath, JSON.stringify(manifest));
+    const people = Array.from({ length: 101 }, () => ({ id: randomUUID(), membershipId: randomUUID() }));
+    await db.user.createMany({ data: people.map(({ id }) => ({ id, username: `r${id.replaceAll("-", "").slice(0, 12)}`, status: "ACTIVE" })) });
+    await db.academyMembership.createMany({ data: people.map(({ id, membershipId }) => ({ id: membershipId, academyId: ids.academy, userId: id, role: "STUDENT", status: "ACTIVE" })) });
+    await db.classEnrollment.createMany({ data: people.map(({ membershipId }) => ({ classId: ids.class1, membershipId, enrolledByUserId: ids.manager })) });
+    const exercise = await db.programmingExercise.findUniqueOrThrow({ where: { materialId }, include: { testCases: true } });
+    const frozen = gradingSnapshotFor(exercise, { engineVersion: "0.27.5", descriptor: manifest.descriptor });
+    await db.submission.createMany({ data: people.map(({ id }) => ({ userId: id, materialId, sourceMaterialId: materialId, courseId: ids.course, classId: ids.class1,
+      gradingRevision: 1, language: "PYTHON", timeLimitMs: 1000, memoryLimitMb: 128, code: "fixture:correct", totalCount: 2, passedCount: 2, score: 100, status: "PASSED", gradedAt: new Date(),
+      ...frozen.submission, executionQueue: runtimeQueueName("official", manifest.descriptor), engineVersion: nativeRuntimeVersion(manifest.descriptor),
+      problemTitle: "Fixture", courseTitle: "Fixture", moduleTitle: "Fixture", lectureTitle: "Fixture", modulePosition: 1, lecturePosition: 1, problemPosition: 2 })) as never });
+    const limited = new PrismaService(new ConfigService({ DATABASE_URL: databaseUrl, DATABASE_POOL_MAX: 1 }) as never);
+    const access = new AcademyAccessService(limited, new SupportGrantResolver(limited));
+    const regrades = new RegradeService(limited, new PlatformAccessService(limited), access, new AuditService(), config as never);
+    const endpoint = process.env.COVE_NATIVE_TEST_DOCKER_ENDPOINT;
+    const container = process.env.COVE_NATIVE_TEST_REDIS_CONTAINER;
+    const fixtureId = process.env.COVE_NATIVE_FIXTURE_ID;
+    if (!endpoint?.startsWith("unix:///") || !fixtureId || container !== `cove-native-app-redis-${fixtureId}`) throw new Error("Owned local fixture Redis required");
+    const docker = (args: string[]) => promisify(execFile)("docker", ["--host", endpoint, ...args]);
+    expect((await docker(["inspect", "-f", '{{index .Config.Labels "cove.native.task2"}}', container])).stdout.trim()).toBe(fixtureId);
+    let paused = false;
+    try {
+      const plan = await regrades.planRegrade(identity("manager"), { academyId: ids.academy, materialId }, { requestId: randomUUID() });
+      expect(plan.plannedCount).toBe(101);
+      await docker(["pause", container]); paused = true;
+      const dispatch = vi.fn((job, descriptor) => queue.enqueueRegrade(job, descriptor));
+      // No Redis responses are possible here, including readiness. The complete DB intent must still commit.
+      await regrades.startRegrade(identity("manager"), { runId: plan.runId }, dispatch);
+      const pending = await limited.submission.findMany({ where: { regradeRunId: plan.runId } });
+      expect(pending.length).toBe(101); expect(new Set(pending.map(row => row.userId)).size).toBe(101);
+      expect(pending.every(row => row.status === "QUEUED" && row.executionQueue === runtimeQueueName("regrade", manifest.descriptor))).toBe(true);
+      expect(await limited.platformOperationRun.findUniqueOrThrow({ where: { id: plan.runId } })).toMatchObject({ status: "RUNNING", plannedCount: 101, dispatchedCount: 101, completedCount: 0, failedCount: 0 });
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      await docker(["unpause", container]); paused = false;
+      await db.submission.updateMany({ where: { regradeRunId: plan.runId }, data: { createdAt: new Date(Date.now() - 40_000) } });
+      const recovery = new RuntimeRecovery(db, queue.forRuntime(manifest.descriptor));
+      const settled = await until(async () => { await recovery.sweep(); return db.platformOperationRun.findUniqueOrThrow({ where: { id: plan.runId } }); }, run => run.status === "COMPLETED", 60_000);
+      expect(settled).toMatchObject({ plannedCount: 101, dispatchedCount: 101, completedCount: 101, failedCount: 0 });
+      await new RegradeRunner(db, grading).run({ runId: plan.runId, submissionId: pending[0]!.id, requestId: null });
+      await recovery.sweep();
+      expect((await db.platformOperationRun.findUniqueOrThrow({ where: { id: plan.runId } })).completedCount).toBe(101);
+      expect(await db.submission.count({ where: { regradeRunId: plan.runId } })).toBe(101);
+      expect(await db.pointAward.count({ where: { materialId, reason: "EXERCISE_SOLVED" } })).toBe(101);
+      expect(await db.studentExerciseProgress.count({ where: { materialId, status: "SOLVED", attemptCount: 0 } })).toBe(101);
+    } finally {
+      if (paused) await docker(["unpause", container]);
+      await regrades.onModuleDestroy(); await limited.$disconnect();
+    }
+  }, 90_000);
+
 });

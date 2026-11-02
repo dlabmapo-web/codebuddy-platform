@@ -161,7 +161,7 @@ export class SubmissionService {
         const descriptor = quiz ? null : await this.native().select({
           academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision,
           context: "live", kind: "official",
-        }, exercise);
+        }, exercise, tx);
         const snapshot = gradingSnapshotFor(exercise, { engineVersion, descriptor });
 
         await this.classContext.resolveWith(tx, {

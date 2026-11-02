@@ -7,7 +7,7 @@ import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { quizDefinitionSchema, rolesHavePermission, submissionResultSchema, type SaveDraftResult } from "@cove/shared";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
-import { AcademyAccessService } from "../authorization/academy-access.service.js";
+import { AcademyAccessService, type AcademyAccess } from "../authorization/academy-access.service.js";
 import { learningScopeFor } from "../classes/assigned-course-access.js";
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
@@ -29,8 +29,13 @@ export class StaffPracticeService {
     @Optional() private readonly queue?: JudgeQueue,
   ) {}
 
-  async authorize(identity: SupabaseIdentity, input: { academyId: string; materialId: string; preview?: boolean; gradingRevision?: number }, db: Prisma.TransactionClient = this.prisma) {
+  async authorize(identity: SupabaseIdentity, input: { academyId: string; materialId: string; preview?: boolean; gradingRevision?: number }) {
     const actor = await this.access.requirePermission(identity.authUserId, input.academyId, "curriculum.read");
+    return this.authorizedMaterial(actor, input, this.prisma);
+  }
+
+  /** Permission/DLAB/support checks finish before a transaction holds its pool connection. */
+  private async authorizedMaterial(actor: AcademyAccess, input: { academyId: string; materialId: string; preview?: boolean; gradingRevision?: number }, db: Prisma.TransactionClient) {
     // Platform inspection (and assumed support roles) never confers personal participation.
     if (actor.via !== "membership" || !rolesHavePermission(actor.roles, "practice.own.create")) {
       throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
@@ -97,7 +102,7 @@ export class StaffPracticeService {
       throw new AppException("SUBMISSION_RATE_LIMITED", HttpStatus.TOO_MANY_REQUESTS);
     }
     const attempt = existing ?? await snapshotTransaction(this.prisma, async tx => {
-      const { material, exercise } = await this.authorize(identity, input, tx);
+      const { material, exercise } = await this.authorizedMaterial(actor, input, tx);
       if (exercise.submissionPolicy === "PRACTICE_ONLY") throw new AppException("EXERCISE_PRACTICE_ONLY", HttpStatus.BAD_REQUEST);
       const quiz = exercise.quiz == null ? null : quizDefinitionSchema.parse(exercise.quiz);
       if (quiz && !quiz.choices.some((choice) => choice.id === input.code)) {
@@ -109,7 +114,7 @@ export class StaffPracticeService {
       const descriptor = quiz ? null : await this.native().select({
         academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision,
         context: input.preview ? "preview" : "live", kind: "staff-practice",
-      }, exercise);
+      }, exercise, tx);
       const grading = gradingSnapshotFor(exercise, { engineVersion: String(this.config.get("PYODIDE_VERSION")), descriptor });
       const snapshot = practiceSnapshotSchema.parse({
         version: 1, courseId: material.lecture.courseModule.courseId, gradingRevision: exercise.gradingRevision,

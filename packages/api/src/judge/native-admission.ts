@@ -1,5 +1,6 @@
 import { open } from "node:fs/promises";
 import { nativeReleaseManifestSchema, nativeRuntimeDescriptorSchema, type NativeReleaseManifest, type NativeRuntimeDescriptor } from "@cove/shared";
+import type { Prisma } from "../generated/prisma/client.js";
 import type { PrismaService } from "../database/prisma.service.js";
 import type { ExerciseGradingSource } from "./grading-profile.js";
 import { runtimeQueueName, type JudgeQueue } from "./judge.queue.js";
@@ -49,31 +50,33 @@ export type NativeAdmissionContext = {
 export class NativeAdmission {
   private manifest?: Promise<NativeReleaseManifest>;
   constructor(private readonly config: { get(key: string): unknown }, private readonly prisma: PrismaService, private readonly queue?: JudgeQueue) {}
-  async select(context: NativeAdmissionContext, exercise: ExerciseGradingSource): Promise<NativeRuntimeDescriptor | null> {
+  async select(context: NativeAdmissionContext, exercise: ExerciseGradingSource, reader: Pick<Prisma.TransactionClient, "academy"> = this.prisma): Promise<NativeRuntimeDescriptor | null> {
     if (this.config.get("NATIVE_GRADING_ENABLED") !== true || !this.queue) return null;
     if (this.config.get("NATIVE_GRADING_BRIDGE_ACK") !== "filtered-compatibility-workers-v1") throw new Error("Native admission requires completed filtered compatibility worker rollout");
     const path = this.config.get("NATIVE_GRADING_MANIFEST") as string | undefined;
     if (!path) throw new Error("Enabled native admission requires a manifest");
     const manifest = await (this.manifest ??= loadNativeManifest(path));
-    return this.certified(manifest, context, exercise);
+    return this.certified(manifest, context, exercise, reader, true);
   }
   /** Repairs retain their original family. A new native revision needs explicit certification. */
-  async retain(descriptor: NativeRuntimeDescriptor, context: NativeAdmissionContext, exercise: ExerciseGradingSource) {
+  async retain(descriptor: NativeRuntimeDescriptor, context: NativeAdmissionContext, exercise: ExerciseGradingSource, reader: Pick<Prisma.TransactionClient, "academy"> = this.prisma) {
     const path = this.config.get("NATIVE_GRADING_MANIFEST") as string | undefined;
     if (!path || !this.queue) throw new Error("Native repair requires retained certification");
     const manifest = await (this.manifest ??= loadNativeManifest(path));
-    const selected = await this.certified(manifest, context, exercise);
+    // Accepted repairs wait for their recorded capacity; Redis availability cannot change their durable intent.
+    const selected = await this.certified(manifest, context, exercise, reader, false);
     if (!selected || runtimeQueueName("official", descriptor) !== runtimeQueueName("official", selected)) throw new Error("Native repair is not certified for its retained runtime");
     return selected;
   }
-  private async certified(manifest: NativeReleaseManifest, context: NativeAdmissionContext, exercise: ExerciseGradingSource) {
+  private async certified(manifest: NativeReleaseManifest, context: NativeAdmissionContext, exercise: ExerciseGradingSource, reader: Pick<Prisma.TransactionClient, "academy">, requireReady: boolean) {
     if (exercise.memoryLimitMb > 512 || exercise.testCases.length > 10 || !exercise.testCases.length ||
       Buffer.byteLength(exercise.testCases.map(c => c.input).join(""), "utf8") > 65536) return null;
-    const academy = await this.prisma.academy.findUnique({ where: { id: context.academyId }, select: { organizationId: true } });
+    const academy = await reader.academy.findUnique({ where: { id: context.academyId }, select: { organizationId: true } });
     if (!academy || !manifest.eligibility.some(e => e.organizationId === academy.organizationId &&
       e.academyId === context.academyId && e.materialId === context.materialId && e.gradingRevision === context.gradingRevision &&
       e.context === context.context && e.kinds.includes(context.kind) && e.memoryLimitMb === exercise.memoryLimitMb &&
       e.timeLimitMs === exercise.timeLimitMs && exercise.testCases.every(c => (c.timeLimitMsOverride ?? exercise.timeLimitMs) <= e.timeLimitMs))) return null;
+    if (!requireReady) return manifest.descriptor;
     const redis = await this.queue!.redis();
     const count = Number(await redis.eval(READ_READY, 1, nativeReadinessKey(manifest.descriptor, context.kind === "official" ? "official" : "background")));
     return count > 0 ? manifest.descriptor : null;

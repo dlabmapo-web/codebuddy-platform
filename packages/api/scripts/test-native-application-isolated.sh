@@ -12,6 +12,7 @@ native_id="$(date +%s)-$$-$(openssl rand -hex 4)"
 export COVE_NATIVE_FIXTURE_ID="$native_id"
 native_pg="cove-native-app-pg-$native_id"
 native_redis="cove-native-app-redis-$native_id"
+export COVE_NATIVE_TEST_DOCKER_ENDPOINT="$native_docker_endpoint" COVE_NATIVE_TEST_REDIS_CONTAINER="$native_redis"
 cleanup() {
   for native_container in "$native_pg" "$native_redis"; do
     if [ "$(docker inspect -f '{{index .Config.Labels "cove.native.task2"}}' "$native_container" 2>/dev/null || true)" = "$native_id" ]; then docker rm -fv "$native_container" >/dev/null; fi

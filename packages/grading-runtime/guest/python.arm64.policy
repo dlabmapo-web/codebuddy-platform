@@ -1,0 +1,23 @@
+// Default-deny: no external sockets, clone/fork, exec variants, ptrace, mounts, BPF,
+// keyrings, userfaultfd, io_uring, namespace changes or credential transitions.
+// execve is required for the initial trusted CPython exec; the read-only root
+// contains only the Python runtime and policy forbids process creation.
+POLICY python {
+  ALLOW {
+    read, write, readv, writev, close, close_range,
+    newfstat, newfstatat, statx, lseek, openat, readlinkat, getdents64,
+    mmap, mprotect, munmap, mremap, madvise, brk,
+    rt_sigaction, rt_sigprocmask, rt_sigreturn, sigaltstack,
+    futex, set_tid_address, set_robust_list, rseq,
+    getpid, getppid, gettid, getuid, geteuid, getgid, getegid,
+    clock_gettime, clock_getres, gettimeofday, nanosleep, clock_nanosleep,
+    getrandom, newuname, sysinfo, sched_getaffinity, sched_yield,
+    prlimit64, getrlimit, getrusage, fcntl, ioctl,
+    dup, dup3, pipe2, ppoll, pselect6,
+    faccessat, faccessat2,
+    mkdirat, unlinkat, renameat, renameat2, ftruncate, fsync, fdatasync,
+    umask, fchmod, fchown, chdir, fchdir, getcwd,
+    execve, exit, exit_group, restart_syscall
+  }
+}
+USE python DEFAULT KILL

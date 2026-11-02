@@ -33,7 +33,7 @@ for native_clients in 1 2 4; do
   setpriv --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs \
    "$native_node" --max-old-space-size=256 "$native_repo/packages/api/scripts/benchmark-native-classroom.mjs" \
    --fixture "$native_work/authority.json" --output "$native_work/evidence/application-$native_clients-$native_cases.json" \
-   --clients "$native_clients" --cases "$native_cases" --generator-concurrency 2 --max-seconds 60 --authorize-isolated-load
+   --clients "$native_clients" --cases "$native_cases" --generator-concurrency "$native_clients" --max-seconds 60 --authorize-isolated-load
  done
  done
 # Bounded actual Next smoke; mixed 2-client subset does not satisfy full-corpus/fleet SLO.

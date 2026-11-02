@@ -60,7 +60,20 @@ systemd-run --unit="$native_unit" --wait --pipe --collect \
  2>&1 | tee "$native_evidence/unit-$1.log"
 }
 native_unit="cove-$native_project-kernel"
-run_native_unit kernel-only
+native_kernel_started="$(date --iso-8601=seconds)"
+if ! run_native_unit kernel-only; then
+ # Private denial metadata plus a fixed trusted interpreter startup trace. This
+ # never executes learner source and cannot certify containment/performance.
+ journalctl -k --since "$native_kernel_started" --no-pager | grep -E 'SECCOMP|seccomp|type=1326' | tail -30 > "$native_evidence/kernel-denials.log" || true
+ if command -v strace >/dev/null; then
+  timeout 5s env -i PATH="$PATH" HOME=/nonexistent \
+   strace -f -qq -s 80 -o "$native_evidence/trusted-startup.strace" \
+   chroot --userspec=65534:65534 "$native_artifact/rootfs" \
+   /usr/local/bin/python3.12 -I -B -c 'import json, sys; print(sys.version.split()[0])' \
+   > "$native_evidence/trusted-startup.log" 2>&1 || true
+ fi
+ exit 78
+fi
 native_unit="cove-$native_project"
 compose up -d --wait --wait-timeout 60
 native_pg="$(compose ps -q postgres)"; native_redis="$(compose ps -q redis)"

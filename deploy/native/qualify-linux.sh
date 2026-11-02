@@ -54,12 +54,11 @@ PYPORT
 )
 native_auth_origin="http://127.0.0.1:$native_auth_port";native_api_origin="http://127.0.0.1:$native_api_port";native_web_origin="http://127.0.0.1:$native_web_port"
 env -i PATH="$PATH" HOME="$HOME" DOTENV_CONFIG_PATH=/dev/null pnpm --dir "$native_repo" --filter @cove/shared --filter @cove/i18n build > "$native_evidence/i18n-build.log" 2>&1
-env -i PATH="$PATH" HOME="$HOME" DOTENV_CONFIG_PATH=/dev/null TURTLE_BROWSER_PARENT_ORIGIN="$native_web_origin" pnpm --dir "$native_repo" --filter @cove/turtle-browser-runtime build > "$native_evidence/turtle-runtime-build.log" 2>&1
 bash "$native_repo/deploy/native/build-next-fixture.sh" "$native_work/next-source" "$native_auth_origin" "$native_api_origin" "$native_web_origin" > "$native_evidence/next-build.log" 2>&1
 native_next_id="sha256:$(sha256sum "$native_work/next-source/packages/web/.next/BUILD_ID" | cut -d' ' -f1)"
 # Unit source/learner artifacts are immutable. Only this owned cgroup subtree and work dir are writable.
 systemd-run --unit="$native_unit" --wait --pipe --collect \
- --property=Delegate=cpu,memory,pids --property=MemoryMax=2560M --property=MemorySwapMax=0 \
+ --property='Delegate=cpu memory pids' --property=MemoryMax=2560M --property=MemorySwapMax=0 \
  --property=CPUQuota=200% --property=TasksMax=256 --property=RuntimeMaxSec=900 \
  --property=KillMode=control-group --property=TimeoutStopSec=25 \
  --property=CapabilityBoundingSet='CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_SETUID CAP_SETGID CAP_SYS_RESOURCE CAP_DAC_OVERRIDE CAP_CHOWN CAP_SETPCAP' \

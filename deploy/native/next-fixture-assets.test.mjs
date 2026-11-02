@@ -19,6 +19,13 @@ test('sanitized fixture generates and really serves Monaco loader/worker and noV
         const generated = await promisify(execFile)('bash', [join(repo, 'deploy/native/build-next-fixture.sh'), source,
             'http://127.0.0.1:4420', 'http://127.0.0.1:4419', 'http://127.0.0.1:3409', '--assets-only'], { timeout: 45000, maxBuffer: 1024 * 1024 });
         const web = join(source, 'packages/web');
+        let turtleConfig = '';
+        try {
+            const turtle = join(source, 'packages/turtle-browser-runtime/dist');
+            const manifest = JSON.parse(await readFile(join(turtle, 'manifest.json'), 'utf8'));
+            turtleConfig = await readFile(join(turtle, manifest.id, 'config.mjs'), 'utf8');
+        } catch (error) { if (error.code !== 'ENOENT') throw error; }
+        assert.equal(turtleConfig, 'export const parentOrigin = "http://127.0.0.1:3409";\n', 'fixture must build its own Turtle assets with the exact loopback parent');
         assert.ok(!(await readdir(web)).some(name => name.startsWith('.env') || name === '.auth'));
         const version = require('monaco-editor/package.json').version;
         const worker = (await readdir(join(dirname(require.resolve('monaco-editor/package.json')), 'min/vs/assets'))).find(name => /^editor\.worker-.*\.js$/.test(name));

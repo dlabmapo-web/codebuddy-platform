@@ -22,9 +22,14 @@ for raw in subprocess.check_output(['git','-C',str(root),'ls-files','-z']).split
  target=dest/rel;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,target)
 for name in ('web','shared','i18n','turtle-browser-runtime'):
  target=dest/'packages'/name/'node_modules';target.symlink_to(root/'packages'/name/'node_modules',target_is_directory=True)
- if name!='web' and (root/'packages'/name/'dist').exists():shutil.copytree(root/'packages'/name/'dist',dest/'packages'/name/'dist')
+ if name in ('shared','i18n') and (root/'packages'/name/'dist').exists():shutil.copytree(root/'packages'/name/'dist',dest/'packages'/name/'dist')
 (dest/'node_modules').symlink_to(root/'node_modules',target_is_directory=True)
 PY
+# Build fixture-bound Turtle assets in this private copy. Production builds keep
+# their strict HTTPS default; only this explicit loopback fixture sets local mode.
+env -i PATH="$PATH" HOME="$HOME" DOTENV_CONFIG_PATH=/dev/null COVE_TURTLE_BROWSER_LOCAL=1 \
+ TURTLE_BROWSER_PARENT_ORIGIN="$native_web" \
+ pnpm --dir "$native_dest/packages/turtle-browser-runtime" run build
 # Run the actual package generators in the sanitized tree before Next compilation.
 native_web_command() {
  env -i PATH="$PATH" HOME="$HOME" NEXT_TELEMETRY_DISABLED=1 DOTENV_CONFIG_PATH=/dev/null \

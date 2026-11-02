@@ -473,15 +473,16 @@ export class NsJailBackend implements NativeBackend {
         // EOF on the control pipe may arrive before stderr/exit notifications.
         // Keep diagnostics bounded without delaying cleanup indefinitely.
         let diagnosticTimer: ReturnType<typeof setTimeout> | undefined;
+        let supervisorExit: { code: number | null; signal: string | null } | undefined;
         try {
           await Promise.race([
-            processClosed?.catch(() => {}),
-            new Promise<void>(resolve => { diagnosticTimer = setTimeout(resolve, 100); }),
+            processClosed?.then(exit => { supervisorExit = exit; }).catch(() => {}),
+            new Promise<void>(resolve => { diagnosticTimer = setTimeout(resolve, 1500); }),
           ]);
         } finally { clearTimeout(diagnosticTimer); }
         throw new NativeInfrastructureError(
           cause instanceof NativeInfrastructureError ? cause.message : "Native launcher failure",
-          { cause: { startupLog: await readStartupLog(join(directory, "nsjail.log")), startupStderr: startupStderr?.text().slice(0, 8192), original: cause } },
+          { cause: { startupLog: await readStartupLog(join(directory, "nsjail.log")), startupStderr: startupStderr?.text().slice(0, 8192), supervisorExit, original: cause } },
         );
       }
       if (cause instanceof NativeInfrastructureError) throw cause;

@@ -357,7 +357,9 @@ export class NsJailBackend implements NativeBackend {
       );
       if (signal.aborted)
         throw new NativeInfrastructureError("Cancelled before launch");
-      child = spawn(o.nsjailPath, ["--config", join(directory, "jail.cfg")], {
+      // Require mount_setattr/open_tree rather than legacy remounts that clear
+      // locked inherited flags in a user namespace. Never fall back silently.
+      child = spawn(o.nsjailPath, ["--config", join(directory, "jail.cfg"), "--experimental_mnt", "new"], {
         env: { PATH: "/usr/sbin:/usr/bin:/sbin:/bin", LANG: "C.UTF-8" },
         cwd: directory,
         stdio: ["pipe", "pipe", "pipe", "pipe"],

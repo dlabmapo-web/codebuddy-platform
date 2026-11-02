@@ -24,6 +24,9 @@ all non-glibc dependencies must resolve inside that artifact's launcher-lib.
 On ordinary Docker Desktop, run `bash deploy/native/local-gate.sh IMAGE_ID`.
 Exit 78 is a failed/unsupported **actual** native gate. Do not grant privileges,
 mount host cgroups or change security controls to make it green.
+The launcher explicitly requires the pinned NsJail's new mount API
+(`open_tree`/`mount_setattr`); it does not fall back to legacy remounts. The
+pre-execution gate still verifies the read-only root and writable bounded scratch.
 
 For an approved disposable systemd Linux host only (install Chromium with `PLAYWRIGHT_BROWSERS_PATH=/absolute/fixture-browsers pnpm exec playwright install --with-deps chromium` first and export that same path):
 

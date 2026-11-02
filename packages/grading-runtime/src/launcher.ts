@@ -29,6 +29,7 @@ import { ByteCapture } from "./framing.js";
 import { jailConfig, NSJAIL_REVISION } from "./policy.js";
 import { fileDigest, rootfsDigest } from "./identity.js";
 import { verifyCgroupLimits } from "./cgroup-limits.js";
+import { readStartupLog } from "./startup-log.js";
 import {
   readControl,
   childGroups,
@@ -464,6 +465,12 @@ export class NsJailBackend implements NativeBackend {
       };
       return completedResult;
     } catch (cause) {
+      if (started === undefined && directory) {
+        throw new NativeInfrastructureError(
+          cause instanceof NativeInfrastructureError ? cause.message : "Native launcher failure",
+          { cause: { startupLog: await readStartupLog(join(directory, "nsjail.log")), original: cause } },
+        );
+      }
       if (cause instanceof NativeInfrastructureError) throw cause;
       throw new NativeInfrastructureError("Native launcher failure", { cause });
     } finally {

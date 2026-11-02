@@ -113,7 +113,7 @@ try {
     }
 }
 catch (error) {
-    console.error(JSON.stringify({ gate: 'actual-linux-native', status: 'UNSUPPORTED_OR_FAILED', passed, error: String(error) }));
+    console.error(JSON.stringify({ gate: 'actual-linux-native', status: 'UNSUPPORTED_OR_FAILED', passed, error: String(error), startupLog: error?.cause?.startupLog }));
     process.exitCode = 78;
 }
 finally {

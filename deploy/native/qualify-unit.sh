@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-native_work="$1"; native_repo="$2"; native_artifact="$native_work/artifact"
+native_work="$1"; native_repo="$2"; native_artifact="${3:?Explicit immutable artifact directory required}"
 native_cgroup="/sys/fs/cgroup$(sed -n 's/^0:://p' /proc/self/cgroup)"
 case "$native_cgroup" in /sys/fs/cgroup/system.slice/cove-native-*.service) ;; *) echo 'Refusing nonfixture delegated unit' >&2; exit 78;; esac
 mkdir "$native_cgroup/service"

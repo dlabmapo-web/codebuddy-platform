@@ -40,8 +40,8 @@ iface_no_lo: true
 uidmap { inside_id: "65534" outside_id: "65534" count: 1 }
 gidmap { inside_id: "65534" outside_id: "65534" count: 1 }
 mount_proc: false
-mount { src: ${q(paths.rootfs)} dst: "/" is_bind: true rw: false nosuid: true nodev: true }
-mount { dst: "/tmp" fstype: "tmpfs" options: "size=${resources.scratchMb * 1024 * 1024},mode=1777" rw: true nosuid: true nodev: true noexec: true }
+mount { src: ${q(paths.rootfs)} dst: "/" is_dir: true is_bind: true rw: false nosuid: true nodev: true }
+mount { dst: "/tmp" is_dir: true fstype: "tmpfs" options: "size=${resources.scratchMb * 1024 * 1024},mode=1777" rw: true nosuid: true nodev: true noexec: true }
 seccomp_policy_file: ${q(paths.policy)}
 pass_fd: 3
 use_cgroupv2: true

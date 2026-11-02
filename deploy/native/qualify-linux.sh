@@ -14,6 +14,11 @@ export COVE_NATIVE_FIXTURE_ID="native-$(date +%s)-$$-$(openssl rand -hex 4)"
 native_project="$COVE_NATIVE_FIXTURE_ID"
 native_unit="cove-$native_project"
 native_work="$(mktemp -d /run/cove-native-qualification-XXXXXXXX)"
+# Static credential-free assets must be traversable by the mapped host UID while
+# NsJail builds mounts. Secret configuration/socket/case work stays under0700.
+native_assets="$(mktemp -d /run/cove-native-assets-XXXXXXXX)"
+chmod 0711 "$native_assets"
+native_artifact="$native_assets/artifact"
 native_container=''
 compose() { docker compose -p "$native_project" -f "$native_repo/deploy/native/fixture.compose.yml" "$@"; }
 cleanup() {
@@ -27,13 +32,16 @@ cleanup() {
  if [ -n "$native_container" ] && [ "$(docker inspect -f '{{index .Config.Labels "cove.native.qualification"}}' "$native_container" 2>/dev/null || true)" = "$COVE_NATIVE_FIXTURE_ID" ]; then docker rm "$native_container" >/dev/null; fi
  cp -a "$native_work/evidence/." "$native_evidence/" 2>/dev/null || true
  rm -rf -- "$native_work"
+ rm -rf -- "$native_assets"
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 docker image inspect "$native_image" > "$native_evidence/image.json"
 native_container="$(docker create --label "cove.native.qualification=$COVE_NATIVE_FIXTURE_ID" "$native_image")"
-docker cp "$native_container:/opt/cove" "$native_work/artifact"
+docker cp "$native_container:/opt/cove" "$native_artifact"
+setpriv --reuid=65534 --regid=65534 --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs \
+ /usr/bin/test -r "$native_artifact/rootfs/opt/cove/bootstrap.py"
 mkdir -m 700 "$native_work/evidence"
 compose up -d --wait --wait-timeout 60
 native_pg="$(compose ps -q postgres)"; native_redis="$(compose ps -q redis)"
@@ -62,10 +70,10 @@ systemd-run --unit="$native_unit" --wait --pipe --collect \
  --property=CPUQuota=200% --property=TasksMax=256 --property=RuntimeMaxSec=900 \
  --property=KillMode=control-group --property=TimeoutStopSec=25 \
  --property=CapabilityBoundingSet='CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_SETUID CAP_SETGID CAP_SYS_RESOURCE CAP_DAC_OVERRIDE CAP_CHOWN CAP_SETPCAP' \
- --property=ProtectSystem=strict --property="ReadOnlyPaths=$native_work/artifact $native_repo" \
+ --property=ProtectSystem=strict --property="ReadOnlyPaths=$native_artifact $native_repo" \
  --property="ReadWritePaths=$native_work /sys/fs/cgroup/system.slice/$native_unit.service" \
  --property=NoNewPrivileges=yes --property=PrivateTmp=yes \
  /usr/bin/env -i PATH="$PATH" HOME=/nonexistent DOTENV_CONFIG_PATH=/dev/null \
  "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:?Explicit fixture browser installation path required}" "COVE_NATIVE_AUTH_PORT=$native_auth_port" "COVE_NATIVE_API_PORT=$native_api_port" "COVE_NATIVE_NEXT_ORIGIN=$native_web_origin" "COVE_NATIVE_NEXT_BUILD_ID=$native_next_id" "COVE_NATIVE_FIXTURE_ID=$COVE_NATIVE_FIXTURE_ID" "DATABASE_URL=$native_db" "REDIS_URL=$native_redis_url" \
- /bin/bash "$native_repo/deploy/native/qualify-unit.sh" "$native_work" "$native_repo" \
+ /bin/bash "$native_repo/deploy/native/qualify-unit.sh" "$native_work" "$native_repo" "$native_artifact" \
  2>&1 | tee "$native_evidence/unit.log"

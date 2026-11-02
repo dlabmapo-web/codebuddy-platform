@@ -1,5 +1,18 @@
 # Native grading implementation evidence — 2026-11-02
 
+## Later Linux qualification
+
+After the source-completion snapshot below, the user authorized a feature push
+and disposable Linux qualification. Actual containment, bounded application,
+real Next browser and execution-marker crash gates passed on AMD64. See the
+[Linux qualification evidence](2026-11-02-native-grading-linux-qualification.md)
+for the run, exact identities, timings and remaining 200-student release gates.
+Production admission remains disabled.
+
+## Original source-completion snapshot
+
+The statements below describe the state before that authorized Linux follow-up.
+
 Source implementation is complete for the three scoped tasks. Native Linux
 containment, actual Next browser latency and classroom/fleet release gates remain
 **unpassed**. Native production admission remains disabled; manifests generated

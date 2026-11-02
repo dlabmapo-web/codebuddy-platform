@@ -1,6 +1,8 @@
 # Native node and disposable qualification
 
-This source is implemented; actual Linux and classroom release gates are unpassed.
+The disposable AMD64 Linux containment, bounded application, actual Next browser
+and launcher-crash qualification passed. See the [measured evidence](../../docs/research/2026-11-02-native-grading-linux-qualification.md).
+The 200-student classroom/fleet release gates remain unpassed.
 Nothing here changes production defaults. No executor port or Docker socket is
 exposed to learner execution. An empty eligibility list admits zero new work.
 
@@ -33,7 +35,8 @@ For an approved disposable systemd Linux host only (install Chromium with `PLAYW
 ```
 pnpm install --frozen-lockfile
 pnpm native:build
-sudo env PATH="$PATH" HOME=/root bash deploy/native/qualify-linux.sh \
+sudo env PATH="$PATH" HOME=/root PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" \
+  bash deploy/native/qualify-linux.sh \
   --isolated-host sha256:ACTUAL_LOCAL_IMAGE_ID /absolute/new-evidence-directory
 ```
 
@@ -136,8 +139,10 @@ exercise URLs, reviewed corpus sources and the independently committed grade.
 The fixture's `/ready`, `/cohort`, `/submit`, `/result` and `/commit` endpoints
 are implemented in `application-fixture.mjs`; operators do not need to author
 another server. The qualifier runs the actual Next two-client/ten-case smoke
-under Xvfb after application cohorts. The actual Linux/Next execution remains
-unpassed here because the local native kernel gate fails first.
+under Xvfb after application cohorts. The bounded actual Linux/Next execution passed on the disposable AMD64 runner.
+Docker Desktop remains unsupported when its delegated kernel prerequisites fail;
+that local refusal is not skipped or repaired. See the linked evidence for the
+exact tested counts and remaining classroom gates.
 
 The frozen application profile currently enforces an 8 MiB output ceiling. This
 fixture records that actual ceiling and its separate <=128-byte generated-output

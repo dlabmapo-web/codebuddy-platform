@@ -9,6 +9,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import { totalmem, availableParallelism } from 'node:os';
+import { createRequire } from 'node:module';
 const [artifactArg, configPath, authorityPath] = process.argv.slice(2);
 if (!artifactArg || !configPath || !authorityPath || process.env.DOTENV_CONFIG_PATH !== '/dev/null' || !/^native-[a-z0-9-]{8,80}$/.test(process.env.COVE_NATIVE_FIXTURE_ID ?? ''))
     throw Error('Explicit isolated sanitized fixture required');
@@ -48,6 +49,7 @@ let materialId, cases = 0;
 const nextOrigin = process.env.COVE_NATIVE_NEXT_ORIGIN;
 const provider = nextOrigin ? nextAuthFixture(nextOrigin) : undefined;
 let nativeApiReady = !nextOrigin;
+let createNextApiClient;
 if (nextOrigin) {
     const u = new URL(nextOrigin);
     if (u.hostname !== '127.0.0.1' || u.protocol !== 'http:' || !u.port)
@@ -123,7 +125,22 @@ try {
                         students.set(id, { id, authId, workload });
                         people.push({ id, workload });
                     }
-                    value = { students: people, bounds: { memoryLimitMb: 512, executionOutputLimitBytes: 8388608, generatedMaxOutputBytes: 128, sourceChars: Math.max(...classroomCorpus.map(c => c.code.length)), aggregateStdinBytes: Array.from({ length: cases }, (_, i) => Buffer.byteLength('학생' + i)).reduce((a, b) => a + b, 0) }, nextStudents: provider ? people.map(p => ({ id: p.id, url: nextOrigin + '/academy/nf-' + ids.academy + '/learn/exercises/' + materialId + '?classId=' + ids.class, storageState: provider.storageState(students.get(p.id), 'http://127.0.0.1:' + server.address().port) })) : undefined, materialId, academyId: ids.academy, classId: ids.class };
+                    let nextStudents;
+                    if (provider) {
+                        nextStudents = [];
+                        for (const person of people) {
+                            const storageState = provider.storageState(students.get(person.id), origin);
+                            const cookie = storageState.cookies.find(value => value.name === 'sb-127-auth-token');
+                            const session = JSON.parse(Buffer.from(cookie.value.slice(7), 'base64url'));
+                            const client = createNextApiClient(session.access_token);
+                            // Match real sign-in completion: authenticated cookies alone do
+                            // not create the mandatory server-side student inactivity lease.
+                            await client.studentSession.begin({});
+                            await client.learn.getMaterialType({ academyId: ids.academy, materialId });
+                            nextStudents.push({ id: person.id, url: nextOrigin + '/academy/nf-' + ids.academy + '/learn/exercises/' + materialId + '?classId=' + ids.class, storageState });
+                        }
+                    }
+                    value = { students: people, bounds: { memoryLimitMb: 512, executionOutputLimitBytes: 8388608, generatedMaxOutputBytes: 128, sourceChars: Math.max(...classroomCorpus.map(c => c.code.length)), aggregateStdinBytes: Array.from({ length: cases }, (_, i) => Buffer.byteLength('학생' + i)).reduce((a, b) => a + b, 0) }, nextStudents, materialId, academyId: ids.academy, classId: ids.class };
                 }
                 else if (url.pathname === '/submit') {
                     const student = students.get(input.studentId);
@@ -161,6 +178,10 @@ try {
         NestFactory.create = async (...args) => loopbackApplication(await create(...args), () => { nativeApiReady = true; });
         process.chdir(dirname(authorityPath));
         await load('/dist/src/main.js');
+        const webRequire = createRequire(resolve(dirname(authorityPath), 'next-source/packages/web/package.json'));
+        const { createORPCClient } = await import(pathToFileURL(webRequire.resolve('@orpc/client')));
+        const { RPCLink } = await import(pathToFileURL(webRequire.resolve('@orpc/client/fetch')));
+        createNextApiClient = accessToken => createORPCClient(new RPCLink({ url: 'http://127.0.0.1:' + process.env.COVE_NATIVE_API_PORT + '/api/rpc', headers: { Authorization: 'Bearer ' + accessToken, 'X-Cove-Bff-Secret': process.env.BFF_SHARED_SECRET } }));
     }
     await writeFile(authorityPath, JSON.stringify({ version: 1, isolated: true, fixtureId, pid: process.pid, token, expiresAt: Date.now() + 900000, origin, next: nextOrigin ? { origin: nextOrigin, apiOrigin: 'http://127.0.0.1:' + process.env.COVE_NATIVE_API_PORT, buildIdentity: process.env.COVE_NATIVE_NEXT_BUILD_ID } : undefined }), { mode: 0o600, flag: 'wx' });
     console.log(JSON.stringify({ fixtureId, origin, authorityPath, workerWarmMs }));

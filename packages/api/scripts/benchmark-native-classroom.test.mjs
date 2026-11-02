@@ -3,8 +3,32 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, chmod, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseArgs, loadAuthority, loopback, summarize, assertSloEvidence, matchesExpectedGrade } from './benchmark-native-classroom.mjs';
+import { parseArgs, loadAuthority, loopback, summarize, assertSloEvidence, matchesExpectedGrade, awaitNativeReadiness } from './benchmark-native-classroom.mjs';
 const args = ['--fixture', '/fixture', '--output', '/report'];
+test('readiness waits for real component startup before admitting a cohort', { timeout: 3000 }, async () => {
+    const { createServer } = await import('node:http');
+    let requests = 0;
+    const server = createServer((request, response) => {
+        requests++;
+        response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ fixtureId: 'native-ready-fixture', backend: 'nsjail', ready: requests >= 3, checks: { api: requests >= 3 } }));
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    try {
+        const deadline = performance.now() + 1500, observed = [];
+        const remaining = () => { const value = deadline - performance.now(); if (value <= 0) throw Error('Overall benchmark deadline'); return value; };
+        const ready = await awaitNativeReadiness(async () => (await fetch(`http://127.0.0.1:${server.address().port}/ready`)).json(), 'native-ready-fixture', remaining, value => observed.push(value));
+        assert.equal(ready.ready, true);
+        assert.equal(observed[0].checks.api, false);
+        assert.equal(requests, 3);
+    } finally { await new Promise(resolve => server.close(resolve)); }
+});
+
+test('readiness refuses another fixture and bounds a permanently unready component', async () => {
+    await assert.rejects(awaitNativeReadiness(async () => ({ fixtureId: 'other', backend: 'nsjail', ready: true }), 'native-ready-fixture', () => 1000));
+    const deadline = performance.now() + 25;
+    await assert.rejects(awaitNativeReadiness(async () => ({ fixtureId: 'native-ready-fixture', backend: 'nsjail', ready: false }), 'native-ready-fixture', () => Math.max(0, deadline - performance.now())), /readiness|deadline/);
+    assert.ok(performance.now() - deadline < 150);
+});
 test('bounded defaults and larger cohorts require explicit authorization', () => { assert.equal(parseArgs(args).clients, 2); for (const extra of [['--clients', '200'], ['--clients', '3'], ['--cases', '2'], ['--max-seconds', '0'], ['--generator-concurrency', '201'], ['--assert-slo']])
     assert.throws(() => parseArgs([...args, ...extra])); assert.equal(parseArgs([...args, '--clients', '200', '--authorize-isolated-load']).clients, 200); });
 test('refuses production URLs and preserves all failures in denominator', () => { for (const url of ['https://cove.ac', 'http://localhost:4000', 'http://127.0.0.1', 'http://user:pw@127.0.0.1:3000'])

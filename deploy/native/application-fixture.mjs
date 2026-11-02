@@ -96,7 +96,8 @@ try {
             let value;
             if (request.method === 'GET' && url.pathname === '/ready') {
                 const health = await probe.health();
-                value = { ready: health.ready && await worker.health() && nativeApiReady && (!nextOrigin || await fetch(nextOrigin + '/login', { redirect: 'manual', signal: AbortSignal.timeout(5000) }).then(r => r.status < 500)), fixtureId, backend: 'nsjail', runtimeFingerprint: nativeRuntimeVersion(manifest.descriptor), workerWarmMs, resources: { configured: manifest.resources, physicalMemoryBytes: totalmem(), effectiveCpus: availableParallelism(), controls: Object.fromEntries(await Promise.all(['cpu.max', 'memory.max', 'memory.current', 'memory.peak', 'memory.events', 'memory.swap.max', 'pids.max', 'pids.current', 'cpu.stat'].map(async (name) => [name, (await readFile(config.cgroupRoot + '/' + name, 'utf8')).trim()]))), health }, timings: worker.metrics() };
+                const checks = { launcher: health.ready, worker: await worker.health(), api: nativeApiReady, next: !nextOrigin || await fetch(nextOrigin + '/login', { redirect: 'manual', signal: AbortSignal.timeout(5000) }).then(r => r.status < 500) };
+                value = { ready: Object.values(checks).every(value => value === true), checks, fixtureId, backend: 'nsjail', runtimeFingerprint: nativeRuntimeVersion(manifest.descriptor), workerWarmMs, resources: { configured: manifest.resources, physicalMemoryBytes: totalmem(), effectiveCpus: availableParallelism(), controls: Object.fromEntries(await Promise.all(['cpu.max', 'memory.max', 'memory.current', 'memory.peak', 'memory.events', 'memory.swap.max', 'pids.max', 'pids.current', 'cpu.stat'].map(async (name) => [name, (await readFile(config.cgroupRoot + '/' + name, 'utf8')).trim()]))), health }, timings: worker.metrics() };
             }
             else if (request.method === 'POST') {
                 let body = '';

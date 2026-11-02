@@ -64,6 +64,21 @@ export function createFixtureRpc(fixture, remaining) {
     return async (path, data) => { const response = await fetch(fixture.origin + path, { method: data ? 'POST' : 'GET', headers: { Authorization: 'Bearer ' + fixture.token, 'Content-Type': 'application/json' }, body: data ? JSON.stringify(data) : undefined, redirect: 'error', signal: AbortSignal.timeout(Math.max(1, Math.floor(Math.min(15000, remaining())))) }); if (!response.ok)
         throw Error('Fixture HTTP ' + response.status); return response.json(); };
 }
+export async function awaitNativeReadiness(rpc, fixtureId, remaining, observe = () => {}) {
+    const deadline = performance.now() + Math.min(15000, remaining());
+    for (;;) {
+        if (Math.min(deadline - performance.now(), remaining()) <= 0)
+            throw Error('Actual native readiness deadline; no cohort admitted');
+        const ready = await rpc('/ready');
+        observe(ready);
+        if (ready.fixtureId !== fixtureId || ready.backend !== 'nsjail')
+            throw Error('Actual native readiness fixture/backend mismatch');
+        if (ready.ready === true) return ready;
+        const wait = Math.min(100, deadline - performance.now(), remaining());
+        if (wait <= 0) throw Error('Actual native readiness deadline; no cohort admitted');
+        await new Promise(resolve => setTimeout(resolve, wait));
+    }
+}
 async function main() {
     const options = parseArgs(process.argv.slice(2)), fixture = await loadAuthority(options.fixture);
     await lstat(options.output).then(() => { throw Error('Output already exists'); }, error => { if (error.code !== 'ENOENT') throw error; });
@@ -97,9 +112,7 @@ async function main() {
         }
         for (let burst = 0; burst < options.bursts; burst++) {
             const readinessAt = performance.now();
-            const ready = await rpc('/ready');
-            if (!ready.ready || ready.fixtureId !== fixture.fixtureId || ready.backend !== 'nsjail')
-                throw Error('Actual native readiness required before every cohort');
+            const ready = await awaitNativeReadiness(rpc, fixture.fixtureId, remaining, value => { report.lastReadiness = value; });
             const readinessMs = performance.now() - readinessAt;
             const cohort = await rpc('/cohort', { clients: options.clients, cases: options.cases, burst });
             if (cohort.students.length !== options.clients || new Set(cohort.students.map(s => s.id)).size !== options.clients)

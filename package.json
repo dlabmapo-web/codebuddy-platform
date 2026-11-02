@@ -24,7 +24,9 @@
     "deploy:validate": "bash deploy/scripts/validate-local.sh",
     "load:production": "bash deploy/load/run.sh",
     "e2e:dlab": "playwright test --config e2e/dlab.playwright.config.ts",
-    "test:dlab": "bash packages/api/scripts/test-dlab-isolated.sh"
+    "test:dlab": "bash packages/api/scripts/test-dlab-isolated.sh",
+    "native:build": "bash deploy/native/build-image.sh",
+    "native:qualify": "bash deploy/native/qualify-linux.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

@@ -39,7 +39,9 @@
     "start:video": "node dist/src/videos/video-worker.js",
     "dlab:map-campus": "tsx src/integrations/dlab/scripts/operator.ts map",
     "dlab:set-campus-access": "tsx src/integrations/dlab/scripts/operator.ts access",
-    "dlab:invalidate-sessions": "tsx src/integrations/dlab/scripts/operator.ts invalidate"
+    "dlab:invalidate-sessions": "tsx src/integrations/dlab/scripts/operator.ts invalidate",
+    "benchmark:native-classroom": "node --max-old-space-size=512 scripts/benchmark-native-classroom.mjs",
+    "test:native-harness": "node --test scripts/benchmark-native-classroom.test.mjs ../../deploy/native/deployment-contract.test.mjs"
   },
   "dependencies": {
     "@cove/shared": "workspace:*",

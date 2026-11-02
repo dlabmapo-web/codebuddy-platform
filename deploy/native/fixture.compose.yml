@@ -1,0 +1,22 @@
+# Used only by fixture-services.sh with a random owner project and loopback ports.
+services:
+  postgres:
+    image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+    labels: {cove.native.qualification: '${COVE_NATIVE_FIXTURE_ID:?required}'}
+    environment: {POSTGRES_PASSWORD: native-fixture, POSTGRES_DB: cove_native_test}
+    ports: ['127.0.0.1::5432']
+    mem_limit: 384m
+    cpus: 0.5
+    pids_limit: 128
+    tmpfs: ['/var/lib/postgresql/data:rw,nosuid,nodev,size=256m']
+  redis:
+    image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    labels: {cove.native.qualification: '${COVE_NATIVE_FIXTURE_ID:?required}'}
+    command: ['redis-server', '--save', '', '--appendonly', 'no', '--maxmemory', '64mb', '--maxmemory-policy', 'noeviction']
+    ports: ['127.0.0.1::6379']
+    mem_limit: 128m
+    cpus: 0.25
+    pids_limit: 64
+    tmpfs: ['/data:rw,nosuid,nodev,size=64m']
+networks:
+  default: {internal: true}

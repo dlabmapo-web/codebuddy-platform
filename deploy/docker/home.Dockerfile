@@ -8,6 +8,7 @@ WORKDIR /app
 FROM base AS dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/api/package.json packages/api/package.json
+COPY packages/grading-runtime/package.json packages/grading-runtime/package.json
 COPY packages/home/package.json packages/home/package.json
 COPY packages/i18n/package.json packages/i18n/package.json
 COPY packages/judge-worker/package.json packages/judge-worker/package.json
@@ -18,7 +19,8 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter @cove/home...
 
 FROM dependencies AS builder
-COPY . .
+COPY packages/home packages/home
+COPY packages/i18n packages/i18n
 ARG DEPLOYMENT_VERSION=local
 ARG NEXT_PUBLIC_STUDIO_URL=https://cs.coveedu.com
 ARG NEXT_PUBLIC_MVP_URL=https://mvp.coveedu.com

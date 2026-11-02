@@ -8,6 +8,7 @@ WORKDIR /app
 FROM base AS dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/api/package.json packages/api/package.json
+COPY packages/grading-runtime/package.json packages/grading-runtime/package.json
 COPY packages/home/package.json packages/home/package.json
 COPY packages/i18n/package.json packages/i18n/package.json
 COPY packages/judge-worker/package.json packages/judge-worker/package.json
@@ -18,7 +19,10 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter @cove/web... --filter @cove/turtle-browser-runtime
 
 FROM dependencies AS builder
-COPY . .
+COPY packages/web packages/web
+COPY packages/shared packages/shared
+COPY packages/i18n packages/i18n
+COPY packages/turtle-browser-runtime packages/turtle-browser-runtime
 ARG DEPLOYMENT_VERSION=local
 ARG NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co
 ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=build-placeholder

@@ -1,4 +1,6 @@
-import { withExecutionKind } from "./execution-telemetry.js";
+import { measuredNativeClient } from "./native-telemetry.js";
+import { startNativeMonitor } from "./native-monitor.js";
+import { ExecutionTelemetry, withExecutionKind } from "./execution-telemetry.js";
 import { randomUUID } from "node:crypto";
 import { ConfigService } from "@nestjs/config";
 import { z } from "zod";
@@ -32,6 +34,7 @@ export const nativeWorkerEnvironmentSchema = z.object({
   DATABASE_API_POOL_BUDGET: z.coerce.number().int().nonnegative(),
   DATABASE_OPERATIONAL_RESERVE: z.coerce.number().int().min(1),
   JUDGE_FLEET_WORKER_COUNT: z.coerce.number().int().positive(),
+  JUDGE_HEALTH_PORT: z.coerce.number().int().min(0).max(65535).default(0),
   JUDGE_COMPARATOR_POOL_SIZE: z.coerce.number().int().min(1).max(8).default(1),
 }).superRefine((e, ctx) => {
   if (e.DATABASE_API_POOL_BUDGET + e.DATABASE_OPERATIONAL_RESERVE + e.DATABASE_POOL_MAX * e.JUDGE_FLEET_WORKER_COUNT > e.DATABASE_CONNECTION_BUDGET)
@@ -44,7 +47,9 @@ export async function bootstrapNativeWorker(configuration: Record<string, unknow
   const gate = new NativeJobGate(manifest.resources);
   const prisma = new PrismaService(new ConfigService(env) as never);
   const queue = new JudgeQueue(env.REDIS_URL, manifest.descriptor);
-  const comparator = new ComparatorPool(env.JUDGE_COMPARATOR_POOL_SIZE);
+  const telemetry = new ExecutionTelemetry();
+  const comparator = new ComparatorPool(env.JUDGE_COMPARATOR_POOL_SIZE, {}, telemetry);
+  let monitor: ReturnType<typeof startNativeMonitor> | undefined;
   const probe = new NativeExecutionClient({ socketPath: env.NATIVE_GRADING_SOCKET, descriptor: manifest.descriptor, lane: "official" });
   const workers: Worker[] = [];
   const nodeId = randomUUID();
@@ -78,6 +83,7 @@ export async function bootstrapNativeWorker(configuration: Record<string, unknow
     await withdraw().catch(() => undefined);
     process.off("SIGTERM", onSignal); process.off("SIGINT", onSignal);
     await Promise.all(workers.map(w => w.close()));
+    await monitor?.close();
     await probe.dispose(); await comparator.dispose(); await queue.close(); await prisma.$disconnect();
   };
   try {
@@ -103,7 +109,7 @@ export async function bootstrapNativeWorker(configuration: Record<string, unknow
       finally { pulseBusy = false; }
     };
     if (!(await probe.health()).ready) throw new Error("Native launcher is not ready");
-    const grading = new GradingService(prisma, probe, new PointAwardService(prisma), comparator);
+    const grading = new GradingService(prisma, probe, new PointAwardService(prisma), comparator, telemetry);
     const execute = async <T>(memory: number, descriptor: unknown, lane: "official" | "background", action: (grading: GradingService, client: NativeExecutionClient) => Promise<T>) => {
       const frozen = frozenNativeDescriptor(descriptor);
       if (!frozen || runtimeQueueName("official", frozen) !== runtimeQueueName("official", manifest.descriptor)) throw new Error("Native queue/descriptor mismatch");
@@ -115,7 +121,7 @@ export async function bootstrapNativeWorker(configuration: Record<string, unknow
           } catch (error) {
             await setConsumersReady(false); await withdraw().catch(() => undefined); throw error;
           }
-          const result = await action(grading.withEngine(client), client);
+          const result = await action(grading.withEngine(measuredNativeClient(client, telemetry)), client);
           await ready();
           return result;
         } finally { await client.dispose(); }
@@ -123,24 +129,24 @@ export async function bootstrapNativeWorker(configuration: Record<string, unknow
     };
     workers.push(queue.createWorker(async job => {
       const row = await prisma.submission.findUniqueOrThrow({ where: { id: job.data.submissionId }, select: { memoryLimitMb: true, executionRuntimeSnapshot: true } });
-      return execute(row.memoryLimitMb, row.executionRuntimeSnapshot, "official", g => withExecutionKind("official", () => g.grade(job.data.submissionId, job.updateProgress), job.data.submissionId));
+      return execute(row.memoryLimitMb, row.executionRuntimeSnapshot, "official", g => withExecutionKind("official", () => telemetry.time("service", () => g.grade(job.data.submissionId, job.updateProgress)), job.data.submissionId));
     }, manifest.resources.cpuSlots));
     if (background) {
       workers.push(queue.createPracticeWorker(async job => {
         const row = await prisma.staffPracticeAttempt.findUniqueOrThrow({ where: { id: job.attemptId }, select: { snapshot: true } });
         const snapshot = practiceSnapshotSchema.parse(row.snapshot);
-        await execute(snapshot.memoryLimitMb, snapshot.executionRuntimeSnapshot, "background", g => withExecutionKind("practice", () => new PracticeRunner(prisma, g).run(job.attemptId), job.attemptId));
+        await execute(snapshot.memoryLimitMb, snapshot.executionRuntimeSnapshot, "background", g => withExecutionKind("practice", () => telemetry.time("service", () => new PracticeRunner(prisma, g).run(job.attemptId)), job.attemptId));
       }, 1));
       workers.push(queue.createRegradeWorker(async job => {
         const row = await prisma.submission.findUniqueOrThrow({ where: { id: job.data.submissionId }, select: { memoryLimitMb: true, executionRuntimeSnapshot: true } });
-        await execute(row.memoryLimitMb, row.executionRuntimeSnapshot, "background", g => withExecutionKind("regrade", () => new RegradeRunner(prisma, g).run(job.data), job.data.submissionId));
+        await execute(row.memoryLimitMb, row.executionRuntimeSnapshot, "background", g => withExecutionKind("regrade", () => telemetry.time("service", () => new RegradeRunner(prisma, g).run(job.data)), job.data.submissionId));
       }, 1));
       workers.push(queue.createSampleWorker(async job => {
         const record = await store.get(job.data.checkId);
         if (!record) return;
         await execute(record.snapshot.memoryLimitMb, record.snapshot.executionRuntimeSnapshot, "background", async (_, client) => {
           // Native gate already reserves background capacity for the entire job.
-          await withExecutionKind("sample", () => new SampleCheckRunner(store, client, comparator, new ExecutionCapacity(2)).run(job.data.checkId), job.data.checkId);
+          await withExecutionKind("sample", () => telemetry.time("service", () => new SampleCheckRunner(store, measuredNativeClient(client, telemetry), comparator, new ExecutionCapacity(2)).run(job.data.checkId)), job.data.checkId);
         });
       }, 1, id => { void new SampleCheckRunner(store, probe, comparator, new ExecutionCapacity(2)).markFailed(id); }));
     }
@@ -155,6 +161,8 @@ export async function bootstrapNativeWorker(configuration: Record<string, unknow
       recoveryWork = recovery.sweep().catch(error => console.error("native recovery failed", String(error))).finally(() => { recovering = false; });
     }, 30_000);
     process.once("SIGTERM", onSignal); process.once("SIGINT", onSignal);
-    return { close, queue, prisma };
+    const health = async () => !stopped && (await probe.health()).ready && (await queue.redis()).status === "ready";
+    monitor = startNativeMonitor(env.JUDGE_HEALTH_PORT, telemetry, health);
+    return { close, queue, prisma, health, metrics: () => telemetry.snapshot() };
   } catch (error) { await close(); throw error; }
 }

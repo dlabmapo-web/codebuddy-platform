@@ -23,3 +23,16 @@ docs
 **/.next-turtle-browser
 **/__pycache__
 deploy/runtime
+
+# Private deployment and browser qualification state must never enter a build.
+deploy/deployment.env
+deploy/secrets
+deploy/generated
+e2e/.auth
+**/*authority*.json
+
+.env-backups
+**/.env-backups
+deploy/native/*.json
+
+.native-fixture-browsers

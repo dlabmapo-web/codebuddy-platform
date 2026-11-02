@@ -88,6 +88,15 @@ async function main() {
     const rpc = createFixtureRpc(fixture, remaining);
     const report = { version: 1, stage: options.mode === 'application' ? 'authorized-service-admission-to-committed-read' : 'actual-next-click-to-committed-display', options, fixtureId: fixture.fixtureId, nextBuildIdentity: fixture.next?.buildIdentity ?? null, network: { rttMs: options.mode === 'next-browser' ? 80 : null, mbps: options.mode === 'next-browser' ? 20 : null }, generator: { arch: arch(), platform: platform(), cpus: cpus().length, memoryBytes: totalmem(), maxConcurrency: options.concurrency }, unmeasured: ['production-auth-provider-latency', 'cross-machine-commit-to-display', 'database-pool-wait'], bursts: [], status: 'FAILED' };
     let browser;
+    const diagnosticPages = [];
+    const captureBrowserDiagnostics = async () => {
+        report.browserDiagnostics = await Promise.all(diagnosticPages.map(async ({ page, failures }, index) => {
+            const diagnostic = { url: page.url(), failures };
+            try { diagnostic.bodyText = (await page.locator('body').innerText({ timeout: 1000 })).slice(0, 6000); } catch (error) { diagnostic.bodyError = String(error); }
+            try { diagnostic.screenshot = options.output + `.page-${index}.png`; await page.screenshot({ path: diagnostic.screenshot, timeout: 1000 }); } catch (error) { diagnostic.screenshotError = String(error); }
+            return diagnostic;
+        }));
+    };
     // One process-wide watchdog bounds browser/transport stalls as well as polling.
     // Persist partial observations before the small browser-cleanup grace expires.
     const watchdog = setTimeout(() => {
@@ -132,6 +141,12 @@ async function main() {
                         throw Error('Prepared Next identity/material differs from owned cohort');
                     const context = await browser.newContext({ storageState: student.storageState });
                     const page = await context.newPage();
+                    const failures = [];
+                    const recordFailure = value => { if (failures.length < 30) failures.push(value); };
+                    page.on('pageerror', error => recordFailure({ kind: 'pageerror', message: error.message.slice(0, 2000) }));
+                    page.on('requestfailed', request => recordFailure({ kind: 'requestfailed', path: new URL(request.url()).pathname, error: request.failure()?.errorText }));
+                    page.on('response', response => { if (response.status() >= 400) recordFailure({ kind: 'http', path: new URL(response.url()).pathname, status: response.status() }); });
+                    diagnosticPages.push({ page, failures });
                     const cdp = await context.newCDPSession(page);
                     await cdp.send('Network.enable');
                     await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 80, downloadThroughput: 20e6 / 8, uploadThroughput: 20e6 / 8 });
@@ -196,6 +211,7 @@ async function main() {
                         rows.push({ student: student.id, workload: student.workload.kind, sourceDigest: 'sha256:' + createHash('sha256').update(student.workload.code).digest('hex'), submissionId, correct, elapsedMs: browser ? result.displayMs : performance.now() - started, status: result.status, commitVerified: result.committed === true, clickEvidence: result.clickEvidence ?? null, stages: result.stages ?? null });
                     }
                     catch (error) {
+                        if (browser) await captureBrowserDiagnostics();
                         rows.push({ student: student.id, submissionId, correct: false, elapsedMs: performance.now() - started, error: String(error) });
                     }
                 }
@@ -214,6 +230,7 @@ async function main() {
     }
     catch (error) {
         report.error = String(error);
+        if (browser && !report.browserDiagnostics) await captureBrowserDiagnostics();
         process.exitCode = 1;
     }
     finally {

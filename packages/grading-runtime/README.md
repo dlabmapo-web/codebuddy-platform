@@ -163,6 +163,16 @@ these tests do not establish containment.
 On an isolated, delegated, production-equivalent Linux node, run
 `pnpm --filter @cove/grading-runtime smoke /absolute/isolated-config.json` and
 `node packages/grading-runtime/test/linux-crash-smoke.mjs /absolute/crash-config.json`.
+Run the crash command itself in a direct service leaf of the configured parent
+envelope: its child launcher inherits that placement, and its in-process restart
+probe uses the same placement. Both count toward the service overhead reservation.
+The crash gate waits at most 15 seconds for a marker written by its known learner
+after GO, observed through the case PID's private `/tmp`, before killing the
+launcher. It passes only after empty retained case evidence causes the expected
+stale-case readiness refusal; allocation alone or an unrelated startup refusal
+cannot pass. Its focused synthetic regression can be run with
+`pnpm --filter @cove/grading-runtime exec tsx --test test/linux-crash-smoke.test.ts`;
+that regression does not certify actual Linux containment.
 The smoke covers success/nonzero/syntax/top-level await, prompt/Unicode, guest
 filesystem/environment/network/Unix/control-FD access, PID/thread denial,
 memory/CPU/wall/output limits, fresh scratch, cancellation and concurrent isolation.

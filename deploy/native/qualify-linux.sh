@@ -41,16 +41,9 @@ for native_try in {1..60}; do if docker exec "$native_pg" pg_isready -U postgres
 native_pg_port="$(docker port "$native_pg" 5432/tcp | sed 's/.*://')"; native_redis_port="$(docker port "$native_redis" 6379/tcp | sed 's/.*://')"
 native_db="postgresql://postgres:native-fixture@127.0.0.1:$native_pg_port/cove_native_test"
 native_redis_url="redis://127.0.0.1:$native_redis_port/0"
-docker exec -i "$native_pg" psql -U postgres -d cove_native_test -v ON_ERROR_STOP=1 <<'SQL'
-CREATE TABLE native_qualification_fixture (fixture_id TEXT PRIMARY KEY);
-CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
-CREATE SCHEMA auth; CREATE FUNCTION auth.uid() RETURNS UUID LANGUAGE SQL AS 'SELECT NULL::uuid';
-CREATE SCHEMA storage; CREATE TABLE storage.objects (id UUID, bucket_id TEXT, name TEXT);
-SQL
-docker exec "$native_pg" psql -U postgres -d cove_native_test -v ON_ERROR_STOP=1 -c "INSERT INTO native_qualification_fixture VALUES ('$COVE_NATIVE_FIXTURE_ID')"
 docker exec "$native_redis" redis-cli SET cove-native-qualification-owner "$COVE_NATIVE_FIXTURE_ID" >/dev/null
 # Migration runs on the controller with only this owned synthetic URL.
-env -i PATH="$PATH" HOME="$HOME" DOTENV_CONFIG_PATH=/dev/null DATABASE_URL="$native_db" DIRECT_URL="$native_db" pnpm --dir "$native_repo/packages/api" exec prisma migrate deploy > "$native_evidence/migrations.log" 2>&1
+bash "$native_repo/deploy/native/prepare-fixture-db.sh" "$native_pg" "$COVE_NATIVE_FIXTURE_ID" > "$native_evidence/migrations.log" 2>&1
 # Allocate loopback fixture ports without touching any existing listener.
 read -r native_auth_port native_api_port native_web_port < <(python3 - <<'PYPORT'
 import socket

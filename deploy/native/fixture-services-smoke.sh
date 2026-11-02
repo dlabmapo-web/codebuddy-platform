@@ -46,3 +46,4 @@ for port, request, replies in [(ports[0], struct.pack('!II',8,80877103), (b'N',b
             time.sleep(.2)
 print('PostgreSQL/Redis real host loopback connectivity PASS')
 PY
+bash deploy/native/prepare-fixture-db.sh "$native_pg" "$COVE_NATIVE_FIXTURE_ID"

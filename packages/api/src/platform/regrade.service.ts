@@ -1,3 +1,8 @@
+import { NativeAdmission, frozenNativeDescriptor } from "../judge/native-admission.js";
+import { JudgeQueue, runtimeQueueName } from "../judge/judge.queue.js";
+import { snapshotTransaction } from "../judge/snapshot-transaction.js";
+import type { NativeRuntimeDescriptor } from "@cove/shared";
+import { nativeRuntimeVersion } from "@cove/grading-runtime";
 import { quizDefinitionSchema } from "@cove/shared";
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -102,6 +107,15 @@ type StaleRow = { submissionId: string; userId: string };
 @Injectable()
 export class RegradeService {
   private readonly logger = new Logger(RegradeService.name);
+  private nativeQueue?: JudgeQueue;
+  private nativeAdmission?: NativeAdmission;
+  private native() {
+    const redisUrl = this.config.get<string>("REDIS_URL");
+    if (!redisUrl) throw new Error("Native repair requires Redis");
+    this.nativeQueue ??= new JudgeQueue(redisUrl);
+    return this.nativeAdmission ??= new NativeAdmission(this.config, this.prisma, this.nativeQueue);
+  }
+  async onModuleDestroy() { await this.nativeQueue?.close(); }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -494,7 +508,7 @@ export class RegradeService {
       runId: string;
       submissionId: string;
       requestId: string | null;
-    }) => Promise<void>,
+    }, descriptor?: NativeRuntimeDescriptor | null) => Promise<void>,
   ): Promise<OperationRun> {
     const run = await this.prisma.platformOperationRun.findUnique({
       where: { id: input.runId },
@@ -545,21 +559,19 @@ export class RegradeService {
     let dispatched = 0;
     for (let index = 0; index < stale.length; index += CREATE_CHUNK) {
       const chunk = stale.slice(index, index + CREATE_CHUNK);
-      const created = await this.prisma.$transaction((tx) =>
-        this.writeRepairs(tx, run.id, chunk),
-      );
-      for (const submissionId of created) {
+      const created = await snapshotTransaction(this.prisma, async tx => {
+        const rows = await this.writeRepairs(tx, run.id, chunk);
+        await tx.platformOperationRun.update({ where: { id: run.id }, data: { dispatchedCount: { increment: rows.length } } });
+        return rows;
+      });
+      for (const { submissionId, descriptor } of created) {
         await dispatch({
           runId: run.id,
           submissionId,
           requestId: run.requestId,
-        });
+        }, descriptor);
         dispatched += 1;
       }
-      await this.prisma.platformOperationRun.update({
-        where: { id: run.id },
-        data: { dispatchedCount: dispatched },
-      });
     }
 
     this.logger.log(
@@ -660,7 +672,7 @@ export class RegradeService {
     tx: Prisma.TransactionClient,
     runId: string,
     chunk: StaleRow[],
-  ): Promise<string[]> {
+  ): Promise<Array<{ submissionId: string; descriptor: NativeRuntimeDescriptor | null }>> {
     const originals = await tx.submission.findMany({
       where: { id: { in: chunk.map((row) => row.submissionId) } },
       select: {
@@ -668,13 +680,14 @@ export class RegradeService {
         userId: true,
         materialId: true,
         sourceMaterialId: true,
+        executionRuntimeSnapshot: true, engineVersion: true,
         courseId: true,
         classId: true,
         code: true,
       },
     });
 
-    const created: string[] = [];
+    const created: Array<{ submissionId: string; descriptor: NativeRuntimeDescriptor | null }> = [];
     for (const original of originals) {
       if (!original.materialId) continue;
       const material = await tx.material.findUnique({
@@ -744,8 +757,16 @@ export class RegradeService {
       // The runtime that will actually judge it, exactly as
       // `SubmissionService` stamps it: a repair is graded now, by this
       // deployment, and must say so.
-      const engineVersion = this.config.get("PYODIDE_VERSION", { infer: true });
-      const snapshot = gradingSnapshotFor(exercise, { engineVersion });
+      const origin = frozenNativeDescriptor(original.executionRuntimeSnapshot);
+      const engineVersion = origin ? origin.comparator.version : (original.engineVersion?.replace(/^pyodide-/, "") ?? this.config.get("PYODIDE_VERSION", { infer: true }));
+      let descriptor: NativeRuntimeDescriptor | null = null;
+      if (origin) {
+        const academyId = (await tx.course.findUniqueOrThrow({ where: { id: original.courseId }, select: { academyId: true } })).academyId;
+        descriptor = await this.native().retain(origin, {
+          academyId, materialId: original.materialId, gradingRevision: exercise.gradingRevision, context: "live", kind: "regrade",
+        }, exercise);
+      }
+      const snapshot = gradingSnapshotFor(exercise, { engineVersion, descriptor });
 
       const courseModule = material.lecture.courseModule;
       const repair = await tx.submission.create({
@@ -764,7 +785,8 @@ export class RegradeService {
           ...(quiz ? { quizSnapshot: { version: 1, title: material.title, description: exercise.description, definition: quiz } } : {}),
           code: original.code,
           totalCount: quiz ? 1 : exercise.testCases.length,
-          engineVersion,
+          engineVersion: descriptor ? nativeRuntimeVersion(descriptor) : engineVersion,
+          executionQueue: runtimeQueueName("regrade", descriptor),
           problemTitle: material.title,
           courseTitle: courseModule.course.title,
           moduleTitle: courseModule.title,
@@ -776,7 +798,7 @@ export class RegradeService {
         },
         select: { id: true },
       });
-      created.push(repair.id);
+      created.push({ submissionId: repair.id, descriptor });
     }
     return created;
   }

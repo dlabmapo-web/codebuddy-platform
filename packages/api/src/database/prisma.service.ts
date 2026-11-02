@@ -9,7 +9,7 @@ import type { ApiEnvironment } from "../config/env.schema.js";
 export class PrismaService extends PrismaClient implements OnModuleDestroy {
   constructor(configService: ConfigService<ApiEnvironment, true>) {
     const connectionString = configService.get("DATABASE_URL", { infer: true });
-    const adapter = new PrismaPg({ connectionString });
+    const adapter = new PrismaPg({ connectionString, max: configService.get("DATABASE_POOL_MAX", { infer: true }) ?? 10 });
 
     super({ adapter });
   }

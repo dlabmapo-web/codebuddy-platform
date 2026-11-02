@@ -1,3 +1,5 @@
+import { bootstrapNativeWorker } from "./native-worker.js";
+import { RuntimeRecovery } from "./runtime-recovery.js";
 import { PracticeRunner } from "./practice.runner.js";
 import "reflect-metadata";
 // The judge boots without Nest, so nothing else loads the env file for it.
@@ -33,12 +35,11 @@ import { SandboxExecutionEngine } from "./sandbox-engine.js";
  * Started with `pnpm --filter @cove/api start:judge`.
  */
 const SWEEP_INTERVAL_MS = 60_000;
-const QUEUED_STALE_AFTER_MS = 30_000;
-/** Longer than any legitimate submission: 50 cases at the 60s ceiling. */
-const STALE_AFTER_MS = 10 * 60_000;
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger("Judge");
+  if (process.env.JUDGE_RUNTIME_FAMILY === "native") { await bootstrapNativeWorker(process.env); return; }
+  if (process.env.JUDGE_RUNTIME_FAMILY && process.env.JUDGE_RUNTIME_FAMILY !== "pyodide") throw new Error("Unknown worker runtime family");
   const environment = validateEnvironment(process.env);
   if (environment.JUDGE_METRICS_SECRET && Object.entries(environment).some(([key, value]) => key !== "JUDGE_METRICS_SECRET" && /SECRET|TOKEN|PASSWORD|_KEY$/.test(key) && value === environment.JUDGE_METRICS_SECRET)) {
     throw new Error("Judge metrics credential must be independent");
@@ -168,26 +169,12 @@ async function bootstrap(): Promise<void> {
     comparatorPool: environment.JUDGE_COMPARATOR_POOL_SIZE, backgroundConcurrency: environment.REGRADE_CONCURRENCY,
     sampleConcurrency: environment.SAMPLE_CHECK_CONCURRENCY, readinessGuard: environment.JUDGE_READINESS_GUARD, traceTimings: environment.JUDGE_TRACE_TIMINGS }));
 
+  const recovery = new RuntimeRecovery(prisma, queue);
+  let recovering = false;
   const sweeper = setInterval(() => {
-    void prisma.staffPracticeAttempt.findMany({
-      where: { status: "QUEUED", createdAt: { lt: new Date(Date.now() - QUEUED_STALE_AFTER_MS) } },
-      select: { id: true }, take: 100,
-    }).then((rows) => Promise.all(rows.map((row) => queue.enqueuePractice(row.id))))
-      .catch((error) => logger.error(`practice sweeper failed: ${String(error)}`));
-    void prisma.staffPracticeAttempt.updateMany({
-      where: { status: "RUNNING", startedAt: { lt: new Date(Date.now() - STALE_AFTER_MS) } },
-      data: { status: "ERRORED", gradedAt: new Date() },
-    }).catch((error) => logger.error(`practice recovery failed: ${String(error)}`));
-
-    void grading
-      .sweepStale({
-        queuedOlderThanMs: QUEUED_STALE_AFTER_MS,
-        runningOlderThanMs: STALE_AFTER_MS,
-      })
-      .then(({ requeue }) =>
-        Promise.all(requeue.map((submissionId) => queue.enqueue(submissionId))),
-      )
-      .catch((error) => logger.error(`sweeper failed: ${String(error)}`));
+    if (recovering) return;
+    recovering = true;
+    void recovery.sweep().catch(error => logger.error(`sweeper failed: ${String(error)}`)).finally(() => { recovering = false; });
   }, SWEEP_INTERVAL_MS);
 
   logger.log(

@@ -1,3 +1,5 @@
+import { nativeRuntimeVersion } from "@cove/grading-runtime";
+import { nativeRuntimeDescriptorSchema, type NativeRuntimeDescriptor } from "@cove/shared";
 import { inputPromptPolicySchema, programmingExerciseGradingModeSchema, inputPromptPolicyForSemanticVersion, type InputPromptPolicy } from "@cove/shared";
 import type { ExerciseGradingSource } from "./grading-profile.js";
 import { gradingSnapshotFor, gradingPolicySnapshotSchema, resolveGradingProfile } from "./grading-profile.js";
@@ -9,6 +11,7 @@ export function sampleSnapshotFor(
   testCase: ExerciseGradingSource["testCases"][number],
   code: string,
   engineVersion: string,
+  descriptor?: NativeRuntimeDescriptor | null,
 ): SampleSnapshot | null {
   const profile = resolveGradingProfile(exercise, exercise.testCases);
   if (profile.kind === "unsupported" || testCase.visibility !== "SAMPLE") return null;
@@ -17,7 +20,8 @@ export function sampleSnapshotFor(
       inputPromptPolicy: profile.inputPromptPolicy,
       gradingSemanticVersion: exercise.gradingSemanticVersion,
       gradingMode: "LEGACY_STDIO",
-      engineVersion: `pyodide-${engineVersion}`,
+      engineVersion: descriptor ? nativeRuntimeVersion(descriptor) : `pyodide-${engineVersion}`,
+      ...(descriptor ? { executionRuntimeSnapshot: descriptor } : {}),
       code,
       memoryLimitMb: exercise.memoryLimitMb,
       // Infrastructure may wait for a runner; student execution still gets
@@ -33,7 +37,7 @@ export function sampleSnapshotFor(
       },
     };
   }
-  const snapshot = gradingSnapshotFor({ ...exercise, testCases: [testCase] }, { engineVersion });
+  const snapshot = gradingSnapshotFor({ ...exercise, testCases: [testCase] }, { engineVersion, descriptor });
   const selected = snapshot.cases[0]!;
   return {
     inputPromptPolicy: profile.inputPromptPolicy,
@@ -42,6 +46,7 @@ export function sampleSnapshotFor(
     memoryLimitMb: exercise.memoryLimitMb,
     totalTimeLimitMs: profile.totalTimeLimitMs,
     comparatorTimeLimitMs: profile.comparatorTimeLimitMs,
+    ...(descriptor ? { executionRuntimeSnapshot: descriptor } : {}),
     policy: gradingPolicySnapshotSchema.parse(snapshot.submission.gradingPolicySnapshot),
     testCase: {
       input: selected.input,
@@ -55,6 +60,7 @@ export function sampleSnapshotFor(
 
 /** Historical Redis records lack both fields. New semantics must be explicit. */
 export function sampleInputPromptPolicy(snapshot: SampleSnapshot): InputPromptPolicy | null {
+  if (snapshot.executionRuntimeSnapshot !== undefined && !nativeRuntimeDescriptorSchema.safeParse(snapshot.executionRuntimeSnapshot).success) return null;
   const parsed = inputPromptPolicySchema.safeParse(snapshot.inputPromptPolicy === undefined ? "INCLUDE" : snapshot.inputPromptPolicy);
   if (!parsed.success) return null;
   const parsedMode = programmingExerciseGradingModeSchema.safeParse(

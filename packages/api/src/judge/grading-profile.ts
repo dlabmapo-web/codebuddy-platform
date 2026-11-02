@@ -1,3 +1,5 @@
+import { nativeRuntimeDescriptorSchema, type NativeRuntimeDescriptor } from "@cove/shared";
+import { nativeRuntimeVersion } from "@cove/grading-runtime";
 import {
   gradingProfileBounds,
   inputPromptPolicySchema,
@@ -67,7 +69,7 @@ export type ExerciseGradingSource = ProfileColumns & {
  * does not understand is refused as a configuration error rather than guessed
  * at. Never holds a secret.
  */
-export const gradingPolicySnapshotSchema = z.object({
+const historicalPolicySchema = z.object({
   version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   inputPromptPolicy: inputPromptPolicySchema.optional(),
   semanticVersion: z.string(),
@@ -92,6 +94,19 @@ export const gradingPolicySnapshotSchema = z.object({
     : policy.semanticVersion === "elice-v1" && (policy.inputPromptPolicy === undefined || policy.inputPromptPolicy === "INCLUDE");
   if (!valid) ctx.addIssue({ code: "custom", message: "Inconsistent prompt policy snapshot" });
 });
+const nativePolicySchema = z.object({
+  version: z.literal(4), inputPromptPolicy: inputPromptPolicySchema,
+  semanticVersion: z.enum(["elice-v1", "elice-v2"]),
+  runtime: nativeRuntimeDescriptorSchema,
+  comparator: z.object({ runtime: z.literal("pyodide-cpython"), engineVersion: z.string(), budgetMs: z.number().int().positive() }),
+  ceilings: z.object({ totalTimeLimitMs: z.number().int().positive(), caseTimeLimitMs: z.number().int().positive(),
+    memoryLimitMb: z.number().int().min(16).max(512), outputBytes: z.number().int().positive().max(MAX_OUTPUT_BYTES) }),
+}).superRefine((policy, ctx) => {
+  if ((policy.semanticVersion === "elice-v2") !== (policy.inputPromptPolicy === "IGNORE") ||
+      policy.comparator.engineVersion !== policy.runtime.comparator.version)
+    ctx.addIssue({ code: "custom", message: "Inconsistent native policy" });
+});
+export const gradingPolicySnapshotSchema = z.union([historicalPolicySchema, nativePolicySchema]);
 export type GradingPolicySnapshot = z.infer<typeof gradingPolicySnapshotSchema>;
 
 /**
@@ -104,10 +119,10 @@ export type GradingPolicySnapshot = z.infer<typeof gradingPolicySnapshotSchema>;
  */
 export function gradingSnapshotFor(
   exercise: ExerciseGradingSource,
-  runtime: { engineVersion: string },
+  runtime: { engineVersion: string; descriptor?: NativeRuntimeDescriptor | null },
 ) {
   const enhanced = exercise.gradingMode === "ELICE_STDIO";
-  const policy: GradingPolicySnapshot | null = enhanced
+  let policy: GradingPolicySnapshot | null = enhanced
     ? {
         // Older workers only understand v1 and must refuse these submissions
         // rather than grade them using their smaller, hardcoded output cap.
@@ -133,8 +148,13 @@ export function gradingSnapshotFor(
       }
     : null;
 
+  if (policy && runtime.descriptor) policy = nativePolicySchema.parse({ ...policy, version: 4,
+    inputPromptPolicy: exercise.inputPromptPolicy ?? "INCLUDE", runtime: runtime.descriptor,
+    comparator: { ...policy.comparator, engineVersion: runtime.descriptor.comparator.version },
+  });
   return {
     submission: {
+      ...(runtime.descriptor ? { executionRuntimeSnapshot: nativeRuntimeDescriptorSchema.parse(runtime.descriptor) } : {}),
       submissionPolicy: "AUTOMATIC" as const,
       inputPromptPolicy: exercise.inputPromptPolicy ?? "INCLUDE",
       gradingMode: exercise.gradingMode,
@@ -287,7 +307,7 @@ export function runtimeMismatch(
   policy: GradingPolicySnapshot,
   running: { engine: string | null; comparator: string | null },
 ): string | null {
-  const recordedEngine = `pyodide-${policy.runtime.engineVersion}`;
+  const recordedEngine = policy.version === 4 ? nativeRuntimeVersion(policy.runtime) : `pyodide-${policy.runtime.engineVersion}`;
   const recordedComparator = `pyodide-${policy.comparator.engineVersion}`;
   if (running.engine !== recordedEngine) {
     return `runner is ${running.engine ?? "unknown"}, submission recorded ${recordedEngine}`;

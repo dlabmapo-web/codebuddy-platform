@@ -1,3 +1,7 @@
+import { NativeAdmission, frozenNativeDescriptor } from "../judge/native-admission.js";
+import { runtimeQueueName } from "../judge/judge.queue.js";
+import { snapshotTransaction } from "../judge/snapshot-transaction.js";
+import type { Prisma } from "../generated/prisma/client.js";
 import { createPracticeAttempt } from "./staff-practice.repository.js";
 import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -16,6 +20,8 @@ import { appliedScoreHundredthsFor } from '../judge/grading.js';
 
 @Injectable()
 export class StaffPracticeService {
+  private nativeAdmission?: NativeAdmission;
+  private native() { return this.nativeAdmission ??= new NativeAdmission(this.config, this.prisma, this.queue); }
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AcademyAccessService,
@@ -23,7 +29,7 @@ export class StaffPracticeService {
     @Optional() private readonly queue?: JudgeQueue,
   ) {}
 
-  async authorize(identity: SupabaseIdentity, input: { academyId: string; materialId: string; preview?: boolean; gradingRevision?: number }) {
+  async authorize(identity: SupabaseIdentity, input: { academyId: string; materialId: string; preview?: boolean; gradingRevision?: number }, db: Prisma.TransactionClient = this.prisma) {
     const actor = await this.access.requirePermission(identity.authUserId, input.academyId, "curriculum.read");
     // Platform inspection (and assumed support roles) never confers personal participation.
     if (actor.via !== "membership" || !rolesHavePermission(actor.roles, "practice.own.create")) {
@@ -31,7 +37,7 @@ export class StaffPracticeService {
     }
     if (input.preview && !rolesHavePermission(actor.roles, "curriculum.review")) throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
     const scope = learningScopeFor(input.academyId, actor);
-    const material = await this.prisma.material.findFirst({
+    const material = await db.material.findFirst({
       where: { id: input.materialId, ...(input.preview ? { AND: [scope.material, { lecture: { courseModule: { course: { academyId: input.academyId } } } }] } : reachableMaterialWhere(input.academyId, scope)) },
       include: {
         programmingExercise: { include: { testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] } } },
@@ -90,33 +96,47 @@ export class StaffPracticeService {
       Number(this.config.get("SUBMISSION_RATE_LIMIT") ?? 10), 60_000)) {
       throw new AppException("SUBMISSION_RATE_LIMITED", HttpStatus.TOO_MANY_REQUESTS);
     }
-    if (exercise.submissionPolicy === "PRACTICE_ONLY") throw new AppException("EXERCISE_PRACTICE_ONLY", HttpStatus.BAD_REQUEST);
-    const quiz = exercise.quiz == null ? null : quizDefinitionSchema.parse(exercise.quiz);
-    if (quiz && !quiz.choices.some((choice) => choice.id === input.code)) {
-      throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.BAD_REQUEST);
-    }
-    if (!quiz && (!exercise.testCases.length || resolveGradingProfile(exercise, exercise.testCases).kind === "unsupported")) {
-      throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
-    }
-    const grading = gradingSnapshotFor(exercise, { engineVersion: String(this.config.get("PYODIDE_VERSION")) });
-    const snapshot = practiceSnapshotSchema.parse({
-      version: 1, courseId: material.lecture.courseModule.courseId, gradingRevision: exercise.gradingRevision,
-      timeLimitMs: exercise.timeLimitMs, memoryLimitMb: exercise.memoryLimitMb,
-      ...grading.submission, gradingCases: quiz ? [] : grading.cases,
-      quizSnapshot: quiz ? { version: 1, title: material.title, description: exercise.description, definition: quiz } : null,
-    });
-    const attempt = existing ?? await createPracticeAttempt(this.prisma, {
-      academyId: input.academyId, userId: actor.userId, materialId: material.id,
-      requestId: input.requestId, code: input.code, context: input.preview ? `preview:${exercise.gradingRevision}` : "live",
-      snapshot: JSON.parse(JSON.stringify(snapshot)),
+    const attempt = existing ?? await snapshotTransaction(this.prisma, async tx => {
+      const { material, exercise } = await this.authorize(identity, input, tx);
+      if (exercise.submissionPolicy === "PRACTICE_ONLY") throw new AppException("EXERCISE_PRACTICE_ONLY", HttpStatus.BAD_REQUEST);
+      const quiz = exercise.quiz == null ? null : quizDefinitionSchema.parse(exercise.quiz);
+      if (quiz && !quiz.choices.some((choice) => choice.id === input.code)) {
+        throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.BAD_REQUEST);
+      }
+      if (!quiz && (!exercise.testCases.length || resolveGradingProfile(exercise, exercise.testCases).kind === "unsupported")) {
+        throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
+      }
+      const descriptor = quiz ? null : await this.native().select({
+        academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision,
+        context: input.preview ? "preview" : "live", kind: "staff-practice",
+      }, exercise);
+      const grading = gradingSnapshotFor(exercise, { engineVersion: String(this.config.get("PYODIDE_VERSION")), descriptor });
+      const snapshot = practiceSnapshotSchema.parse({
+        version: 1, courseId: material.lecture.courseModule.courseId, gradingRevision: exercise.gradingRevision,
+        timeLimitMs: exercise.timeLimitMs, memoryLimitMb: exercise.memoryLimitMb,
+        ...grading.submission, gradingCases: quiz ? [] : grading.cases,
+        quizSnapshot: quiz ? { version: 1, title: material.title, description: exercise.description, definition: quiz } : null,
+      });
+      return createPracticeAttempt(tx, {
+        academyId: input.academyId, userId: actor.userId, materialId: material.id,
+        requestId: input.requestId, code: input.code, context: input.preview ? `preview:${exercise.gradingRevision}` : "live",
+        snapshot: JSON.parse(JSON.stringify(snapshot)),
+        ...(descriptor ? { executionQueue: runtimeQueueName("practice", descriptor) } : {}),
+      });
     });
     if (attempt.materialId !== input.materialId || attempt.code !== input.code) {
       throw new AppException("PERMISSION_DENIED", HttpStatus.CONFLICT);
     }
-    try { if (attempt.status === "QUEUED") await this.queue.enqueuePractice(attempt.id); }
+    try { if (attempt.status === "QUEUED") await this.queue.enqueuePractice(attempt.id, frozenNativeDescriptor(practiceSnapshotSchema.parse(attempt.snapshot).executionRuntimeSnapshot)); }
     catch { throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE); }
     const stored = practiceSnapshotSchema.parse(attempt.snapshot);
     return { submissionId: attempt.id, totalCount: stored.quizSnapshot ? 1 : stored.gradingCases.length };
+  }
+
+  async runtimeForStream(identity: SupabaseIdentity, input: { academyId: string; submissionId: string }) {
+    await this.get(identity, input);
+    const row = await this.prisma.staffPracticeAttempt.findUniqueOrThrow({ where: { id: input.submissionId }, select: { snapshot: true } });
+    return frozenNativeDescriptor(practiceSnapshotSchema.parse(row.snapshot).executionRuntimeSnapshot);
   }
 
   async get(identity: SupabaseIdentity, input: { academyId: string; submissionId: string }) {

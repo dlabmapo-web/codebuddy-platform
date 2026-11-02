@@ -1823,6 +1823,9 @@ model Submission {
   feedbackPolicy            Json?                @map("feedback_policy")
   /// Effective ceilings, output cap, comparator budget and runtime identity,
   /// versioned and validated. Never holds a secret.
+  executionRuntimeSnapshot Json? @map("execution_runtime_snapshot")
+  executionQueue String? @map("execution_queue")
+  regradeCountedAt DateTime? @map("regrade_counted_at") @db.Timestamptz(6)
   gradingPolicySnapshot     Json?                @map("grading_policy_snapshot")
 
   /// Raw weighted result. Null on every legacy row, where `score` is the only
@@ -2798,6 +2801,7 @@ model StaffPracticeAttempt {
   requestId String @map("request_id") @db.Uuid
   code String
   snapshot Json
+  executionQueue String? @map("execution_queue")
   result Json?
   status SubmissionStatus @default(QUEUED)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)

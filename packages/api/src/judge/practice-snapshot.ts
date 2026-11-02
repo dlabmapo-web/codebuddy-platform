@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { caseComparatorSchema, inputPromptPolicySchema, materialScorePolicySchema, quizSnapshotSchema } from "@cove/shared";
+import { nativeRuntimeDescriptorSchema, caseComparatorSchema, inputPromptPolicySchema, materialScorePolicySchema, quizSnapshotSchema } from "@cove/shared";
 
 /** Internal only: this contains hidden expectations and must never cross an API boundary. */
 export const practiceSnapshotSchema = z.object({
@@ -19,6 +19,7 @@ export const practiceSnapshotSchema = z.object({
   materialMaximumHundredths: z.number().nullable(),
   materialScorePolicy: materialScorePolicySchema.nullable(),
   gradingPolicySnapshot: z.unknown().optional(),
+  executionRuntimeSnapshot: nativeRuntimeDescriptorSchema.optional(),
   quizSnapshot: quizSnapshotSchema.nullable(),
   gradingCases: z.array(z.object({
     position: z.number().int().positive(),

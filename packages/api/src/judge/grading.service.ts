@@ -1,3 +1,6 @@
+import { nativeRuntimeVersion } from "@cove/grading-runtime";
+import { sameNativeRuntime } from "@cove/shared";
+import { frozenNativeDescriptor } from "./native-admission.js";
 import { quizSnapshotSchema } from "@cove/shared";
 import { Injectable, Logger } from "@nestjs/common";
 import { ExecutionTelemetry, withExecutionCaseCount } from "./execution-telemetry.js";
@@ -43,6 +46,7 @@ export type GradingWork = Pick<GradingSubmission,
 > & {
   quizSnapshot: unknown;
   gradingPolicySnapshot?: unknown;
+  executionRuntimeSnapshot?: unknown;
   gradingCases: Array<Omit<GradingSubmission["gradingCases"][number], "id" | "submissionId">>;
   material?: GradingSubmission["material"];
   classId?: string | null;
@@ -105,6 +109,7 @@ export class GradingService {
   private readonly logger = new Logger(GradingService.name);
   private readonly engine: ExecutionEngine;
   private readonly comparator: OutputComparator;
+  private readonly baseComparator: OutputComparator;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -124,8 +129,13 @@ export class GradingService {
     comparator: OutputComparator,
     readonly telemetry = new ExecutionTelemetry(),
   ) {
+    this.baseComparator = comparator;
     this.engine = { get version() { return engine.version; }, run: request => this.telemetry.time("engine", () => engine.run(request)), dispose: () => engine.dispose() };
     this.comparator = { get version() { return comparator.version; }, compare: request => this.telemetry.time("compare", () => comparator.compare(request)) };
+  }
+
+  withEngine(engine: ExecutionEngine): GradingService {
+    return new GradingService(this.prisma, engine, this.points, this.baseComparator, this.telemetry);
   }
 
   async grade(
@@ -206,6 +216,16 @@ export class GradingService {
       );
       await fail("UNSUPPORTED_GRADING_PROFILE");
       return;
+    }
+    let descriptor;
+    try { descriptor = frozenNativeDescriptor(submission.executionRuntimeSnapshot); }
+    catch { await fail("RUNTIME_VERSION_MISMATCH"); return; }
+    if ((descriptor && nativeRuntimeVersion(descriptor) !== this.engine.version) ||
+        (!descriptor && this.engine.version.startsWith("native-cpython-")) ||
+        (profile.kind === "elice" && profile.policy?.version === 4 &&
+          (!descriptor || !sameNativeRuntime(descriptor, profile.policy.runtime))) ||
+        (descriptor && profile.kind === "elice" && profile.policy?.version !== 4)) {
+      await fail("RUNTIME_VERSION_MISMATCH"); return;
     }
     if (profile.kind === "legacy") {
       await this.gradeLegacy(submission, report, sink);
@@ -527,15 +547,10 @@ export class GradingService {
       });
 
       const materialId = submission.materialId;
-      const currentRevision = submission.material?.programmingExercise
-        ?.gradingRevision;
-      if (
-        !materialId ||
-        currentRevision === undefined ||
-        currentRevision !== submission.gradingRevision
-      ) {
-        return;
-      }
+      if (!materialId) return;
+      // Lock the authored revision until this commit; an edit during execution cannot move current progress.
+      const revisions = await tx.$queryRaw<Array<{ grading_revision: number }>>`SELECT grading_revision FROM programming_exercises WHERE material_id = ${materialId}::uuid FOR SHARE`;
+      if (revisions[0]?.grading_revision !== submission.gradingRevision) return;
 
       const previous = await tx.studentExerciseProgress.findUnique({
         where: {
@@ -552,7 +567,7 @@ export class GradingService {
         score: summary.score,
         // Read off the row rather than passed in by the caller, so no dispatch
         // path can forget it. See §5.4 of the console operations design.
-        isRepair: submission.regradeRunId !== null,
+        isRepair: submission.regradeRunId != null,
       });
 
       await tx.studentExerciseProgress.upsert({
@@ -622,12 +637,12 @@ export class GradingService {
     const runningCutoff = new Date(Date.now() - input.runningOlderThanMs);
     const [queued, errored] = await this.prisma.$transaction([
       this.prisma.submission.findMany({
-        where: { status: "QUEUED", createdAt: { lt: queuedCutoff } },
+        where: { executionQueue: null, status: "QUEUED", createdAt: { lt: queuedCutoff } },
         select: { id: true },
         take: 100,
       }),
       this.prisma.submission.updateMany({
-        where: { status: "RUNNING", startedAt: { lt: runningCutoff } },
+        where: { executionQueue: null, status: "RUNNING", startedAt: { lt: runningCutoff } },
         data: {
           status: "ERRORED",
           failureReason: "WORKER_LOST",

@@ -3,7 +3,7 @@ import { Logger } from "@nestjs/common";
 import { AuditService } from "../academies/audit.service.js";
 import type { PrismaService } from "../database/prisma.service.js";
 import type { GradingService } from "./grading.service.js";
-import type { RegradeJob } from "./judge.queue.js";
+import { REGRADE_QUEUE, type RegradeJob } from "./judge.queue.js";
 
 /**
  * One repair, graded and then counted against its run.
@@ -25,7 +25,7 @@ export class RegradeRunner {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly grading: GradingService,
+    private readonly grading?: GradingService,
   ) {}
 
   async run(job: RegradeJob): Promise<void> {
@@ -34,15 +34,25 @@ export class RegradeRunner {
       `[${trace}] regrade ${job.runId}: grading ${job.submissionId}`,
     );
 
+    if (!this.grading) throw new Error("Regrade execution requires a grader");
+    // Migrate only newly claimed compatibility repairs into retry-safe accounting.
+    // Historical terminal repairs have no counted marker and must not be counted again.
+    await this.prisma.submission.updateMany({ where: { id: job.submissionId, regradeRunId: job.runId, status: "QUEUED", executionQueue: null }, data: { executionQueue: REGRADE_QUEUE } });
     await this.grading.grade(job.submissionId, async () => {
       // A repair has nobody watching it. The live path streams per-case
       // progress to the student who is waiting; here the run's counters are
       // the only progress anybody reads.
     });
 
+    await this.account(job);
+  }
+
+  /** Idempotent settlement also used when recovery discovers a worker-lost repair. */
+  async account(job: RegradeJob): Promise<void> {
+    const trace = job.requestId ?? "-";
     const settled = await this.prisma.submission.findUnique({
       where: { id: job.submissionId },
-      select: { status: true },
+      select: { status: true, executionQueue: true },
     });
     // ERRORED and CANCELLED are judge faults, and a repair that hit one has not
     // repaired anything — it counts against the run so the operator sees that
@@ -50,11 +60,16 @@ export class RegradeRunner {
     const failed =
       !settled || settled.status === "ERRORED" || settled.status === "CANCELLED";
 
-    await this.prisma.platformOperationRun.update({
-      where: { id: job.runId },
-      data: failed
-        ? { failedCount: { increment: 1 } }
-        : { completedCount: { increment: 1 } },
+    if (!settled?.executionQueue || !["PASSED", "FAILED", "ERRORED", "CANCELLED"].includes(settled.status)) return;
+    await this.prisma.$transaction(async tx => {
+      const counted = await tx.submission.updateMany({
+        where: { id: job.submissionId, regradeRunId: job.runId, regradeCountedAt: null,
+          status: { in: ["PASSED", "FAILED", "ERRORED", "CANCELLED"] } },
+        data: { regradeCountedAt: new Date() },
+      });
+      if (!counted.count) return;
+      await tx.platformOperationRun.update({ where: { id: job.runId },
+        data: failed ? { failedCount: { increment: 1 } } : { completedCount: { increment: 1 } } });
     });
 
     await this.settleIfDone(job, trace);

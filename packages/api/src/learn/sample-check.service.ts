@@ -1,3 +1,5 @@
+import { NativeAdmission } from "../judge/native-admission.js";
+import { snapshotTransaction } from "../judge/snapshot-transaction.js";
 import { createHash, randomUUID } from "node:crypto";
 
 import { HttpStatus, Injectable, Logger, Optional } from "@nestjs/common";
@@ -52,6 +54,8 @@ const exerciseInclude = {
  */
 @Injectable()
 export class SampleCheckService {
+  private nativeAdmission?: NativeAdmission;
+  private native() { return this.nativeAdmission ??= new NativeAdmission(this.config, this.prisma, this.queue); }
   private readonly logger = new Logger(SampleCheckService.name);
   private readonly store: SampleCheckStore | null;
 
@@ -79,14 +83,14 @@ export class SampleCheckService {
     const queue = this.queue;
     if (!store || !queue) throw unavailable();
 
-    const material = await this.prisma.material.findFirst({
+    const material = await snapshotTransaction(this.prisma, tx => tx.material.findFirst({
       where: {
         id: input.materialId,
         type: 'PROGRAMMING_EXERCISE',
         ...reachableMaterialWhere(input.academyId, learningScopeFor(input.academyId, actor)),
       },
       include: exerciseInclude,
-    });
+    }));
     const exercise = material?.programmingExercise;
     if (!material || !exercise) throw notFound();
     if (exercise.submissionPolicy === "PRACTICE_ONLY") throw new AppException("EXERCISE_PRACTICE_ONLY", HttpStatus.BAD_REQUEST);
@@ -114,9 +118,12 @@ export class SampleCheckService {
     // Hidden and nonexistent positions are indistinguishable from here.
     if (!testCase) throw notFound();
 
+    const descriptor = await this.native().select({
+      academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision, context: "live", kind: "sample",
+    }, exercise);
     const snapshot = sampleSnapshotFor(
       exercise, testCase, input.code,
-      this.config.get("PYODIDE_VERSION", { infer: true }),
+      this.config.get("PYODIDE_VERSION", { infer: true }), descriptor,
     );
     if (!snapshot) throw unavailable();
 
@@ -178,14 +185,9 @@ export class SampleCheckService {
       }
 
       try {
-        await queue.enqueueSampleCheck(record.checkId);
+        await queue.enqueueSampleCheck(record.checkId, record.snapshot.executionRuntimeSnapshot);
       } catch (error) {
         this.logger.error(`sample check ${record.checkId} could not be queued: ${String(error)}`);
-        await store.transition(record, ["QUEUED"], {
-          status: "UNAVAILABLE",
-          failure: "ENQUEUE_FAILED",
-          finishedAt: Date.now(),
-        });
         throw unavailable();
       }
       return toView(record, true);
@@ -238,7 +240,7 @@ export class SampleCheckService {
       // Terminal, so its admission markers are freed in the same write and the
       // student may start another check at once. The job it never reached is
       // dropped rather than left to produce a result nobody is waiting for.
-      await this.queue?.removeSampleCheck(record.checkId).catch(() => undefined);
+      await this.queue?.removeSampleCheck(record.checkId, record.snapshot.executionRuntimeSnapshot).catch(() => undefined);
       return expired;
     }
     if (isSampleCheckActive(record.status) && now > record.lostAfter) {
@@ -270,7 +272,7 @@ export class SampleCheckService {
         finishedAt: Date.now(),
       });
       if (cancelled) {
-        await this.queue?.removeSampleCheck(record.checkId).catch(() => undefined);
+        await this.queue?.removeSampleCheck(record.checkId, record.snapshot.executionRuntimeSnapshot).catch(() => undefined);
         return toView(cancelled, visible);
       }
     }
@@ -353,6 +355,7 @@ export class SampleCheckService {
     if (record.requestHash !== requestHash) {
       throw new AppException("SAMPLE_CHECK_CONFLICT", HttpStatus.CONFLICT);
     }
+    if (record.status === "QUEUED") await this.queue?.enqueueSampleCheck(record.checkId, record.snapshot.executionRuntimeSnapshot);
     return toView(record, true);
   }
 

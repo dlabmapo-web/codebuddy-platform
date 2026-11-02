@@ -5,7 +5,7 @@ import { createSubmissionFallback } from './submission-fallback';
 afterEach(() => vi.useRealTimers());
 
 describe('createSubmissionFallback', () => {
-  it('fetches once after 15 seconds without an event', () => {
+  it('repeats only read recovery after quiet streams, within a finite bound', () => {
     vi.useFakeTimers();
     const fetchOnce = vi.fn();
     const fallback = createSubmissionFallback(fetchOnce, 15_000);
@@ -15,7 +15,9 @@ describe('createSubmissionFallback', () => {
     fallback.touch();
     vi.advanceTimersByTime(30_000);
 
-    expect(fetchOnce).toHaveBeenCalledTimes(1);
+    expect(fetchOnce.mock.calls.length).toBeGreaterThan(1);
+    vi.runAllTimers();
+    expect(fetchOnce).toHaveBeenCalledTimes(120);
   });
 
   it('measures inactivity from the latest progress event', () => {

@@ -103,6 +103,10 @@ export const apiEnvironmentSchema = z.object({
       { message: "must be 32 bytes of base64" },
     )
     .optional(),
+  NATIVE_GRADING_BRIDGE_ACK: z.literal("filtered-compatibility-workers-v1").optional(),
+  NATIVE_GRADING_ENABLED: z.preprocess(v => v === "true" || v === true, z.boolean()).default(false),
+  NATIVE_GRADING_MANIFEST: z.string().startsWith("/").optional(),
+  DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
   DATABASE_URL: postgresUrlSchema,
   DIRECT_URL: postgresUrlSchema,
   /**
@@ -222,6 +226,10 @@ export const apiEnvironmentSchema = z.object({
     .enum(["development", "test", "production"])
     .optional(),
 }).superRefine((environment, context) => {
+  if (environment.NATIVE_GRADING_ENABLED) {
+    for (const key of ["NATIVE_GRADING_MANIFEST", "NATIVE_GRADING_BRIDGE_ACK", "REDIS_URL"] as const)
+      if (!environment[key]) context.addIssue({ code: "custom", path: [key], message: "is required for native admission after filtered compatibility worker rollout" });
+  }
   if (environment.TURTLE_TRIAL_BROWSER_ENABLED || environment.TURTLE_TRIAL_BROWSER_ADMISSION_ENABLED) {
     if (!environment.TURTLE_TRIAL_ENABLED || !environment.TURTLE_TRIAL_BROWSER_ENABLED) context.addIssue({ code: 'custom', path: ['TURTLE_TRIAL_BROWSER_ENABLED'], message: 'browser execution requires the trial and browser feature flags' });
     for (const key of ['TURTLE_TRIAL_BROWSER_RUNTIME_ORIGIN', 'TURTLE_TRIAL_BROWSER_RUNTIME_ID'] as const) if (!environment[key]) context.addIssue({ code: 'custom', path: [key], message: 'is required for browser execution' });

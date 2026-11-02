@@ -55,7 +55,7 @@ export function createPlatformOperationsRouters(
           return deps.regradeService.startRegrade(
             context.identity,
             input,
-            (job: RegradeJob) => queue.enqueueRegrade(job),
+            (job: RegradeJob, descriptor) => queue.enqueueRegrade(job, descriptor),
           );
         }),
       cancelPlan: os.platformOperations.cancelPlan

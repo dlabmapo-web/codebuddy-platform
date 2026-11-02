@@ -1,3 +1,8 @@
+import { nativeRuntimeVersion } from "@cove/grading-runtime";
+import type { NativeRuntimeDescriptor } from "@cove/shared";
+import { NativeAdmission } from "../judge/native-admission.js";
+import { snapshotTransaction } from "../judge/snapshot-transaction.js";
+import { runtimeQueueName } from "../judge/judge.queue.js";
 import { quizDefinitionSchema, quizFeedback } from "@cove/shared";
 import { HttpStatus, Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -60,6 +65,8 @@ function ownedSubmissionWhere(input: {
 
 @Injectable()
 export class SubmissionService {
+  private nativeAdmission?: NativeAdmission;
+  private native() { return this.nativeAdmission ??= new NativeAdmission(this.config, this.prisma, this.queue); }
   private readonly logger = new Logger(SubmissionService.name);
   private readonly rateLimit: number;
 
@@ -95,9 +102,9 @@ export class SubmissionService {
     }
     await this.consumeRateLimit(userId);
 
-    let createdSubmission: { id: string; totalCount: number };
+    let createdSubmission: { id: string; totalCount: number; descriptor: NativeRuntimeDescriptor | null };
     try {
-      createdSubmission = await this.prisma.$transaction(async (tx) => {
+      createdSubmission = await snapshotTransaction(this.prisma, async (tx) => {
         // Serialize admission against typed runtime conversion. A conversion
         // takes FOR UPDATE; an earlier admission must commit before its pending
         // work inventory, and a later admission must read the converted type.
@@ -151,7 +158,11 @@ export class SubmissionService {
           );
         }
         const engineVersion = this.config.get("PYODIDE_VERSION", { infer: true });
-        const snapshot = gradingSnapshotFor(exercise, { engineVersion });
+        const descriptor = quiz ? null : await this.native().select({
+          academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision,
+          context: "live", kind: "official",
+        }, exercise);
+        const snapshot = gradingSnapshotFor(exercise, { engineVersion, descriptor });
 
         await this.classContext.resolveWith(tx, {
           academyId: input.academyId,
@@ -189,7 +200,8 @@ export class SubmissionService {
             ...(quiz ? { quizSnapshot: { version: 1, title: material.title, description: exercise.description, definition: quiz } } : {}),
             code: input.code,
             totalCount: quiz ? 1 : exercise.testCases.length,
-            engineVersion,
+            engineVersion: descriptor ? nativeRuntimeVersion(descriptor) : engineVersion,
+            ...(descriptor ? { executionQueue: runtimeQueueName("official", descriptor) } : {}),
             solveSessionId: solveSession?.id ?? null,
             solveElapsedSec: solveSession
               ? solveElapsedSeconds(solveSession.startedAt, new Date())
@@ -208,7 +220,7 @@ export class SubmissionService {
           },
           select: { id: true },
         });
-        return { id: created.id, totalCount: quiz ? 1 : exercise.testCases.length };
+        return { id: created.id, totalCount: quiz ? 1 : exercise.testCases.length, descriptor };
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -219,7 +231,8 @@ export class SubmissionService {
 
     const submissionId = createdSubmission.id;
     try {
-      await this.queue.enqueue(submissionId);
+      if (createdSubmission.descriptor) await this.queue.enqueue(submissionId, createdSubmission.descriptor);
+      else await this.queue.enqueue(submissionId);
     } catch (error) {
       this.logger.error(`enqueue failed for ${submissionId}: ${String(error)}`);
     }

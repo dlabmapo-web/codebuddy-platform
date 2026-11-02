@@ -1,11 +1,11 @@
 'use client';
-import { buildCaseCells, isTerminalStatus, type SubmissionResult } from '@cove/shared';
+import { buildCaseCells, isTerminalStatus, submissionResultSchema, type SubmissionResult } from '@cove/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 import { orpc } from '@/lib/orpc';
 import { useLatestSubmission } from '@/components/workspace/use-latest-submission';
 
-/** Polling is bounded and cancelled on unmount; it never opens student SSE or monitoring. */
+/** Personal practice uses its authorized stream plus bounded read recovery. */
 export function usePracticeSubmission(academyId: string, materialId: string, preview = false, gradingRevision?: number, enabled = true, userId = "") {
   const client = useQueryClient();
   const latest = useLatestSubmission({ academyId, materialId, mode: 'staff-practice', preview, gradingRevision }, userId, enabled);
@@ -18,10 +18,29 @@ export function usePracticeSubmission(academyId: string, materialId: string, pre
   const request = React.useRef<{ code: string; id: string } | null>(null);
   const result = useQuery({
     queryKey: ['staff-practice', userId, academyId, 'result', submissionId],
-    queryFn: () => orpc.learn.getPracticeResult({ academyId, submissionId: submissionId! }),
+    queryFn: async () => {
+      const next = await orpc.learn.getPracticeResult({ academyId, submissionId: submissionId! });
+      const committed = client.getQueryData<SubmissionResult>(['staff-practice', userId, academyId, 'result', submissionId]);
+      // A read started before commit may finish after the terminal stream event.
+      return committed && isTerminalStatus(committed.status) ? committed : next;
+    },
     enabled: Boolean(submissionId), retry: 1, refetchOnWindowFocus: true,
     refetchInterval: (query) => Date.now() - acceptedAt.current >= 120000 || query.state.error || (query.state.data && isTerminalStatus(query.state.data.status)) ? false : 1000,
   });
+  React.useEffect(() => {
+    if (!submissionId) return;
+    const source = new EventSource(`/api/learn/practice-submissions/${submissionId}/stream?academyId=${encodeURIComponent(academyId)}`);
+    const onResult = (event: MessageEvent<string>) => {
+      try {
+        const parsed = submissionResultSchema.safeParse(JSON.parse(event.data));
+        if (!parsed.success || parsed.data.submissionId !== submissionId) return;
+        client.setQueryData<SubmissionResult>(['staff-practice', userId, academyId, 'result', submissionId], previous => previous && isTerminalStatus(previous.status) ? previous : parsed.data);
+        if (isTerminalStatus(parsed.data.status)) source.close();
+      } catch { /* Existing bounded polling recovers a malformed or dropped stream. */ }
+    };
+    source.addEventListener('result', onResult);
+    return () => source.close();
+  }, [academyId, client, submissionId, userId]);
   const history = useQuery({
     queryKey: ['staff-practice', userId, academyId, materialId, preview, gradingRevision, 'history'],
     queryFn: () => orpc.learn.listPracticeAttempts({ academyId, materialId, preview, gradingRevision }),

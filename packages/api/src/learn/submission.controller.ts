@@ -1,3 +1,4 @@
+import { frozenNativeDescriptor } from "../judge/native-admission.js";
 import {
   Controller,
   HttpStatus,
@@ -71,6 +72,10 @@ export class SubmissionController {
       submissionId,
     );
 
+    const routing = await this.prisma.submission.findUnique({ where: { id: submissionId }, select: { executionRuntimeSnapshot: true } });
+    const descriptor = frozenNativeDescriptor(routing?.executionRuntimeSnapshot);
+    const events = descriptor ? this.queue?.forRuntime(descriptor).events : this.queue?.events;
+
     // Replay one event so a verdict found by the initial database check cannot
     // race ahead of the Observable subscription.
     const subject = new ReplaySubject<StreamEvent>(1);
@@ -82,20 +87,34 @@ export class SubmissionController {
       closed = true;
       timers.forEach(clearInterval);
       timers.forEach(clearTimeout);
-      this.queue?.events.off("progress", onProgress);
-      this.queue?.events.off("completed", onCompleted);
-      this.queue?.events.off("failed", onFailed);
+      events?.off("progress", onProgress);
+      events?.off("completed", onCompleted);
+      events?.off("failed", onFailed);
       subject.complete();
     };
 
+    let reading = false;
+    let readAgain = false;
     const emitResult = async () => {
-      const submission = await this.prisma.submission.findUnique({
-        where: { id: submissionId },
-        select: { status: true, passedCount: true, totalCount: true },
-      });
-      if (!submission) return;
-      subject.next({ type: "result", data: JSON.stringify(submission) });
-      if (isTerminalStatus(submission.status)) finish();
+      if (closed) return;
+      if (reading) { readAgain = true; return; }
+      reading = true;
+      try {
+        do {
+          readAgain = false;
+          await this.submissions.assertOwnership(identity.authUserId, academyId, submissionId);
+          const submission = await this.prisma.submission.findUnique({
+            where: { id: submissionId }, select: { status: true, passedCount: true, totalCount: true },
+          });
+          if (closed || !submission) return;
+          // Only durable committed state can terminate a stream.
+          subject.next({ type: "result", data: JSON.stringify({ status: submission.status, passedCount: submission.passedCount, totalCount: submission.totalCount }) });
+          if (isTerminalStatus(submission.status)) { finish(); return; }
+        } while (readAgain && !closed);
+      } catch {
+        if (!closed) subject.next({ type: "error", data: JSON.stringify({ submissionId, reason: "JUDGE_UNAVAILABLE" }) });
+        finish();
+      } finally { reading = false; }
     };
 
     const onProgress = ({ jobId, data }: { jobId: string; data: unknown }) => {
@@ -118,17 +137,12 @@ export class SubmissionController {
       failedReason: string;
     }) => {
       if (jobId !== submissionId) return;
-      subject.next({
-        type: "error",
-        // BullMQ's raw reason can contain exception input. Keep the public
-        // error deliberately generic.
-        data: JSON.stringify({ submissionId, reason: "JUDGE_FAILED" }),
-      });
+      void emitResult();
     };
 
-    this.queue?.events.on("progress", onProgress);
-    this.queue?.events.on("completed", onCompleted);
-    this.queue?.events.on("failed", onFailed);
+    events?.on("progress", onProgress);
+    events?.on("completed", onCompleted);
+    events?.on("failed", onFailed);
 
     // A submission graded before the stream opened would otherwise never emit.
     void emitResult();
@@ -137,6 +151,7 @@ export class SubmissionController {
       setInterval(() => subject.next({ type: "ping", data: "" }), KEEP_ALIVE_MS),
     );
     timers.push(setTimeout(finish, MAX_STREAM_MS));
+    timers.push(setInterval(() => void emitResult(), 2_000));
 
     return new Observable<StreamEvent>((subscriber) => {
       const subscription = subject.subscribe(subscriber);

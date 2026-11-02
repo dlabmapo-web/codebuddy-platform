@@ -1,3 +1,5 @@
+import { frozenNativeDescriptor } from "./native-admission.js";
+import { nativeRuntimeVersion } from "@cove/grading-runtime";
 import { Logger } from "@nestjs/common";
 import { sampleCheckDisplayLimit, type SampleCheckStatus } from "@cove/shared";
 
@@ -91,6 +93,12 @@ export class SampleCheckRunner {
     if (inputPromptPolicy === null) {
       await this.end(record, ["RUNNING"], "UNAVAILABLE", { failure: "UNSUPPORTED_POLICY" });
       return;
+    }
+    let descriptor;
+    try { descriptor = frozenNativeDescriptor(snapshot.executionRuntimeSnapshot); }
+    catch { await this.end(record, ["RUNNING"], "UNAVAILABLE", { failure: "RUNTIME_VERSION_MISMATCH" }); return; }
+    if ((descriptor && nativeRuntimeVersion(descriptor) !== this.engine.version) || (!descriptor && this.engine.version.startsWith("native-cpython-"))) {
+      await this.end(record, ["RUNNING"], "UNAVAILABLE", { failure: "RUNTIME_VERSION_MISMATCH" }); return;
     }
     const legacy = snapshot.gradingMode === "LEGACY_STDIO";
     const mismatch = legacy

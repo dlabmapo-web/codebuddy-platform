@@ -1,3 +1,5 @@
+import { nativeRuntimeVersion } from "@cove/grading-runtime";
+import { nativeRuntimeDescriptorSchema, type NativeRuntimeDescriptor } from "@cove/shared";
 import { Injectable, Logger, type OnModuleDestroy } from "@nestjs/common";
 import { Queue, QueueEvents, Worker, type ConnectionOptions } from "bullmq";
 import { Redis } from "ioredis";
@@ -29,6 +31,12 @@ export const REGRADE_QUEUE = "cove-regrade";
  * a slot for submissions (`execution-capacity.ts`).
  */
 export const SAMPLE_QUEUE = "cove-sample-checks";
+
+export type WorkKind = "official" | "practice" | "sample" | "regrade";
+export function runtimeQueueName(kind: WorkKind, descriptor?: NativeRuntimeDescriptor | null): string {
+  const base = { official: GRADING_QUEUE, practice: PRACTICE_QUEUE, sample: SAMPLE_QUEUE, regrade: REGRADE_QUEUE }[kind];
+  return descriptor ? `${base}-native-v1-${nativeRuntimeVersion(descriptor).slice("native-cpython-".length)}` : base;
+}
 
 export type SampleCheckJob = { checkId: string };
 
@@ -109,13 +117,35 @@ export class JudgeQueue implements OnModuleDestroy {
   private regradeInstance: Queue<RegradeJob> | null = null;
   private sampleInstance: Queue<SampleCheckJob> | null = null;
   private eventsInstance: QueueEvents | null = null;
+  private practiceEventsInstance: QueueEvents | null = null;
   private rateLimitClient: Redis | null = null;
   private rateLimitConnection: Promise<void> | null = null;
 
-  constructor(private readonly redisUrl: string) {}
+  private readonly families = new Map<string, JudgeQueue>();
+  readonly descriptor?: NativeRuntimeDescriptor;
+  constructor(private readonly redisUrl: string, descriptor?: NativeRuntimeDescriptor) {
+    this.descriptor = descriptor ? nativeRuntimeDescriptorSchema.parse(descriptor) : undefined;
+    if (this.descriptor) { Object.freeze(this.descriptor.comparator); Object.freeze(this.descriptor); }
+  }
+  /** Bound producer/event connections across retained releases. No per-submission clients. */
+  forRuntime(descriptor?: NativeRuntimeDescriptor | null): JudgeQueue {
+    if (!descriptor) {
+      if (this.descriptor) throw new Error("Native queue cannot dispatch compatibility work");
+      return this;
+    }
+    const name = runtimeQueueName("official", descriptor);
+    if (name === runtimeQueueName("official", this.descriptor)) return this;
+    let family = this.families.get(name);
+    if (!family) {
+      if (this.families.size >= 16) throw new Error("Too many retained runtime queue families");
+      family = new JudgeQueue(this.redisUrl, descriptor);
+      this.families.set(name, family);
+    }
+    return family;
+  }
 
   get queue(): Queue<GradingJob> {
-    this.queueInstance ??= new Queue<GradingJob>(GRADING_QUEUE, {
+    this.queueInstance ??= new Queue<GradingJob>(runtimeQueueName("official", this.descriptor), {
       connection: redisConnection(this.redisUrl),
       defaultJobOptions: {
         attempts: 2,
@@ -128,7 +158,7 @@ export class JudgeQueue implements OnModuleDestroy {
   }
 
   get practiceQueue(): Queue<PracticeJob> {
-    this.practiceInstance ??= new Queue<PracticeJob>(PRACTICE_QUEUE, {
+    this.practiceInstance ??= new Queue<PracticeJob>(runtimeQueueName("practice", this.descriptor), {
       connection: redisConnection(this.redisUrl),
       defaultJobOptions: { attempts: 2, backoff: { type: "exponential", delay: 2_000 },
         removeOnComplete: { age: 3_600, count: 1_000 }, removeOnFail: { age: 86_400 } },
@@ -137,7 +167,7 @@ export class JudgeQueue implements OnModuleDestroy {
   }
 
   get regradeQueue(): Queue<RegradeJob> {
-    this.regradeInstance ??= new Queue<RegradeJob>(REGRADE_QUEUE, {
+    this.regradeInstance ??= new Queue<RegradeJob>(runtimeQueueName("regrade", this.descriptor), {
       connection: redisConnection(this.redisUrl),
       defaultJobOptions: {
         attempts: 2,
@@ -153,7 +183,7 @@ export class JudgeQueue implements OnModuleDestroy {
   }
 
   get sampleQueue(): Queue<SampleCheckJob> {
-    this.sampleInstance ??= new Queue<SampleCheckJob>(SAMPLE_QUEUE, {
+    this.sampleInstance ??= new Queue<SampleCheckJob>(runtimeQueueName("sample", this.descriptor), {
       connection: redisConnection(this.redisUrl),
       defaultJobOptions: {
         attempts: 1,
@@ -180,21 +210,26 @@ export class JudgeQueue implements OnModuleDestroy {
   }
 
   /** `jobId` is the check id: a retried dispatch cannot run a check twice. */
-  async enqueueSampleCheck(checkId: string): Promise<void> {
-    await this.sampleQueue.add("sample", { checkId }, { jobId: checkId });
+  async enqueueSampleCheck(checkId: string, descriptor?: NativeRuntimeDescriptor | null): Promise<void> {
+    await (descriptor ? this.forRuntime(descriptor) : this).sampleQueue.add("sample", { checkId }, { jobId: checkId });
   }
 
   /**
    * Removes a check that has not started. A job already running is locked
    * and stays; the worker sees the cancel and discards its result.
    */
-  async removeSampleCheck(checkId: string): Promise<void> {
-    const job = await this.sampleQueue.getJob(checkId);
+  async removeSampleCheck(checkId: string, descriptor?: NativeRuntimeDescriptor | null): Promise<void> {
+    const job = await (descriptor ? this.forRuntime(descriptor) : this).sampleQueue.getJob(checkId);
     await job?.remove().catch(() => undefined);
   }
 
+  get practiceEvents(): QueueEvents {
+    this.practiceEventsInstance ??= new QueueEvents(runtimeQueueName("practice", this.descriptor), { connection: redisConnection(this.redisUrl) });
+    return this.practiceEventsInstance;
+  }
+
   get events(): QueueEvents {
-    this.eventsInstance ??= new QueueEvents(GRADING_QUEUE, {
+    this.eventsInstance ??= new QueueEvents(runtimeQueueName("official", this.descriptor), {
       connection: redisConnection(this.redisUrl),
     });
     return this.eventsInstance;
@@ -204,16 +239,16 @@ export class JudgeQueue implements OnModuleDestroy {
    * `jobId` is the submission id, so BullMQ deduplicates: a retried request or
    * a double-clicked button cannot enqueue the same grading twice.
    */
-  async enqueue(submissionId: string): Promise<void> {
-    await this.queue.add(
+  async enqueue(submissionId: string, descriptor?: NativeRuntimeDescriptor | null): Promise<void> {
+    await (descriptor ? this.forRuntime(descriptor) : this).queue.add(
       "grade",
       { submissionId },
       { jobId: submissionId },
     );
   }
 
-  async enqueuePractice(attemptId: string): Promise<void> {
-    await this.practiceQueue.add("practice", { attemptId }, { jobId: attemptId });
+  async enqueuePractice(attemptId: string, descriptor?: NativeRuntimeDescriptor | null): Promise<void> {
+    await (descriptor ? this.forRuntime(descriptor) : this).practiceQueue.add("practice", { attemptId }, { jobId: attemptId });
   }
 
   /**
@@ -225,9 +260,9 @@ export class JudgeQueue implements OnModuleDestroy {
    * readable in a worker log and makes a retried dispatch inside one run
    * deduplicate exactly as the live path does.
    */
-  async enqueueRegrade(job: RegradeJob): Promise<void> {
-    await this.regradeQueue.add("regrade", job, {
-      jobId: `regrade:${job.runId}:${job.submissionId}`,
+  async enqueueRegrade(job: RegradeJob, descriptor?: NativeRuntimeDescriptor | null): Promise<void> {
+    await (descriptor ? this.forRuntime(descriptor) : this).regradeQueue.add("regrade", job, {
+      jobId: `regrade-${job.runId}-${job.submissionId}`,
     });
   }
 
@@ -283,7 +318,7 @@ export class JudgeQueue implements OnModuleDestroy {
     concurrency: number,
   ): Worker<GradingJob> {
     const worker = new Worker<GradingJob>(
-      GRADING_QUEUE,
+      runtimeQueueName("official", this.descriptor),
       async (job) =>
         handler({
           data: job.data,
@@ -302,7 +337,7 @@ export class JudgeQueue implements OnModuleDestroy {
   }
 
   createPracticeWorker(handler: (job: PracticeJob, queuedAtMs?: number) => Promise<void>, concurrency: number): Worker<PracticeJob> {
-    const worker = new Worker<PracticeJob>(PRACTICE_QUEUE, (job) => handler(job.data, job.timestamp), {
+    const worker = new Worker<PracticeJob>(runtimeQueueName("practice", this.descriptor), (job) => handler(job.data, job.timestamp), {
       connection: redisConnection(this.redisUrl), concurrency,
     });
     worker.on("failed", (job, error) => this.logger.error(`practice job ${job?.id ?? "unknown"} failed: ${error.message}`));
@@ -314,7 +349,7 @@ export class JudgeQueue implements OnModuleDestroy {
     concurrency: number,
   ): Worker<RegradeJob> {
     const worker = new Worker<RegradeJob>(
-      REGRADE_QUEUE,
+      runtimeQueueName("regrade", this.descriptor),
       async (job) => handler({ data: job.data, queuedAtMs: job.timestamp }),
       { connection: redisConnection(this.redisUrl), concurrency },
     );
@@ -332,7 +367,7 @@ export class JudgeQueue implements OnModuleDestroy {
     onFailed: (checkId: string, error: Error) => void,
   ): Worker<SampleCheckJob> {
     const worker = new Worker<SampleCheckJob>(
-      SAMPLE_QUEUE,
+      runtimeQueueName("sample", this.descriptor),
       async (job) => handler({ data: job.data, queuedAtMs: job.timestamp }),
       { connection: redisConnection(this.redisUrl), concurrency },
     );
@@ -345,17 +380,21 @@ export class JudgeQueue implements OnModuleDestroy {
   }
 
   async close(): Promise<void> {
+    await Promise.all([...this.families.values()].map(family => family.close()));
+    this.families.clear();
     await this.queueInstance?.close();
     await this.practiceInstance?.close();
     await this.regradeInstance?.close();
     await this.sampleInstance?.close();
     await this.eventsInstance?.close();
+    await this.practiceEventsInstance?.close();
     await this.rateLimitClient?.quit().catch(() => undefined);
     this.queueInstance = null;
     this.practiceInstance = null;
     this.regradeInstance = null;
     this.sampleInstance = null;
     this.eventsInstance = null;
+    this.practiceEventsInstance = null;
     this.rateLimitClient = null;
     this.rateLimitConnection = null;
   }

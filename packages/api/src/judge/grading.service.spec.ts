@@ -113,6 +113,7 @@ function createService(options?: {
     },
   };
   const tx = {
+    $queryRaw: vi.fn().mockResolvedValue([{ grading_revision: options?.currentRevision ?? 1 }]),
     submission: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     submissionCase: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },
     studentExerciseProgress: {

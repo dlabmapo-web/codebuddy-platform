@@ -30,3 +30,34 @@ test('expected FAILED grades count as correct, infrastructure and missing/mismat
         assert.equal(matchesExpectedGrade({ ...result, ...bad }, student, 1, 'native-pinned'), false);
     assert.equal(summarize([{ correct: true, elapsedMs: 5000 }], 1).allUnder5s, false);
 });
+
+test('RPC accepts fractional remaining time and aborts within the same finite deadline', { timeout: 5000 }, async () => {
+    const { createServer } = await import('node:http');
+    const { createFixtureRpc } = await import('./benchmark-native-classroom.mjs');
+    const server = createServer((request, response) => {
+        if (request.url === '/ready') response.writeHead(200, { 'Content-Type': 'application/json' }).end('{"ready":true}');
+        // /stall intentionally waits for the caller's transport budget to expire.
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const clock = { now: 0.75 };
+    const deadline = 5000.25;
+    const rpc = createFixtureRpc({ origin: `http://127.0.0.1:${server.address().port}`, token: 'synthetic' }, () => {
+        const remaining = deadline - clock.now;
+        if (remaining <= 0) throw Error('Overall benchmark deadline');
+        return remaining;
+    });
+    try {
+        assert.deepEqual(await rpc('/ready'), { ready: true }); // 4999.5ms: formerly ERR_OUT_OF_RANGE.
+        clock.now = deadline - 50.5;
+        const started = performance.now();
+        await assert.rejects(rpc('/stall'), error => error.name === 'TimeoutError');
+        assert.ok(performance.now() - started < 1000, 'remaining budget must not reset to 15s');
+        clock.now = deadline - 0.75;
+        await assert.rejects(rpc('/stall'), error => error.name === 'TimeoutError');
+        clock.now = deadline;
+        await assert.rejects(rpc('/ready'), /Overall benchmark deadline/);
+    } finally {
+        server.closeAllConnections();
+        await new Promise(resolve => server.close(resolve));
+    }
+});

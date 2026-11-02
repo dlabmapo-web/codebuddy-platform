@@ -4,6 +4,8 @@ set -euo pipefail
 native_repo="$(cd "$(dirname "$0")/../.." && pwd)";native_dest="${1:?New sanitized source directory required}"
 native_auth="${2:?Explicit loopback auth origin}";native_api="${3:?Explicit loopback API origin}";native_web="${4:?Explicit loopback Next origin}"
 node -e 'for(const v of process.argv.slice(1)){const u=new URL(v);if(u.protocol!=="http:"||u.hostname!=="127.0.0.1"||!u.port)throw Error("Loopback fixture origin required")}' "$native_auth" "$native_api" "$native_web"
+native_mode="${5:-}"
+case "$native_mode" in ''|--assets-only) ;; *) echo 'Unknown fixture build mode' >&2; exit 2;; esac
 mkdir -m 700 "$native_dest"
 # Tracked allowlist only; excludes dotenv, auth state, artifacts and dependencies before copying.
 python3 - "$native_repo" "$native_dest" <<'PY'
@@ -23,9 +25,14 @@ for name in ('web','shared','i18n','turtle-browser-runtime'):
  if name!='web' and (root/'packages'/name/'dist').exists():shutil.copytree(root/'packages'/name/'dist',dest/'packages'/name/'dist')
 (dest/'node_modules').symlink_to(root/'node_modules',target_is_directory=True)
 PY
-# PUBLIC values are frozen at build time; server RPC/BFF uses matching synthetic config.
-env -i PATH="$PATH" HOME="$HOME" NEXT_TELEMETRY_DISABLED=1 DOTENV_CONFIG_PATH=/dev/null \
+# Run the actual package generators in the sanitized tree before Next compilation.
+native_web_command() {
+ env -i PATH="$PATH" HOME="$HOME" NEXT_TELEMETRY_DISABLED=1 DOTENV_CONFIG_PATH=/dev/null \
  NEXT_PUBLIC_SUPABASE_URL="$native_auth" NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=fixture-public-key \
  NEXT_PUBLIC_API_URL="$native_api/api/rpc" NEXT_PUBLIC_SITE_URL="$native_web" \
  INTERNAL_API_RPC_URL="$native_api/api/rpc" BFF_SHARED_SECRET=local-native-bff-secret-only-never-production \
- pnpm --dir "$native_dest/packages/web" exec next build --webpack
+ pnpm --dir "$native_dest/packages/web" "$@"
+}
+native_web_command run prebuild
+# The bounded regression exercises real generators/static serving without a full build.
+if [ "$native_mode" != --assets-only ]; then native_web_command exec next build --webpack; fi

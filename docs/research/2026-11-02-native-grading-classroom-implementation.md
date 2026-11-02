@@ -217,3 +217,64 @@ JavaScript syntax and `git diff --check` pass. Native fixture Compose renders
 without starting resources. The installed Next CLI guide was also inspected for
 production build/start directory/host flags. No CI workflow was pushed or run
 remotely; its complete supported-Linux integration remains an explicit open gate.
+
+## Scoped Task 3 review fixes
+
+The two Important findings in `task-3-review.md` are fixed without changing
+production code or native containment/admission/queue behavior.
+
+1. `build-next-fixture.sh` now runs the web package's actual `prebuild` lifecycle
+   inside the tracked-source sanitized copy, generating both noVNC and Monaco
+   before Next compilation. Its bounded `--assets-only` regression mode executes
+   those same generators. The regression checks nonempty generated files, starts
+   the real installed Next16.4.1 development server with the sanitized web working
+   directory, and compares HTTP200 response bytes with generated files for
+   `/monaco/0.55.1/vs/loader.js`,
+   `/monaco/0.55.1/vs/assets/editor.worker-Be8ye1pW.js` and `/novnc-rfb.js`.
+   It does not copy ambient generated assets, dotenv or auth state. This is asset
+   generation/serving evidence, not a full native/browser performance result.
+2. The benchmark's actual RPC factory now floors/clamps each post-deadline-check
+   transport timeout to an integer in1..15000ms. A live sub-millisecond allowance
+   gets1ms; the overall watchdog/deadline remains unchanged. The HTTP regression
+   uses a fake remaining clock with4999.5ms,50.5ms and0.75ms allowances: readiness
+   succeeds, stalled requests abort within the remaining budget, and an expired
+   deadline prevents the next request. The former ERR_OUT_OF_RANGE is not a
+   successful timeout or hidden failed submission.
+
+Focused verification:
+
+```
+node --test packages/api/scripts/benchmark-native-classroom.test.mjs deploy/native/*.test.mjs
+bash -n deploy/native/build-next-fixture.sh
+node --check packages/api/scripts/benchmark-native-classroom.mjs
+node --check packages/api/scripts/benchmark-native-classroom.test.mjs
+node --check deploy/native/next-fixture-assets.test.mjs
+git diff --check
+```
+
+All8 focused tests pass (`review-focused-final.log`,5.96s). The separate bounded
+sanitized asset/real-Next HTTP test passes in4.05s; fractional HTTP regression
+passes in0.10s. Failed test iterations are retained: the first used an obsolete
+Monaco workerMain path (the installed0.55.1 package uses hashed worker assets),
+and the second launched the development server from the repository working
+folder; the verified test uses the sanitized package working directory. These
+failures are not reported as successful asset serving.
+
+Script-only image refresh reused the exact tested immutable base
+`sha256:01f955bc83fe565d8c75393ea0e5ae7983aa5ac3bfc7a59516fa8402f8d2432b`
+through a digest-derived local tag, verified before/after. A temporary recorded
+Dockerfile copied only `deploy/native` and the two changed benchmark script files;
+no TypeScript builder, package install or broad application suite was repeated.
+Latest local ARM64 config ID:
+`sha256:cf7da57aae18754dd8adf666d0115000c19c6ef8036376608ba55ef543616533`
+(1336350413bytes). `verify-image.sh` passes relocated cleared-environment ELF
+loading, native-worker module import, dependency hashes and private-file inventory
+on this refreshed image. Exact recipe/build/identity/contract logs are
+`review-tools-refresh.Dockerfile`, `review-tools-image-build.log`,
+`review-tools-image-identity.log` and `review-tools-image-contract.log` beside the
+Task3 evidence. Rootfs/NsJail/policy/comparator bytes are unchanged from the base.
+
+Actual delegated Linux, complete Next/native application execution and all200/
+five-burst acceptance remain unpassed. The known local delegated-controller
+exit78 remains applicable; no host setting or resource was changed. No production,
+remote CI, deployment, push, purchase,200-client load or subagent was used.

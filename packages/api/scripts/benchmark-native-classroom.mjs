@@ -59,14 +59,18 @@ export function assertSloEvidence(report) {
     if (report.stage !== 'actual-next-click-to-committed-display' || report.options.clients !== 200 || report.options.bursts !== 5 || report.bursts.length !== 5 || report.bursts.some(b => b.workloadBounds?.memoryLimitMb !== 512 || !Number.isFinite(b.workloadBounds?.executionOutputLimitBytes) || !Number.isFinite(b.workloadBounds?.generatedMaxOutputBytes) || b.workloadBounds.generatedMaxOutputBytes > 16384 || !Number.isFinite(b.workloadBounds?.sourceChars) || b.workloadBounds.sourceChars > 10000 || !Number.isFinite(b.workloadBounds?.aggregateStdinBytes) || b.workloadBounds.aggregateStdinBytes > 65536 || classroomCorpus.some(c => !b.rows.some(r => r.workload === c.kind && r.sourceDigest === ('sha256:' + createHash('sha256').update(c.code).digest('hex')))) || !b.summary.allUnder5s || b.arrivalWindowMs > 1000 || !b.commitVerified || !b.visibleBrowser || b.rows.some(r => !r.clickEvidence?.trusted || Math.abs(r.clickEvidence.alignmentMs) > 5)) || report.network.rttMs !== 80 || report.network.mbps !== 20)
         throw Error('All-200/five-burst SLO evidence failed or incomplete');
 }
+/** Node requires an integer delay; a live sub-millisecond budget still gets 1ms. */
+export function createFixtureRpc(fixture, remaining) {
+    return async (path, data) => { const response = await fetch(fixture.origin + path, { method: data ? 'POST' : 'GET', headers: { Authorization: 'Bearer ' + fixture.token, 'Content-Type': 'application/json' }, body: data ? JSON.stringify(data) : undefined, redirect: 'error', signal: AbortSignal.timeout(Math.max(1, Math.floor(Math.min(15000, remaining())))) }); if (!response.ok)
+        throw Error('Fixture HTTP ' + response.status); return response.json(); };
+}
 async function main() {
     const options = parseArgs(process.argv.slice(2)), fixture = await loadAuthority(options.fixture);
     await lstat(options.output).then(() => { throw Error('Output already exists'); }, error => { if (error.code !== 'ENOENT') throw error; });
     const deadline = performance.now() + options.maxSeconds * 1000;
     const remaining = () => { const n = deadline - performance.now(); if (n <= 0)
         throw Error('Overall benchmark deadline'); return n; };
-    const rpc = async (path, data) => { const response = await fetch(fixture.origin + path, { method: data ? 'POST' : 'GET', headers: { Authorization: 'Bearer ' + fixture.token, 'Content-Type': 'application/json' }, body: data ? JSON.stringify(data) : undefined, redirect: 'error', signal: AbortSignal.timeout(Math.min(15000, remaining())) }); if (!response.ok)
-        throw Error('Fixture HTTP ' + response.status); return response.json(); };
+    const rpc = createFixtureRpc(fixture, remaining);
     const report = { version: 1, stage: options.mode === 'application' ? 'authorized-service-admission-to-committed-read' : 'actual-next-click-to-committed-display', options, fixtureId: fixture.fixtureId, nextBuildIdentity: fixture.next?.buildIdentity ?? null, network: { rttMs: options.mode === 'next-browser' ? 80 : null, mbps: options.mode === 'next-browser' ? 20 : null }, generator: { arch: arch(), platform: platform(), cpus: cpus().length, memoryBytes: totalmem(), maxConcurrency: options.concurrency }, unmeasured: ['production-auth-provider-latency', 'cross-machine-commit-to-display', 'database-pool-wait'], bursts: [], status: 'FAILED' };
     let browser;
     // One process-wide watchdog bounds browser/transport stalls as well as polling.

@@ -4,7 +4,7 @@
 // contains only the Python runtime and policy forbids process creation.
 POLICY python {
   ALLOW {
-    read, write, readv, writev, close, close_range,
+    read, pread64, write, readv, writev, close, close_range,
     newfstat, newfstatat, statx, lseek, openat, readlinkat, getdents64,
     mmap, mprotect, munmap, mremap, madvise, brk,
     rt_sigaction, rt_sigprocmask, rt_sigreturn, sigaltstack,

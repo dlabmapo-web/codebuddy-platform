@@ -37,7 +37,12 @@ for native_clients in 1 2 4; do
  done
  done
 # Bounded actual Next smoke; mixed 2-client subset does not satisfy full-corpus/fleet SLO.
-xvfb-run -a "$native_node" --max-old-space-size=512 "$native_repo/packages/api/scripts/benchmark-native-classroom.mjs" --mode next-browser --fixture "$native_work/authority.json" --output "$native_work/evidence/next-browser-2-10.json" --clients 2 --cases 10 --max-seconds 120
+# Chromium's crash reporter requires writable profile/config directories. Keep
+# them inside the owned fixture rather than the intentionally nonexistent unit home.
+mkdir -m 700 "$native_work/browser-home" "$native_work/browser-home/config" "$native_work/browser-home/cache"
+setpriv --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs \
+ env HOME="$native_work/browser-home" XDG_CONFIG_HOME="$native_work/browser-home/config" XDG_CACHE_HOME="$native_work/browser-home/cache" \
+ xvfb-run -a "$native_node" --max-old-space-size=512 "$native_repo/packages/api/scripts/benchmark-native-classroom.mjs" --mode next-browser --fixture "$native_work/authority.json" --output "$native_work/evidence/next-browser-2-10.json" --clients 2 --cases 10 --max-seconds 120
 kill -- -"$native_next"; wait "$native_next" || true; native_next=''
 kill "$native_fixture"; wait "$native_fixture" || true; native_fixture=''
 kill "$native_launcher"; wait "$native_launcher"; native_launcher=''

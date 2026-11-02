@@ -55,7 +55,7 @@ rlimit_cpu: ${Math.ceil(request.timeLimitMs / 1000) + 1}
 rlimit_core: 0
 rlimit_fsize: ${resources.scratchMb}
 rlimit_nofile: 32
-rlimit_nproc_type: INF
+rlimit_nproc_type: HARD
 rlimit_stack: 8
 rlimit_stack_type: VALUE
 time_limit: ${Math.ceil((startupTimeoutMs + request.timeLimitMs + cleanupTimeoutMs) / 1000)}

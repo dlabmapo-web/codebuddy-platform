@@ -72,8 +72,8 @@ bounded measurement and native telemetry integration.
 
 ## Local evidence and exact identities
 
-Raw logs are retained under the ignored workflow directory
-`.superpowers/sdd/2026-11-02-native-grading-classroom-capacity-implementation/task-3-evidence/`.
+Raw logs are retained locally under the ignored evidence directory
+`test-results/native-grading-2026-11-02/task-3-evidence/`.
 They contain synthetic fixture data only. Private credential contents were not displayed or used for a connection; the cancelled broad-copy issue is recorded below.
 
 The strict actual image probe ran using:
@@ -278,3 +278,51 @@ Actual delegated Linux, complete Next/native application execution and all200/
 five-burst acceptance remain unpassed. The known local delegated-controller
 exit78 remains applicable; no host setting or resource was changed. No production,
 remote CI, deployment, push, purchase,200-client load or subagent was used.
+
+
+## Independent controller verification
+
+At `8d4f6549`, the controller independently reran the complete isolated application
+suite: **12/12 scenarios passed**, including concurrent admissions with one API
+DB connection and 101 repair intents surviving an actual owned Redis outage with
+once-only recovery. These use a deterministic launcher and certify application
+contracts, not native execution speed or isolation. The controller also reran
+**29/29 runtime contract tests** and the API build; all passed.
+
+At `6847629e`, after script-only fixes, the controller independently reran all
+**8/8 qualification-script tests**, including real sanitized Next asset serving,
+and attempted the actual launcher gate against refreshed immutable image
+`sha256:cf7da57aae18754dd8adf666d0115000c19c6ef8036376608ba55ef543616533`.
+The gate again returned **78: delegated cpu/memory/pids controls required**.
+No privileged workaround or cohort was started. Native admission remains off.
+
+Exact commands:
+
+```sh
+bash packages/api/scripts/test-native-application-isolated.sh
+pnpm --filter @cove/grading-runtime test
+DOTENV_CONFIG_PATH=/dev/null DIRECT_URL=postgresql://fixture:fixture@127.0.0.1:1/fixture pnpm --filter @cove/api build
+node --test packages/api/scripts/benchmark-native-classroom.test.mjs deploy/native/*.test.mjs
+bash deploy/native/local-gate.sh sha256:cf7da57aae18754dd8adf666d0115000c19c6ef8036376608ba55ef543616533
+```
+
+Task reviews approved all three tasks after scoped fixes. The final whole-branch
+review and scoped re-review approved the implementation after commit `744a2855`. Raw reports and logs are
+retained locally under `test-results/native-grading-2026-11-02/` after workflow
+cleanup. That evidence directory is ignored and is not published.
+
+
+The final review found one older standalone crash qualification entrypoint that
+could report success before learner execution. Commit `744a2855` requires a
+learner-written post-GO marker and the exact stale-allocation startup refusal;
+unrelated placement/control errors cannot pass. Six filesystem-backed decision
+regressions passed independently. The controller then reran the full runtime
+package on that final source: **35/35 tests passed**, zero failures or skips.
+These tests do not certify actual Linux containment. The updated standalone
+entrypoint has not been executed on a supported Linux host, and the previously
+recorded image was unchanged by this qualification-test/README-only commit.
+
+All material review findings are resolved. The requested
+`feat/native-grading-classroom-capacity` branch is retained without merge, push
+or deployment. Supported Linux qualification and the actual fleet benchmark are
+still required before enabling native production admission or promising capacity.

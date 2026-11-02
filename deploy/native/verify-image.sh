@@ -8,6 +8,7 @@ command docker --host "$native_endpoint" run --rm --network none --read-only --c
  set -e
  readelf -d /opt/cove/nsjail | grep -F '\''$ORIGIN/launcher-lib'\''
  /opt/cove/node /opt/cove/tools/verify-linkage.mjs /opt/cove
+ /opt/cove/node /opt/cove/tools/worker-closure.mjs --verify /opt/cove/worker
  /opt/cove/node --input-type=module -e '\''import {validateLauncherLibraries} from "/opt/cove/tools/validate-artifacts.mjs";await validateLauncherLibraries("/opt/cove");await import("/opt/cove/worker/dist/src/judge/native-worker.js");console.log("artifact closure and launcher dependency hashes PASS")'\''
  if find /opt/cove/worker -name ".env*" -o -name "*authority*.json" -o -path "*/.auth/*" | grep .; then exit 1; fi
  '

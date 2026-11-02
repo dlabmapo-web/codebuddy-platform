@@ -14,10 +14,12 @@ RUN --mount=type=cache,id=cove-native-pnpm,target=/pnpm/store pnpm install --fro
 COPY packages/api packages/api
 COPY packages/shared packages/shared
 COPY packages/grading-runtime packages/grading-runtime
+COPY deploy/native/worker-closure.mjs deploy/native/worker-closure.mjs
 RUN --mount=type=cache,id=cove-native-pnpm,target=/pnpm/store pnpm --filter @cove/shared build && pnpm --filter @cove/grading-runtime build \
  && DIRECT_URL=postgresql://build:build@127.0.0.1:1/build pnpm --filter @cove/api build \
  && pnpm --filter @cove/api deploy --prod /opt/cove/worker \
- && cp -R packages/api/dist /opt/cove/worker/dist
+ && cp -R packages/api/dist /opt/cove/worker/dist \
+ && node deploy/native/worker-closure.mjs --finalize /opt/cove/worker /source/packages/api
 # This is a private artifact/runtime, not a catch-all privileged container.
 FROM guest AS runtime
 COPY deploy/native/package-launcher.py /opt/cove/package-launcher.py

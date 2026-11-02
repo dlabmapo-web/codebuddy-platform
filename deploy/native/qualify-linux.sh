@@ -7,6 +7,8 @@ case "$2" in sha256:????????????????????????????????????????????????????????????
 native_image="$2"; native_evidence="$(realpath -m "$3")"
 mkdir -m 700 "$native_evidence"
 native_repo="$(cd "$(dirname "$0")/../.." && pwd)"
+native_service_uid="$(stat -c '%u' "$native_repo")"
+native_service_gid="$(stat -c '%g' "$native_repo")"
 native_endpoint="$(docker context inspect --format '{{.Endpoints.docker.Host}}')"
 case "$native_endpoint" in unix:///*) ;; *) echo 'Local Docker only' >&2; exit 2;; esac
 docker() { command docker --host "$native_endpoint" "$@"; }
@@ -46,11 +48,16 @@ mkdir -m 700 "$native_work/evidence"
 # Prove the real kernel boundary before preparing DB/browser resources. Both
 # phases use this same protected unit configuration and resource envelope.
 run_native_unit() {
+# Keep all trusted socket clients on the same UID, with read access to their own
+# checkout/dependency/browser paths. Never relax a host home directory's mode.
+chown -R --no-dereference -- "$native_service_uid:$native_service_gid" "$native_work"
 systemd-run --unit="$native_unit" --wait --pipe --collect \
+ --property="User=$native_service_uid" --property="Group=$native_service_gid" \
  --property='Delegate=cpu memory pids' --property=MemoryMax=2560M --property=MemorySwapMax=0 \
  --property=CPUQuota=200% --property=TasksMax=256 --property=RuntimeMaxSec=900 \
  --property=KillMode=control-group --property=TimeoutStopSec=25 \
  --property=CapabilityBoundingSet='CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_SETUID CAP_SETGID CAP_SYS_RESOURCE CAP_DAC_OVERRIDE CAP_CHOWN CAP_SETPCAP' \
+ --property=AmbientCapabilities='CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_SETUID CAP_SETGID CAP_SYS_RESOURCE CAP_DAC_OVERRIDE CAP_CHOWN CAP_SETPCAP' \
  --property=ProtectSystem=strict --property="ReadOnlyPaths=$native_artifact $native_repo" \
  --property="ReadWritePaths=$native_work /sys/fs/cgroup/system.slice/$native_unit.service" \
  --property=NoNewPrivileges=yes --property=PrivateTmp=yes \

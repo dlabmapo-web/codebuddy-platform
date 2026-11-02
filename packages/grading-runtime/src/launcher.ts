@@ -9,7 +9,7 @@ import {
   lstat,
   statfs,
 } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { arch, availableParallelism, totalmem } from "node:os";
 import type { Duplex } from "node:stream";
@@ -28,6 +28,7 @@ import { CleanupUncertainError, type NativeBackend } from "./service.js";
 import { ByteCapture } from "./framing.js";
 import { jailConfig, NSJAIL_REVISION } from "./policy.js";
 import { fileDigest, rootfsDigest } from "./identity.js";
+import { verifyCgroupLimits } from "./cgroup-limits.js";
 import {
   readControl,
   childGroups,
@@ -117,42 +118,7 @@ export class NsJailBackend implements NativeBackend {
       throw new NativeInfrastructureError(
         "Unsupported: delegated cpu/memory/pids controls required",
       );
-    if (
-      (await readControl(join(o.cgroupRoot, "memory.max"))) !==
-        String(r.envelopeMemoryMb * 1024 * 1024) ||
-      (await readControl(join(o.cgroupRoot, "memory.swap.max"))) !== "0"
-    )
-      throw new NativeInfrastructureError(
-        "Node memory envelope is not kernel enforced",
-      );
-    const [quota, period] = (await readControl(join(o.cgroupRoot, "cpu.max")))
-      .split(" ")
-      .map(Number);
-    if (!Number.isFinite(quota) || quota <= 0 || quota / period !== r.cpuSlots)
-      throw new NativeInfrastructureError(
-        "Node CPU envelope is not kernel enforced",
-      );
-    // A child may advertise a larger limit than a tighter ancestor. Reject that
-    // configuration rather than mistaking the local numbers for effective budget.
-    for (
-      let ancestor = dirname(o.cgroupRoot);
-      ancestor !== dirname(ancestor);
-      ancestor = dirname(ancestor)
-    ) {
-      if (Number((await statfs(ancestor)).type) !== 0x63677270) break;
-      const memory = await readControl(join(ancestor, "memory.max"));
-      if (memory !== "max" && Number(memory) < r.envelopeMemoryMb * 1024 * 1024)
-        throw new NativeInfrastructureError(
-          "Ancestor memory limit is below the node envelope",
-        );
-      const [quota, period] = (
-        await readControl(join(ancestor, "cpu.max"))
-      ).split(" ");
-      if (quota !== "max" && Number(quota) / Number(period) < r.cpuSlots)
-        throw new NativeInfrastructureError(
-          "Ancestor CPU quota is below the node envelope",
-        );
-    }
+    await verifyCgroupLimits(o.cgroupRoot, r);
     // The service must be inside the same envelope in its own leaf (no internal processes).
     const groups = await childGroups(o.cgroupRoot);
     let enclosed = false;

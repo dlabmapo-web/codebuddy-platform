@@ -4,6 +4,7 @@ import io
 import json
 import os
 import sys
+import types
 
 payload = json.load(sys.stdin)
 source = payload["code"]
@@ -18,7 +19,7 @@ if ignore_prompt:
     builtins.input = quiet_input
 def run_script(source):
     # Function locals retain the original primitives even if learner code mutates
-    # builtins or imports the bootstrap's __main__ module.
+    # builtins or imports the learner's __main__ module.
     compile_script = builtins.compile
     execute = builtins.exec
     exit_type = builtins.SystemExit
@@ -26,7 +27,10 @@ def run_script(source):
     is_instance = builtins.isinstance
     integer = builtins.int
     integer_equal = integer.__eq__
-    namespace = {"__name__": "__main__", "__file__": "main.py"}
+    learner_module = types.ModuleType("__main__")
+    learner_module.__file__ = "main.py"
+    sys.modules["__main__"] = learner_module
+    namespace = learner_module.__dict__
     program = compile_script(source, "main.py", "exec", flags=0, dont_inherit=True)
     try:
         execute(program, namespace, namespace)

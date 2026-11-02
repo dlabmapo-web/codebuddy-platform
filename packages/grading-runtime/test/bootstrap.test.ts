@@ -110,3 +110,20 @@ test("SystemExit integer wrapping and monkeypatched builtins preserve failure", 
   );
   assert.notEqual(mutated.exit, 0);
 });
+
+test("learner globals belong to the registered __main__ without bootstrap state", async () => {
+  const result = await guest(
+    "x = 7\nimport __main__\nprint(__main__.x)\nprint(__main__.__dict__ is globals())\nprint(hasattr(__main__, 'run_script'), hasattr(__main__, 'payload'))",
+  );
+  assert.deepEqual(result, {
+    stdout: "7\nTrue\nFalse False\n",
+    stderr: "",
+    exit: 0,
+  });
+});
+test("learner-defined dataclasses can be pickled through registered __main__", async () => {
+  const result = await guest(
+    "import pickle\nfrom dataclasses import dataclass\n@dataclass\nclass Example:\n value: int\nx = Example(7)\nrestored = pickle.loads(pickle.dumps(x))\nprint(restored.value, type(restored) is Example)",
+  );
+  assert.deepEqual(result, { stdout: "7 True\n", stderr: "", exit: 0 });
+});

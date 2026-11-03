@@ -32,7 +32,7 @@
     "filter_offline": "Offline",
     "column_student": "Student",
     "column_state": "State",
-    "column_exercise": "Current exercise",
+    "column_exercise": "Current material",
     "column_activity": "Last activity",
     "column_run": "Latest run",
     "empty": "No students match this filter.",
@@ -41,10 +41,10 @@
     "open_live": "Open live",
     "open_live_new_tab": "Open live in new tab",
     "open_points": "Points",
-    "no_exercise": "Not in an exercise",
+    "no_exercise": "No material open",
     "never_seen": "Never",
     "membership_inactive": "Inactive membership",
-    "in_exercise": "In an exercise",
+    "in_exercise": "Viewing a material",
     "solution_status": "Solution status"
   },
   "state": {
@@ -265,5 +265,28 @@
     "minutes": "{{count}}m",
     "seconds": "{{count}}s",
     "rate_limited": "Too many requests. Wait a minute, then retry."
+  },
+  "observation": {
+    "materials": "Materials",
+    "student_on": "Student is on {{title}}",
+    "no_material": "Online — no material open",
+    "return_live": "Return to live",
+    "student_answer": "Student answer",
+    "live_response": "Live response · Read only",
+    "saved_response": "Saved response · Read only",
+    "waiting_response": "Waiting for live response",
+    "waiting_drawing": "Waiting for the student’s drawing",
+    "student_drawing": "Student’s live Turtle drawing",
+    "student_output": "Student terminal output",
+    "turtle": "Live Turtle activity",
+    "pdf_page": "Student PDF page: {{page}}",
+    "video_state": "Student: {{position}}s · {{state}}",
+    "playing": "Playing",
+    "paused": "Paused",
+    "ended": "Ended",
+    "loading": "Loading material…",
+    "load_failed": "Live material is unavailable. Try again.",
+    "retry": "Retry",
+    "access_denied": "Monitoring access has ended."
   }
 }

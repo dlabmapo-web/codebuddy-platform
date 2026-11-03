@@ -1,7 +1,7 @@
 'use client';
 
 import { Send, Save, BookOpen, History, MessageSquareText, ListChecks, FileCode2, Play, Square, Terminal, Turtle, Expand } from 'lucide-react';
-import { useStudentPresence } from '@/lib/monitoring/student-presence';
+import { useMaterialObservation, StudentObservationIndicator } from '@/lib/monitoring/use-material-observation';
 import { LessonHeader, LessonFooter } from '@/components/workspace/lesson-chrome';
 import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-navigator';
 import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
@@ -70,6 +70,8 @@ export function ManualWorkspace({
   const [loadedInstructions, setLoadedInstructions] = useState("");
   const [files, setFiles] = useState<Record<string, string>>({});
   const [answer, setAnswer] = useState("");
+  const [observedDrawing, setObservedDrawing] = useState<string | null>(null);
+  const onObservedFrame = useCallback((frame: string) => setObservedDrawing(frame.length <= 700000 ? frame : null), []);
   const [selected, setSelected] = useState("main.py");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -263,14 +265,13 @@ export function ManualWorkspace({
     }
     if (href) router.push(href); else if (id) navigation.navigate(id);
   }
-  const { setOpenMaterial } = useStudentPresence();
   const presenceCourseId = !preview && !data?.practice ? data?.course.id : undefined;
-  useEffect(() => {
-    if (!presenceCourseId || !selectedClass) return;
-    setOpenMaterial({ materialId, courseId: presenceCourseId, classId: selectedClass });
-    return () => setOpenMaterial(null);
-  }, [materialId, presenceCourseId, selectedClass, setOpenMaterial]);
+  useMaterialObservation({ materialId, courseId: presenceCourseId, classId: selectedClass, enabled: Boolean(presenceCourseId),
+    work: choice ? { choices: choiceSelected } : data?.type === 'TURTLE_EXERCISE'
+      ? { files, entryPoint: data.config.entryPoint, execution: preparing ? 'STARTING' : session?.state ?? 'READY', output: preparing ? '' : (session?.output ?? '').slice(-64000), drawing: observedDrawing }
+      : { answer } });
   async function run(solution = false) {
+    setObservedDrawing(null);
     setSolutionRun(solution);
     const current = ++generation.current;
     setBusy(true);
@@ -513,6 +514,7 @@ export function ManualWorkspace({
         leaveHref={navigation.courseHref}
         curriculum={<CurriculumTrigger compact ref={triggerRef} open={panelOpen} panelId={panelId} onToggle={togglePanel} path={navigation.context?.path ?? null} />}>
         {data.practice ? <span className="hidden rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand sm:inline-flex">{pt('label')}</span> : null}
+        <StudentObservationIndicator />
         <ManualStaffActions academyId={academyId} data={data} classId={selectedClass} onRunSolution={preview && drawing ? () => void run(true) : undefined} runDisabled={busy || Boolean(running)} />
       </LessonHeader>
       {preview ? <p role="note" className={`flex shrink-0 items-center gap-2 border-b border-brand/15 bg-brand-soft px-5 text-brand ${drawing ? "py-1.5 text-xs" : "py-3 text-sm"}`}><BookOpen aria-hidden className="size-4 shrink-0" />{mt(data.practice ? "ui.preview_practice_notice" : "ui.preview_notice")}</p> : null}
@@ -743,7 +745,7 @@ export function ManualWorkspace({
                   className={styles.drawing}
                 >
                   {session ? (
-                    <GuiViewer key={session.id} session={session} onError={showError} onStop={() => void stop()} layout={drawingLayout} onLayoutChange={setDrawingLayout} />
+                    <GuiViewer key={session.id} session={session} onError={showError} onFrame={onObservedFrame} onStop={() => void stop()} layout={drawingLayout} onLayoutChange={setDrawingLayout} />
                   ) : (
                     <div className="flex min-h-0 flex-1 flex-col bg-white">
                       <div className="flex min-h-11 shrink-0 items-center gap-1 border-b border-border bg-card px-3 text-xs">

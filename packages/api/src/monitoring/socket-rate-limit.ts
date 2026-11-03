@@ -51,6 +51,8 @@ export class SocketRateLimiter {
  * side; these stop a modified client from turning one room into a fire hose.
  */
 export const monitoringRateRules: Record<string, RateLimitRule> = {
+  'observation.start': { capacity: 20, windowMs: 60_000 },
+  'observation.publish': { capacity: 240, windowMs: 60_000 },
   "class.join": { capacity: 10, windowMs: 60_000 },
   "student.watch.start": { capacity: 20, windowMs: 60_000 },
   "presence.publish": { capacity: 30, windowMs: 60_000 },

@@ -24,7 +24,7 @@ const openVisit = {
   studentMembershipRef: studentMembershipId,
 };
 
-function leaseFor(visitId: string, overrides: Partial<WatchLease> = {}): WatchLease {
+function leaseFor(visitId: string, overrides: Partial<WatchLease & { draftId: string }> = {}): WatchLease & { draftId: string } {
   return {
     visitId,
     sessionId: "session-1",
@@ -46,7 +46,7 @@ function leaseFor(visitId: string, overrides: Partial<WatchLease> = {}): WatchLe
  * visit is a different tab of the same teacher, and the whole point of the
  * scope is that it survives untouched.
  */
-function socketWatching(visitId: string, overrides: Partial<WatchLease> = {}) {
+function socketWatching(visitId: string, overrides: Partial<WatchLease & { draftId: string }> = {}) {
   const lease = leaseFor(visitId, overrides);
   return {
     data: {

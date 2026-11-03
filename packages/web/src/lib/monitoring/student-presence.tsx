@@ -5,6 +5,8 @@ import {
   monitoringProtocolVersion,
   monitoringTiming,
   shouldPublishActivity,
+  observationEvents,
+  type ObservationWork,
 } from '@cove/shared';
 import * as React from 'react';
 import type { Socket } from 'socket.io-client';
@@ -48,7 +50,9 @@ type StudentPresence = {
    * What the student has open, for as long as the page holding it is mounted.
    * Null everywhere else, which is what the roster reads as Online.
    */
-  setOpenMaterial: (material: OpenMaterial | null) => void;
+  setOpenMaterial: (material: OpenMaterial | null) => (() => void) | void;
+  publishObservation: (materialId: string, work: ObservationWork) => void;
+  watching: boolean;
   /** Any real interaction. A heartbeat on its own is not activity. */
   markActive: () => void;
 };
@@ -60,6 +64,8 @@ type StudentPresence = {
  * signal it was never going to send.
  */
 const noop: StudentPresence = {
+  watching: false,
+  publishObservation: () => undefined,
   socket: null,
   academyId: null,
   state: 'connecting',
@@ -94,6 +100,16 @@ export function StudentPresenceProvider({
   children: React.ReactNode;
 }) {
   const { socket, state, report } = useMonitoringSocket();
+  const [watching, setWatching] = React.useState(false);
+  const workRef = React.useRef<{ materialId: string; work: ObservationWork; dirty: boolean } | null>(null);
+  const revisionRef = React.useRef(0);
+  const ownerRef = React.useRef<symbol | null>(null);
+  const indicatorRevisionRef = React.useRef(-1);
+  const publishObservation = React.useCallback((materialId: string, work: ObservationWork) => {
+    const previous = workRef.current;
+    if (previous?.materialId === materialId && JSON.stringify(previous.work) === JSON.stringify(work)) return;
+    workRef.current = { materialId, work, dirty: true };
+  }, []);
   const materialRef = React.useRef<OpenMaterial | null>(null);
   const activeRef = React.useRef(false);
   const visibilityRef = React.useRef<'VISIBLE' | 'HIDDEN'>('VISIBLE');
@@ -119,6 +135,8 @@ export function StudentPresenceProvider({
 
   const setOpenMaterial = React.useCallback(
     (material: OpenMaterial | null) => {
+      const owner = Symbol();
+      ownerRef.current = owner;
       const previous = materialRef.current;
       materialRef.current = material;
       // Opening or leaving an exercise moves the student between Solving and
@@ -130,6 +148,12 @@ export function StudentPresenceProvider({
       ) {
         publishRef.current();
       }
+      return () => {
+        if (ownerRef.current !== owner) return;
+        materialRef.current = null;
+        workRef.current = null;
+        publishRef.current();
+      };
     },
     [],
   );
@@ -149,6 +173,7 @@ export function StudentPresenceProvider({
         active: activeRef.current,
       });
       activeRef.current = false;
+      if (workRef.current) workRef.current.dirty = true;
     };
     publishRef.current = publish;
 
@@ -174,6 +199,26 @@ export function StudentPresenceProvider({
     socket.on('connect', publish);
     if (socket.connected) publish();
     const timer = setInterval(publish, monitoringTiming.presenceHeartbeatMs);
+    const publishWork = () => {
+      const entry = workRef.current;
+      const material = materialRef.current;
+      if (!socket.connected || !entry?.dirty || !material?.classId || entry.materialId !== material.materialId) return;
+      socket.timeout(5000).emit(observationEvents.publish, { academyId, classId: material.classId, materialId: entry.materialId,
+        revision: ++revisionRef.current, work: entry.work }, (failure: Error | null, accepted: boolean) => {
+        if (!failure && accepted && workRef.current === entry) entry.dirty = false;
+      });
+    };
+    const requestWork = () => { if (workRef.current) workRef.current.dirty = true; publishWork(); };
+    const onIndicator = (event: { watching: boolean; revision: number }) => {
+      if (!Number.isSafeInteger(event.revision) || event.revision <= indicatorRevisionRef.current) return;
+      indicatorRevisionRef.current = event.revision;
+      setWatching(event.watching === true);
+    };
+    const disconnected = () => setWatching(false);
+    socket.on(observationEvents.request, requestWork);
+    socket.on(observationEvents.indicator, onIndicator);
+    socket.on('disconnect', disconnected);
+    const workTimer = setInterval(publishWork, 500);
     globalThis.document?.addEventListener('visibilitychange', onVisibility);
     for (const type of LEARNING_ACTIVITY_EVENTS) {
       globalThis.addEventListener(type, onActivity, {
@@ -188,6 +233,10 @@ export function StudentPresenceProvider({
     globalThis.document?.addEventListener('ended', onVideoStop, true);
     return () => {
       clearInterval(timer);
+      clearInterval(workTimer);
+      socket.off(observationEvents.request, requestWork);
+      socket.off(observationEvents.indicator, onIndicator);
+      socket.off('disconnect', disconnected);
       globalThis.document?.removeEventListener('visibilitychange', onVisibility);
       for (const type of LEARNING_ACTIVITY_EVENTS) {
         globalThis.removeEventListener(type, onActivity, { capture: true });
@@ -202,8 +251,8 @@ export function StudentPresenceProvider({
   }, [academyId, closeActivity, markActive, socket]);
 
   const value = React.useMemo(
-    () => ({ academyId, markActive, report, setOpenMaterial, socket, state }),
-    [academyId, markActive, report, setOpenMaterial, socket, state],
+    () => ({ academyId, markActive, report, setOpenMaterial, socket, state, watching, publishObservation }),
+    [academyId, markActive, report, setOpenMaterial, socket, state, watching, publishObservation],
   );
 
   return (

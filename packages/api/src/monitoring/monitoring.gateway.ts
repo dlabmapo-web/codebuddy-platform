@@ -1,7 +1,8 @@
 import { AppException } from "../common/app-exception.js";
 import { randomUUID } from "node:crypto";
 
-import { Logger } from "@nestjs/common";
+import { Logger, Optional } from "@nestjs/common";
+import { MaterialObservationGateway } from './material-observation.gateway.js';
 import {
   ConnectedSocket,
   MessageBody,
@@ -221,12 +222,14 @@ type MonitoringSocketData = {
    * a path that already does several round trips.
    */
   watchStarts: Promise<unknown>;
+  presenceChanges?: Promise<unknown>;
 };
 
 type MonitoringSocket = Socket & { data: MonitoringSocketData };
 
 @WebSocketGateway({
   namespace: monitoringNamespace,
+  maxHttpBufferSize: 2 * 1024 * 1024,
   // Recovery keeps rooms and a bounded packet buffer across a short drop, but
   // `skipMiddlewares` stays off: a suspended or deleted identity must be
   // revalidated before it is restored, never waved through because it held a
@@ -277,6 +280,7 @@ export class MonitoringGateway
      * live presence back as historical time.
      */
     private readonly activity: LearningActivityAccumulator,
+    @Optional() private readonly observation?: MaterialObservationGateway,
   ) {}
 
   afterInit(server: Server): void {
@@ -404,6 +408,7 @@ export class MonitoringGateway
     if (!data) return;
     // Finish in-flight acknowledged commands before cleaning up their holds.
     await data.watchStarts;
+    await data.presenceChanges;
 
     if (data.student) {
       // Best effort, and deliberately before the presence work: a clean tab
@@ -431,6 +436,7 @@ export class MonitoringGateway
               entry.classId,
               entryState,
             );
+            await this.observation?.activityChanged({ academyId: data.student!.academyId, classId: entry.classId, membershipId: data.student!.membershipId });
             if (entryState?.state === "RECONNECTING") {
               this.scheduleWatchContextExpiry(data.student!, entry.classId);
             }
@@ -904,6 +910,12 @@ export class MonitoringGateway
     @ConnectedSocket() socket: MonitoringSocket,
     @MessageBody() body: unknown,
   ): Promise<void> {
+    const pending = (socket.data.presenceChanges ?? Promise.resolve()).then(() => this.applyPresencePublish(socket, body));
+    socket.data.presenceChanges = pending.catch(() => undefined);
+    await pending;
+  }
+
+  private async applyPresencePublish(socket: MonitoringSocket, body: unknown): Promise<void> {
     if (!this.allow(socket, "presence.publish")) return;
     const parsed = presencePublishPayloadSchema.safeParse(body);
     if (!parsed.success) return void this.rejectPayload(socket);
@@ -1005,6 +1017,7 @@ export class MonitoringGateway
         ? parsed.data.classId
         : null;
     const nextMaterialId = material && verifiedClassId ? material.id : null;
+    if (socket.disconnected) return;
     if (student.materialId !== nextMaterialId) student.draftId = null;
     student.materialId = nextMaterialId;
     // Moving to another course closes the interval that belonged to the last
@@ -1037,6 +1050,7 @@ export class MonitoringGateway
         active: parsed.data.active,
       });
       await this.publishPresence(student.academyId, entry.classId, state);
+      await this.observation?.activityChanged({ academyId: student.academyId, classId: entry.classId, membershipId: student.membershipId });
       // Manual activities report solving, but cannot become a programming
       // editor's follow target. Their answers have a separate tutoring view.
       const watchableInClass = visibleInClass && (!material || material.type === "PROGRAMMING_EXERCISE");
@@ -1074,7 +1088,7 @@ export class MonitoringGateway
       });
       if (leases.length) {
         const draft = await this.prisma.exerciseDraft.findFirst({
-          where: { id: { in: leases.map((lease) => lease.draftId) }, materialId: student.materialId },
+          where: { id: { in: leases.flatMap((lease) => lease.draftId ? [lease.draftId] : []) }, materialId: student.materialId },
           select: { id: true },
         });
         if (draft) {
@@ -2012,6 +2026,7 @@ export class MonitoringGateway
     // offline counts at the grace boundary, not only a watch-context update.
     this.server.to(monitoringRooms.classPresence(student.academyId, classId))
       .emit(monitoringServerEvents.classSnapshot, snapshot);
+    await this.observation?.activityChanged({ academyId: student.academyId, classId, membershipId: student.membershipId });
     this.publishWatchContext(student, classId, {
       materialId: null,
       courseId: null,
@@ -2207,6 +2222,7 @@ export class MonitoringGateway
     const lease = await this.watchSessions.endByVisitId(visitId);
     if (!lease) return;
     await this.visits.end(visitId, "WATCH_REPLACED");
+    if (!lease.draftId) return;
     this.server.serverSideEmit("monitoring:revoke-visit", visitId, "WATCH_REPLACED");
     const previousOwner = this.localWatches.get(visitId);
     if (previousOwner?.socket.data.teacher?.watch === previousOwner?.watch && previousOwner) {

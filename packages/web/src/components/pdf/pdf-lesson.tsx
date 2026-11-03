@@ -13,6 +13,7 @@ import { useMaterialNavigation } from '@/components/workspace/use-material-navig
 import { MediaStaffActions, type MediaStaffPermissions } from '@/components/workspace/media-staff-actions';
 import { PdfResourceLink } from './pdf-resource-link';
 import { PdfReader } from './pdf-reader';
+import { useMaterialObservation, StudentObservationIndicator } from '@/lib/monitoring/use-material-observation';
 
 export function PdfLesson({ academyId, materialId, classId, permissions }: {
   academyId: string; materialId: string; classId?: string; permissions?: MediaStaffPermissions;
@@ -24,6 +25,7 @@ export function PdfLesson({ academyId, materialId, classId, permissions }: {
     queryFn: () => pdfApi.read({ academyId, materialId }), retry: false, staleTime: 0,
   });
   const data = query.data;
+  useMaterialObservation({ materialId, classId, courseId: data?.course.id, enabled: !permissions?.canTutor });
   const navigation = useMaterialNavigation({ academyId, materialId, classId, courseId: data?.course.id, materials: data?.materials });
   const { open: panelOpen, panelId, triggerRef, toggle: togglePanel, close: closePanel } = useNavigatorPanel('material-course-outline');
   if (!data) return <main className="p-6" role={query.isError ? 'alert' : 'status'}>{t(query.isError ? 'pdf.unavailable' : 'pdf.loading')}</main>;
@@ -31,6 +33,7 @@ export function PdfLesson({ academyId, materialId, classId, permissions }: {
     <LessonHeader courseTitle={data.course.title} lectureTitle={data.lecture.title} title={data.title} leaveHref={navigation.courseHref}
       curriculum={<CurriculumTrigger compact ref={triggerRef} open={panelOpen} panelId={panelId} onToggle={togglePanel} path={navigation.context?.path ?? null} />}>
       <MediaStaffActions academyId={academyId} type="PDF_DOCUMENT" data={data} permissions={permissions} />
+      <StudentObservationIndicator />
     </LessonHeader>
     <div className="relative flex min-h-0 flex-1">
       <WorkspaceCurriculumNavigator context={navigation.context} displayedMaterialId={materialId} open={panelOpen} panelId={panelId}

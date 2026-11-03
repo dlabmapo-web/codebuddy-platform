@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import type { MonitoringVisitEndReason } from "@cove/shared";
 
 import { PrismaService } from "../database/prisma.service.js";
-import type { MonitoringMaterialClaim } from "./monitoring-access.service.js";
+import type { MonitoringStudentClaim } from "./monitoring-access.service.js";
 
 /**
  * The record of who could see whom, and when.
@@ -36,7 +36,7 @@ export class MonitoringVisitService {
    * on each other.
    */
   async start(
-    claim: MonitoringMaterialClaim,
+    claim: MonitoringStudentClaim & { materialId?: string | null },
     session: { sessionId: string; replacesVisitId: string | null },
   ): Promise<{
     id: string;

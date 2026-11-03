@@ -1,7 +1,7 @@
 # Continuous monitoring across every learning material
 
 Date: 2026-11-03 (Asia/Seoul)
-Status: Proposed specification for review; implementation and release are separate work.
+Status: Implemented on the feature branch; local checks and coverage limits are recorded in the [verification report](../../research/2026-11-03-all-material-live-monitoring-verification.md). Release is separate work.
 Branch: `fix/all-material-live-monitoring-spec`
 Base: local `feat/cove-studio-v2` at `7f50870d` (already one commit ahead of its tracked remote when investigation began).
 
@@ -394,7 +394,7 @@ for every academy-enabled Turtle runtime backend; testing one backend does not
 satisfy the others. Turtle drawing observation and video monitoring are required
 release checks, not optional follow-up work.
 
-This document has been checked for scope, contradictory selection/follow behavior,
-stale-message handling and separation of observation from student writes. No
-implementation tests were run for this documentation-only change. Browser
-observations above are investigative evidence, not acceptance of a completed fix.
+Implementation and actual local test results are recorded in the
+[verification report](../../research/2026-11-03-all-material-live-monitoring-verification.md).
+The production UI observations above describe the original issue before this
+implementation. The feature branch has not been merged or deployed.

@@ -189,8 +189,7 @@ export function useStudentMonitoring({
    */
   React.useEffect(() => {
     if (!materialId || !courseId) return;
-    setOpenMaterial({ materialId, courseId, classId });
-    return () => setOpenMaterial(null);
+    return setOpenMaterial({ materialId, courseId, classId });
   }, [classId, courseId, materialId, setOpenMaterial]);
 
   /* -------------------------------------------------------- the lifecycle */

@@ -54,7 +54,7 @@ export type WatchLease = {
   academyId: string;
   classId: string;
   studentMembershipId: string;
-  draftId: string;
+  draftId: string | null;
   mode: MonitoringWatchMode;
 };
 
@@ -133,9 +133,11 @@ local indexes = {
   prefix .. 'watch-by-teacher:' .. current['teacherMembershipId'],
   prefix .. 'watch-by-class:' .. current['academyId'] .. ':' .. current['classId'],
   prefix .. 'watch-by-student:' .. current['academyId'] .. ':' .. current['studentMembershipId'],
-  prefix .. 'watch-by-draft:' .. current['draftId'],
   prefix .. 'watch-by-academy:' .. current['academyId']
 }
+if current['draftId'] and current['draftId'] ~= cjson.null then
+  table.insert(indexes, prefix .. 'watch-by-draft:' .. current['draftId'])
+end
 for _, key in ipairs(indexes) do
   redis.call('SADD', key, current['visitId'])
   redis.call('PEXPIRE', key, tonumber(ARGV[2]) * 4)
@@ -473,7 +475,7 @@ export class WatchSessionRegistry {
       `${monitoringKeyPrefix}watch-by-teacher:${lease.teacherMembershipId}`,
       `${monitoringKeyPrefix}watch-by-class:${lease.academyId}:${lease.classId}`,
       `${monitoringKeyPrefix}watch-by-student:${lease.academyId}:${lease.studentMembershipId}`,
-      `${monitoringKeyPrefix}watch-by-draft:${lease.draftId}`,
+      ...(lease.draftId ? [`${monitoringKeyPrefix}watch-by-draft:${lease.draftId}`] : []),
       `${monitoringKeyPrefix}watch-by-academy:${lease.academyId}`,
     ];
   }

@@ -99,6 +99,11 @@ export class PresenceRegistry {
     return this.redis !== null && !this.degraded;
   }
 
+  async currentSource(academyId: string, classId: string, membershipId: string) {
+    const redis = this.client();
+    return redis ? this.read(redis, academyId, classId, membershipId) : null;
+  }
+
   /**
    * Records one student's signals and returns the state the server derived.
    *
@@ -366,7 +371,7 @@ export class PresenceRegistry {
   }
 }
 
-function presenceKey(
+export function presenceKey(
   academyId: string,
   classId: string,
   membershipId: string,

@@ -28,7 +28,8 @@ export function effectivelyVisibleActivityWhere(academyId: string): Prisma.Mater
   const { programmingExercise: _programmingExercise, ...visibility } = effectivelyVisibleMaterialWhere(academyId);
   return {
     ...visibility,
-    OR: [{ programmingExercise: { isNot: null } }, { manualMaterial: { isNot: null } }],
+    OR: [{ programmingExercise: { isNot: null } }, { manualMaterial: { isNot: null } },
+      { pdfDocument: { isNot: null } }, { videoLesson: { isNot: null } }],
   };
 }
 

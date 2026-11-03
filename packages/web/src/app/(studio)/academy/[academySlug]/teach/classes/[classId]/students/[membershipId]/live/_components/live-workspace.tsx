@@ -7,6 +7,8 @@ import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import {
   navigatorPathFromBreadcrumb,
   type MonitoringStudentContext,
+  type ObservationSnapshot,
+  type MaterialType,
 } from '@cove/shared';
 import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
@@ -70,12 +72,24 @@ export function LiveWorkspace({
   membershipId,
   context,
   teacherMembershipRef,
+  onSelectMaterial,
+  onCodeSelected,
+  selectedMaterialId,
+  observation,
+  onRegisterTransition,
+  onReturnToObserved,
 }: {
   academyId: string;
   classId: string;
   membershipId: string;
   context: MonitoringStudentContext;
   teacherMembershipRef: string | null;
+  onSelectMaterial?: (materialId: string, type?: MaterialType) => Promise<void>;
+  onCodeSelected?: (materialId: string) => void;
+  selectedMaterialId?: string;
+  observation?: ObservationSnapshot | null;
+  onRegisterTransition?: (prepare: (() => Promise<boolean>) | null) => void;
+  onReturnToObserved?: () => void;
 }) {
   const academySlug = useAcademySlug();
   const { t } = useTranslation('monitoring');
@@ -204,6 +218,22 @@ export function LiveWorkspace({
     watchDenied: live.denied !== null,
     watchEnded: live.ended !== null,
   });
+  React.useEffect(() => {
+    onRegisterTransition?.(live.prepareStudentSwitch);
+    return () => onRegisterTransition?.(null);
+  }, [onRegisterTransition, live.prepareStudentSwitch]);
+  const requestedPreviewRef = React.useRef<string | null>(null);
+  const { displayedMaterialId: displayedForNavigation, select: selectForNavigation,
+    following: followingForNavigation, previewing: previewingForNavigation } = display;
+  React.useEffect(() => {
+    // The watch acknowledgement announces this material in the display hook.
+    // Do not race that announcement with a saved preview of the same problem.
+    if (!selectedMaterialId || !live.session || followingForNavigation || previewingForNavigation || selectedMaterialId === live.session.materialId || selectedMaterialId === displayedForNavigation) return;
+    const request = `${selectedMaterialId}:${live.session.visitId}`;
+    if (requestedPreviewRef.current === request) return;
+    requestedPreviewRef.current = request;
+    selectForNavigation(selectedMaterialId);
+  }, [selectedMaterialId, live.session, displayedForNavigation, selectForNavigation, followingForNavigation, previewingForNavigation]);
   // Destructured rather than kept as an object: reading `.open` off a hook
   // result that also carries a ref is a ref access as far as the React
   // compiler is concerned, and it is right to flag it.
@@ -386,7 +416,9 @@ export function LiveWorkspace({
             />
           }
           liveStatus={
-            display.live.available
+            observation?.state === 'RECONNECTING' ? t('indicator.reconnecting') : observation?.materialId
+              ? `${t('live.on_exercise', { title: observation.path?.exercise.title ?? '' })}`
+              : display.live.available
               ? t('live.on_exercise', {
                   title: display.live.path?.exercise.title ?? '',
                 })
@@ -395,6 +427,10 @@ export function LiveWorkspace({
           unsaved={live.unsaved}
         />
       </div>
+      {observation?.materialId && observation.type !== 'PROGRAMMING_EXERCISE' && onReturnToObserved ? <div className="flex items-center gap-3 border-b border-border bg-card px-4 py-2 text-sm">
+        <span>{t('live.on_exercise', { title: observation.path?.exercise.title ?? '' })}</span>
+        <button type="button" className="rounded-lg border border-border px-3 py-1 font-semibold" onClick={onReturnToObserved}>{t('preview.return')}</button>
+      </div> : null}
 
       {live.pendingRecovery ? (
         <div role="status" className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-2 text-sm">
@@ -441,7 +477,7 @@ export function LiveWorkspace({
               ? (display.live.path?.exercise.title ?? null)
               : null
           }
-          onReturn={display.returnToLive}
+          onReturn={() => { if (display.live.materialId) onCodeSelected?.(display.live.materialId); display.returnToLive(); }}
           previewTitle={previewed.exercise.title}
           returning={display.following}
         />
@@ -475,7 +511,7 @@ export function LiveWorkspace({
           width from the workspace rather than covering it. */}
       <div className={navigatorRow}>
         <WorkspaceCurriculumNavigator
-          resourceHref={(id) => {
+          resourceHref={onSelectMaterial ? undefined : (id) => {
             for (const courseModule of display.navigator?.course.modules ?? []) for (const lecture of courseModule.lectures) {
               const type = lecture.documents?.some(item => item.materialId === id) ? 'PDF_DOCUMENT'
                 : lecture.videos?.some(item => item.materialId === id) ? 'VIDEO_LESSON'
@@ -499,11 +535,20 @@ export function LiveWorkspace({
           // The student's own exercise, marked even while the teacher reads
           // somewhere else.
           liveMaterialId={
-            display.live.available ? display.live.materialId : null
+            observation ? observation.materialId : display.live.available ? display.live.materialId : null
           }
           onClose={closePanel}
           onRetry={display.loadCurriculum}
-          onSelect={display.select}
+          onSelect={(id) => {
+            let type: MaterialType = 'PROGRAMMING_EXERCISE';
+            for (const courseModule of display.navigator?.course.modules ?? []) for (const lecture of courseModule.lectures) {
+              if (lecture.documents?.some(item => item.materialId === id)) type = 'PDF_DOCUMENT';
+              if (lecture.videos?.some(item => item.materialId === id)) type = 'VIDEO_LESSON';
+              const manual = lecture.manualMaterials?.find(item => item.materialId === id); if (manual) type = manual.type;
+            }
+            if (type !== 'PROGRAMMING_EXERCISE' && onSelectMaterial) { void onSelectMaterial(id, type); return; }
+            onCodeSelected?.(id); display.select(id);
+          }}
           open={panelOpen}
           panelId={panelId}
         />

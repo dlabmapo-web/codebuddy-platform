@@ -90,7 +90,7 @@ export function GuiViewer({
     const capture = () => {
       if (disposed || !canvas.current || connectionLost) return;
       try {
-        lastFrame = canvas.current.toDataURL();
+        lastFrame = canvas.current.toDataURL('image/webp', 0.8);
         latest.current.onFrame?.(lastFrame);
       } catch { /* A frame is best-effort; never replace a useful one with an error. */ }
     };

@@ -12,6 +12,7 @@ import { MonitoringAccessService } from "./monitoring-access.service.js";
 import { MonitoringFeedbackBroadcaster } from "./monitoring-feedback-broadcaster.js";
 import { MonitoringFeedbackService } from "./monitoring-feedback.service.js";
 import { MonitoringGateway } from "./monitoring.gateway.js";
+import { MaterialObservationGateway } from './material-observation.gateway.js';
 import { MonitoringRevocationModule } from "./monitoring-revocation.module.js";
 import { MonitoringService } from "./monitoring.service.js";
 import { PresenceRegistry } from "./presence.registry.js";
@@ -54,6 +55,7 @@ import { AcademiesModule } from "../academies/academies.module.js";
     MonitoringFeedbackService,
     MonitoringFeedbackBroadcaster,
     MonitoringGateway,
+    MaterialObservationGateway,
   ],
   exports: [HelpRequestService, MonitoringAccessService, MonitoringService, MonitoringRevocationModule],
 })

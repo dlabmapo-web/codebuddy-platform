@@ -15,6 +15,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { pdfApi } from '@/lib/pdf-api';
+import { useStudentPresence } from '@/lib/monitoring/student-presence';
 import 'react-pdf/dist/Page/TextLayer.css';
 // Keep the searchable/selectable text layer available on Safari as well as canvas rendering.
 ensureReadableStreamIterator();
@@ -37,11 +38,17 @@ export function PdfCanvas({
   materialId,
   preview = false,
   exerciseMaterialId,
+  initialPage,
+  alignmentRevision,
+  observing = false,
 }: {
   academyId: string;
   materialId: string;
   preview?: boolean;
   exerciseMaterialId?: string;
+  initialPage?: number;
+  alignmentRevision?: number;
+  observing?: boolean;
 }) {
   const { t } = useTranslation('content');
   const root = useRef<HTMLDivElement>(null);
@@ -55,7 +62,16 @@ export function PdfCanvas({
   const data = query.data;
   const [error, setError] = useState<string>();
   const [inputError, setInputError] = useState(false);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(initialPage ?? 1);
+  const [alignment, setAlignment] = useState({ page: initialPage, revision: alignmentRevision });
+  const { publishObservation } = useStudentPresence();
+  if (alignment.page !== initialPage || alignment.revision !== alignmentRevision) {
+    setAlignment({ page: initialPage, revision: alignmentRevision });
+    if (initialPage) setPage(initialPage);
+  }
+  useEffect(() => {
+    if (!observing && !preview && !exerciseMaterialId && data) publishObservation(materialId, { pdfPage: page });
+  }, [observing, preview, exerciseMaterialId, materialId, page, data, publishObservation]);
   const [zoom, setZoom] = useState(100);
   const [fit, setFit] = useState<'width' | 'page' | null>('width');
   const [size, setSize] = useState({ width: 800, height: 600 });

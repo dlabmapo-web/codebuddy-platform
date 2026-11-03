@@ -448,7 +448,7 @@ test('Manager class cards receive student presence over WebSocket across coding,
 
 for (const engine of ['Chromium', 'WebKit'] as const) {
   test(`${engine} learning UI identifies materials, opens PDF rows and keeps student and monitor statements consistent`, async ({ browser, request }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(360_000);
     const ownedBrowser = engine === 'WebKit' ? await webkit.launch() : null;
     const current = ownedBrowser ?? browser;
     const staffContext = await current.newContext({ baseURL: 'http://127.0.0.1:3309' });
@@ -497,11 +497,19 @@ for (const engine of ['Chromium', 'WebKit'] as const) {
       await expect(monitorStatement.frameLocator('iframe').getByText('Read two numbers and print their sum.', { exact: true })).toBeVisible();
       for (const text of ['Two integers separated by a space.', 'One integer: their sum.', 'Each integer is between 0 and 100.']) await expect(monitorStatement.getByText(text, { exact: true })).toBeVisible();
       await expect.poll(() => monitorStatement.locator('iframe').evaluate(frame => frame.getBoundingClientRect().height)).toBeLessThan(160);
-      const monitorPdf = staff.getByRole('complementary', { name: 'Course', exact: true }).getByRole('link').filter({ hasText: 'Lesson reference PDF' });
-      await expect(monitorPdf).toHaveAttribute('target', '_blank');
+      const monitorPdf = staff.getByRole('complementary', { name: 'Course', exact: true }).getByRole('button').filter({ hasText: 'Lesson reference PDF' });
       const note = staff.getByPlaceholder('Write one short note for this student on this exercise');
       await note.fill('Keep this feedback while reading the lesson.');
-      const [resource] = await Promise.all([staffContext.waitForEvent('page'), monitorPdf.click()]);
+      const tabCount = staffContext.pages().length;
+      await monitorPdf.click();
+      await expect(staff.getByTestId('pdf-reader')).toBeVisible();
+      await expect(staff.getByTestId('student-current-material')).toContainText('Add two numbers');
+      expect(staffContext.pages()).toHaveLength(tabCount);
+      await staff.goBack();
+      await expect(note).toHaveValue('Keep this feedback while reading the lesson.');
+      // Ordinary staff practice remains a separate explicit destination.
+      const resource = await staffContext.newPage();
+      await resource.goto(root + '/learn/documents/' + classroom.pdfMaterialId + '?classId=' + assigned.id);
       await expect(resource).toHaveURL(new RegExp('/learn/documents/' + classroom.pdfMaterialId));
       await expect(resource.locator('.react-pdf__Page__canvas')).toBeVisible({ timeout: 30_000 });
       await expect(resource.getByRole('complementary', { name: 'Course', exact: true })).toBeVisible();

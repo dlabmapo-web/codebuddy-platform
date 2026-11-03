@@ -43,6 +43,7 @@ import {
   watchStartPayloadSchema,
   watchStopPayloadSchema,
   watchSummaryFetchPayloadSchema,
+  studentBindingFetchSchema,
   type AppErrorCode,
   type DocumentSyncResult,
   type MonitoringAck,
@@ -899,6 +900,32 @@ export class MonitoringGateway
   }
 
   /* ------------------------------------------------------------- student */
+
+  /** A restored page may have missed the push that originally attached its draft. */
+  @SubscribeMessage(monitoringClientEvents.studentBindingFetch)
+  async studentBindingFetch(@ConnectedSocket() socket: MonitoringSocket, @MessageBody() body: unknown) {
+    return this.command(socket, monitoringClientEvents.studentBindingFetch, studentBindingFetchSchema, body, async input => {
+      await socket.data.presenceChanges;
+      await this.access.requireFeature(input.academyId);
+      const self = await this.access.requireStudentSelf(socket.data.identity, input.academyId);
+      const student = socket.data.student;
+      if (!student || student.membershipId !== self.membershipId || student.academyId !== input.academyId ||
+        student.classId !== input.classId || student.materialId !== input.materialId || !student.classes.some((item: { classId: string }) => item.classId === input.classId)) {
+        throw publicError('MONITORING_STUDENT_UNAVAILABLE');
+      }
+      const source = await this.presence.currentSource(input.academyId, input.classId, self.membershipId);
+      if (!source || source.socketGeneration !== socket.data.generation || source.materialId !== input.materialId) throw publicError('MONITORING_STUDENT_UNAVAILABLE');
+      const leases = await this.watchSessions.list({ academyId: input.academyId, classId: input.classId, studentMembershipId: self.membershipId });
+      if (!leases.length) return null;
+      const draft = await this.prisma.exerciseDraft.findFirst({ where: { id: { in: leases.flatMap(lease => lease.draftId ? [lease.draftId] : []) },
+        userId: self.userId, materialId: input.materialId }, select: { id: true } });
+      if (!draft) return null;
+      const summary = await this.watchSessions.summarize({ academyId: input.academyId, classId: input.classId, studentMembershipId: self.membershipId, draftId: draft.id });
+      if (!summary.watcherCount) return null;
+      return { classId: input.classId, studentMembershipId: self.membershipId, materialId: input.materialId, draftId: draft.id,
+        indicator: summary.indicator, startedAt: new Date().toISOString() };
+    });
+  }
 
   /**
    * A student's own signals.

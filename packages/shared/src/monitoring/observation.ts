@@ -8,7 +8,7 @@ import { publicChoiceSchema } from '../content/multiple-choice.js';
 export const observationEvents = {
   start: 'observation.start', stop: 'observation.stop', snapshot: 'observation.snapshot',
   publish: 'observation.publish', request: 'observation.request', indicator: 'observation.indicator',
-  resync: 'observation.resync', awareness: 'observation.awareness',
+  resync: 'observation.resync', awareness: 'observation.awareness', teacherAwareness: 'observation.teacherAwareness',
 } as const;
 export function observationAccessEnded(code?: string) {
   return Boolean(code && ['MONITORING_ACCESS_DENIED', 'PERMISSION_DENIED', 'MONITORING_STUDENT_UNAVAILABLE', 'MONITORING_DISABLED'].includes(code));
@@ -65,3 +65,8 @@ export const observationAwarenessEventSchema = observationAwarenessSchema.extend
 });
 export type ObservationAwareness = z.infer<typeof observationAwarenessSchema>;
 export type ObservationAwarenessEvent = z.infer<typeof observationAwarenessEventSchema>;
+export const teacherObservationAwarenessSchema = observationAwarenessSchema.extend({ membershipId: z.uuid() });
+export const teacherObservationAwarenessEventSchema = observationAwarenessEventSchema.extend({
+  peerId: z.string().min(1).max(128), generation: z.number().int().nonnegative(),
+});
+export type TeacherObservationAwarenessEvent = z.infer<typeof teacherObservationAwarenessEventSchema>;

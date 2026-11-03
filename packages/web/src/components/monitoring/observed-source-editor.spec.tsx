@@ -1,45 +1,23 @@
 // @vitest-environment happy-dom
-import React, { act, useEffect } from 'react';
-import { createRoot } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
-import type { ObservationAwarenessEvent } from '@cove/shared';
-import { materialCodeKey } from '@/lib/monitoring/awareness/material-code';
-import { ObservedSourceEditor } from './observed-source-editor';
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
-const fake = vi.hoisted(() => {
-  const collection = { set: vi.fn(), clear: vi.fn() };
-  const instance = { createDecorationsCollection: () => collection, getModel: () => ({ getLineCount: () => 3, getLineMaxColumn: () => 80 }),
-    getScrolledVisiblePosition: () => ({ top: 40, left: 90, height: 20 }), getLayoutInfo: () => ({ height: 300, width: 800, contentLeft: 48, contentWidth: 752 }),
-    getDomNode: () => ({ getBoundingClientRect: () => ({ left: 100, top: 200 }) }),
-    onDidScrollChange: () => ({ dispose: vi.fn() }), onDidLayoutChange: () => ({ dispose: vi.fn() }) };
-  return { collection, instance };
-});
-vi.mock('@/components/editor/code-editor', () => ({ CodeEditor: function Editor({ onMount }: { onMount: (instance: unknown) => void }) {
-  useEffect(() => onMount(fake.instance), [onMount]); return <div>Editor</div>;
-} }));
-afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
-it('places snapshot cursors only against the same file and exact code snapshot', async () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  const code = 'import turtle\nturtle.done()';
-  const awareness = { editor: { file: 'main.py', fingerprint: materialCodeKey(code), cursor: {
-    line: 2, column: 4, selectionEndLine: 2, selectionEndColumn: 4 }, mouse: { line: 2, column: 5, offset: { x: 0.4, y: 0.25 } } },
-    pointer: { surface: 'editor', space: 'surface', material: null, x: 0.5, y: 0.5 } } as ObservationAwarenessEvent;
-  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
-  const render = (value: string, file: string) => act(() => root.render(<ObservedSourceEditor peerName="Student" code={value} file={file} awareness={awareness} />));
+import { expect, it } from 'vitest';
+import type { editor } from 'monaco-editor';
+import { captureSnapshotPointer, projectSnapshotPointer, registerSnapshotPointer } from '@/lib/monitoring/awareness/snapshot-pointer';
+it('maps the actual mouse displacement and fences the file and content snapshot', () => {
+  let code = 'import turtle\nturtle.done()'; let version = 1;
+  const node = document.createElement('div'); document.body.append(node);
+  node.getBoundingClientRect = () => ({ left: 100, top: 200, width: 800, height: 300 } as DOMRect);
+  node.getClientRects = () => [node.getBoundingClientRect()] as unknown as DOMRectList;
+  const subscription = () => ({ dispose() {} });
+  const model = { getValue: () => code, getAlternativeVersionId: () => version, getLineCount: () => 3, getLineMaxColumn: () => 80 };
+  const instance = { getDomNode: () => node, getModel: () => model, getTargetAtClientPoint: () => ({ type: 6, position: { lineNumber: 2, column: 5 } }),
+    getScrolledVisiblePosition: () => ({ top: 40, left: 90, height: 20 }), getLayoutInfo: () => ({ height: 300, contentLeft: 48, contentWidth: 752 }),
+    onDidScrollChange: subscription, onDidLayoutChange: subscription, onDidChangeModelContent: subscription, onDidChangeModel: subscription } as unknown as editor.IStandaloneCodeEditor;
+  const unregister = registerSnapshotPointer(instance, 'main.py');
   try {
-    await render(code, 'main.py');
-    await act(() => new Promise(resolve => setTimeout(resolve, 40)));
-    const marker = document.querySelector<HTMLElement>('[data-testid="peer-pointer"]');
-    expect(marker).not.toBeNull();
-    expect(parseFloat(marker!.style.left) + 4.5 * (20 / 24)).toBeCloseTo(198);
-    expect(parseFloat(marker!.style.top) + 2.5 * (20 / 24)).toBeCloseTo(245);
-    expect(marker!.textContent).toContain('Student');
-    expect(fake.collection.set).toHaveBeenCalled();
-    fake.collection.set.mockClear();
-    await render(code + '\n# newer snapshot', 'main.py');
-    expect(document.querySelector('[data-testid="peer-pointer"]')).toBeNull();
-    expect(fake.collection.set).not.toHaveBeenCalled();
-    await render(code, 'other.py');
-    expect(document.querySelector('[data-testid="peer-pointer"]')).toBeNull();
-  } finally { await act(() => root.unmount()); host.remove(); }
+    const remote = captureSnapshotPointer(node, { clientX: 198, clientY: 245 });
+    expect(projectSnapshotPointer(remote)).toEqual({ left: 198, top: 245 });
+    expect(projectSnapshotPointer(remote && { ...remote, file: 'other.py' })).toBeNull();
+    code += '\n# changed'; version++;
+    expect(projectSnapshotPointer(remote)).toBeNull();
+  } finally { unregister(); node.remove(); }
 });

@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { MonitoringStudentContext, MaterialType } from '@cove/shared';
+import { useMaterialPointerPublisher } from '@/lib/monitoring/use-material-awareness';
 import { useObservationWatch } from '@/lib/monitoring/use-observation-watch';
 import { orpc } from '@/lib/orpc';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
@@ -57,6 +58,8 @@ export function AllMaterialMonitor(props: { academyId: string; classId: string; 
     setCodeAttached(current.type === 'PROGRAMMING_EXERCISE' && (!selected || selected === current.materialId));
   }
   if (!codeAttached && shown?.type === 'PROGRAMMING_EXERCISE') setCodeAttached(true);
+  useMaterialPointerPublisher({ socket: watch.socket, academyId, classId, membershipId, materialId: id,
+    enabled: watch.state === 'live' && id === current?.materialId && current?.type !== 'PROGRAMMING_EXERCISE' });
   const isCurrent = Boolean(id && current?.materialId === id && current.state !== 'OFFLINE' && current.state !== 'RECONNECTING');
   const liveWork = isCurrent && watch.state === 'live' ? current?.work ?? null : null;
   const shownWork = liveWork ?? (id ? watch.lastWork[id] ?? null : null);
@@ -93,8 +96,8 @@ export function AllMaterialMonitor(props: { academyId: string; classId: string; 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
         {watch.error ? <p role="alert" className="p-4">{t('observation.load_failed')}</p> : null}
         {material.isError ? <div role="alert" className="p-5">{t('observation.load_failed')} <button className="underline" onClick={() => void material.refetch()}>{t('observation.retry')}</button></div>
-          : shown ? <ObservedMaterialView key={shown.materialId} academyId={academyId} classId={classId} membershipId={membershipId} material={shown} studentName={context.student.displayName ?? context.student.email ?? membershipId}
-            work={shownWork} lastSeen={lastSeen} live={isCurrent && watch.state === 'live'} awareness={id === current?.materialId ? watch.awareness : null} alignRevision={alignment} /> : <p role="status" className="p-5">{t('observation.loading')}</p>}
+          : shown ? <ObservedMaterialView key={shown.materialId} academyId={academyId} classId={classId} membershipId={membershipId} material={shown}
+            work={shownWork} lastSeen={lastSeen} live={isCurrent && watch.state === 'live'} alignRevision={alignment} /> : <p role="status" className="p-5">{t('observation.loading')}</p>}
       </div>
     </div>
   </main>;

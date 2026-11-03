@@ -1,93 +1,66 @@
 'use client';
-import { useCallback, useEffect, useRef } from 'react';
-import type { editor } from 'monaco-editor';
-import { observationEvents, type ObservationAwareness, type CollaborationSurface } from '@cove/shared';
-import { materialCodeKey } from './awareness/material-code';
+import { useEffect, useRef } from 'react';
+import type { Socket } from 'socket.io-client';
+import { observationEvents, type ObservationAwareness } from '@cove/shared';
 import { useStudentPresence } from './student-presence';
+import { useSnapshotEditor } from './awareness/use-snapshot-editor';
+import { captureSnapshotPointer } from './awareness/snapshot-pointer';
+import { codeGeometryEvent } from './awareness/code-pointer';
 import { observeSurfaceIframes, type PointerCaptureSurface, type PointerViewportPoint } from './awareness/iframe-pointer-capture';
 import { pointerBoxFor, resolvePointerAnchor, resolvePointerSurface, toCanvasPosition, toSurfaceFraction } from './awareness/surfaces';
 
 const sequences = new WeakMap<object, number>();
-export function useMaterialAwareness({ enabled, materialId, classId, activeFile }: {
-  enabled: boolean; materialId: string; classId?: string; activeFile?: string;
+export function useMaterialPointerPublisher({ enabled, socket, academyId, materialId, classId, membershipId }: {
+  enabled: boolean; socket: Socket | null; academyId: string | null; materialId?: string | null; classId?: string; membershipId?: string;
 }) {
-  const { socket, academyId } = useStudentPresence();
-  const file = useRef(activeFile);
-  useEffect(() => { file.current = activeFile; }, [activeFile]);
   const value = useRef<Pick<ObservationAwareness, 'pointer' | 'focus' | 'editor'>>({ pointer: null, focus: null, editor: null });
-  const dirty = useRef(false);
-  const onEditorMount = useCallback((instance: editor.IStandaloneCodeEditor) => {
-    let version = -1; let fingerprint = ''; let previousModel: editor.ITextModel | null = null;
-    const update = () => {
-      const model = instance.getModel();
-      const next = model?.getAlternativeVersionId() ?? -1;
-      if (next !== version || model !== previousModel) { version = next; previousModel = model; fingerprint = materialCodeKey(model?.getValue() ?? ''); }
-      const selection = instance.getSelection();
-      if (!selection || !file.current) return;
-      value.current = { ...value.current, focus: 'editor', editor: { file: file.current, fingerprint,
-        mouse: value.current.editor?.mouse ?? null, cursor: { line: selection.positionLineNumber,
-          column: selection.positionColumn, selectionEndLine: selection.selectionStartLineNumber,
-          selectionEndColumn: selection.selectionStartColumn } } };
-      dirty.current = true;
-    };
-    const subscriptions = [instance.onDidChangeCursorSelection(update), instance.onDidFocusEditorText(update),
-      instance.onMouseMove(event => {
-        update();
-        if (!value.current.editor) return;
-        const position = event.target.position;
-        const pixel = position && instance.getScrolledVisiblePosition(position);
-        const box = instance.getDomNode()?.getBoundingClientRect();
-        const point = event.event.browserEvent;
-        value.current.editor.mouse = position && pixel && pixel.height > 0 && box && (event.target.type === 6 || event.target.type === 7)
-          ? { line: position.lineNumber, column: position.column, offset: {
-            x: (point.clientX - box.left - pixel.left) / pixel.height,
-            y: (point.clientY - box.top - pixel.top) / pixel.height,
-          } } : null;
-      })];
-    instance.onDidDispose(() => subscriptions.forEach(item => item.dispose()));
-  }, []);
   useEffect(() => {
-    if (!enabled || !socket || !academyId || !classId) return;
+    if (!enabled || !socket || !academyId || !classId || !materialId) return;
     value.current = { pointer: null, focus: null, editor: null };
+    let dirty = false; let lastPoint: PointerViewportPoint | null = null;
+    const event = membershipId ? observationEvents.teacherAwareness : observationEvents.awareness;
     const send = (clear = false) => {
-      if (!socket.connected || (!dirty.current && !clear)) return;
+      if (!socket.connected || (!dirty && !clear)) return;
       const sequence = (sequences.get(socket) ?? 0) + 1; sequences.set(socket, sequence);
-      const payload = { ...value.current, academyId, classId, materialId, sequence };
-      if (clear) socket.emit(observationEvents.awareness, payload);
-      else socket.volatile.emit(observationEvents.awareness, payload);
-      dirty.current = false;
+      const payload = { ...value.current, academyId, classId, materialId, sequence, ...(membershipId ? { membershipId } : {}) };
+      if (clear) socket.emit(event, payload); else socket.volatile.emit(event, payload);
+      dirty = false;
     };
-    const clear = () => { value.current = { pointer: null, focus: null, editor: null }; dirty.current = true; send(true); };
+    const clear = () => { value.current = { pointer: null, focus: null, editor: null }; dirty = true; send(true); };
     const capture = (point: PointerViewportPoint, resolved: PointerCaptureSurface | null, target: EventTarget | null = null) => {
-      // Match coding: keep the last representable location when crossing a
-      // gap, browser chrome or a window boundary. Session changes clear it.
       if (!resolved) return;
+      lastPoint = point;
       const { box, space, material } = pointerBoxFor(resolved);
       const position = space === 'canvas' ? toCanvasPosition(point, box) : toSurfaceFraction(point, box);
       if (!position) return;
       const anchor = space === 'surface' ? resolvePointerAnchor(target ?? document.elementFromPoint(point.clientX, point.clientY), resolved.element, point) : null;
-      value.current = { ...value.current, focus: resolved.surface, pointer: { surface: resolved.surface, space,
-        material, ...position, ...(anchor ? { anchor } : {}) } };
-      dirty.current = true;
+      value.current = { focus: resolved.surface, pointer: { surface: resolved.surface, space, material, ...position, ...(anchor ? { anchor } : {}) },
+        editor: resolved.surface === 'editor' ? captureSnapshotPointer(resolved.element, point) : null };
+      dirty = true;
     };
     const move = (event: PointerEvent) => capture(event, resolvePointerSurface(event.target), event.target);
-    const focus = (event: Event) => {
-      const resolved = resolvePointerSurface(event.target);
-      value.current = { ...value.current, focus: resolved?.surface as CollaborationSurface ?? null };
-      dirty.current = true;
+    const geometry = () => {
+      if (membershipId) return;
+      if (!lastPoint) return;
+      const target = document.elementFromPoint(lastPoint.clientX, lastPoint.clientY);
+      capture(lastPoint, resolvePointerSurface(target), target);
     };
-    const request = () => { dirty.current = true; send(); };
+    const request = () => { dirty = true; send(); };
     document.addEventListener('pointermove', move, true);
-    document.addEventListener('focusin', focus, true);
-    document.addEventListener('input', focus, true);
+    window.addEventListener(codeGeometryEvent, geometry);
     const stopFrames = observeSurfaceIframes({ onLeave: () => undefined, onPointerMove: capture });
-    socket.on(observationEvents.request, request);
+    if (!membershipId) socket.on(observationEvents.request, request);
     socket.on('connect', request);
     const timer = setInterval(() => send(), 80);
     return () => {
       clear(); clearInterval(timer); stopFrames(); socket.off(observationEvents.request, request); socket.off('connect', request);
-      document.removeEventListener('pointermove', move, true); document.removeEventListener('focusin', focus, true); document.removeEventListener('input', focus, true);
+      document.removeEventListener('pointermove', move, true); window.removeEventListener(codeGeometryEvent, geometry);
     };
-  }, [enabled, socket, academyId, classId, materialId]);
+  }, [enabled, socket, academyId, classId, materialId, membershipId]);
+}
+export function useMaterialAwareness(input: { enabled: boolean; materialId: string; classId?: string; activeFile?: string }) {
+  const { socket, academyId } = useStudentPresence();
+  const onEditorMount = useSnapshotEditor(input.activeFile);
+  useMaterialPointerPublisher({ ...input, socket, academyId });
   return { onEditorMount };
 }

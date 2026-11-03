@@ -599,10 +599,7 @@ export function LiveWorkspace({
                   <LiveEditor
                     pointerIdentity={live.session ? { draftId: live.session.draftId, material: live.session.materialId } : undefined}
                     fontSize={preferences.fontSize}
-                    onCursor={live.publishCursor}
-                    peerName={student}
                     readOnly={!live.canEditCode || !display.isLive}
-                    remoteCursor={live.remote.cursor}
                     text={live.text}
                   />
                 )}

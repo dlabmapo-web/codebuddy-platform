@@ -1,4 +1,5 @@
 'use client';
+import { StudentMaterialPointers } from '@/components/monitoring/student-material-pointers';
 import { useEffect } from 'react';
 import { useObservationTranslation } from '@/components/monitoring/use-observation-translation';
 import type { ObservationWork } from '@cove/shared';
@@ -19,8 +20,8 @@ export function useMaterialObservation(input: { materialId: string; courseId?: s
   return awareness;
 }
 
-export function StudentObservationIndicator() {
+export function StudentObservationIndicator({ materialId, classId }: { materialId: string; classId?: string }) {
   const { watching } = useStudentPresence();
   const { t } = useObservationTranslation();
-  return watching ? <span role="status" className="rounded-full bg-warning/10 px-3 py-1.5 text-xs font-semibold text-warning">{t('indicator.monitoring')}</span> : null;
+  return <><StudentMaterialPointers materialId={materialId} classId={classId} />{watching ? <span role="status" className="rounded-full bg-warning/10 px-3 py-1.5 text-xs font-semibold text-warning">{t('indicator.monitoring')}</span> : null}</>;
 }

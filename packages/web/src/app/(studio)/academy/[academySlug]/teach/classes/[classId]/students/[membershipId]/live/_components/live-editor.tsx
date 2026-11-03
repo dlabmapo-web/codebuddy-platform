@@ -1,16 +1,11 @@
 'use client';
 
-import type { CollaborationCursor } from '@cove/shared';
 import dynamic from 'next/dynamic';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import type * as Y from 'yjs';
 
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
-import {
-  attachRemoteCursor,
-  readCursor,
-} from '@/lib/monitoring/awareness/remote-cursor';
 import {
   bindYTextToMonaco,
   type MonacoCodeEditor,
@@ -41,28 +36,17 @@ function EditorFallback() {
 export function LiveEditor({
   pointerIdentity,
   fontSize,
-  onCursor,
-  peerName,
   readOnly,
-  remoteCursor,
   text,
 }: {
   pointerIdentity?: { draftId: string; material: string };
   fontSize: number;
-  onCursor: (cursor: CollaborationCursor | null) => void;
-  /** Whose caret the label names — the student, by name. */
-  peerName: string;
   readOnly: boolean;
-  remoteCursor: CollaborationCursor | null;
   text: Y.Text;
 }) {
   const pointerDraftId = pointerIdentity?.draftId;
   const pointerMaterial = pointerIdentity?.material;
   const [editor, setEditor] = React.useState<MonacoCodeEditor | null>(null);
-  const cursorRef = React.useRef<ReturnType<typeof attachRemoteCursor> | null>(
-    null,
-  );
-
   // `onMount` cannot clean up after itself — it is a notification, not an
   // effect — so it does nothing but hand the editor over, and everything with
   // a lifetime is built and torn down below.
@@ -73,41 +57,6 @@ export function LiveEditor({
     });
     return () => binding.destroy();
   }, [editor, text, pointerDraftId, pointerMaterial]);
-
-  React.useEffect(() => {
-    if (!editor) return;
-    const cursorListener = editor.onDidChangeCursorSelection((event) => {
-      onCursor(readCursor(event.selection));
-    });
-    let frame = 0;
-    const contentListener = editor.onDidChangeModelContent(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        onCursor(readCursor(editor.getSelection()));
-      });
-    });
-    return () => {
-      cancelAnimationFrame(frame);
-      cursorListener.dispose();
-      contentListener.dispose();
-    };
-  }, [editor, onCursor]);
-
-  // The label is rebuilt with the editor and with the name, and torn down with
-  // either — a widget left behind would outlive the editor that owns it.
-  React.useEffect(() => {
-    if (!editor) return;
-    const cursor = attachRemoteCursor(editor, peerName, 'student');
-    cursorRef.current = cursor;
-    return () => {
-      cursor.dispose();
-      cursorRef.current = null;
-    };
-  }, [editor, peerName]);
-
-  React.useEffect(() => {
-    cursorRef.current?.update(remoteCursor);
-  }, [remoteCursor]);
 
   return (
     <div className="min-h-0 flex-1 bg-editor-bg">

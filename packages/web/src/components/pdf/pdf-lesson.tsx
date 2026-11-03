@@ -33,7 +33,7 @@ export function PdfLesson({ academyId, materialId, classId, permissions }: {
     <LessonHeader courseTitle={data.course.title} lectureTitle={data.lecture.title} title={data.title} leaveHref={navigation.courseHref}
       curriculum={<CurriculumTrigger compact ref={triggerRef} open={panelOpen} panelId={panelId} onToggle={togglePanel} path={navigation.context?.path ?? null} />}>
       <MediaStaffActions academyId={academyId} type="PDF_DOCUMENT" data={data} permissions={permissions} />
-      <StudentObservationIndicator />
+      <StudentObservationIndicator materialId={materialId} classId={classId} />
     </LessonHeader>
     <div className="relative flex min-h-0 flex-1">
       <WorkspaceCurriculumNavigator context={navigation.context} displayedMaterialId={materialId} open={panelOpen} panelId={panelId}

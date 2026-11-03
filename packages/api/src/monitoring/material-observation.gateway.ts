@@ -1,7 +1,7 @@
 import { Inject, Logger } from '@nestjs/common';
 import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { monitoringNamespace, monitoringRooms, monitoringWatchLease, observationEvents, observationStartSchema,
-  observationPublishSchema, observationAwarenessSchema, observationAccessEnded, publicChoiceSchema, resolveLiveState, type ObservationSnapshot, type ObservationWork } from '@cove/shared';
+  observationPublishSchema, observationAwarenessSchema, teacherObservationAwarenessSchema, observationAccessEnded, publicChoiceSchema, resolveLiveState, type TeacherObservationAwarenessEvent, type ObservationSnapshot, type ObservationWork } from '@cove/shared';
 import type { Server, Socket } from 'socket.io';
 import type { SupabaseIdentity } from '../auth/auth.types.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -20,6 +20,8 @@ type ObservationSocket = Socket & { data: {
   observation?: Observation; observationStarts?: Promise<unknown>;
   student?: { academyId: string; membershipId: string; classId: string | null; materialId: string | null; classes: Array<{ classId: string }> } | null;
   observationSequence?: number;
+  teacherPointerSequence?: number;
+  teacherPointer?: TeacherObservationAwarenessEvent;
 } };
 const keyFor = (scope: Scope) => `${monitoringKeyPrefix}observation:${scope.academyId}:${scope.classId}:${scope.membershipId}`;
 
@@ -102,6 +104,9 @@ export class MaterialObservationGateway {
     const timer = this.timers.get(socket.id); if (timer) clearInterval(timer); this.timers.delete(socket.id);
     const current = socket.data.observation; delete socket.data.observation;
     if (!current) return;
+    const pointer = socket.data.teacherPointer; delete socket.data.teacherPointer;
+    if (pointer) this.server.to(monitoringRooms.student(current.claim.academyId, current.claim.studentMembershipId)).emit(
+      observationEvents.teacherAwareness, { ...pointer, sequence: pointer.sequence + 1, pointer: null, editor: null, focus: null, sentAt: Date.now() });
     await socket.leave(monitoringRooms.watchContext(current.claim.academyId, current.claim.classId, current.claim.studentMembershipId));
     const ended = await Promise.allSettled([this.watches.end(current.lease), this.visits.end(current.lease.visitId, 'CONNECTION_EXPIRED')]);
     if (ended.some(result => result.status === 'rejected')) this.logger.warn('Observation cleanup incomplete; its lease will expire');
@@ -212,6 +217,25 @@ export class MaterialObservationGateway {
       input.sequence !== socket.data.observationSequence) return;
     this.server.to(monitoringRooms.watchContext(input.academyId, input.classId, self.membershipId)).volatile.emit(
       observationEvents.awareness, { ...input, membershipId: self.membershipId, source: source.socketGeneration, sentAt: Date.now() });
+  }
+
+  @SubscribeMessage(observationEvents.teacherAwareness)
+  async teacherAwareness(@ConnectedSocket() socket: ObservationSocket, @MessageBody() body: unknown) {
+    const parsed = teacherObservationAwarenessSchema.safeParse(body);
+    const current = socket.data.observation;
+    if (!parsed.success || !current || !socket.data.limiter.take('observation.teacherAwareness')) return;
+    const input = parsed.data; const claim = current.claim;
+    if (input.academyId !== claim.academyId || input.classId !== claim.classId || input.membershipId !== claim.studentMembershipId ||
+      input.sequence <= (socket.data.teacherPointerSequence ?? -1)) return;
+    socket.data.teacherPointerSequence = input.sequence;
+    const [lease, source] = await Promise.all([this.watches.isCurrent(current.lease),
+      this.presence.currentSource(claim.academyId, claim.classId, claim.studentMembershipId)]).catch(() => [null, null]);
+    if (!lease || !source || source.interruptedAt !== null || source.materialId !== input.materialId ||
+      socket.data.observation !== current || socket.data.teacherPointerSequence !== input.sequence) return;
+    const event: TeacherObservationAwarenessEvent = { ...input, peerId: `teacher:${current.lease.visitId}`,
+      generation: current.lease.generation, source: source.socketGeneration, sentAt: Date.now() };
+    socket.data.teacherPointer = event;
+    this.server.to(monitoringRooms.student(claim.academyId, claim.studentMembershipId)).volatile.emit(observationEvents.teacherAwareness, event);
   }
 
   private async indicator(scope: Scope) {

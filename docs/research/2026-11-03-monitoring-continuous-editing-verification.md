@@ -91,3 +91,7 @@ was removed. All four regression cases then passed; their artifacts are under
 
 No dependency or database migration was added. Work remains on the feature
 branch; no merge or deployment was performed.
+
+The subsequent bidirectional mouse relay, removal of caret widgets and
+saved-buffer return fix are recorded in the
+[bidirectional pointer verification](2026-11-03-bidirectional-material-pointers-verification.md).

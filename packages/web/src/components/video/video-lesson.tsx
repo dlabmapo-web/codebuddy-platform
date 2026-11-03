@@ -122,7 +122,7 @@ export function VideoLesson({
             </Link>
           ) : null}
         <MediaStaffActions academyId={academyId} type="VIDEO_LESSON" data={data} permissions={permissions} />
-        <StudentObservationIndicator />
+        <StudentObservationIndicator materialId={materialId} classId={chosen} />
       </LessonHeader>
       <div className="relative flex min-h-0 flex-1">
         <WorkspaceCurriculumNavigator context={navigation.context} displayedMaterialId={materialId} open={panelOpen} panelId={panelId}

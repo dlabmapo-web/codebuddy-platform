@@ -189,6 +189,7 @@ function ProgrammingWorkspace({
     // Persists, but promotes nothing: a teacher opening a student who is
     // reading an old attempt must not turn that attempt into their draft.
     onBeforeCollaborate: draft.flushWithoutPromoting,
+    hasLocalEdits: draft.hasLocalEdits,
     onAfterCollaborate: draft.acceptCollaborationSnapshot,
     // Not flushing a reviewed attempt is not enough on its own: the first
     // bind seeds the shared document from the editor. See

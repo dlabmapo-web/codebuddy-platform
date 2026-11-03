@@ -516,7 +516,7 @@ export function ManualWorkspace({
         leaveHref={navigation.courseHref}
         curriculum={<CurriculumTrigger compact ref={triggerRef} open={panelOpen} panelId={panelId} onToggle={togglePanel} path={navigation.context?.path ?? null} />}>
         {data.practice ? <span className="hidden rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand sm:inline-flex">{pt('label')}</span> : null}
-        <StudentObservationIndicator />
+        <StudentObservationIndicator materialId={materialId} classId={selectedClass} />
         <ManualStaffActions academyId={academyId} data={data} classId={selectedClass} onRunSolution={preview && drawing ? () => void run(true) : undefined} runDisabled={busy || Boolean(running)} />
       </LessonHeader>
       {preview ? <p role="note" className={`flex shrink-0 items-center gap-2 border-b border-brand/15 bg-brand-soft px-5 text-brand ${drawing ? "py-1.5 text-xs" : "py-3 text-sm"}`}><BookOpen aria-hidden className="size-4 shrink-0" />{mt(data.practice ? "ui.preview_practice_notice" : "ui.preview_notice")}</p> : null}

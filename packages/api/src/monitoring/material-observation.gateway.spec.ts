@@ -22,6 +22,27 @@ function setup() {
   return { gateway, socket, input, prisma, presence, redis, watches, access, emit, scope: { academyId, classId, membershipId } };
 }
 describe('material observation authority', () => {
+  it('relays teacher pointers only through a current authorized lease for the selected material', async () => {
+    const s = setup();
+    const event = { ...s.scope, materialId: s.input.materialId, sequence: 1, focus: 'pdf', pointer: { surface: 'pdf', x: 0.25, y: 0.5 }, editor: null };
+    await s.gateway.teacherAwareness(s.socket as never, event);
+    expect(s.emit).not.toHaveBeenCalled();
+    await s.gateway.start(s.socket as never, { ...s.scope, sessionId: randomUUID(), version: 1 });
+    Object.assign(s.watches, { isCurrent: vi.fn().mockResolvedValue({}) });
+    s.emit.mockClear();
+    await s.gateway.teacherAwareness(s.socket as never, event);
+    expect(s.emit).toHaveBeenCalledWith(observationEvents.teacherAwareness, expect.objectContaining({ peerId: expect.stringMatching(/^teacher:/), source: 'current' }));
+    s.emit.mockClear();
+    await s.gateway.teacherAwareness(s.socket as never, event);
+    await s.gateway.teacherAwareness(s.socket as never, { ...event, sequence: 2, materialId: randomUUID() });
+    await s.gateway.teacherAwareness(s.socket as never, { ...event, sequence: 3, membershipId: randomUUID() });
+    await s.gateway.teacherAwareness(s.socket as never, { ...event, sequence: 4, peerId: 'forged' });
+    expect(s.emit).not.toHaveBeenCalled();
+    Object.assign(s.watches, { isCurrent: vi.fn().mockResolvedValue(null) });
+    await s.gateway.teacherAwareness(s.socket as never, { ...event, sequence: 5 });
+    expect(s.emit).not.toHaveBeenCalled();
+    await s.gateway.stop(s.socket as never); s.gateway.onModuleDestroy();
+  });
   it('forwards only the authenticated current source and drops stale pointer frames', async () => {
     const s = setup();
     Object.assign(s.socket.data, { student: { academyId: s.scope.academyId, membershipId: s.scope.membershipId,

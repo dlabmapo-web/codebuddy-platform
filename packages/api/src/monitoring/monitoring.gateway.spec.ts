@@ -1617,6 +1617,22 @@ describe("first watch draft creation", () => {
 });
 
 describe("direct live page watch", () => {
+  it('recovers only the authenticated student’s own active coding attachment', async () => {
+    const prisma = { exerciseDraft: { findFirst: vi.fn().mockResolvedValue({ id: draftId }) } };
+    const { gateway, presence, watchSessions } = createGateway({ prisma });
+    Object.assign(gateway, { access: { requireFeature: vi.fn(), requireStudentSelf: vi.fn().mockResolvedValue({ membershipId: studentMembershipId, userId: claim.studentUserId }) } });
+    Object.assign(presence, { currentSource: vi.fn().mockResolvedValue({ socketGeneration: 'generation-1', materialId }) });
+    watchSessions.list.mockResolvedValue([{ draftId }] as never);
+    watchSessions.summarize.mockResolvedValue({ watcherCount: 1, indicator: 'HELPING' } as never);
+    const socket = createSocket({ student: { academyId, membershipId: studentMembershipId, classId, materialId, classes: [{ classId }] } });
+    const result = await gateway.studentBindingFetch(socket, { eventId: crypto.randomUUID(), academyId, classId, materialId });
+    expect(result).toMatchObject({ ok: true, data: { draftId, materialId, classId, indicator: 'HELPING' } });
+    expect(prisma.exerciseDraft.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ userId: claim.studentUserId, materialId }) }));
+    prisma.exerciseDraft.findFirst.mockClear();
+    const denied = await gateway.studentBindingFetch(socket, { eventId: crypto.randomUUID(), academyId, classId, materialId: crypto.randomUUID() });
+    expect(denied).toMatchObject({ ok: false, code: 'MONITORING_STUDENT_UNAVAILABLE' });
+    expect(prisma.exerciseDraft.findFirst).not.toHaveBeenCalled();
+  });
   it.each([false, true])("authorizes the watch and its requested automatic editing (%s)", async (autoEdit) => {
     const { gateway, visits, watchSessions } = createGateway({
       snapshot: async () => ({ entries: [{ studentMembershipId, materialId }] }) as unknown as PresenceSnapshot,

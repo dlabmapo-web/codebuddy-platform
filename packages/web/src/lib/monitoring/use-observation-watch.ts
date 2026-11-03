@@ -92,5 +92,5 @@ export function useObservationWatch(scope: { academyId: string; classId: string;
       socket.emit(observationEvents.stop);
     };
   }, [socket, academyId, classId, membershipId, scopeKey, report]);
-  return { snapshot, state, error, lastWork: lastWork.scope === scopeKey && state !== 'revoked' ? lastWork.work : {}, awareness: state === 'live' && snapshot?.state !== 'OFFLINE' && snapshot?.state !== 'RECONNECTING' && awareness?.source === snapshot?.source && awareness?.materialId === snapshot?.materialId ? awareness : null };
+  return { socket, snapshot, state, error, lastWork: lastWork.scope === scopeKey && state !== 'revoked' ? lastWork.work : {}, awareness: state === 'live' && snapshot?.state !== 'OFFLINE' && snapshot?.state !== 'RECONNECTING' && awareness?.source === snapshot?.source && awareness?.materialId === snapshot?.materialId ? awareness : null };
 }

@@ -55,7 +55,9 @@ export const observationAwarenessSchema = z.object({
   focus: collaborationSurfaceSchema.nullable(),
   pointer: collaborationPointerSchema.refine(value => !value.code).nullable(),
   editor: z.object({ file: z.string().min(1).max(128), fingerprint: z.string().min(3).max(40), cursor: collaborationCursorSchema,
-    mouse: z.object({ line: z.number().int().min(1).max(10000000), column: z.number().int().min(1).max(10000000) }).nullable(),
+    mouse: z.object({ line: z.number().int().min(1).max(10000000), column: z.number().int().min(1).max(10000000),
+      offset: z.object({ x: z.number().finite().min(-100000).max(100000), y: z.number().finite().min(-100000).max(100000) }).optional(),
+    }).nullable(),
   }).nullable(),
 }).strict();
 export const observationAwarenessEventSchema = observationAwarenessSchema.extend({

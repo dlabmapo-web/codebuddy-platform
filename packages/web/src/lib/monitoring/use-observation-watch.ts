@@ -20,9 +20,7 @@ export function useObservationWatch(scope: { academyId: string; classId: string;
     let accessEnded = false;
     let attempts = 0;
     let sequence = -1;
-    let awarenessExpiry: ReturnType<typeof setTimeout> | undefined;
     let awarenessSource = ''; let awarenessSequence = -1;
-    let pointerKey = ''; let pointerVisible = true; let pointerExpiry: ReturnType<typeof setTimeout> | undefined;
     let retry: ReturnType<typeof setTimeout> | undefined;
     const accept = (data: unknown) => {
       const parsed = observationSnapshotSchema.safeParse(data);
@@ -31,6 +29,8 @@ export function useObservationWatch(scope: { academyId: string; classId: string;
       if (parsed.data.sequence <= sequence) return true;
       sequence = parsed.data.sequence;
       setSnapshot(parsed.data);
+      setAwareness(previous => previous?.source === parsed.data.source && previous?.materialId === parsed.data.materialId &&
+        parsed.data.state !== 'OFFLINE' && parsed.data.state !== 'RECONNECTING' ? previous : null);
       if (parsed.data.materialId && parsed.data.work) {
         const id = parsed.data.materialId; const work = parsed.data.work;
         setLastWork(previous => {
@@ -52,7 +52,7 @@ export function useObservationWatch(scope: { academyId: string; classId: string;
           else {
             setError(reply?.code ?? 'MONITORING_REALTIME_UNAVAILABLE');
             const denied = observationAccessEnded(reply?.code);
-            if (denied) { accessEnded = true; setSnapshot(null); setLastWork({ scope: scopeKey, work: {} }); }
+            if (denied) { accessEnded = true; setSnapshot(null); setAwareness(null); setLastWork({ scope: scopeKey, work: {} }); }
             report({ type: denied ? 'revoked' : 'degraded' });
             if (!denied && socket.connected) retry = setTimeout(start, Math.min(30000, 1000 * 2 ** Math.min(attempts++, 5)));
           }
@@ -61,7 +61,7 @@ export function useObservationWatch(scope: { academyId: string; classId: string;
     const revoked = (event: { classId?: string; studentMembershipId?: string | null }) => {
       if (event.classId !== scope.classId || (event.studentMembershipId && event.studentMembershipId !== scope.membershipId)) return;
       accessEnded = true; clearTimeout(retry);
-      setSnapshot(null); setLastWork({ scope: scopeKey, work: {} }); setError('MONITORING_ACCESS_DENIED'); report({ type: 'revoked' });
+      setSnapshot(null); setAwareness(null); setLastWork({ scope: scopeKey, work: {} }); setError('MONITORING_ACCESS_DENIED'); report({ type: 'revoked' });
     };
     const resync = (event: { classId?: string; membershipId?: string }) => {
       if (event.classId !== classId || event.membershipId !== membershipId) return;
@@ -74,18 +74,11 @@ export function useObservationWatch(scope: { academyId: string; classId: string;
       if (next.academyId !== academyId || next.classId !== classId || next.membershipId !== membershipId ||
         Date.now() - next.sentAt > 5000 || (awarenessSource === next.source && next.sequence <= awarenessSequence)) return;
       awarenessSource = next.source; awarenessSequence = next.sequence;
-      const key = JSON.stringify([next.source, next.materialId, next.pointer, next.editor?.mouse]);
-      if (key !== pointerKey) {
-        pointerKey = key; pointerVisible = true; clearTimeout(pointerExpiry);
-        pointerExpiry = setTimeout(() => { pointerVisible = false; setAwareness(previous => previous ? { ...previous, pointer: null,
-          editor: previous.editor ? { ...previous.editor, mouse: null } : null } : null); }, 5000);
-      }
-      setAwareness({ ...next, pointer: pointerVisible ? next.pointer : null,
-        editor: next.editor ? { ...next.editor, mouse: pointerVisible ? next.editor.mouse : null } : null });
-      clearTimeout(awarenessExpiry);
-      awarenessExpiry = setTimeout(() => setAwareness(null), 5000);
+      // Like the coding monitor, the student's last position stays until an
+      // explicit clear or the source/session lifecycle ends. Idle is not leave.
+      setAwareness(next);
     };
-    const clearAwareness = () => { clearTimeout(awarenessExpiry); clearTimeout(pointerExpiry); pointerKey = ''; setAwareness(null); };
+    const clearAwareness = () => { awarenessSource = ''; awarenessSequence = -1; setAwareness(null); };
     socket.on(observationEvents.awareness, receiveAwareness);
     socket.on('disconnect', clearAwareness);
     socket.on('connect', start);
@@ -94,10 +87,10 @@ export function useObservationWatch(scope: { academyId: string; classId: string;
     socket.on(observationEvents.resync, resync);
     if (socket.connected) start();
     return () => {
-      active = false; clearTimeout(retry); clearTimeout(awarenessExpiry); clearTimeout(pointerExpiry); socket.off(observationEvents.awareness, receiveAwareness); socket.off('disconnect', clearAwareness); socket.off('connect', start); socket.off(observationEvents.snapshot, accept); socket.off('access.revoked', revoked);
+      active = false; clearTimeout(retry); socket.off(observationEvents.awareness, receiveAwareness); socket.off('disconnect', clearAwareness); socket.off('connect', start); socket.off(observationEvents.snapshot, accept); socket.off('access.revoked', revoked);
       socket.off(observationEvents.resync, resync);
       socket.emit(observationEvents.stop);
     };
   }, [socket, academyId, classId, membershipId, scopeKey, report]);
-  return { snapshot, state, error, lastWork: lastWork.scope === scopeKey && state !== 'revoked' ? lastWork.work : {}, awareness: state === 'live' && awareness?.source === snapshot?.source && awareness?.materialId === snapshot?.materialId ? awareness : null };
+  return { snapshot, state, error, lastWork: lastWork.scope === scopeKey && state !== 'revoked' ? lastWork.work : {}, awareness: state === 'live' && snapshot?.state !== 'OFFLINE' && snapshot?.state !== 'RECONNECTING' && awareness?.source === snapshot?.source && awareness?.materialId === snapshot?.materialId ? awareness : null };
 }

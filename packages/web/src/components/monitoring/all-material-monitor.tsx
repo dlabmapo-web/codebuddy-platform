@@ -93,7 +93,7 @@ export function AllMaterialMonitor(props: { academyId: string; classId: string; 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
         {watch.error ? <p role="alert" className="p-4">{t('observation.load_failed')}</p> : null}
         {material.isError ? <div role="alert" className="p-5">{t('observation.load_failed')} <button className="underline" onClick={() => void material.refetch()}>{t('observation.retry')}</button></div>
-          : shown ? <ObservedMaterialView key={shown.materialId} academyId={academyId} classId={classId} membershipId={membershipId} material={shown}
+          : shown ? <ObservedMaterialView key={shown.materialId} academyId={academyId} classId={classId} membershipId={membershipId} material={shown} studentName={context.student.displayName ?? context.student.email ?? membershipId}
             work={shownWork} lastSeen={lastSeen} live={isCurrent && watch.state === 'live'} awareness={id === current?.materialId ? watch.awareness : null} alignRevision={alignment} /> : <p role="status" className="p-5">{t('observation.loading')}</p>}
       </div>
     </div>

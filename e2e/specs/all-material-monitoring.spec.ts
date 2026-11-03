@@ -39,6 +39,21 @@ async function visibleCode(page: Page, code?: string) {
   }, code);
 }
 
+async function editableEditor(page: Page) {
+  return page.evaluate(() => {
+    const monaco = (window as unknown as { monaco?: { editor: { getEditors(): Array<{ getDomNode(): HTMLElement | null; getRawOptions(): { readOnly?: boolean } }> } } }).monaco;
+    const editor = monaco?.editor.getEditors().find(item => item.getDomNode()?.getClientRects().length);
+    return editor ? !editor.getRawOptions().readOnly : false;
+  });
+}
+async function pointerAt(page: Page, expected: { x: number; y: number }) {
+  await expect(page.getByTestId('peer-pointer')).toBeVisible();
+  await expect.poll(() => page.getByTestId('peer-pointer').evaluate((node, expected) => {
+    const box = node.getBoundingClientRect();
+    return Math.max(Math.abs(box.left + 4.5 * (20 / 24) - expected.x), Math.abs(box.top + 2.5 * (20 / 24) - expected.y));
+  }, expected)).toBeLessThan(2);
+}
+
 for (const role of ['lab_head', 'instructor', 'tutor'] as const) {
   test(`${role} monitors live quiz, answers, PDF, video and actual Turtle output in one tab`, async ({ browser, page, request }, info) => {
     test.setTimeout(info.project.name === 'webkit' ? 900000 : 360000);
@@ -197,9 +212,17 @@ for (const role of ['lab_head', 'instructor', 'tutor'] as const) {
       await follow('Lesson reference PDF');
       await expect(page.getByTestId('pdf-reader')).toBeVisible();
       await expect(page.getByTestId('student-pdf-position')).toContainText('1');
+      await expect(page.locator('.react-pdf__Page canvas')).toBeVisible();
+      await expect(learner.locator('.react-pdf__Page canvas')).toBeVisible();
       await learner.locator('.react-pdf__Page').hover({ position: { x: 120, y: 100 }, timeout: 25000 });
       await expect(page.getByTestId('observation-focus')).toContainText('the PDF');
-      await expect(page.getByTestId('peer-pointer')).toBeVisible();
+      const sourcePaper = (await learner.locator('[data-collab-anchor="pdf-page:1"]').boundingBox())!;
+      const staffPaper = (await page.locator('[data-collab-anchor="pdf-page:1"]').boundingBox())!;
+      const pdfPoint = { x: staffPaper.x + 120 / sourcePaper.width * staffPaper.width, y: staffPaper.y + 100 / sourcePaper.height * staffPaper.height };
+      await pointerAt(page, pdfPoint);
+      await page.bringToFront();
+      await page.waitForTimeout(6200);
+      await pointerAt(page, pdfPoint);
       await navigateStudent('videos', classroom.videoMaterialId, 'Lesson video');
       await follow('Lesson video');
       await expect(learner.locator('video')).toBeVisible();
@@ -238,7 +261,25 @@ for (const role of ['lab_head', 'instructor', 'tutor'] as const) {
       });
       await expect(page.getByTestId('observation-focus')).toContainText('main.py:2');
       await learner.locator('.monaco-editor').hover({ position: { x: 100, y: 30 } });
-      await expect(page.getByTestId('observation-editor-pointer')).toBeVisible();
+      await expect(page.getByTestId('peer-pointer')).toBeVisible();
+      const logicalPoint = await learner.evaluate(() => {
+        type Editor = { getDomNode(): HTMLElement; getTargetAtClientPoint(x: number, y: number): { position: { lineNumber: number; column: number } }; getScrolledVisiblePosition(position: { lineNumber: number; column: number }): { left: number; top: number; height: number } };
+        const editor = (window as unknown as { monaco: { editor: { getEditors(): Editor[] } } }).monaco.editor.getEditors().find(item => item.getDomNode()?.getClientRects().length)!;
+        const box = editor.getDomNode().getBoundingClientRect();
+        const position = editor.getTargetAtClientPoint(box.left + 100, box.top + 30).position;
+        const pixel = editor.getScrolledVisiblePosition(position);
+        return { position, dx: (100 - pixel.left) / pixel.height, dy: (30 - pixel.top) / pixel.height };
+      });
+      const expectedPoint = await page.evaluate(({ position, dx, dy }) => {
+        type Editor = { getDomNode(): HTMLElement; getScrolledVisiblePosition(position: { lineNumber: number; column: number }): { left: number; top: number; height: number } };
+        const editor = (window as unknown as { monaco: { editor: { getEditors(): Editor[] } } }).monaco.editor.getEditors().find(item => item.getDomNode()?.getClientRects().length)!;
+        const box = editor.getDomNode().getBoundingClientRect(); const pixel = editor.getScrolledVisiblePosition(position);
+        return { x: box.left + pixel.left + dx * pixel.height, y: box.top + pixel.top + dy * pixel.height };
+      }, logicalPoint);
+      await pointerAt(page, expectedPoint);
+      await page.bringToFront();
+      await page.waitForTimeout(6200);
+      await pointerAt(page, expectedPoint);
       const turtleCanvas = learner.getByTestId('turtle-display').locator('canvas');
       for (let attempt = 0; attempt < 3; attempt++) {
         await learner.getByRole('button', { name: 'Run', exact: true }).click();
@@ -275,21 +316,27 @@ for (const role of ['lab_head', 'instructor', 'tutor'] as const) {
       await page.getByRole('button', { name: 'Return to live', exact: true }).click();
       await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 60000 });
       await expect(page.getByText('Live on Add two numbers', { exact: true })).toBeVisible();
-      const edit = page.getByRole('button', { name: 'Edit code · Off', exact: true });
-      await expect(edit).toBeEnabled(); await edit.click();
-      await expect(page.getByRole('button', { name: 'Edit code · On', exact: true })).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByRole('button', { name: /^Edit code/ })).toHaveCount(0);
+      await expect.poll(() => editableEditor(page)).toBe(true);
       await visibleCode(page, 'print("staff live edit")');
       await expect.poll(() => visibleCode(learner)).toBe('print("staff live edit")');
       await visibleCode(learner, 'print("student follow-up")');
       await expect.poll(() => visibleCode(page)).toBe('print("student follow-up")');
+      const statementTop = (await page.getByTestId('problem-statement').boundingBox())!.y;
       // Reading another material must retain the complete selected coding UI.
       await navigateStudent('documents', classroom.pdfMaterialId, 'Lesson reference PDF');
       await expect(page.getByTestId('student-current-material')).toContainText('Lesson reference PDF');
       await expect(page.locator('.monaco-editor')).toBeVisible();
       await expect(page.getByTestId('problem-statement')).toBeVisible();
       await expect(page.getByRole('textbox', { name: 'Your note for this exercise', exact: true })).toBeVisible();
-      await expect(page.getByRole('textbox', { name: 'Your note for this exercise', exact: true })).toBeDisabled();
-      await expect(page.getByRole('button', { name: /^Edit code · (On|Off)$/ })).toBeDisabled();
+      await expect(page.getByRole('textbox', { name: 'Your note for this exercise', exact: true })).toBeEnabled();
+      await page.getByRole('textbox', { name: 'Your note for this exercise', exact: true }).fill('Retained while reading another material');
+      await expect(page.getByRole('button', { name: /^Edit code/ })).toHaveCount(0);
+      await expect(page.getByText(/^Previewing /)).toHaveCount(0);
+      await expect.poll(async () => Math.abs((await page.getByTestId('problem-statement').boundingBox())!.y - statementTop)).toBeLessThan(1);
+      await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeEnabled({ timeout: 60000 });
+      await page.getByRole('button', { name: 'Run', exact: true }).click();
+      await expect(page.getByTestId('terminal')).toContainText('student follow-up', { timeout: 30000 });
       await learner.locator('.react-pdf__Page').hover({ position: { x: 120, y: 100 }, timeout: 25000 });
       await expect(page.getByTestId('observation-focus')).toContainText('the PDF');
       await expect(page.getByTestId('peer-pointer')).toHaveCount(0);
@@ -298,9 +345,8 @@ for (const role of ['lab_head', 'instructor', 'tutor'] as const) {
       await expect(page.getByTestId('student-current-material')).toContainText('Add two numbers');
       const resume = page.getByRole('button', { name: 'Return to live', exact: true });
       if (await resume.isVisible()) await resume.click();
-      const returnedEdit = page.getByRole('button', { name: /^Edit code · (On|Off)$/ });
-      await expect(returnedEdit).toBeEnabled();
-      if (await returnedEdit.getAttribute('aria-pressed') !== 'true') await returnedEdit.click();
+      await expect.poll(() => editableEditor(page)).toBe(true);
+      await expect(page.getByRole('textbox', { name: 'Your note for this exercise', exact: true })).toHaveValue('Retained while reading another material');
       await visibleCode(page, 'print("after material return")');
       await expect.poll(() => visibleCode(learner)).toBe('print("after material return")');
       const codeStarts = observationStarts;
@@ -311,10 +357,12 @@ for (const role of ['lab_head', 'instructor', 'tutor'] as const) {
       expect(page.context().pages()).toHaveLength(tabCount);
       await navigation(page, () => page.goBack());
       await expect(page.locator('.monaco-editor')).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Edit code · Off', exact: true })).toBeEnabled();
+      await expect.poll(() => editableEditor(page)).toBe(true);
       expect(observationStarts).toBe(codeStarts);
       await navigation(page, () => page.reload());
-      await expect(page.getByRole('button', { name: 'Edit code · Off', exact: true })).toBeEnabled({ timeout: 90000 });
+      await expect.poll(() => editableEditor(page), { timeout: 90000 }).toBe(true);
+      await visibleCode(page, 'print("automatic edit after reload")');
+      await expect.poll(() => visibleCode(learner)).toBe('print("automatic edit after reload")');
       await page.getByRole('complementary', { name: 'Course', exact: true }).getByRole('button').filter({ hasText: 'Lesson reference PDF' }).click();
       await expect(page.getByTestId('pdf-reader')).toBeVisible();
       await page.setViewportSize({ width: 390, height: 844 });

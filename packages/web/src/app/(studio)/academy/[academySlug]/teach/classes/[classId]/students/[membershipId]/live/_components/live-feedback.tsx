@@ -23,6 +23,7 @@ import type { MonitoringAckResult } from '@/lib/monitoring/types';
  */
 export function FeedbackDock({
   canSend,
+  canDraft = canSend,
   draft,
   feedback,
   materialId,
@@ -32,6 +33,8 @@ export function FeedbackDock({
   teacherMembershipRef,
 }: {
   canSend: boolean;
+  /** Draft locally while reading another problem; sending still needs a live watch. */
+  canDraft?: boolean;
   /**
    * The composer's text, retained above student navigation by full note scope.
    *
@@ -134,7 +137,7 @@ export function FeedbackDock({
             <span className="sr-only">{t('feedback.note_label')}</span>
             <textarea
               className="h-16 w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-[13.5px] leading-[1.55] outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:bg-canvas disabled:opacity-70"
-              disabled={!canSend}
+              disabled={!canDraft}
               maxLength={monitoringLimits.feedbackMaxLength}
               onChange={(event) => onDraftChange(event.target.value)}
               // The composer sits inches from the code being discussed, so the
@@ -145,7 +148,7 @@ export function FeedbackDock({
                 }
               }}
               placeholder={
-                canSend ? t('feedback.placeholder') : t('feedback.waiting')
+                canDraft ? t('feedback.placeholder') : t('feedback.waiting')
               }
               value={body}
             />

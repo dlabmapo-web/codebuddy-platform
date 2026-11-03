@@ -106,3 +106,7 @@ performed.
 After the final browser run, the runner's observation/GUI containers were gone
 and ports 3309, 4319, 4320, 4339 and 4029 had no listeners. The developer's existing
 application session and unrelated containers were left running.
+
+The subsequent removal of the edit switch and preview strips, together with
+held mouse markers and Turtle pixel offsets, is recorded in the
+[continuous workspace verification](2026-11-03-monitoring-continuous-editing-verification.md).

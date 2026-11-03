@@ -128,6 +128,8 @@ export const watchStartPayloadSchema = commandBase.extend({
   academyId: z.uuid(),
   classId: z.uuid(),
   studentMembershipId: z.uuid(),
+  /** Current monitoring UI requests editing as part of the authorized watch. */
+  autoEdit: z.boolean().optional(),
   /**
    * This workspace's own identity, generated at mount and held in memory only.
    *

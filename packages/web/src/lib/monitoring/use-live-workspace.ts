@@ -73,10 +73,12 @@ export function useLiveWorkspace({
   academyId,
   classId,
   studentMembershipId,
+  autoEdit = false,
 }: {
   academyId: string;
   classId: string;
   studentMembershipId: string;
+  autoEdit?: boolean;
 }) {
   const { socket, state, report } = useMonitoringSocket({ classId, studentMembershipId });
   const [pendingUpdates] = React.useState(() => new PendingTeacherUpdates());
@@ -281,6 +283,7 @@ export function useLiveWorkspace({
               academyId,
               classId,
               studentMembershipId,
+              autoEdit,
               sessionId: sessionIdRef.current,
               protocolVersion: monitoringProtocolVersion,
             },
@@ -424,13 +427,14 @@ export function useLiveWorkspace({
                 });
               };
               // The previous edit intent does not grant a new visit permission.
-              // Ask the server, replay only the retained operations, then lock.
+              // Reauthorize and replay only retained operations. Automatic
+              // editing retains the new grant; older callers return to reading.
               changeRecoveryMode('HELPING', () => {
                 pendingUpdates.resume();
                 void pendingUpdates.settle().then((applied) => {
                   if (watchTokenRef.current !== token || sessionRef.current?.visitId !== ack.data.visitId) return;
                   if (!applied) { unavailable(); return; }
-                  changeRecoveryMode('MONITORING', () => {
+                  const finishRecovery = () => {
                     recoveringRef.current = false;
                     pendingDocumentRef.current = null;
                     preservePendingBufferRef.current = false;
@@ -438,7 +442,9 @@ export function useLiveWorkspace({
                     setDenied(null);
                     setSyncedDraftId(ack.data.draftId);
                     report({ type: 'synchronized' });
-                  });
+                  };
+                  if (autoEdit) finishRecovery();
+                  else changeRecoveryMode('MONITORING', finishRecovery);
                 });
               });
             },
@@ -494,6 +500,7 @@ export function useLiveWorkspace({
     report,
     socket,
     studentMembershipId,
+    autoEdit,
   ]);
 
   React.useEffect(() => {
@@ -940,8 +947,8 @@ export function useLiveWorkspace({
      * Whether Monaco may be writable.
      *
      * Everything `canEdit` requires, plus server-confirmed edit permission.
-     * A workspace opens read-only, a reconnect returns to read-only because
-     * the new watch starts in MONITORING, and losing the connection disables
+     * The current UI requests editing with the watch; older callers may still
+     * start in MONITORING. Both wait for synchronization; disconnect disables
      * it through `state`. The server enforces the same rule independently, so
      * this is the UI agreeing with the gate rather than being it.
      */

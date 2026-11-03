@@ -1617,8 +1617,8 @@ describe("first watch draft creation", () => {
 });
 
 describe("direct live page watch", () => {
-  it("joins the teacher notification room without needing a roster subscription", async () => {
-    const { gateway, visits } = createGateway({
+  it.each([false, true])("authorizes the watch and its requested automatic editing (%s)", async (autoEdit) => {
+    const { gateway, visits, watchSessions } = createGateway({
       snapshot: async () => ({ entries: [{ studentMembershipId, materialId }] }) as unknown as PresenceSnapshot,
     });
     Object.assign(gateway, {
@@ -1632,12 +1632,25 @@ describe("direct live page watch", () => {
     Object.assign(visits, { start: vi.fn().mockResolvedValue({ id: visitId, startedAt: new Date(), replaced: null }) });
     const socket = createSocket({});
     try {
-      const result = await gateway.watchStart(socket, { eventId: crypto.randomUUID(), academyId, classId, studentMembershipId, sessionId, protocolVersion: 3 });
+      const result = await gateway.watchStart(socket, { eventId: crypto.randomUUID(), academyId, classId, studentMembershipId, sessionId, protocolVersion: 3, autoEdit,
+        materialId: '80000000-0000-4000-8000-000000000099' });
       expect(result.ok).toBe(true);
+      if (result.ok) expect(result.data.mode).toBe(autoEdit ? 'HELPING' : 'MONITORING');
+      expect(watchSessions.register).toHaveBeenCalledWith(expect.objectContaining({ mode: autoEdit ? 'HELPING' : 'MONITORING', draftId }));
+      expect((gateway as unknown as { access: { requireMonitorableMaterial: unknown } }).access.requireMonitorableMaterial).toHaveBeenCalledWith(claim, materialId);
       expect(socket.join).toHaveBeenCalledWith(expect.arrayContaining([monitoringRooms.teacher(academyId, teacherMembershipId)]));
     } finally {
       gateway.onModuleDestroy();
     }
+  });
+
+  it('does not grant automatic editing without class authorization', async () => {
+    const { gateway, watchSessions } = createGateway();
+    Object.assign(gateway, { requireClassClaim: vi.fn().mockRejectedValue(new AppException('MONITORING_ACCESS_DENIED', 403)) });
+    const result = await gateway.watchStart(createSocket({}), { eventId: crypto.randomUUID(), academyId, classId,
+      studentMembershipId, sessionId, protocolVersion: 3, autoEdit: true });
+    expect(result).toMatchObject({ ok: false, code: 'MONITORING_ACCESS_DENIED' });
+    expect(watchSessions.register).not.toHaveBeenCalled();
   });
 });
 

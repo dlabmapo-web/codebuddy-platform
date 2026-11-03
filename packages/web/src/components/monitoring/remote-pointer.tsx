@@ -75,10 +75,13 @@ function useHydrated(): boolean {
 export function RemotePointer({
   name,
   pointer,
+  position,
 }: {
   /** The peer, as this reader is allowed to know them. */
   name: string;
   pointer: CollaborationPointer | null;
+  /** A snapshot editor projects its own model; the marker presentation is shared. */
+  position?: { left: number; top: number } | null;
 }) {
   const { t } = useTranslation('monitoring');
   const [placement, setPlacement] = React.useState<Placement | null>(null);
@@ -94,7 +97,7 @@ export function RemotePointer({
       // One placement per frame: scroll and resize fire far faster than the
       // screen can show, and `getBoundingClientRect` forces layout.
       frame = requestAnimationFrame(() => {
-        setPlacement({ key, view: measure(pointer) });
+        setPlacement({ key, view: position === undefined ? measure(pointer) : position ? { kind: 'arrow', ...position } : { kind: 'elsewhere' } });
       });
     };
 
@@ -133,7 +136,7 @@ export function RemotePointer({
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-  }, [pointer]);
+  }, [pointer, position]);
 
   // The portal target only exists in the browser, and a placement is only ever
   // drawn for the pointer it was measured from — which is why nothing has to

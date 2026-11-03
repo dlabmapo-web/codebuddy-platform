@@ -607,6 +607,7 @@ export class MonitoringGateway
       classId: string;
       studentMembershipId: string;
       sessionId: string;
+      autoEdit?: boolean;
     },
   ): Promise<{
     draftId: string;
@@ -662,6 +663,7 @@ export class MonitoringGateway
       sessionId: payload.sessionId,
       replacesVisitId: null,
     });
+    const mode: MonitoringWatchMode = payload.autoEdit ? 'HELPING' : 'MONITORING';
     const lease: WatchLease = {
       visitId: visit.id,
       sessionId: payload.sessionId,
@@ -671,7 +673,7 @@ export class MonitoringGateway
       classId: claim.classId,
       studentMembershipId: claim.studentMembershipId,
       draftId,
-      mode: "MONITORING",
+      mode,
     };
     const registered = await this.watchSessions.register(lease);
     if (!registered.ok) {
@@ -720,7 +722,7 @@ export class MonitoringGateway
       visitId: visit.id,
       generation,
       draftId,
-      mode: "MONITORING",
+      mode,
       // Derived from the visit, so five tabs of one teacher are five peers
       // that cannot overwrite each other's caret — and so a client can never
       // claim to be somebody else's pointer by editing a payload.
@@ -744,7 +746,7 @@ export class MonitoringGateway
       materialId: claim.materialId,
       draftId,
       visitId: visit.id,
-      indicator: "MONITORING",
+      indicator: mode,
       startedAt,
     });
     // The student's own room, so the indicator follows the person rather
@@ -759,7 +761,7 @@ export class MonitoringGateway
         materialId: claim.materialId,
         draftId,
         visitId: visit.id,
-        indicator: "MONITORING",
+        indicator: mode,
         startedAt,
       });
     await this.publishWatchSummary({
@@ -785,7 +787,7 @@ export class MonitoringGateway
       visitId: visit.id,
       sessionId: payload.sessionId,
       generation,
-      mode: "MONITORING" as const,
+      mode,
     };
   }
 

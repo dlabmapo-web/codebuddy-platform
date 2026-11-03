@@ -12,7 +12,8 @@ import { TerminalPanel } from '@/components/workspace/terminal-panel';
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 import { LiveEditor } from '@/app/(studio)/academy/[academySlug]/teach/classes/[classId]/students/[membershipId]/live/_components/live-editor';
 import { FeedbackDock } from '@/app/(studio)/academy/[academySlug]/teach/classes/[classId]/students/[membershipId]/live/_components/live-feedback';
-import { HelpModeToggle } from '@/app/(studio)/academy/[academySlug]/teach/classes/[classId]/students/[membershipId]/live/_components/help-mode-toggle';
+import { RemotePointer } from '@/components/monitoring/remote-pointer';
+import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import type { TutoringStudent } from './staff-tutoring-drawer';
 const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), { ssr: false });
 export type TutoringTransitionGuard = { current: (() => Promise<boolean>) | null };
@@ -29,9 +30,8 @@ export function StaffStudentPane(props: Props) {
 function StudentSession({ academyId, materialId, userId, student, context, starterCode, beforeChangeRef, close }: Props & { context: MonitoringStudentContext }) {
   const { t } = useTranslation('practice');
   const { t: tm } = useTranslation('monitoring');
-  const live = useLiveWorkspace({ academyId, classId: student.classId, studentMembershipId: student.membershipId });
+  const live = useLiveWorkspace({ academyId, classId: student.classId, studentMembershipId: student.membershipId, autoEdit: true });
   const runner = usePythonRunner();
-  const [busy, setBusy] = React.useState(false);
   const [note, setNote] = React.useState('');
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const [terminal, setTerminal] = React.useState<'you' | 'student'>('you');
@@ -53,14 +53,10 @@ function StudentSession({ academyId, materialId, userId, student, context, start
     beforeChangeRef.current = prepare;
     return () => { if (beforeChangeRef.current === prepare) beforeChangeRef.current = null; };
   }, [beforeChangeRef, feedbackOpen, live, note, stored, t]);
-  async function mode(next: boolean) {
-    setBusy(true);
-    try { await live.setMode(next ? 'HELPING' : 'MONITORING'); }
-    finally { setBusy(false); }
-  }
   const savedCode = context.exercise?.draftCode ?? starterCode;
   const canRun = runner.ready && !runner.running;
   return <div className="flex h-full min-h-0 flex-col bg-card">
+    <RemotePointer name={student.displayName} pointer={exact ? live.remote.pointer : null} />
     <div className="grid shrink-0 grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-card px-4 py-3 sm:flex sm:flex-wrap">
       <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-soft font-bold text-brand">{[...student.displayName][0]}</span>
       <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{student.displayName}</p><p className="truncate text-xs text-sub">{student.identifier}</p></div>
@@ -73,15 +69,14 @@ function StudentSession({ academyId, materialId, userId, student, context, start
     </div>
     <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-canvas px-4 py-2">
       <p className="flex items-center gap-2 text-xs text-sub">{synchronized && live.helping ? <Pencil aria-hidden className="size-3.5 text-brand" /> : <LockKeyhole aria-hidden className="size-3.5" />}{t(synchronized && live.helping ? 'tutoring_editing' : 'tutoring_readonly')}</p>
-      <HelpModeToggle busy={busy} disabled={!synchronized || Boolean(live.pendingRecovery)} helping={exact && live.helping} onToggle={(next) => void mode(next)} />
     </div>
     {live.pendingRecovery ? <div role="status" className="flex shrink-0 gap-3 border-b border-warning/30 bg-warning/10 px-4 py-2 text-xs"><span>{tm('workspace.pending_blocked')}</span><button type="button" onClick={live.follow}>{t('dialog_retry')}</button><button type="button" onClick={() => {
       const url = URL.createObjectURL(new Blob([live.text.toString()], { type: 'text/plain' }));
       const link = document.createElement('a'); link.href = url; link.download = 'unsynced-teacher-code.py'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     }}>{t('download')}</button></div> : null}
     {!synchronized ? <p role="status" className="shrink-0 border-b border-border px-4 py-2 text-xs text-sub">{t('tutoring_saved_snapshot')} <button type="button" onClick={live.follow} className="font-bold text-brand">{t('dialog_retry')}</button></p> : null}
-    <div className="flex min-h-32 flex-1 flex-col bg-editor-bg">
-      {synchronized ? <LiveEditor fontSize={13} onCursor={live.publishCursor} peerName={student.displayName} readOnly={!live.canEditCode} remoteCursor={live.remote.cursor} text={live.text} /> : <MonacoEditor beforeMount={registerPaircodeTheme} language="python" theme="paircode-dark" height="100%" value={savedCode} options={{ ariaLabel: t('tutoring_saved_code'), automaticLayout: true, readOnly: true, fontFamily: EDITOR_FONT_FAMILY, fontSize: 13, minimap: { enabled: false }, scrollBeyondLastLine: false }} />}
+    <div className="flex min-h-32 flex-1 flex-col bg-editor-bg" {...surfaceProps('editor')}>
+      {synchronized ? <LiveEditor pointerIdentity={live.session ? { draftId: live.session.draftId, material: live.session.materialId } : undefined} fontSize={13} onCursor={live.publishCursor} peerName={student.displayName} readOnly={!live.canEditCode} remoteCursor={live.remote.cursor} text={live.text} /> : <MonacoEditor beforeMount={registerPaircodeTheme} language="python" theme="paircode-dark" height="100%" value={savedCode} options={{ ariaLabel: t('tutoring_saved_code'), automaticLayout: true, readOnly: true, fontFamily: EDITOR_FONT_FAMILY, fontSize: 13, minimap: { enabled: false }, scrollBeyondLastLine: false }} />}
     </div>
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-y border-border bg-canvas px-3 py-2">
       <button type="button" disabled={!canRun} onClick={() => { setTerminal('you'); void runner.run(synchronized ? live.text.toString() : savedCode); }} className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-xs font-bold text-on-brand hover:bg-brand-deep disabled:opacity-50"><Play aria-hidden className="size-3.5" />{t('tutoring_run')}</button>

@@ -5,10 +5,11 @@ import type { ObservationAwarenessEvent } from '@cove/shared';
 import { materialCodeKey } from '@/lib/monitoring/awareness/material-code';
 import { CodeEditor } from '@/components/editor/code-editor';
 import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
+import { RemotePointer } from './remote-pointer';
 import styles from './observed-source-editor.module.css';
 
-export function ObservedSourceEditor({ code, file, awareness }: {
-  code: string; file: string; awareness: ObservationAwarenessEvent | null;
+export function ObservedSourceEditor({ code, file, awareness, peerName }: {
+  code: string; file: string; awareness: ObservationAwarenessEvent | null; peerName: string;
 }) {
   const [instance, setInstance] = useState<editor.IStandaloneCodeEditor | null>(null);
   const [mouse, setMouse] = useState<{ top: number; left: number } | null>(null);
@@ -29,17 +30,20 @@ export function ObservedSourceEditor({ code, file, awareness }: {
     }
     const place = () => {
       const position = remote?.mouse && model && remote.mouse.line <= model.getLineCount()
-        ? instance.getScrolledVisiblePosition({ lineNumber: remote.mouse.line, column: remote.mouse.column }) : null;
-      setMouse(position && position.top >= 0 && position.top < instance.getLayoutInfo().height && position.left >= instance.getLayoutInfo().contentLeft && position.left < instance.getLayoutInfo().width
-        ? { left: position.left, top: position.top } : null);
+        ? instance.getScrolledVisiblePosition({ lineNumber: remote.mouse.line, column: Math.min(remote.mouse.column, model.getLineMaxColumn(remote.mouse.line)) }) : null;
+      const box = instance.getDomNode()?.getBoundingClientRect();
+      const layout = instance.getLayoutInfo();
+      const left = position ? position.left + (remote?.mouse?.offset?.x ?? 0) * position.height : -1;
+      const top = position ? position.top + (remote?.mouse?.offset?.y ?? 0) * position.height : -1;
+      setMouse(box && top >= 0 && top < layout.height && left >= layout.contentLeft && left < layout.contentLeft + layout.contentWidth
+        ? { left: box.left + left, top: box.top + top } : null);
     };
     place(); const scroll = instance.onDidScrollChange(place); const layout = instance.onDidLayoutChange(place);
-    return () => { decorations.clear(); scroll.dispose(); layout.dispose(); };
+    window.addEventListener('scroll', place, true); window.addEventListener('resize', place);
+    return () => { decorations.clear(); scroll.dispose(); layout.dispose(); window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place); };
   }, [instance, remote, code]);
   return <div {...surfaceProps('editor')} className="relative flex min-h-0 flex-1 flex-col overflow-hidden" data-testid="student-source">
     <CodeEditor code={code} readOnly fontSize={14} onChange={() => {}} onMount={instance => setInstance(instance)} />
-    {mouse ? <span data-testid="observation-editor-pointer" aria-hidden className="pointer-events-none absolute z-20 text-peer" style={{ left: mouse.left, top: mouse.top }}>
-      <svg width="18" height="22" viewBox="0 0 18 22" fill="currentColor"><path d="M1 1v17l5-5 4 8 3-2-4-7h7Z" /></svg>
-    </span> : null}
+    {remote?.mouse && awareness?.pointer?.surface === 'editor' ? <RemotePointer name={peerName} pointer={awareness.pointer} position={mouse} /> : null}
   </div>;
 }

@@ -21,7 +21,7 @@ const setup = vi.hoisted(() => {
 });
 vi.mock('./use-monitoring-socket', () => ({ useMonitoringSocket: () => ({ socket: setup.socket, state: 'live', report: setup.report }) }));
 afterEach(() => { setup.handlers.clear(); vi.useRealTimers(); vi.unstubAllGlobals(); });
-it('fences awareness by scope/source/sequence and expires the last marker', async () => {
+it('fences awareness and holds the student marker until an explicit clear or source lifecycle change', async () => {
   vi.useFakeTimers(); vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   function Harness() { const result = useObservationWatch(setup.scope); return <p data-pointer={result.awareness?.pointer ? 'visible' : 'none'}>{result.awareness?.focus ?? 'none'}</p>; }
@@ -35,10 +35,21 @@ it('fences awareness by scope/source/sequence and expires the last marker', asyn
     await act(() => vi.advanceTimersByTimeAsync(4000));
     await receive({ ...event, sequence: 3, sentAt: Date.now() });
     await act(() => vi.advanceTimersByTimeAsync(1001)); expect(host.textContent).toBe('answer');
-    expect(host.querySelector('p')?.dataset.pointer).toBe('none');
-    await act(() => vi.advanceTimersByTimeAsync(4000)); expect(host.textContent).toBe('none');
+    expect(host.querySelector('p')?.dataset.pointer).toBe('visible');
+    await act(() => vi.advanceTimersByTimeAsync(60000)); expect(host.textContent).toBe('answer');
     await receive({ ...event, source: 'old-tab', sequence: 4, sentAt: Date.now() }); expect(host.textContent).toBe('none');
     await receive({ ...event, sequence: 5, sentAt: Date.now() }); expect(host.textContent).toBe('answer');
+    await receive({ ...event, sequence: 6, focus: null, pointer: null, sentAt: Date.now() }); expect(host.textContent).toBe('none');
+    await receive({ ...event, sequence: 7, sentAt: Date.now() }); expect(host.textContent).toBe('answer');
+    await act(() => { for (const handler of setup.handlers.get(observationEvents.snapshot) ?? []) handler({ ...setup.scope,
+      materialId: setup.materialId, type: 'WRITTEN_RESPONSE', path: null, source: 'selected', revision: 2, sequence: 2,
+      state: 'RECONNECTING', work: null, observedAt: new Date().toISOString() }); });
+    expect(host.textContent).toBe('none');
+    await act(() => { for (const handler of setup.handlers.get(observationEvents.snapshot) ?? []) handler({ ...setup.scope,
+      materialId: setup.materialId, type: 'WRITTEN_RESPONSE', path: null, source: 'selected', revision: 3, sequence: 3,
+      state: 'ONLINE', work: null, observedAt: new Date().toISOString() }); });
+    expect(host.textContent).toBe('none');
+    await receive({ ...event, sequence: 8, sentAt: Date.now() }); expect(host.textContent).toBe('answer');
     await act(() => { for (const handler of setup.handlers.get('disconnect') ?? []) handler(null); });
     expect(host.textContent).toBe('none');
   } finally { await act(() => root.unmount()); host.remove(); }

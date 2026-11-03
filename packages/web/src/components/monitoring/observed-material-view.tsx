@@ -19,16 +19,16 @@ import { TerminalLines } from '@/components/manual/terminal-lines';
 import { ChoiceOptions, ChoiceRich } from '@/components/manual/choice-options';
 import { useObservationTranslation } from './use-observation-translation';
 
-export function ObservedMaterialView({ academyId, classId, material, work, live, alignRevision, awareness, lastSeen }: {
+export function ObservedMaterialView({ academyId, classId, material, work, live, alignRevision, awareness, lastSeen, studentName }: {
   academyId: string; classId: string; membershipId: string; material: ObservedMaterial;
-  work: ObservationWork | null; live: boolean; alignRevision: number; awareness?: ObservationAwarenessEvent | null; lastSeen?: boolean;
+  studentName: string; work: ObservationWork | null; live: boolean; alignRevision: number; awareness?: ObservationAwarenessEvent | null; lastSeen?: boolean;
 }) {
   const state = work ?? material.saved ?? (material.type === 'TURTLE_EXERCISE' && material.files ? { files: material.files, entryPoint: material.entryPoint } : null);
   if (material.type === 'PDF_DOCUMENT') return <ObservedPdf academyId={academyId} materialId={material.materialId} work={work} alignRevision={alignRevision} lastSeen={lastSeen ?? false} />;
   if (material.type === 'VIDEO_LESSON') return <ObservedVideo academyId={academyId} classId={classId} materialId={material.materialId} work={work} alignRevision={alignRevision} lastSeen={lastSeen ?? false} />;
   // Coding always uses the full LiveWorkspace, including saved previews.
   if (material.type === 'PROGRAMMING_EXERCISE') return null;
-  return <ObservedManual material={material} work={state} live={Boolean(work && live)} awareness={awareness ?? null} alignRevision={alignRevision} lastSeen={lastSeen ?? false} academyId={academyId} classId={classId} />;
+  return <ObservedManual studentName={studentName} material={material} work={state} live={Boolean(work && live)} awareness={awareness ?? null} alignRevision={alignRevision} lastSeen={lastSeen ?? false} academyId={academyId} classId={classId} />;
 
 }
 
@@ -53,9 +53,9 @@ function ObservedVideo({ academyId, classId, materialId, work, alignRevision, la
     {query.data ? <VideoPlayer data={query.data} academyId={academyId} classId={classId} observing alignTo={alignment} /> : <p role={query.isError ? 'alert' : 'status'}>{t(query.isError ? 'observation.load_failed' : 'observation.loading')}</p>}
   </section>;
 }
-function ObservedManual({ material, work, live, awareness, alignRevision, academyId, classId, lastSeen }: {
+function ObservedManual({ material, work, live, awareness, alignRevision, academyId, classId, lastSeen, studentName }: {
   material: ObservedMaterial; work: ObservationWork | null; live: boolean; awareness: ObservationAwarenessEvent | null;
-  alignRevision: number; academyId: string; classId: string; lastSeen: boolean;
+  alignRevision: number; academyId: string; classId: string; lastSeen: boolean; studentName: string;
 }) {
   const { t } = useObservationTranslation(); const { t: mt } = useManualTranslation();
   const drawing = material.type === 'TURTLE_EXERCISE';
@@ -69,7 +69,7 @@ function ObservedManual({ material, work, live, awareness, alignRevision, academ
         <h2 className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-sub"><BookOpen aria-hidden className="size-4" />{mt('activity_instructions')}</h2>
         {material.choice ? <ChoiceRich content={material.description} scope={{ academyId, classId, materialId: material.materialId }} /> : <div {...anchorProps('statement:instructions')}><RichTextFrame content={material.description} title={mt('activity_instructions')} /></div>}
       </aside> : null}
-      {drawing ? <ObservedTurtle work={work} material={material} awareness={awareness} alignRevision={alignRevision} live={live} lastSeen={lastSeen} /> : <section className={`flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-border bg-card ${instructions ? '' : 'mx-auto w-full max-w-3xl'}`} aria-label={mt('ui.answer_workspace')}>
+      {drawing ? <ObservedTurtle studentName={studentName} work={work} material={material} awareness={awareness} alignRevision={alignRevision} live={live} lastSeen={lastSeen} /> : <section className={`flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-border bg-card ${instructions ? '' : 'mx-auto w-full max-w-3xl'}`} aria-label={mt('ui.answer_workspace')}>
         <div {...surfaceProps('answer')} className="min-h-0 flex-1 overflow-y-auto">
           {material.choice ? <ChoiceOptions definition={material.choice} selected={work?.choices ?? []} disabled onChange={() => {}} scope={{ academyId, classId, materialId: material.materialId }} /> : <WrittenAnswerCard question={material.question ?? undefined} hint={material.hint} answer={work?.answer ?? ''} readOnly answerLabel={t('observation.student_answer')} onChange={() => {}} />}
         </div>
@@ -79,7 +79,7 @@ function ObservedManual({ material, work, live, awareness, alignRevision, academ
   </div>;
 }
 
-function ObservedTurtle({ material, work, awareness, alignRevision, live, lastSeen }: { material: ObservedMaterial; work: ObservationWork | null; awareness: ObservationAwarenessEvent | null; alignRevision: number; live: boolean; lastSeen: boolean }) {
+function ObservedTurtle({ material, work, awareness, alignRevision, live, lastSeen, studentName }: { studentName: string; material: ObservedMaterial; work: ObservationWork | null; awareness: ObservationAwarenessEvent | null; alignRevision: number; live: boolean; lastSeen: boolean }) {
   const { t } = useObservationTranslation(); const { t: mt } = useManualTranslation();
   const [selection, setSelection] = useState<{ revision: number; file: string | null }>({ revision: alignRevision, file: null });
   if (selection.revision !== alignRevision) setSelection({ revision: alignRevision, file: null });
@@ -96,7 +96,7 @@ function ObservedTurtle({ material, work, awareness, alignRevision, live, lastSe
       </button>)}
       <span className="ml-auto px-3 text-xs">{t('observation.read_only')}</span>
     </div>
-    <div className={styles.editor}><ObservedSourceEditor code={files[current] ?? ''} file={current} awareness={awareness} /></div>
+    <div className={styles.editor}><ObservedSourceEditor peerName={studentName} code={files[current] ?? ''} file={current} awareness={awareness} /></div>
     <div className={`${styles.controls} flex min-h-12 flex-wrap items-center gap-2 border-y border-border bg-card px-3 py-1.5`}>
       <button disabled type="button" className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-semibold text-on-brand opacity-50"><Play aria-hidden className="size-3.5" />{mt('run')}</button>
       <button disabled type="button" className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm opacity-50"><Square aria-hidden className="size-3.5" />{mt('stop')}</button>

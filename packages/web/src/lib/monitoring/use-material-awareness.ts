@@ -17,11 +17,11 @@ export function useMaterialAwareness({ enabled, materialId, classId, activeFile 
   const value = useRef<Pick<ObservationAwareness, 'pointer' | 'focus' | 'editor'>>({ pointer: null, focus: null, editor: null });
   const dirty = useRef(false);
   const onEditorMount = useCallback((instance: editor.IStandaloneCodeEditor) => {
-    let version = -1; let fingerprint = '';
+    let version = -1; let fingerprint = ''; let previousModel: editor.ITextModel | null = null;
     const update = () => {
       const model = instance.getModel();
       const next = model?.getAlternativeVersionId() ?? -1;
-      if (next !== version) { version = next; fingerprint = materialCodeKey(model?.getValue() ?? ''); }
+      if (next !== version || model !== previousModel) { version = next; previousModel = model; fingerprint = materialCodeKey(model?.getValue() ?? ''); }
       const selection = instance.getSelection();
       if (!selection || !file.current) return;
       value.current = { ...value.current, focus: 'editor', editor: { file: file.current, fingerprint,
@@ -31,9 +31,19 @@ export function useMaterialAwareness({ enabled, materialId, classId, activeFile 
       dirty.current = true;
     };
     const subscriptions = [instance.onDidChangeCursorSelection(update), instance.onDidFocusEditorText(update),
-      instance.onMouseMove(event => { update(); if (value.current.editor) value.current.editor.mouse = event.target.position
-        ? { line: event.target.position.lineNumber, column: event.target.position.column } : null; }),
-      instance.onDidBlurEditorText(() => { value.current = { ...value.current, editor: null }; dirty.current = true; })];
+      instance.onMouseMove(event => {
+        update();
+        if (!value.current.editor) return;
+        const position = event.target.position;
+        const pixel = position && instance.getScrolledVisiblePosition(position);
+        const box = instance.getDomNode()?.getBoundingClientRect();
+        const point = event.event.browserEvent;
+        value.current.editor.mouse = position && pixel && pixel.height > 0 && box && (event.target.type === 6 || event.target.type === 7)
+          ? { line: position.lineNumber, column: position.column, offset: {
+            x: (point.clientX - box.left - pixel.left) / pixel.height,
+            y: (point.clientY - box.top - pixel.top) / pixel.height,
+          } } : null;
+      })];
     instance.onDidDispose(() => subscriptions.forEach(item => item.dispose()));
   }, []);
   useEffect(() => {
@@ -49,7 +59,9 @@ export function useMaterialAwareness({ enabled, materialId, classId, activeFile 
     };
     const clear = () => { value.current = { pointer: null, focus: null, editor: null }; dirty.current = true; send(true); };
     const capture = (point: PointerViewportPoint, resolved: PointerCaptureSurface | null, target: EventTarget | null = null) => {
-      if (!resolved) { value.current = { ...value.current, pointer: null, focus: null }; dirty.current = true; return; }
+      // Match coding: keep the last representable location when crossing a
+      // gap, browser chrome or a window boundary. Session changes clear it.
+      if (!resolved) return;
       const { box, space, material } = pointerBoxFor(resolved);
       const position = space === 'canvas' ? toCanvasPosition(point, box) : toSurfaceFraction(point, box);
       if (!position) return;
@@ -64,22 +76,17 @@ export function useMaterialAwareness({ enabled, materialId, classId, activeFile 
       value.current = { ...value.current, focus: resolved?.surface as CollaborationSurface ?? null };
       dirty.current = true;
     };
-    const visible = () => { if (document.hidden) clear(); };
     const request = () => { dirty.current = true; send(); };
     document.addEventListener('pointermove', move, true);
     document.addEventListener('focusin', focus, true);
     document.addEventListener('input', focus, true);
-    document.addEventListener('pointerleave', clear);
-    document.addEventListener('visibilitychange', visible);
-    window.addEventListener('blur', clear);
-    const stopFrames = observeSurfaceIframes({ onLeave: clear, onPointerMove: capture });
+    const stopFrames = observeSurfaceIframes({ onLeave: () => undefined, onPointerMove: capture });
     socket.on(observationEvents.request, request);
+    socket.on('connect', request);
     const timer = setInterval(() => send(), 80);
     return () => {
-      clear(); clearInterval(timer); stopFrames(); socket.off(observationEvents.request, request);
+      clear(); clearInterval(timer); stopFrames(); socket.off(observationEvents.request, request); socket.off('connect', request);
       document.removeEventListener('pointermove', move, true); document.removeEventListener('focusin', focus, true); document.removeEventListener('input', focus, true);
-      document.removeEventListener('pointerleave', clear); document.removeEventListener('visibilitychange', visible);
-      window.removeEventListener('blur', clear);
     };
   }, [enabled, socket, academyId, classId, materialId]);
   return { onEditorMount };

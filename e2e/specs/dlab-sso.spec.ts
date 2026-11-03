@@ -253,11 +253,12 @@ test(`OS ${staffRole} covers academy classes without teaching assignments`, asyn
     await expect(page.getByRole('region', { name: 'Other Python class', exact: true })).toBeVisible();
     await tutoringClass.getByText('Browser student', { exact: true }).click();
     await expect(page.getByRole('button', { name: 'Return to my code', exact: true }).first()).toBeVisible();
-    const editMode = page.getByRole('button', { name: 'Edit code · Off', exact: true });
-    await expect(editMode).toBeEnabled({ timeout: 30_000 });
-    await expect(editMode).toHaveAttribute('aria-pressed', 'false');
-    await editMode.click();
-    await expect(page.getByRole('button', { name: 'Edit code · On', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: /^Edit code/ })).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => {
+      const monaco = (window as unknown as { monaco?: { editor: { getEditors(): Array<{ getDomNode(): HTMLElement | null; getRawOptions(): { readOnly?: boolean } }> } } }).monaco;
+      const editor = monaco?.editor.getEditors().find(item => item.getDomNode()?.getClientRects().length);
+      return editor ? !editor.getRawOptions().readOnly : false;
+    }), { timeout: 30000 }).toBe(true);
     await expect.poll(() => visibleEditor(page, 'print(40 + 2)')).toBe('print(40 + 2)');
     await expect.poll(() => visibleEditor(studentPage), { timeout: 30_000 }).toBe('print(40 + 2)');
     const run = page.getByRole('button', { name: 'Run', exact: true });
@@ -267,7 +268,7 @@ test(`OS ${staffRole} covers academy classes without teaching assignments`, asyn
     await page.screenshot({ path: test.info().outputPath('manager-unified-tutoring.png'), animations: 'disabled', timeout: 15_000 });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole('button', { name: 'Code', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Edit code · On', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Edit code/ })).toHaveCount(0);
     expect(await page.getByRole('paragraph').filter({ hasText: /^Browser student$/ }).evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: test.info().outputPath('manager-unified-tutoring-mobile.png'), animations: 'disabled', timeout: 15_000 });

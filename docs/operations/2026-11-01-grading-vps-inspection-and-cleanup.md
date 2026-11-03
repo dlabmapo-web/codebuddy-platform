@@ -108,3 +108,66 @@ allocation, historical observations, or local prototype. Keep it as a candidate
 control plane. Execution capacity and control-plane throughput require the
 separate acceptance work in the
 [new specification](../superpowers/specs/2026-11-01-native-grading-classroom-capacity-design.md).
+
+
+## 2026-11-03 production deployment preparation
+
+The user now explicitly requests activating the new grader in the existing Cove
+platform, rather than creating a separate pilot exercise. That authorizes preparing
+the production rollout; it does not establish the 200-student/five-second target.
+This follow-up inspection made no production configuration, database, container,
+queue, or service changes.
+
+Verified over the existing key-authenticated deployment account:
+
+- Ubuntu kernel 6.8.0-147-generic, x86_64, six logical CPUs, glibc 2.39 and
+  cgroup v2 with cpu/memory/pids controllers. These are prerequisite observations,
+  not an actual native execution qualification on this host.
+- 11,960 MiB RAM, 8,576 MiB available in the initial snapshot, no swap.
+- The application and compatibility grader still run source
+  `0ae56bc6ce882ce1fad5730c1bc19e5d8677c238`; inspected health checks were healthy.
+- No native systemd service is installed. `/opt/cove` belongs to UID/GID 1001.
+- The production Redis service has no host-published port. A host-native worker
+  needs a deliberate private connection path; the container name is not a
+  host-resolvable Redis endpoint. No Redis networking was changed.
+- SSH works, but `sudo -n true` returns `sudo: a password is required`.
+  The account belongs to `cove`, `sudo` and `docker`. Privileged native service
+  installation requires owner authentication in an SSH terminal. No credential
+  was collected, and no privilege workaround was attempted.
+
+The existing production Compose/release path does not install the native host
+service or mount/select a native manifest in the API. The qualified AMD64 native
+images were measured on disposable CI runners and were not published to the
+production registry. Existing local native image tags are older experimental
+builds and must not be deployed as the qualified release.
+
+A read-only transaction aggregated exercise configuration, without reading student
+submissions, credentials, case answers, or personal data. Across current Python
+exercise records with no quiz payload:
+
+| Grading mode | Submission policy | Records | Pass current structural native guard |
+| --- | --- | --- | --- |
+| LEGACY_STDIO | AUTOMATIC | 1860 | 1693 |
+| ELICE_STDIO | AUTOMATIC | 1096 | 2 |
+| LEGACY_STDIO | PRACTICE_ONLY | 213 | 15 |
+| ELICE_STDIO | PRACTICE_ONLY | 5 | 5 |
+
+These counts include stored exercises regardless of visibility; they are not
+active classroom or traffic counts. Structural eligibility is not certification
+or verified readiness. No production release manifest was created or enabled.
+
+A second aggregate identifies the important Elice gap: most of those exercises
+have 1–10 cases but author-defined per-case hard timeouts greater than the
+exercise default. Current admission requires the manifest timeout to equal the
+default and every override to be no greater, so those records stay on compatibility
+grading. Some exercises also have 11–50 cases or more than 64 KiB aggregate stdin.
+Deploying the code unchanged cannot make all these exercises use native grading.
+Authored limits must be preserved; they must not be edited just to pass admission.
+
+Before activation, complete and verify: appropriate admission/certification
+handling for live authored profiles; immutable production image publication;
+filtered compatibility-worker rollout; bounded host service and private Redis
+connectivity; shared API/worker manifest wiring; actual host execution/readiness;
+then normal platform submission/committed-result smoke. New admission must be
+withdrawable while retained native jobs keep their matching workers for drain
+and recovery. A broad switch or production load test was not performed.

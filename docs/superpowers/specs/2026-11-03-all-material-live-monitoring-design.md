@@ -24,6 +24,11 @@ The user confirmed that monitors should see quiz and short/written answers chang
 live before submission. These responses are read-only for monitors. Staff editing
 of these answers and submitting on the student's behalf are outside this change.
 
+The user also explicitly confirmed Turtle and video monitoring. Both are required
+for Teachers, Team Leads and Managers in this fix, including direct Open live
+entry, same-tab viewing, the LIVE sidebar marker and continuous student tracking.
+Showing only that the student opened a Turtle or video material is insufficient.
+
 ## 2. Evidence and investigation limits
 
 ### Authenticated production UI inspection
@@ -157,8 +162,22 @@ page must not own or replace the student's watch.
 | Standalone PDF | Document, current page, bounded normalized reading position and current material identity | Independent reading and zoom; Return to live aligns to the latest reported page once. No continuous forced scrolling. |
 | Multiple-choice quiz | Current choice IDs/selection, submission status and latest public result | Read-only student's response. Keep authored correct answers/explanations behind their existing separate permission checks. |
 | Short/written answer | Current response text, submission status and latest public result | Read-only student's response; never bind staff inputs to the student's save/submit endpoints. |
-| Turtle/manual graphics | Current source files/entry point, execution state and bounded public output; existing drawing surface when the runtime supports authorized read-only viewing | Read-only monitoring. Reuse runtime viewer authorization without granting keyboard/mouse input or starting a second student execution. |
+| Turtle/manual graphics | Live source files/entry point, execution state, bounded terminal output and the student's current drawing as it changes | Read-only monitoring of the student's actual execution and drawing. Reuse runtime viewer authorization without granting keyboard/mouse input or starting a second student execution. |
 | Video lesson | Material, playback timestamp, playing/paused/ended state and existing progress summary | Independent player, paused initially. Return to live seeks once; monitor playback creates no student viewing-history events or completion. |
+
+Turtle observation must work for every runtime backend enabled for the academy,
+including the browser runtime. Add an authorized read-only drawing adapter where
+one is missing; runtime limitations must not silently reduce monitoring to a
+material title or code snapshot. Reset, a new run, clear drawing and execution
+errors must update the monitor without leaving stale output labeled live. Staff
+must see the student's drawing, rather than a separate rerun of the source.
+
+For video, render the lesson itself inside the monitoring shell alongside the
+student's live timestamp and playback state. Play, pause, seek, completion and
+movement to the next material update those indicators while the watch remains
+active. Staff may independently view the video and use Return to live to align
+their player once to the student's latest position. Do not autoplay audio or
+force staff playback on every student update.
 
 Observation starts read-only for every new material attachment. Code edit mode
 does not silently transfer across a student's material change or reconnection.
@@ -353,14 +372,27 @@ pattern; add short-answer and supplementary-resource cases. Required scenarios:
 10. Preserve exact bidirectional code editing, acknowledged Edit code mode,
     pending-edit recovery, independent staff terminal runs, public submission
     results, feedback and reference-PDF behavior on coding materials.
+11. For each of Teacher, Team Lead and Manager, open a student already using
+    Turtle. Observe live source edits, a run's actual drawing and terminal output,
+    reset/clear, errors and a second run. Repeat for every academy-enabled runtime
+    backend, including browser Turtle. Staff navigation to another material and
+    back retains the student watch; staff cannot control the student's runtime.
+12. For each monitoring role, open a student already watching video. Render the
+    video in the same monitoring tab and observe student play, pause, seek, end
+    and next-material movement. Return to live aligns the staff player to the
+    latest student position. Staff playback must not alter student progress or
+    control the student's player. Verify reconnect and LIVE markers for both
+    Turtle and video, including while staff read another material.
 
 Add focused shared-contract, access-predicate, gateway/registry, display-reducer,
 registration-lifecycle and roster tests for these invariants. Extend existing
 monitoring and mixed-material browser suites with assertions about watch identity
 and absence of student writes, not only rendered headers. Run Chromium and WebKit
 for student/staff transitions; verify a narrow viewport for header/sidebar usability.
-Run shared/API/web type checks and affected lint checks. Record which runtime
-backends were exercised for Turtle rather than claiming parity from one backend.
+Run shared/API/web type checks and affected lint checks. Record results separately
+for every academy-enabled Turtle runtime backend; testing one backend does not
+satisfy the others. Turtle drawing observation and video monitoring are required
+release checks, not optional follow-up work.
 
 This document has been checked for scope, contradictory selection/follow behavior,
 stale-message handling and separation of observation from student writes. No

@@ -1,8 +1,9 @@
 # Recover coding monitoring after a material transition
 
 Date: 2026-11-03. Scope: the existing all-material monitoring feature branch.
-The user requested this spec and implementation after observing the failed state
-in native Safari (student) and Chrome (monitor).
+Status: Proposed; awaiting user approval before implementation.
+The user requested this spec after observing the failed state in native Safari
+(student) and Chrome (monitor). Implementation will begin only after approval.
 
 ## Evidence and problem
 
@@ -45,6 +46,9 @@ the two monitoring protocols is a larger change than this defect requires.
    connection and exact synchronized document readiness, including while showing
    its saved preview. A healthy observation socket alone cannot label that code
    session Live. Reading a different saved material retains the observation status.
+   If automatic recovery exhausts its budget while the selected problem is
+   available, show the existing retry-connection action so recovery never requires
+   a browser refresh.
 5. Every retry goes through existing server authorization and document sync.
    Pointer sharing and the student indicator resume through their normal watch
    and binding paths. No server grant or visibility rule is relaxed.
@@ -70,3 +74,21 @@ the two monitoring protocols is a larger change than this defect requires.
 
 No authentication-policy, inactivity-timeout, schema/migration, deployment,
 merge, or unrelated UI change is included.
+
+## Acceptance criteria
+
+- A monitor can open coding while the student is still on PDF or between
+  materials, then receive the student's coding session automatically once the
+  student reaches that selected problem. Neither person refreshes or clicks Follow.
+- Recovery works after both a brief transition and an arrival later than the
+  initial retry budget, including a cached coding-page return.
+- After recovery, the student sees the teacher indicator; edits and mouse
+  pointers work in both directions; teacher pointers still hide after three
+  seconds; no remote typing-line label reappears.
+- The monitor's Live label represents an attached, synchronized coding session
+  when that selected problem is the student's current material.
+- Repeated heartbeats do not replace a healthy watch or create unlimited retries.
+  Selecting another material preserves independent reading and pending edits.
+- Revocation, enrollment/course removal and protocol-refresh requirements remain
+  enforced; a stale availability hint grants no access.
+

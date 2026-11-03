@@ -307,6 +307,7 @@ export function findAnchorElement(
   surface: HTMLElement,
   key: string,
 ): HTMLElement | null {
+  if (surface.getAttribute(collaborationAnchorAttribute) === key) return surface;
   for (const element of surface.querySelectorAll<HTMLElement>(
     `[${collaborationAnchorAttribute}]`,
   )) {

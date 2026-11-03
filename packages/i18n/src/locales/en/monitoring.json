@@ -157,7 +157,11 @@
       "statement": "the problem",
       "editor": "the code",
       "terminal": "the terminal",
-      "feedback": "the feedback"
+      "feedback": "the feedback",
+      "answer": "the answer",
+      "drawing": "the drawing",
+      "pdf": "the PDF",
+      "video": "the video"
     }
   },
   "indicator": {
@@ -287,6 +291,8 @@
     "loading": "Loading material…",
     "load_failed": "Live material is unavailable. Try again.",
     "retry": "Retry",
-    "access_denied": "Monitoring access has ended."
+    "access_denied": "Monitoring access has ended.",
+    "read_only": "Read only",
+    "last_response": "Last observed response · Read only"
   }
 }

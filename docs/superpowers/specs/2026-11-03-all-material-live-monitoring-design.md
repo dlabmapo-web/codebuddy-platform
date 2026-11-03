@@ -398,3 +398,6 @@ Implementation and actual local test results are recorded in the
 [verification report](../../research/2026-11-03-all-material-live-monitoring-verification.md).
 The production UI observations above describe the original issue before this
 implementation. The feature branch has not been merged or deployed.
+
+The later screenshot-based workspace and pointer corrections are specified in
+[monitoring workspace parity](2026-11-03-monitoring-workspace-parity-design.md).

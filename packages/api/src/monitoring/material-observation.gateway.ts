@@ -1,7 +1,7 @@
 import { Inject, Logger } from '@nestjs/common';
 import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { monitoringNamespace, monitoringRooms, monitoringWatchLease, observationEvents, observationStartSchema,
-  observationPublishSchema, observationAccessEnded, publicChoiceSchema, resolveLiveState, type ObservationSnapshot, type ObservationWork } from '@cove/shared';
+  observationPublishSchema, observationAwarenessSchema, observationAccessEnded, publicChoiceSchema, resolveLiveState, type ObservationSnapshot, type ObservationWork } from '@cove/shared';
 import type { Server, Socket } from 'socket.io';
 import type { SupabaseIdentity } from '../auth/auth.types.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -18,6 +18,8 @@ type Observation = { claim: MonitoringStudentClaim; lease: WatchLease };
 type ObservationSocket = Socket & { data: {
   identity: SupabaseIdentity; generation: string; limiter: SocketRateLimiter;
   observation?: Observation; observationStarts?: Promise<unknown>;
+  student?: { academyId: string; membershipId: string; classId: string | null; materialId: string | null; classes: Array<{ classId: string }> } | null;
+  observationSequence?: number;
 } };
 const keyFor = (scope: Scope) => `${monitoringKeyPrefix}observation:${scope.academyId}:${scope.classId}:${scope.membershipId}`;
 
@@ -167,7 +169,7 @@ export class MaterialObservationGateway {
       let safe: ObservationWork = {};
       if (material?.type === 'PDF_DOCUMENT') safe = { pdfPage: work.pdfPage };
       else if (material?.type === 'VIDEO_LESSON') safe = { videoPosition: work.videoPosition, videoState: work.videoState };
-      else if (material?.type === 'TURTLE_EXERCISE') safe = { files: work.files, entryPoint: work.entryPoint, execution: work.execution, output: work.output, drawing: work.drawing };
+      else if (material?.type === 'TURTLE_EXERCISE') safe = { files: work.files, activeFile: work.activeFile && work.files && Object.hasOwn(work.files, work.activeFile) ? work.activeFile : undefined, entryPoint: work.entryPoint, execution: work.execution, output: work.output, drawing: work.drawing };
       else if (material?.type === 'WRITTEN_RESPONSE') safe = { answer: work.answer };
       else if (material?.type === 'MULTIPLE_CHOICE') {
         const choice = publicChoiceSchema.safeParse(material.manualMaterial?.multipleChoice);
@@ -191,6 +193,25 @@ export class MaterialObservationGateway {
       if (accepted === 1) await this.activityChanged(scope);
       return accepted === 1;
     } catch { /* Transient observation failure must not break student saving. */ }
+  }
+
+  @SubscribeMessage(observationEvents.awareness)
+  async awareness(@ConnectedSocket() socket: ObservationSocket, @MessageBody() body: unknown) {
+    const parsed = observationAwarenessSchema.safeParse(body);
+    if (!parsed.success || !this.redis || !socket.data.limiter.take('observation.awareness')) return;
+    const input = parsed.data;
+    // This claim is established by authenticated presence, and refreshed by its
+    // heartbeats. A client cannot nominate another membership in this event.
+    const self = socket.data.student;
+    if (!self || self.academyId !== input.academyId || self.classId !== input.classId ||
+      self.materialId !== input.materialId || !self.classes.some((item: { classId: string }) => item.classId === input.classId) ||
+      input.sequence <= (socket.data.observationSequence ?? -1)) return;
+    socket.data.observationSequence = input.sequence;
+    const source = await this.presence.currentSource(input.academyId, input.classId, self.membershipId).catch(() => null);
+    if (!source || source.socketGeneration !== socket.data.generation || source.materialId !== input.materialId ||
+      input.sequence !== socket.data.observationSequence) return;
+    this.server.to(monitoringRooms.watchContext(input.academyId, input.classId, self.membershipId)).volatile.emit(
+      observationEvents.awareness, { ...input, membershipId: self.membershipId, source: source.socketGeneration, sentAt: Date.now() });
   }
 
   private async indicator(scope: Scope) {

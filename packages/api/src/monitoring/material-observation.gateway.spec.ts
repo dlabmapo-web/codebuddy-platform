@@ -15,13 +15,37 @@ function setup() {
     summarize: vi.fn().mockResolvedValue({ watcherCount: 1, revision: 1 }), end: vi.fn(), renew: vi.fn() };
   const visits = { start: vi.fn().mockResolvedValue({ id: randomUUID() }), end: vi.fn() };
   const gateway = new MaterialObservationGateway(prisma as never, access as never, presence as never, watches as never, visits as never, redis as never);
-  const emit = vi.fn(); gateway.server = { to: vi.fn().mockReturnValue({ emit }) } as never;
+  const emit = vi.fn(); gateway.server = { to: vi.fn().mockReturnValue({ emit, volatile: { emit } }) } as never;
   const socket = { id: randomUUID(), connected: true, disconnected: false, data: { identity: {}, generation: 'current', limiter: { take: () => true } },
     emit: vi.fn(), join: vi.fn(), leave: vi.fn() };
   const input = { academyId, classId, materialId, revision: 1, work: {} };
   return { gateway, socket, input, prisma, presence, redis, watches, access, emit, scope: { academyId, classId, membershipId } };
 }
 describe('material observation authority', () => {
+  it('forwards only the authenticated current source and drops stale pointer frames', async () => {
+    const s = setup();
+    Object.assign(s.socket.data, { student: { academyId: s.scope.academyId, membershipId: s.scope.membershipId,
+      classId: s.scope.classId, materialId: s.input.materialId, classes: [{ classId: s.scope.classId }] } });
+    const event = { academyId: s.scope.academyId, classId: s.scope.classId, materialId: s.input.materialId,
+      sequence: 2, focus: 'answer', pointer: { surface: 'answer', x: 0.5, y: 0.5 }, editor: null };
+    await s.gateway.awareness(s.socket as never, event);
+    expect(s.emit).toHaveBeenCalledWith(observationEvents.awareness, expect.objectContaining({
+      membershipId: s.scope.membershipId, source: 'current', sequence: 2 }));
+    s.emit.mockClear();
+    await s.gateway.awareness(s.socket as never, { ...event, sequence: 1 });
+    await s.gateway.awareness(s.socket as never, { ...event, sequence: 3, classId: randomUUID() });
+    s.presence.currentSource.mockResolvedValueOnce({ socketGeneration: 'another', materialId: s.input.materialId } as never);
+    await s.gateway.awareness(s.socket as never, { ...event, sequence: 4 });
+    expect(s.emit).not.toHaveBeenCalled();
+  });
+  it('denies awareness without authenticated student presence and rejects actor injection', async () => {
+    const s = setup();
+    const event = { academyId: s.scope.academyId, classId: s.scope.classId, materialId: s.input.materialId,
+      sequence: 1, focus: null, pointer: null, editor: null };
+    await s.gateway.awareness(s.socket as never, event);
+    await s.gateway.awareness(s.socket as never, { ...event, membershipId: s.scope.membershipId });
+    expect(s.emit).not.toHaveBeenCalled();
+  });
   it('refreshes the student indicator after a crashed watch expires', async () => {
     const s = setup(); s.watches.summarize.mockResolvedValue({ watcherCount: 0, revision: 2 });
     await s.gateway.activityChanged(s.scope);

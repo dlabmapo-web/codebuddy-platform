@@ -1,5 +1,7 @@
 'use client';
 
+import { TerminalLines } from './terminal-lines';
+import { anchorProps, surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import { Send, Save, BookOpen, History, MessageSquareText, ListChecks, FileCode2, Play, Square, Terminal, Turtle, Expand } from 'lucide-react';
 import { useMaterialObservation, StudentObservationIndicator } from '@/lib/monitoring/use-material-observation';
 import { LessonHeader, LessonFooter } from '@/components/workspace/lesson-chrome';
@@ -266,9 +268,9 @@ export function ManualWorkspace({
     if (href) router.push(href); else if (id) navigation.navigate(id);
   }
   const presenceCourseId = !preview && !data?.practice ? data?.course.id : undefined;
-  useMaterialObservation({ materialId, courseId: presenceCourseId, classId: selectedClass, enabled: Boolean(presenceCourseId),
+  const observation = useMaterialObservation({ materialId, courseId: presenceCourseId, classId: selectedClass, enabled: Boolean(presenceCourseId),
     work: choice ? { choices: choiceSelected } : data?.type === 'TURTLE_EXERCISE'
-      ? { files, entryPoint: data.config.entryPoint, execution: preparing ? 'STARTING' : session?.state ?? 'READY', output: preparing ? '' : (session?.output ?? '').slice(-64000), drawing: observedDrawing }
+      ? { files, activeFile: selected, entryPoint: data.config.entryPoint, execution: preparing ? 'STARTING' : session?.state ?? 'READY', output: preparing ? '' : (session?.output ?? '').slice(-64000), drawing: observedDrawing }
       : { answer } });
   async function run(solution = false) {
     setObservedDrawing(null);
@@ -540,7 +542,7 @@ export function ManualWorkspace({
         <ListChecks aria-hidden className="size-4" />{mt(choice || (short && short.gradingMode !== 'MANUAL') ? 'automatic_graded' : 'teacher_graded').replace(/\s*·\s*$/, '')} · {mt(data.config.includeInScore ? 'included_in_score' : 'excluded_from_score')}
       </div>
       <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${drawing ? "md:flex-row" : "gap-4 overflow-y-auto p-4 sm:p-6 md:flex-row md:overflow-hidden md:p-8"}`}>
-        <aside
+        <aside {...surfaceProps('statement')}
           className={
             !showInstructions
               ? "hidden"
@@ -554,10 +556,10 @@ export function ManualWorkspace({
               scope={{ ...target, classId: selectedClass, preview }}
             />
           ) : (
-            <RichTextFrame
+            <div {...anchorProps('statement:instructions')}><RichTextFrame
               content={data.config.description}
               title={mt("activity_instructions")}
-            />
+            /></div>
           )}
           {preview && data.config.modelAnswer ? (
             <details className="mt-6 rounded-xl border border-border bg-canvas/60 p-4">
@@ -589,8 +591,8 @@ export function ManualWorkspace({
                   setDirty(true); setSaved(mt('unsaved_changes'));
                 }} /></div>
               </div>
-              <div className={styles.editor}>
-                <CodeEditor
+              <div className={styles.editor} {...surfaceProps('editor')}>
+                <CodeEditor onMount={observation.onEditorMount}
                   code={files[selected] ?? ""}
                   fontSize={14}
                   onChange={(value) => {
@@ -602,7 +604,7 @@ export function ManualWorkspace({
               </div>
             </>
           ) : loadedChoice ? (
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div {...surfaceProps('answer')} className="min-h-0 flex-1 overflow-y-auto">
               <ChoiceOptions
                 definition={loadedChoice}
                 selected={choiceSelected}
@@ -742,7 +744,7 @@ export function ManualWorkspace({
               <WorkspaceResizeHandle value={editorShare} onChange={setEditorShare} />
               <div className={styles.results}>
                 <div
-                  className={styles.drawing}
+                  className={styles.drawing} {...surfaceProps('drawing')}
                 >
                   {session ? (
                     <GuiViewer key={session.id} session={session} onError={showError} onFrame={onObservedFrame} onStop={() => void stop()} layout={drawingLayout} onLayoutChange={setDrawingLayout} />
@@ -760,7 +762,7 @@ export function ManualWorkspace({
                   )}
                 </div>
                 <section
-                  className={`${styles.terminal} bg-editor-bg text-white`}
+                  className={`${styles.terminal} bg-editor-bg text-white`} {...surfaceProps('terminal')}
                   aria-label={mt("terminal")}
                 >
                   <div className="flex min-h-11 shrink-0 items-center gap-2 border-b border-white/10 px-3 text-xs font-semibold text-white/65"><Terminal aria-hidden className="size-3.5" />{mt("terminal")}</div>
@@ -768,7 +770,7 @@ export function ManualWorkspace({
                     className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap p-3 font-mono text-xs leading-relaxed"
                     data-testid="turtle-terminal"
                   >
-                    {session?.output || (!session ? mt("code_not_run") : "")}
+                    <TerminalLines output={session?.output || (!session ? mt("code_not_run") : "")} />
                   </pre>
                   <form
                     onSubmit={(e) => {

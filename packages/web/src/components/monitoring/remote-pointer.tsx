@@ -104,6 +104,12 @@ export function RemotePointer({
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place);
     // Ancestors cover sibling-driven movement as well as the pane's own size.
     let element: HTMLElement | null = findCanvasElement(pointer.surface) ?? findSurfaceElement(pointer.surface);
+    if (!element) {
+      // A PDF/player may mount after its first awareness frame arrives.
+      // Observe the containing document until that surface exists as well.
+      mutations?.observe(document.body, { childList: true, subtree: true });
+      observer?.observe(document.body);
+    }
     while (element) {
       observer?.observe(element);
       mutations?.observe(element, { attributes: true, attributeFilter: ['class', 'style'], childList: true });

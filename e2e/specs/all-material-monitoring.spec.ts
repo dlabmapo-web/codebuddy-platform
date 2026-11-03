@@ -72,7 +72,7 @@ for (const role of ['lab_head', 'instructor', 'tutor'] as const) {
     for (const [side, observedPage] of [['staff', page], ['student', learner]] as const) {
       observedPage.on('websocket', socket => {
         const record = (direction: string, payload: string | Buffer) => {
-          if (typeof payload === 'string' && (/(?:watch\.|document\.|access\.|server\.|class\.|presence\.)/.test(payload) || payload.startsWith('43/monitoring'))) {
+          if (typeof payload === 'string' && (/(?:watch\.|document\.|access\.|server\.|class\.|presence\.|observation\.)/.test(payload) || payload.startsWith('43/monitoring'))) {
             if (protocol.length >= 2000) protocol.shift();
             protocol.push({ side, direction, packet: payload.slice(0, 2500) });
           }
@@ -169,6 +169,10 @@ for (const role of ['lab_head', 'instructor', 'tutor'] as const) {
       await follow('Name the language');
       await learner.getByRole('textbox').fill('Unsaved live Python answer');
       await expect(page.getByRole('textbox', { name: 'Student answer' })).toHaveValue('Unsaved live Python answer');
+      await learner.getByRole('textbox').hover();
+      await expect(page.getByTestId('observation-focus')).toContainText('the answer');
+      await expect(page.getByTestId('peer-pointer')).toBeVisible();
+      await page.screenshot({ path: info.outputPath('shared-short-answer-monitor.png') });
       await learner.getByRole('textbox').fill('');
       await expect(page.getByRole('textbox', { name: 'Student answer' })).toHaveValue('');
       await learner.getByRole('textbox').fill('Recovered live answer');
@@ -193,9 +197,18 @@ for (const role of ['lab_head', 'instructor', 'tutor'] as const) {
       await follow('Lesson reference PDF');
       await expect(page.getByTestId('pdf-reader')).toBeVisible();
       await expect(page.getByTestId('student-pdf-position')).toContainText('1');
+      await learner.locator('.react-pdf__Page').hover({ position: { x: 120, y: 100 }, timeout: 25000 });
+      await expect(page.getByTestId('observation-focus')).toContainText('the PDF');
+      await expect(page.getByTestId('peer-pointer')).toBeVisible();
       await navigateStudent('videos', classroom.videoMaterialId, 'Lesson video');
       await follow('Lesson video');
       await expect(learner.locator('video')).toBeVisible();
+      await expect.poll(() => learner.locator('video').evaluate((node: HTMLVideoElement) => node.readyState)).toBeGreaterThan(1);
+      await learner.locator('video').evaluate((node: HTMLVideoElement) => node.pause());
+      await expect(page.locator('video')).toBeVisible();
+      await learner.locator('video').hover();
+      await expect(page.getByTestId('observation-focus')).toContainText('the video');
+      await expect(page.getByTestId('peer-pointer')).toBeVisible();
       await expect.poll(() => learner.locator('video').evaluate((node: HTMLVideoElement) => node.readyState)).toBeGreaterThan(1);
       await learner.locator('video').evaluate(async (node: HTMLVideoElement) => { node.currentTime = 3; await node.play(); });
       await expect(page.getByTestId('student-video-state')).toContainText('Playing');
@@ -212,6 +225,20 @@ for (const role of ['lab_head', 'instructor', 'tutor'] as const) {
       await navigateStudent('turtle', classroom.turtleMaterialId, 'Draw a red square');
       await follow('Draw a red square');
       await expect(page.getByTestId('student-source')).toContainText('turtle.Turtle');
+      await expect.poll(() => visibleCode(learner)).not.toBeNull();
+      const turtleCode = await visibleCode(learner);
+      expect(turtleCode).not.toBeNull();
+      const liveTurtleCode = turtleCode + '\n# Live monitored file\n';
+      await visibleCode(learner, liveTurtleCode);
+      await expect.poll(() => visibleCode(page)).toBe(liveTurtleCode);
+      await learner.evaluate(() => {
+        const monaco = (window as unknown as { monaco: { editor: { getEditors(): Array<{ getDomNode(): HTMLElement | null; setPosition(position: { lineNumber: number; column: number }): void; focus(): void }> } } }).monaco;
+        const editor = monaco.editor.getEditors().find(item => item.getDomNode()?.getClientRects().length)!;
+        editor.setPosition({ lineNumber: 2, column: 4 }); editor.focus();
+      });
+      await expect(page.getByTestId('observation-focus')).toContainText('main.py:2');
+      await learner.locator('.monaco-editor').hover({ position: { x: 100, y: 30 } });
+      await expect(page.getByTestId('observation-editor-pointer')).toBeVisible();
       const turtleCanvas = learner.getByTestId('turtle-display').locator('canvas');
       for (let attempt = 0; attempt < 3; attempt++) {
         await learner.getByRole('button', { name: 'Run', exact: true }).click();
@@ -235,10 +262,16 @@ for (const role of ['lab_head', 'instructor', 'tutor'] as const) {
         let red = 0; for (let i=0; i<pixels.length; i+=4) if (pixels[i]>170 && pixels[i+1]<120 && pixels[i+2]<120) red++;
         return red;
       }), { timeout: 60000 }).toBeGreaterThan(100);
+      await turtleCanvas.hover();
+      await expect(page.getByTestId('observation-focus')).toContainText('the drawing');
+      await expect(page.getByTestId('peer-pointer')).toBeVisible();
+      await expect(page.getByTestId('observed-turtle-workspace').locator('.monaco-editor')).toBeVisible();
       await page.screenshot({ path: info.outputPath('live-turtle-monitor.png') });
       await learner.getByRole('button', { name: 'Stop', exact: true }).click();
       await navigateStudent('exercises', classroom.materialId, 'Add two numbers');
       await expect(page.getByTestId('student-current-material')).toContainText('Add two numbers');
+      await expect(page.getByTestId('student-drawing')).toBeVisible();
+      await expect(page.getByTestId('student-execution-state')).toContainText('Last observed response');
       await page.getByRole('button', { name: 'Return to live', exact: true }).click();
       await expect(page.locator('.monaco-editor')).toBeVisible({ timeout: 60000 });
       await expect(page.getByText('Live on Add two numbers', { exact: true })).toBeVisible();
@@ -249,6 +282,27 @@ for (const role of ['lab_head', 'instructor', 'tutor'] as const) {
       await expect.poll(() => visibleCode(learner)).toBe('print("staff live edit")');
       await visibleCode(learner, 'print("student follow-up")');
       await expect.poll(() => visibleCode(page)).toBe('print("student follow-up")');
+      // Reading another material must retain the complete selected coding UI.
+      await navigateStudent('documents', classroom.pdfMaterialId, 'Lesson reference PDF');
+      await expect(page.getByTestId('student-current-material')).toContainText('Lesson reference PDF');
+      await expect(page.locator('.monaco-editor')).toBeVisible();
+      await expect(page.getByTestId('problem-statement')).toBeVisible();
+      await expect(page.getByRole('textbox', { name: 'Your note for this exercise', exact: true })).toBeVisible();
+      await expect(page.getByRole('textbox', { name: 'Your note for this exercise', exact: true })).toBeDisabled();
+      await expect(page.getByRole('button', { name: /^Edit code · (On|Off)$/ })).toBeDisabled();
+      await learner.locator('.react-pdf__Page').hover({ position: { x: 120, y: 100 }, timeout: 25000 });
+      await expect(page.getByTestId('observation-focus')).toContainText('the PDF');
+      await expect(page.getByTestId('peer-pointer')).toHaveCount(0);
+      await page.screenshot({ path: info.outputPath('coding-workspace-while-student-reads-pdf.png') });
+      await navigateStudent('exercises', classroom.materialId, 'Add two numbers');
+      await expect(page.getByTestId('student-current-material')).toContainText('Add two numbers');
+      const resume = page.getByRole('button', { name: 'Return to live', exact: true });
+      if (await resume.isVisible()) await resume.click();
+      const returnedEdit = page.getByRole('button', { name: /^Edit code · (On|Off)$/ });
+      await expect(returnedEdit).toBeEnabled();
+      if (await returnedEdit.getAttribute('aria-pressed') !== 'true') await returnedEdit.click();
+      await visibleCode(page, 'print("after material return")');
+      await expect.poll(() => visibleCode(learner)).toBe('print("after material return")');
       const codeStarts = observationStarts;
       await page.getByRole('complementary', { name: 'Course', exact: true }).getByRole('button').filter({ hasText: 'Lesson reference PDF' }).click();
       await expect(page.getByTestId('pdf-reader')).toBeVisible();
@@ -264,8 +318,8 @@ for (const role of ['lab_head', 'instructor', 'tutor'] as const) {
       await page.getByRole('complementary', { name: 'Course', exact: true }).getByRole('button').filter({ hasText: 'Lesson reference PDF' }).click();
       await expect(page.getByTestId('pdf-reader')).toBeVisible();
       await page.setViewportSize({ width: 390, height: 844 });
-      await expect(page.getByRole('button', { name: 'Materials', exact: true })).toBeVisible();
-      await page.getByRole('button', { name: 'Materials', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Show or hide the course outline', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Show or hide the course outline', exact: true }).click();
       await expect(page.getByRole('complementary', { name: 'Course', exact: true })).toHaveCount(0);
       await expect(page.getByTestId('pdf-reader')).toBeVisible();
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { observationWorkSchema } from './observation.js';
+import { observationAwarenessSchema, observationWorkSchema } from './observation.js';
 describe('student observation boundary', () => {
   it('preserves intentionally cleared answers, choices and drawings', () => {
     expect(observationWorkSchema.parse({ answer: '', choices: [], drawing: null })).toEqual({ answer: '', choices: [], drawing: null });
@@ -18,4 +18,12 @@ describe('student observation boundary', () => {
     for (const field of ['correctOptionIds', 'expectedAnswer', 'studentMembershipId', 'submit', 'edit'])
       expect(observationWorkSchema.safeParse({ [field]: true }).success).toBe(false);
   });
+});
+
+it('bounds ephemeral awareness and rejects forged identity or execution content', () => {
+  const input = { academyId: '10000000-0000-4000-8000-000000000001', classId: '10000000-0000-4000-8000-000000000002',
+    materialId: '10000000-0000-4000-8000-000000000003', sequence: 1, focus: 'pdf', pointer: { surface: 'pdf', x: 0.5, y: 0.2 }, editor: null };
+  expect(observationAwarenessSchema.safeParse(input).success).toBe(true);
+  for (const extra of [{ membershipId: input.academyId }, { files: { 'main.py': 'pass' } }, { sequence: Infinity },
+    { pointer: { surface: 'pdf', x: 8, y: 0 } }]) expect(observationAwarenessSchema.safeParse({ ...input, ...extra }).success).toBe(false);
 });

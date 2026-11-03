@@ -178,6 +178,10 @@ export const collaborationSurfaces = [
   "editor",
   "terminal",
   "feedback",
+  "answer",
+  "drawing",
+  "pdf",
+  "video",
 ] as const;
 export const collaborationSurfaceSchema = z.enum(collaborationSurfaces);
 export type CollaborationSurface = z.infer<typeof collaborationSurfaceSchema>;

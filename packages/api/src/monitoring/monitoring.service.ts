@@ -353,7 +353,9 @@ export class MonitoringService {
       description: config?.description ?? row.videoLesson?.description ?? row.programmingExercise?.description ?? '',
       question: config?.shortAnswer && typeof config.shortAnswer === 'object' && 'question' in config.shortAnswer
         ? String(config.shortAnswer.question) : choice?.question ?? null,
-      choice, navigator,
+      choice, navigator, hint: config?.hint ?? undefined, includeInScore: config?.includeInScore,
+      entryPoint: config?.entryPoint, files: row.type === 'TURTLE_EXERCISE' && config ? sourceFilesSchema.parse(config.files) : undefined,
+      automaticallyGraded: Boolean(choice || (config?.shortAnswer && typeof config.shortAnswer === 'object' && 'gradingMode' in config.shortAnswer && config.shortAnswer.gradingMode !== 'MANUAL')),
       saved: saved ? { answer: saved.answer, files: sourceFilesSchema.parse(saved.files), ...(choices ? { choices } : {}) } : null,
       savedAt: draft?.updatedAt.toISOString() ?? submitted?.createdAt.toISOString() ?? null,
     };

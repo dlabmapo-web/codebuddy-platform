@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { surfaceProps, anchorProps } from '@/lib/monitoring/awareness/surfaces';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { ensureReadableStreamIterator } from '@/lib/readable-stream-iterator';
 import {
@@ -160,7 +161,7 @@ export function PdfCanvas({
           ? 'fixed inset-0 z-[100] flex flex-col bg-canvas'
           : 'flex h-full min-h-0 flex-col bg-canvas'
       }
-      data-testid="pdf-reader"
+      data-testid="pdf-reader" {...surfaceProps('pdf')}
     >
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-canvas/80 px-3 py-2.5" role="group" aria-label={t('pdf.controls')}>
         <div className={group}>
@@ -248,7 +249,7 @@ export function PdfCanvas({
             } else setError('PDF_NOT_AVAILABLE');
           }}
         >
-          <Page
+          <div className="mx-auto w-fit" {...anchorProps(`pdf-page:${page}`)}><Page
             key={page}
             className="mx-auto w-fit shadow-sm"
             pageNumber={page}
@@ -263,7 +264,7 @@ export function PdfCanvas({
               setOriginal({ width: view.width, height: view.height });
             }}
             loading={<p role="status">{t('pdf.loading')}</p>}
-          />
+          /></div>
         </Document>
       </div>
     </div>

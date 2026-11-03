@@ -145,3 +145,7 @@ The browser suite does not replace exhaustive load/failure-injection testing.
 Pending-write recovery, stale generations, independent watch leases and permission
 denials also have focused unit/Redis coverage. No production deployment or merge
 was performed.
+
+The subsequent Turtle/answer presentation, retained coding workspace and
+non-code pointer corrections have a separate
+[verification report](2026-11-03-monitoring-workspace-parity-verification.md).

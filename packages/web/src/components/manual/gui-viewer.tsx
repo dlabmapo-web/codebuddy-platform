@@ -112,6 +112,7 @@ export function GuiViewer({
           rfb.addEventListener("connect", () => {
             if (disposed) return;
             canvas.current = target.current?.querySelector("canvas") ?? null;
+            canvas.current?.setAttribute('data-collab-anchor', 'drawing:canvas');
             connectionLost = false;
             setSnapshot(undefined);
             setConnection("ready");

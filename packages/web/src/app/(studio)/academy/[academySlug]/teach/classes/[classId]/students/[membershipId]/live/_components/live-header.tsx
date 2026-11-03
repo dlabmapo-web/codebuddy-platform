@@ -41,6 +41,8 @@ export function LiveHeader({
   answer,
   helpMode,
   helpQueue,
+  materialTitle,
+  saveStatus,
 }: {
   studentSwitcher: React.ReactNode;
   classId: string;
@@ -68,6 +70,8 @@ export function LiveHeader({
    */
   helpMode?: React.ReactNode;
   helpQueue?: React.ReactNode;
+  materialTitle?: string;
+  saveStatus?: string;
 }) {
   const academySlug = useAcademySlug();
   const { t } = useTranslation('monitoring');
@@ -76,20 +80,20 @@ export function LiveHeader({
 
   return (
     <header className="shrink-0 border-b border-border bg-card px-3 py-2.5">
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 md:flex-nowrap">
         <Link data-monitoring-class-exit aria-label={t('workspace.back')}
           className="grid size-9 shrink-0 place-items-center rounded-lg text-sub hover:bg-canvas hover:text-ink"
           href={`${routes.academy(academySlug)}/teach/classes/${classId}`}><ArrowLeft aria-hidden className="size-4" /></Link>
         {curriculum}
-        <div className="min-w-0 flex-1">{studentSwitcher}</div>
-        <span aria-live="polite" role="status" className={`shrink-0 text-xs font-semibold ${unsaved ? 'text-draft' : 'text-success'}`}>{unsaved ? t('workspace.unsaved') : t('workspace.saved')}</span>
-        <ConnectionBadge state={connection} />
+        <div className="min-w-0 flex-1 basis-40 md:basis-auto">{studentSwitcher}</div>
+        <span aria-live="polite" role="status" className={`shrink-0 text-xs font-semibold ${unsaved ? 'text-draft' : 'text-success'}`}>{saveStatus ?? (unsaved ? t('workspace.unsaved') : t('workspace.saved'))}</span>
+        <span data-testid="observation-connection"><ConnectionBadge state={connection} /></span>
       </div>
       <div className="mt-2 flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-border pt-2.5">
         <div className="min-w-0 flex-1 basis-52">
-          <p aria-live="polite" className="truncate text-xs text-sub">{liveStatus ?? exercise?.breadcrumb.course.title}</p>
+          <p data-testid="student-current-material" aria-live="polite" className="truncate text-xs text-sub">{liveStatus ?? exercise?.breadcrumb.course.title}</p>
           <div className="mt-1 flex min-w-0 items-center gap-2">
-            <h1 className="truncate text-base font-bold leading-6">{exercise?.exercise.title ?? t('workspace.not_solving_title')}</h1>
+            <h1 className="truncate text-base font-bold leading-6">{materialTitle ?? exercise?.exercise.title ?? t('workspace.not_solving_title')}</h1>
             {exercise ? <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${difficultyStyles[exercise.exercise.difficulty]}`}>{tc(`exercise.difficulty.${exercise.exercise.difficulty}`)}</span> : null}
           </div>
         </div>

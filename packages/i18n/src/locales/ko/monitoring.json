@@ -155,7 +155,11 @@
       "statement": "문제 설명을",
       "editor": "코드를",
       "terminal": "터미널을",
-      "feedback": "피드백을"
+      "feedback": "피드백을",
+      "answer": "답안",
+      "drawing": "그림",
+      "pdf": "PDF",
+      "video": "동영상"
     }
   },
   "indicator": {
@@ -285,6 +289,8 @@
     "loading": "자료를 불러오는 중…",
     "load_failed": "실시간 자료를 불러올 수 없습니다. 다시 시도해 주세요.",
     "retry": "다시 시도",
-    "access_denied": "모니터링 권한이 종료되었습니다."
+    "access_denied": "모니터링 권한이 종료되었습니다.",
+    "read_only": "읽기 전용",
+    "last_response": "마지막 관찰 답안 · 읽기 전용"
   }
 }

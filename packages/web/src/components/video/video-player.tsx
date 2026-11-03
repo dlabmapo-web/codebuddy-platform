@@ -1,4 +1,6 @@
 "use client";
+import { surfaceProps, anchorProps } from '@/lib/monitoring/awareness/surfaces';
+
 import Hls from "hls.js";
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
@@ -240,7 +242,7 @@ export function VideoPlayer({
                 : "relative aspect-video max-h-[max(8rem,calc(100dvh-16rem))] min-h-0 w-full"
           }
         >
-          <video
+          <video {...surfaceProps('video')} {...anchorProps('video:player')}
             ref={element}
             aria-label={data.title}
             playsInline

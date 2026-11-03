@@ -53,6 +53,7 @@ test("bank reserves official slots, counts draining resources, and quarantines u
     active: 0,
     draining: 1,
     quarantined: 0,
+    standby: 0,
     memoryMb: 656,
   });
   const official = bank.acquire(512, "official");
@@ -66,6 +67,36 @@ test("bank reserves official slots, counts draining resources, and quarantines u
   assert.equal(bank.ready, false);
   assert.equal(bank.snapshot().quarantined, 1);
   assert.throws(() => bank.acquire(128, "official"));
+});
+test("standby jails never block a maximum-size admission after smaller work completes", () => {
+  // The qualified node: 1536 MiB after service, two 656 MiB maximum cases -> 224 MiB standby budget.
+  const resources = { ...manifest.resources, physicalMemoryMb: 16000, envelopeMemoryMb: 2560, serviceOverheadMb: 1024, officialReservedMemoryMb: 656 };
+  const bank = new ResourceBank(resources);
+  const small = [bank.acquire(128, "official"), bank.acquire(128, "official")];
+  assert.equal(bank.idleSlots, 0);
+  const standbys = [];
+  for (let release; (release = bank.reserveStandby(32, 8)); ) standbys.push(release);
+  assert.equal(standbys.length, 7);
+  small.forEach((a) => a.cleaned());
+  assert.equal(bank.idleSlots, 2);
+  // Reserved while both slots held small work; the larger work that follows still fits.
+  const first = bank.acquire(512, "official"),
+    second = bank.acquire(512, "official");
+  assert.deepEqual(bank.snapshot(), { active: 2, draining: 0, quarantined: 0, standby: 7, memoryMb: 1536 });
+  first.cleaned();
+  second.cleaned();
+  // Background work keeps its existing bound (the official reserve), unaffected by standbys.
+  bank.acquire(512, "background").cleaned();
+  standbys.forEach((release) => {
+    release();
+    release();
+  });
+  assert.equal(bank.snapshot().standby, 0);
+  // No budget remains when slots alone fill the envelope; a quarantined bank grants none.
+  assert.equal(new ResourceBank({ ...manifest.resources, envelopeMemoryMb: 1568 }).reserveStandby(32, 8), undefined);
+  const quarantined = new ResourceBank(resources);
+  quarantined.quarantine();
+  assert.equal(quarantined.reserveStandby(32, 8), undefined);
 });
 test("memory is reserved by allowance plus scratch and overhead, not measured RSS", () => {
   const bank = new ResourceBank({

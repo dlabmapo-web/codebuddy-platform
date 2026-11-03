@@ -33,6 +33,8 @@ export const nativeTimingsSchema = z
     executionMs: z.number().finite().nonnegative(),
     cleanupMs: z.number().finite().nonnegative(),
     acquisitionMs: z.number().finite().nonnegative().optional(),
+    /** The case claimed a jail started and verified before its request arrived. */
+    prewarmed: z.boolean().optional(),
   })
   .strict();
 export type NativeTimings = z.infer<typeof nativeTimingsSchema>;

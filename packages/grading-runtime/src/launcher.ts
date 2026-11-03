@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import {
   readFile,
   writeFile,
@@ -25,6 +25,7 @@ import {
   type NativeExecutionResult,
 } from "./contract.js";
 import { CleanupUncertainError, type NativeBackend } from "./service.js";
+import type { ResourceBank } from "./resource-bank.js";
 import { ByteCapture } from "./framing.js";
 import { jailConfig, NSJAIL_REVISION } from "./policy.js";
 import { fileDigest, rootfsDigest } from "./identity.js";
@@ -48,14 +49,36 @@ export type NsJailOptions = {
   startupTimeoutMs?: number;
   cleanupTimeoutMs?: number;
 };
+/** Idle interpreter peaks near 10 MiB; claim raises this to the authored limit. */
+const STANDBY_MEMORY_MB = 32;
+const STANDBY_TTL_MS = 30_000;
+/**
+ * Jail startup outlasts a short case several times over, so one replacement per
+ * claim cannot keep up with sequential cases; keep a shallow pipeline per certificate.
+ */
+const STANDBY_DEPTH = 4;
+/** Aged standbys are replaced only while their certificate saw recent demand. */
+const STANDBY_DEMAND_WINDOW_MS = 60_000;
+const NAMESPACES = ["mnt", "pid", "ipc", "net", "uts", "user", "cgroup"] as const;
 export class NsJailBackend implements NativeBackend {
   private prepared = false;
+  private closing = false;
+  private bank?: ResourceBank;
+  private own?: { filters: number; namespaces: Map<string, string> };
+  private readonly standby = new Map<string, Jail[]>();
+  private readonly warming = new Map<string, number>();
+  private warmingTotal = 0;
+  private readonly lastDemand = new Map<string, number>();
+  private readonly background = new Set<Promise<void>>();
   private probing = false;
   private manifest: NativeReleaseManifest;
   private options: NsJailOptions;
   constructor(options: NsJailOptions) {
     this.manifest = nativeReleaseManifestSchema.parse(options.manifest);
     this.options = { ...options, manifest: this.manifest };
+  }
+  attach(bank: ResourceBank) {
+    this.bank = bank;
   }
   async prepare() {
     if (this.prepared) return;
@@ -171,6 +194,21 @@ export class NsJailBackend implements NativeBackend {
       throw new NativeInfrastructureError(
         "Work root must be private and owned",
       );
+    // The launcher's own isolation facts never change; read them once, not per case.
+    this.own = {
+      filters: Number(
+        /^Seccomp_filters:\s+(\d+)$/m.exec(
+          await readFile("/proc/self/status", "utf8"),
+        )?.[1] ?? 0,
+      ),
+      namespaces: new Map(
+        await Promise.all(
+          NAMESPACES.map(
+            async (ns) => [ns, await readlink(`/proc/self/ns/${ns}`)] as const,
+          ),
+        ),
+      ),
+    };
     // This executes through the SAME jail path; a binary/version string alone never means ready.
     this.probing = true;
     let result: NativeExecutionResult;
@@ -233,22 +271,16 @@ export class NsJailBackend implements NativeBackend {
       throw new NativeInfrastructureError(
         "Guest privilege/seccomp controls absent",
       );
-    const ownStatus = await readFile("/proc/self/status", "utf8");
-    const ownFilters = Number(
-      /^Seccomp_filters:\s+(\d+)$/m.exec(ownStatus)?.[1] ?? 0,
-    );
+    const own = this.own!;
     const guestFilters = Number(
       /^Seccomp_filters:\s+(\d+)$/m.exec(status)?.[1] ?? 0,
     );
-    if (guestFilters <= ownFilters)
+    if (guestFilters <= own.filters)
       throw new NativeInfrastructureError(
         "Guest seccomp filter was not installed",
       );
-    for (const ns of ["mnt", "pid", "ipc", "net", "uts", "user", "cgroup"])
-      if (
-        (await readlink(`${proc}/ns/${ns}`)) ===
-        (await readlink(`/proc/self/ns/${ns}`))
-      )
+    for (const ns of NAMESPACES)
+      if ((await readlink(`${proc}/ns/${ns}`)) === own.namespaces.get(ns))
         throw new NativeInfrastructureError(`Missing private ${ns} namespace`);
     const mounts = await readFile(`${proc}/mountinfo`, "utf8");
     const root = mounts.split("\n").find((x) => x.split(" ")[4] === "/");
@@ -278,113 +310,104 @@ export class NsJailBackend implements NativeBackend {
     )
       throw new NativeInfrastructureError("Guest scratch is not bounded");
   }
-  async execute(
-    raw: NativeExecutionRequest,
-    signal: AbortSignal,
-    draining: () => void,
-  ): Promise<NativeExecutionResult> {
-    if (!this.prepared && !this.probing)
-      throw new NativeInfrastructureError("Native backend is not prepared");
-    const { signal: ignored, ...data } = raw;
-    const request = requestSchema.parse(data),
-      o = this.options,
+  /** Spawns and fully verifies a jail gated before its request; never runs learner code. */
+  private async startJail(
+    request: NativeExecutionRequest,
+    standby: boolean,
+    signal?: AbortSignal,
+  ): Promise<Jail> {
+    const o = this.options,
       r = this.manifest.resources;
-    if (request.memoryLimitMb > r.maxCaseMemoryMb)
-      throw new NativeInfrastructureError("Memory exceeds native certificate");
-    const cgroup = join(o.cgroupRoot, `case-${randomUUID()}`);
-    let directory: string | undefined;
-    let created = false;
-    let processClosed:
-      | Promise<{ code: number | null; signal: string | null }>
-      | undefined;
-    let child: ReturnType<typeof spawn> | undefined;
-    let startupStderr: ByteCapture | undefined;
-    const executionCallStarted = performance.now();
-    let cleanupStarted: number | undefined;
-    let completedResult: NativeExecutionResult | undefined;
-    let timedOut = false,
-      started: number | undefined,
-      cpuStart = 0,
-      monitor: ReturnType<typeof setInterval> | undefined,
-      wall: ReturnType<typeof setTimeout> | undefined;
-    let sample: Promise<void> | undefined;
-    let fault: unknown;
-    let stopPromise: Promise<void> | undefined;
-    const stop = () =>
-      (stopPromise ??= (async () => {
-        try {
-          if (created) await killCgroup(cgroup);
-        } finally {
-          child?.kill("SIGKILL");
-        }
-      })());
-    const abort = () => {
-      void stop().catch((error) => {
-        fault = error;
-      });
+    const jail: Jail = {
+      key: jailKey(request),
+      memoryLimitMb: request.memoryLimitMb,
+      timeLimitMs: request.timeLimitMs,
+      cgroup: join(o.cgroupRoot, `case-${randomUUID()}`),
+      created: false,
+      stderr: new ByteCapture(gradingDataLimits.stderrBytes),
+      exited: false,
+      earlyOutput: false,
     };
+    const cancelled = () =>
+      new NativeInfrastructureError("Native execution cancelled");
+    // Cancellation during startup kills and reaps promptly instead of awaiting readiness.
+    const onAbort = () => {
+      if (jail.created) void killCgroup(jail.cgroup).catch(() => {});
+      jail.child?.kill("SIGKILL");
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
     try {
       // Mark created before setting controls, so a partial setup still gets cleaned.
-      await mkdir(cgroup, { mode: 0o700 });
-      created = true;
+      await mkdir(jail.cgroup, { mode: 0o700 });
+      jail.created = true;
+      // An idle standby is kernel-capped well below the authored limit; claim raises it.
       await writeFile(
-        join(cgroup, "memory.max"),
-        String((request.memoryLimitMb + r.scratchMb) * 1024 * 1024),
+        join(jail.cgroup, "memory.max"),
+        String(
+          (standby
+            ? STANDBY_MEMORY_MB
+            : request.memoryLimitMb + r.scratchMb) *
+            1024 *
+            1024,
+        ),
       );
-      await writeFile(join(cgroup, "memory.swap.max"), "0");
-      await writeFile(join(cgroup, "memory.oom.group"), "1");
-      await writeFile(join(cgroup, "pids.max"), String(r.maxCasePids));
-      await writeFile(join(cgroup, "cpu.max"), "100000 100000");
+      await writeFile(join(jail.cgroup, "memory.swap.max"), "0");
+      await writeFile(join(jail.cgroup, "memory.oom.group"), "1");
+      await writeFile(join(jail.cgroup, "pids.max"), String(r.maxCasePids));
+      await writeFile(join(jail.cgroup, "cpu.max"), "100000 100000");
+      // A waiting standby yields CPU to running cases; claim restores the default.
+      if (standby) await writeFile(join(jail.cgroup, "cpu.weight"), "1");
       await writeFile(
-        join(cgroup, "cgroup.subtree_control"),
+        join(jail.cgroup, "cgroup.subtree_control"),
         "+cpu +memory +pids",
       );
-      directory = await mkdtemp(join(o.workRoot, "case-"));
+      jail.directory = await mkdtemp(join(o.workRoot, "case-"));
       await writeFile(
-        join(directory, "jail.cfg"),
+        join(jail.directory, "jail.cfg"),
         jailConfig(
           {
             rootfs: o.rootfsPath,
             policy: o.policyPath,
-            cgroup,
-            log: join(directory, "nsjail.log"),
+            cgroup: jail.cgroup,
+            log: join(jail.directory, "nsjail.log"),
           },
           request,
           r,
-          o.startupTimeoutMs ?? 10000,
+          // The supervisor's own backstop also covers the longest standby wait.
+          (o.startupTimeoutMs ?? 10000) + (standby ? STANDBY_TTL_MS : 0),
           o.cleanupTimeoutMs ?? 5000,
         ),
         { mode: 0o600 },
       );
-      if (signal.aborted)
-        throw new NativeInfrastructureError("Cancelled before launch");
+      if (signal?.aborted) throw cancelled();
       // Require mount_setattr/open_tree rather than legacy remounts that clear
       // locked inherited flags in a user namespace. Never fall back silently.
-      child = spawn(o.nsjailPath, ["--config", join(directory, "jail.cfg"), "--experimental_mnt", "new"], {
+      const child = spawn(o.nsjailPath, ["--config", join(jail.directory, "jail.cfg"), "--experimental_mnt", "new"], {
         env: { PATH: "/usr/sbin:/usr/bin:/sbin:/bin", LANG: "C.UTF-8" },
-        cwd: directory,
+        cwd: jail.directory,
         stdio: ["pipe", "pipe", "pipe", "pipe"],
         shell: false,
       });
-      processClosed = new Promise((resolve, reject) => {
-        child!.once("error", reject);
-        child!.once("close", (code, signal) => resolve({ code, signal }));
+      jail.child = child;
+      jail.processClosed = new Promise((resolve, reject) => {
+        child.once("error", reject);
+        child.once("close", (code, signal) => {
+          jail.exited = true;
+          resolve({ code, signal });
+        });
       });
       // Prevent an early exit rejection while readiness is being awaited.
-      void processClosed.catch(() => {});
-      const stdout = new ByteCapture(
-          request.outputLimitBytes ?? gradingDataLimits.stdoutBytes,
-        ),
-        stderr = new ByteCapture(gradingDataLimits.stderrBytes);
-      startupStderr = stderr;
-      child.stdout!.on("data", (chunk) => stdout.append(chunk));
-      child.stderr!.on("data", (chunk) => stderr.append(chunk));
+      void jail.processClosed.catch(() => {});
+      // Output before a request is claimed cannot come from learner code; discard such a jail.
+      child.stdout!.on("data", (chunk) => {
+        if (jail.stdout) jail.stdout.append(chunk);
+        else jail.earlyOutput = true;
+      });
+      child.stderr!.on("data", (chunk) => jail.stderr.append(chunk));
       child.stdin!.on("error", () => {});
-      child.stdin!.end(JSON.stringify(request));
       const gate = child.stdio[3] as Duplex;
+      jail.gate = gate;
       gate.on("error", () => {});
-      signal.addEventListener("abort", abort, { once: true });
-      if (signal.aborted) abort();
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(
           () =>
@@ -395,6 +418,7 @@ export class NsJailBackend implements NativeBackend {
           clearTimeout(timer);
           gate.off("data", onData);
           gate.off("end", onEnd);
+          signal?.removeEventListener("abort", onCancel);
           if (error) reject(error);
           else resolve();
         };
@@ -408,18 +432,283 @@ export class NsJailBackend implements NativeBackend {
           finish(
             new NativeInfrastructureError("Jail failed before learner start"),
           );
+        const onCancel = () => finish(cancelled());
         gate.once("data", onData);
         gate.once("end", onEnd);
-        void processClosed!.then(() => onEnd(), finish);
+        signal?.addEventListener("abort", onCancel, { once: true });
+        if (signal?.aborted) onCancel();
+        void jail.processClosed!.then(() => onEnd(), finish);
       });
-      await this.verifyGatedChild(cgroup, request.memoryLimitMb);
-      cpuStart = await cpuUsec(cgroup);
+      await this.verifyGatedChild(jail.cgroup, request.memoryLimitMb);
+      if (signal?.aborted) throw cancelled();
+      return jail;
+    } catch (cause) {
+      let failure: unknown = signal?.aborted ? cancelled() : cause;
+      if (jail.directory && !signal?.aborted) {
+        // EOF on the control pipe may arrive before stderr/exit notifications.
+        // Keep diagnostics bounded without delaying cleanup indefinitely.
+        let diagnosticTimer: ReturnType<typeof setTimeout> | undefined;
+        let supervisorExit: { code: number | null; signal: string | null } | undefined;
+        try {
+          await Promise.race([
+            jail.processClosed?.then(exit => { supervisorExit = exit; }).catch(() => {}),
+            new Promise<void>(resolve => { diagnosticTimer = setTimeout(resolve, 1500); }),
+          ]);
+        } finally { clearTimeout(diagnosticTimer); }
+        failure = new NativeInfrastructureError(
+          cause instanceof NativeInfrastructureError ? cause.message : "Native launcher failure",
+          { cause: { startupLog: await readStartupLog(join(jail.directory, "nsjail.log")), startupStderr: jail.stderr.text().slice(0, 8192), supervisorExit, original: cause } },
+        );
+      } else if (!(cause instanceof NativeInfrastructureError))
+        failure = new NativeInfrastructureError("Native launcher failure", { cause });
+      // A cleanup uncertainty outranks the startup failure, as before.
+      await this.disposeJail(jail);
+      throw failure;
+    } finally {
+      signal?.removeEventListener("abort", onAbort);
+    }
+  }
+  /** Kills and reaps every descendant; uncertainty MUST throw CleanupUncertainError. */
+  private async disposeJail(jail: Jail) {
+    const o = this.options;
+    let cleanupError: unknown;
+    try {
+      try {
+        if (jail.created) await killCgroup(jail.cgroup);
+      } finally {
+        jail.child?.kill("SIGKILL");
+      }
+      if (jail.processClosed) {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            jail.processClosed,
+            new Promise<never>((_, reject) => {
+              timer = setTimeout(
+                () =>
+                  reject(
+                    new CleanupUncertainError(
+                      "Supervisor/pipe cleanup deadline",
+                    ),
+                  ),
+                o.cleanupTimeoutMs ?? 5000,
+              );
+              timer.unref();
+            }),
+          ]);
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+      if (jail.created)
+        await cleanupCgroup(jail.cgroup, o.cleanupTimeoutMs ?? 5000);
+    } catch (cause) {
+      cleanupError = new CleanupUncertainError("Native cleanup uncertain", {
+        cause,
+      });
+    }
+    if (jail.directory)
+      try {
+        await rm(jail.directory, { recursive: true, force: true });
+      } catch (cause) {
+        cleanupError = new CleanupUncertainError(
+          "Native scratch cleanup uncertain",
+          { cause },
+        );
+      }
+    if (cleanupError) throw cleanupError;
+  }
+  /** Claims a verified idle jail for exactly this memory/time certificate, if one is ready. */
+  private claimStandby(key: string): Jail | undefined {
+    const idle = this.standby.get(key);
+    while (idle?.length) {
+      const jail = idle.shift()!;
+      clearTimeout(jail.expiry);
+      if (!jail.exited && !jail.earlyOutput) {
+        // The claiming request's own allocation now covers this jail's memory.
+        jail.release?.();
+        return jail;
+      }
+      this.discard(jail);
+    }
+    return undefined;
+  }
+  /**
+   * Background disposal. The standby reservation stays charged until cleanup is
+   * proven; an uncertain cleanup keeps it and removes this generation from admission.
+   */
+  private discard(jail: Jail) {
+    const disposal = this.disposeJail(jail).then(
+      () => jail.release?.(),
+      (error) => {
+        if (error instanceof CleanupUncertainError) this.bank?.quarantine();
+        else jail.release?.();
+      },
+    );
+    this.background.add(disposal);
+    void disposal.finally(() => this.background.delete(disposal));
+  }
+  /** Tops up verified jails ahead of the next cases with the same certificate. */
+  private replenish(request: NativeExecutionRequest) {
+    const key = jailKey(request);
+    while (
+      !this.closing &&
+      this.bank &&
+      (this.standby.get(key)?.length ?? 0) + (this.warming.get(key) ?? 0) <
+        STANDBY_DEPTH &&
+      // Startup burns CPU: warm only on slots no admitted work holds.
+      this.warmingTotal < this.bank.idleSlots
+    ) {
+      const release = this.bank.reserveStandby(
+        STANDBY_MEMORY_MB,
+        this.manifest.resources.cpuSlots * STANDBY_DEPTH,
+      );
+      if (!release) return;
+      this.warming.set(key, (this.warming.get(key) ?? 0) + 1);
+      this.warmingTotal++;
+      const warming = this.startJail(
+        {
+          code: "",
+          stdin: "",
+          timeLimitMs: request.timeLimitMs,
+          memoryLimitMb: request.memoryLimitMb,
+        },
+        true,
+      )
+        .then(
+          (jail) => {
+            jail.release = release;
+            if (this.closing) {
+              this.discard(jail);
+              return;
+            }
+            jail.expiry = setTimeout(() => this.expire(jail), STANDBY_TTL_MS);
+            jail.expiry.unref();
+            const idle = this.standby.get(key) ?? [];
+            idle.push(jail);
+            this.standby.set(key, idle);
+          },
+          (error) => {
+            // startJail has already attempted disposal; uncertainty stays charged.
+            if (error instanceof CleanupUncertainError) this.bank?.quarantine();
+            else release();
+            // Never retry in a loop; the next real case cold-starts and reports failure.
+          },
+        )
+        .finally(() => {
+          this.warming.set(key, this.warming.get(key)! - 1);
+          this.warmingTotal--;
+        });
+      this.background.add(warming);
+      void warming.finally(() => this.background.delete(warming));
+    }
+  }
+  /** Recycles an aged standby; only real requests count as demand for a replacement. */
+  private expire(jail: Jail) {
+    const idle = this.standby.get(jail.key);
+    const index = idle?.indexOf(jail) ?? -1;
+    if (index < 0) return;
+    idle!.splice(index, 1);
+    this.discard(jail);
+    if (
+      performance.now() - (this.lastDemand.get(jail.key) ?? -Infinity) <
+      STANDBY_DEMAND_WINDOW_MS
+    )
+      this.replenish({
+        code: "",
+        stdin: "",
+        timeLimitMs: jail.timeLimitMs,
+        memoryLimitMb: jail.memoryLimitMb,
+      });
+  }
+  async close() {
+    this.closing = true;
+    for (const idle of this.standby.values())
+      for (const jail of idle.splice(0)) {
+        clearTimeout(jail.expiry);
+        this.discard(jail);
+      }
+    while (this.background.size) await Promise.allSettled([...this.background]);
+  }
+  async execute(
+    raw: NativeExecutionRequest,
+    signal: AbortSignal,
+    draining: () => void,
+  ): Promise<NativeExecutionResult> {
+    if (!this.prepared && !this.probing)
+      throw new NativeInfrastructureError("Native backend is not prepared");
+    const { signal: ignored, ...data } = raw;
+    const request = requestSchema.parse(data),
+      r = this.manifest.resources;
+    if (request.memoryLimitMb > r.maxCaseMemoryMb)
+      throw new NativeInfrastructureError("Memory exceeds native certificate");
+    const executionCallStarted = performance.now();
+    let cleanupStarted: number | undefined;
+    let completedResult: NativeExecutionResult | undefined;
+    let timedOut = false,
+      started: number | undefined,
+      cpuStart = 0,
+      monitor: ReturnType<typeof setInterval> | undefined,
+      wall: ReturnType<typeof setTimeout> | undefined;
+    let sample: Promise<void> | undefined;
+    let fault: unknown;
+    let jail: Jail | undefined;
+    let prewarmed = false;
+    let stopPromise: Promise<void> | undefined;
+    const stop = () =>
+      (stopPromise ??= (async () => {
+        try {
+          if (jail?.created) await killCgroup(jail.cgroup);
+        } finally {
+          jail?.child?.kill("SIGKILL");
+        }
+      })());
+    const abort = () => {
+      void stop().catch((error) => {
+        fault = error;
+      });
+    };
+    try {
+      if (signal.aborted)
+        throw new NativeInfrastructureError("Cancelled before launch");
+      jail = this.probing ? undefined : this.claimStandby(jailKey(request));
+      prewarmed = Boolean(jail);
+      if (jail) {
+        // Raise the idle caps to the authored certificate and prove them before GO.
+        const limit = String(
+          (request.memoryLimitMb + r.scratchMb) * 1024 * 1024,
+        );
+        await writeFile(join(jail.cgroup, "memory.max"), limit);
+        await writeFile(join(jail.cgroup, "cpu.weight"), "100");
+        if (
+          (await readControl(join(jail.cgroup, "memory.max"))) !== limit ||
+          (await readControl(join(jail.cgroup, "cpu.weight"))) !== "100"
+        )
+          throw new NativeInfrastructureError("Jail kernel controls mismatch");
+      } else jail = await this.startJail(request, false, signal);
+      if (!this.probing) {
+        this.lastDemand.set(jailKey(request), performance.now());
+        this.replenish(request);
+      }
+      const { child, gate, stderr } = jail;
+      const stdout = new ByteCapture(
+        request.outputLimitBytes ?? gradingDataLimits.stdoutBytes,
+      );
+      jail.stdout = stdout;
+      if (jail.exited || jail.earlyOutput)
+        throw new NativeInfrastructureError("Jail failed before learner start");
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted)
+        throw new NativeInfrastructureError("Native execution cancelled");
+      child!.stdin!.end(JSON.stringify(request));
+      cpuStart = await cpuUsec(jail.cgroup);
       started = performance.now();
-      gate.end("G");
+      gate!.end("G");
       wall = setTimeout(() => {
         timedOut = true;
         abort();
       }, request.timeLimitMs);
+      const cgroup = jail.cgroup;
       monitor = setInterval(() => {
         if (sample) return;
         sample = cpuUsec(cgroup)
@@ -439,7 +728,7 @@ export class NsJailBackend implements NativeBackend {
             sample = undefined;
           });
       }, 10);
-      const exit = await processClosed;
+      const exit = await jail.processClosed!;
       clearTimeout(wall);
       clearInterval(monitor);
       await sample;
@@ -469,22 +758,6 @@ export class NsJailBackend implements NativeBackend {
       };
       return completedResult;
     } catch (cause) {
-      if (started === undefined && directory) {
-        // EOF on the control pipe may arrive before stderr/exit notifications.
-        // Keep diagnostics bounded without delaying cleanup indefinitely.
-        let diagnosticTimer: ReturnType<typeof setTimeout> | undefined;
-        let supervisorExit: { code: number | null; signal: string | null } | undefined;
-        try {
-          await Promise.race([
-            processClosed?.then(exit => { supervisorExit = exit; }).catch(() => {}),
-            new Promise<void>(resolve => { diagnosticTimer = setTimeout(resolve, 1500); }),
-          ]);
-        } finally { clearTimeout(diagnosticTimer); }
-        throw new NativeInfrastructureError(
-          cause instanceof NativeInfrastructureError ? cause.message : "Native launcher failure",
-          { cause: { startupLog: await readStartupLog(join(directory, "nsjail.log")), startupStderr: startupStderr?.text().slice(0, 8192), supervisorExit, original: cause } },
-        );
-      }
       if (cause instanceof NativeInfrastructureError) throw cause;
       throw new NativeInfrastructureError("Native launcher failure", { cause });
     } finally {
@@ -497,42 +770,17 @@ export class NsJailBackend implements NativeBackend {
       try {
         await sample;
         await stop();
-        if (processClosed) {
-          let timer: ReturnType<typeof setTimeout> | undefined;
-          try {
-            await Promise.race([
-              processClosed,
-              new Promise<never>((_, reject) => {
-                timer = setTimeout(
-                  () =>
-                    reject(
-                      new CleanupUncertainError(
-                        "Supervisor/pipe cleanup deadline",
-                      ),
-                    ),
-                  o.cleanupTimeoutMs ?? 5000,
-                );
-                timer.unref();
-              }),
-            ]);
-          } finally {
-            clearTimeout(timer);
-          }
-        }
-        if (created) await cleanupCgroup(cgroup, o.cleanupTimeoutMs ?? 5000);
       } catch (cause) {
         cleanupError = new CleanupUncertainError("Native cleanup uncertain", {
           cause,
         });
       }
-      if (directory)
+      // startJail already disposed a jail that failed before it was returned.
+      if (jail)
         try {
-          await rm(directory, { recursive: true, force: true });
+          await this.disposeJail(jail);
         } catch (cause) {
-          cleanupError = new CleanupUncertainError(
-            "Native scratch cleanup uncertain",
-            { cause },
-          );
+          cleanupError = cause;
         }
       if (cleanupError) throw cleanupError;
       if (completedResult)
@@ -540,7 +788,28 @@ export class NsJailBackend implements NativeBackend {
           startupMs: Math.max(0, started! - executionCallStarted),
           executionMs: completedResult.runtimeMs,
           cleanupMs: Math.max(0, performance.now() - cleanupStarted),
+          prewarmed,
         };
     }
   }
 }
+type Jail = {
+  key: string;
+  memoryLimitMb: number;
+  timeLimitMs: number;
+  cgroup: string;
+  created: boolean;
+  directory?: string;
+  child?: ChildProcess;
+  processClosed?: Promise<{ code: number | null; signal: string | null }>;
+  gate?: Duplex;
+  stdout?: ByteCapture;
+  stderr: ByteCapture;
+  exited: boolean;
+  earlyOutput: boolean;
+  release?: () => void;
+  expiry?: ReturnType<typeof setTimeout>;
+};
+/** Everything baked into a jail's supervisor config before its request exists. */
+const jailKey = (request: Pick<NativeExecutionRequest, "memoryLimitMb" | "timeLimitMs">) =>
+  `${request.memoryLimitMb}:${request.timeLimitMs}`;

@@ -6,17 +6,6 @@ import os
 import sys
 import types
 
-payload = json.load(sys.stdin)
-source = payload["code"]
-stdin = payload["stdin"]
-ignore_prompt = payload.get("inputPromptPolicy", "INCLUDE") == "IGNORE"
-sys.stdin = io.TextIOWrapper(io.BytesIO(stdin.encode("utf-8")), encoding="utf-8")
-sys.argv = ["main.py"]
-if ignore_prompt:
-    original_input = builtins.input
-    def quiet_input(prompt="", /):
-        return original_input()
-    builtins.input = quiet_input
 def run_script(source):
     # Function locals retain the original primitives even if learner code mutates
     # builtins or imports the learner's __main__ module.
@@ -44,7 +33,20 @@ def run_script(source):
             raise exit_type(1) from None
         raise
 
+# Ready is signalled before the request exists, so the launcher can start and
+# verify jails ahead of demand. The request arrives on stdin only when claimed.
 os.write(3, b"R")
+payload = json.load(sys.stdin)
+source = payload["code"]
+stdin = payload["stdin"]
+ignore_prompt = payload.get("inputPromptPolicy", "INCLUDE") == "IGNORE"
+sys.stdin = io.TextIOWrapper(io.BytesIO(stdin.encode("utf-8")), encoding="utf-8")
+sys.argv = ["main.py"]
+if ignore_prompt:
+    original_input = builtins.input
+    def quiet_input(prompt="", /):
+        return original_input()
+    builtins.input = quiet_input
 if os.read(3, 1) != b"G":
     os._exit(125)
 os.close(3)

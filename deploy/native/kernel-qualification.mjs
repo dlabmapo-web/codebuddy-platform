@@ -76,6 +76,55 @@ try {
     else {
         service = new NativeExecutionService({ ...config, backend: new NsJailBackend(config) });
         await service.listen();
+        // First, before other certificates hold standby budget: a repeated certificate
+        // must claim a prewarmed jail, whose 32 MiB idle cap is raised to the authored
+        // limit before GO. The launcher reports the hit; timing alone proves nothing.
+        const cold = await run('print(1)', { memoryLimitMb: 256, timeLimitMs: 1500 });
+        assert.equal(cold.timings.prewarmed, false);
+        let warm;
+        for (let attempt = 1; ; attempt++) {
+            await delay(1500);
+            warm = await run('x = bytearray(200 * 1024 * 1024); print(len(x))', { memoryLimitMb: 256, timeLimitMs: 1500 });
+            if (warm.timings.prewarmed) break;
+            if (attempt === 2) throw Error('Repeated certificate never claimed a prewarmed jail');
+        }
+        assert.equal(warm.outcome, 'PASSED');
+        assert.equal(warm.stdout, '209715200\n');
+        passed++;
+        // Cancellation before readiness (an unused certificate cold-starts) is prompt
+        // and releases capacity, rather than waiting out the startup deadline.
+        const early = new AbortController(), cancelStarted = performance.now();
+        const cancelling = run('print(1)', { signal: early.signal, memoryLimitMb: 96, timeLimitMs: 1100 });
+        setTimeout(() => early.abort(), 5);
+        await assert.rejects(cancelling);
+        const cancelMs = performance.now() - cancelStarted;
+        assert.ok(cancelMs < 3000, `startup cancellation took ${cancelMs} ms`);
+        for (let i = 0; (await client.health()).active + (await client.health()).draining > 0; i++) {
+            if (i > 50) throw Error('Cancelled startup kept capacity');
+            await delay(20);
+        }
+        assert.equal((await client.health()).ready, true);
+        passed++;
+        // Mixed memory/time certificates compete for one standby budget; every result stays correct.
+        const profiles = [[32, 1000], [64, 1200], [128, 1500], [256, 1000]];
+        let mixedHits = 0;
+        for (let round = 0; round < 3; round++)
+            for (const [memoryLimitMb, timeLimitMs] of profiles) {
+                const results = await Promise.all([0, 1].map(i => run(`print(${memoryLimitMb}+${i})`, { memoryLimitMb, timeLimitMs })));
+                results.forEach((r, i) => { assert.equal(r.outcome, 'PASSED'); assert.equal(r.stdout, `${memoryLimitMb + i}\n`); if (r.timings.prewarmed) mixedHits++; });
+            }
+        passed++;
+        // CPU-bound cases running beside warm-up must not lose their wall allowance:
+        // 300 ms of CPU inside a 1000 ms limit, two at once, repeatedly.
+        const busy = 'import time\nt = time.process_time()\nwhile time.process_time() - t < 0.3: pass\nprint("done")';
+        const contentionWallMs = [];
+        for (let round = 0; round < 5; round++)
+            for (const r of await Promise.all([0, 1].map(() => run(busy, { memoryLimitMb: 128, timeLimitMs: 1000 })))) {
+                assert.equal(r.outcome, 'PASSED', 'CPU-bound case lost its wall allowance during warm-up');
+                contentionWallMs.push(r.runtimeMs);
+            }
+        passed++;
+        console.log(JSON.stringify({ gate: 'standby-behaviour', status: 'PASS', coldStartupMs: cold.timings.startupMs, warmStartupMs: warm.timings.startupMs, cancelMs, mixedHits, mixedRuns: 24, contentionWallMs }));
         const check = async (code, expected, extra = {}) => { const result = await run(code, extra); for (const [key, value] of Object.entries(expected))
             assert.equal(result[key], value, code); assert.ok(result.timings && result.timings.cleanupMs >= 0); passed++; };
         await check('print(input("이름: "))', { stdout: '이름: 학생\n', outcome: 'PASSED' }, { stdin: '학생\n' });
@@ -108,7 +157,11 @@ try {
         await delay(300);
         assert.equal((await client.health()).active, 0);
         passed++;
+        // Idle standbys legitimately hold case groups until the service releases them.
+        await service.close();
+        service = undefined;
         assert.equal((await readdir(config.cgroupRoot)).filter(n => n.startsWith('case-')).length, 0);
+        passed++;
         console.log(JSON.stringify({ gate: 'actual-linux-containment', status: 'PASS', passed, descriptor: config.manifest.descriptor }));
     }
 }

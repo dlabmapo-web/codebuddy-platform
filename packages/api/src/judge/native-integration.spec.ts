@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ConfigService } from "@nestjs/config";
@@ -11,7 +11,7 @@ import { practiceSnapshotSchema } from "./practice-snapshot.js";
 import { runtimeQueueName } from "./judge.queue.js";
 import { sampleSnapshotFor } from "./sample-check-snapshot.js";
 import { manifest as fixture } from "../../../grading-runtime/test/fixtures.js";
-import { legacyCaseGrading } from "@cove/shared";
+import { legacyCaseGrading, nativeReleaseManifestSchema } from "@cove/shared";
 import { nativeRuntimeVersion } from "@cove/grading-runtime";
 
 const id = "10000000-0000-4000-8000-000000000001";
@@ -55,6 +55,22 @@ describe("native admission and immutable contracts", () => {
     expect(frozenNativeDescriptor(null)).toBeNull(); expect(() => frozenNativeDescriptor({ engine: "pyodide" })).toThrow();
     const overflow = join(directory, "overflow.json"); await writeFile(overflow, " ".repeat(4 * 1024 * 1024 + 1));
     await expect(loadNativeManifest(overflow)).rejects.toThrow("limit");
+  });
+  it("certifies authored per-case timeouts separately from the unchanged exercise default", async () => {
+    const overridePath = join(directory, "case-timeout-manifest.json");
+    const manifest = JSON.parse(await readFile(path, "utf8"));
+    manifest.eligibility[0].maxCaseTimeLimitMs = 2000;
+    await writeFile(overridePath, JSON.stringify(manifest));
+    const authored = { ...exercise, testCases: [{ ...exercise.testCases[0]!, timeLimitMsOverride: 2000 }] };
+    const certified = admission({ NATIVE_GRADING_MANIFEST: overridePath });
+    expect(await certified.admission.select(context, authored)).toEqual(fixture.descriptor);
+    expect(gradingSnapshotFor(authored, { engineVersion: "0.27.5", descriptor: fixture.descriptor }).cases[0]!.timeLimitMsOverride).toBe(2000);
+    expect(authored.timeLimitMs).toBe(1000);
+    expect(await certified.admission.select(context, { ...authored, testCases: [{ ...authored.testCases[0]!, timeLimitMsOverride: 2001 }] })).toBeNull();
+    expect(await admission().admission.select(context, authored)).toBeNull();
+    expect(await certified.admission.retain(fixture.descriptor, context, authored)).toEqual(fixture.descriptor);
+    manifest.eligibility[0].maxCaseTimeLimitMs = 999;
+    expect(nativeReleaseManifestSchema.safeParse(manifest).success).toBe(false);
   });
   it("preserves historical v1/v2/v3 and explicit v4 native identity, including legacy practice/sample", () => {
     const historical = gradingSnapshotFor(exercise, { engineVersion: "0.27.5" }).submission.gradingPolicySnapshot!;

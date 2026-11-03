@@ -20,6 +20,10 @@ export class CleanupUncertainError extends NativeInfrastructureError {}
 export interface NativeBackend {
   /** Must verify identity and exercise the actual kernel boundary before returning. */
   prepare(): Promise<void>;
+  /** Shares the service's capacity accounting, for prewarmed standby work. */
+  attach?(bank: ResourceBank): void;
+  /** Releases idle prewarmed work; called after every request has settled. */
+  close?(): Promise<void>;
   /** Resolves/rejects only after cleanup; uncertainty MUST throw CleanupUncertainError. */
   execute(
     request: NativeExecutionRequest,
@@ -61,6 +65,7 @@ export class NativeExecutionService {
   async listen() {
     if (this.server)
       throw new NativeInfrastructureError("Service already started");
+    this.options.backend.attach?.(this.bank);
     await this.options.backend.prepare();
     const directory = dirname(this.options.socketPath);
     await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -240,6 +245,7 @@ export class NativeExecutionService {
     this.ready = false;
     for (const socket of this.sockets) socket.destroy();
     await Promise.allSettled(this.runs);
+    await this.options.backend.close?.();
     if (this.server)
       await new Promise<void>((resolve) => this.server!.close(() => resolve()));
     if (this.server) await unlink(this.options.socketPath).catch(() => {});

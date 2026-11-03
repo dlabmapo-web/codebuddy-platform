@@ -102,8 +102,14 @@ export const nativeReleaseManifestSchema = z
               .max(4),
             memoryLimitMb: z.number().int().min(16).max(4096),
             timeLimitMs: z.number().int().min(1).max(120_000),
+            /** Absent retains the original default-only certification. */
+            maxCaseTimeLimitMs: z.number().int().min(1).max(120_000).optional(),
           })
-          .strict(),
+          .strict()
+          .refine(
+            entry => (entry.maxCaseTimeLimitMs ?? entry.timeLimitMs) >= entry.timeLimitMs,
+            { message: "Certified case timeout cannot be lower than the exercise default" },
+          ),
       )
       .max(10000),
   })

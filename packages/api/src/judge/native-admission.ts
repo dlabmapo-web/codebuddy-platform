@@ -75,7 +75,8 @@ export class NativeAdmission {
     if (!academy || !manifest.eligibility.some(e => e.organizationId === academy.organizationId &&
       e.academyId === context.academyId && e.materialId === context.materialId && e.gradingRevision === context.gradingRevision &&
       e.context === context.context && e.kinds.includes(context.kind) && e.memoryLimitMb === exercise.memoryLimitMb &&
-      e.timeLimitMs === exercise.timeLimitMs && exercise.testCases.every(c => (c.timeLimitMsOverride ?? exercise.timeLimitMs) <= e.timeLimitMs))) return null;
+      e.timeLimitMs === exercise.timeLimitMs && exercise.testCases.every(c =>
+        (c.timeLimitMsOverride ?? exercise.timeLimitMs) <= (e.maxCaseTimeLimitMs ?? e.timeLimitMs)))) return null;
     if (!requireReady) return manifest.descriptor;
     const redis = await this.queue!.redis();
     const count = Number(await redis.eval(READ_READY, 1, nativeReadinessKey(manifest.descriptor, context.kind === "official" ? "official" : "background")));

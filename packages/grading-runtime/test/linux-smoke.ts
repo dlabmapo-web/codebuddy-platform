@@ -179,6 +179,8 @@ try {
   await new Promise((r) => setTimeout(r, 200));
   assert.equal((await client.health()).active, 0);
   passed++;
+  // Idle standbys legitimately hold case groups until the service releases them.
+  await service.close();
   assert.equal(
     (await readdir(config.cgroupRoot)).filter((x) => x.startsWith("case-"))
       .length,

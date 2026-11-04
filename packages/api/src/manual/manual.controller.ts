@@ -1,3 +1,5 @@
+import { historyReviewRunSchema } from "@cove/shared";
+import { ReviewExecutionService } from "./review-execution.service.js";
 import type { Request } from "express";
 import {
   Controller,
@@ -45,6 +47,7 @@ export class ManualController {
     private readonly sessions: StudentSessionService,
     private readonly access: AcademyAccessService,
     private readonly limits: RateLimitService,
+    private readonly reviewExecution: ReviewExecutionService,
   ) {}
   private async identify(header?: string) {
     if (!header?.startsWith("Bearer ")) throw new UnauthorizedException();
@@ -312,6 +315,19 @@ export class ManualController {
       await this.identify(auth),
       parse(manualReviewSchema, body),
     );
+  }
+  @Post("review-sessions") async startReview(@Body() body: unknown, @Headers("authorization") auth?: string) {
+    return this.reviewExecution.start(await this.identify(auth), parse(historyReviewRunSchema, body));
+  }
+  @Get("review-sessions/:id") @Header("Cache-Control", "private, no-store") async reviewStatus(@Param("id") id: string, @Headers("authorization") auth?: string) {
+    return this.reviewExecution.session(await this.identify(auth), parse(z.uuid(), id));
+  }
+  @Delete("review-sessions/:id") async stopReview(@Param("id") id: string, @Headers("authorization") auth?: string) {
+    return this.reviewExecution.session(await this.identify(auth), parse(z.uuid(), id), "DELETE");
+  }
+  @Post("review-sessions/:id/input") async reviewInput(@Param("id") id: string, @Body() body: unknown, @Headers("authorization") auth?: string) {
+    const {text} = parse(z.object({text: z.string().max(4096)}).strict(), body);
+    return this.reviewExecution.session(await this.identify(auth), parse(z.uuid(), id), "POST", text);
   }
   @Post("sessions") async start(
     @Body() body: unknown,

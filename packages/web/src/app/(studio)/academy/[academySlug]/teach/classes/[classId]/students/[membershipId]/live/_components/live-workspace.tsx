@@ -28,6 +28,7 @@ import { useLayoutTranslation } from '@/i18n';
 import { orpc } from '@/lib/orpc';
 import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import { useLiveWorkspace } from '@/lib/monitoring/use-live-workspace';
+import { codingConnectionState } from '@/lib/monitoring/connection';
 import { navigatorRow } from '@/lib/workspace/navigator-geometry';
 import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
 import { useEditorPreferences } from '@/lib/workspace/use-editor-preferences';
@@ -98,11 +99,16 @@ export function LiveWorkspace({
   const academySlug = useAcademySlug();
   const { t } = useTranslation('monitoring');
   const { t: tl } = useLayoutTranslation('learn');
+  const selectedCodeIsCurrent = observation?.type === 'PROGRAMMING_EXERCISE' &&
+    observation.materialId === (selectedMaterialId ?? observation.materialId);
   const live = useLiveWorkspace({
     academyId,
     classId,
     studentMembershipId: membershipId,
     autoEdit: true,
+    availableCode: selectedCodeIsCurrent && observation.source && observation.materialId &&
+      observation.state !== 'OFFLINE' && observation.state !== 'RECONNECTING'
+      ? { materialId: observation.materialId, source: observation.source } : null,
   });
   const runner = usePythonRunner();
   // Local runs only: the teacher's copy never claims a server verdict.
@@ -382,7 +388,9 @@ export function LiveWorkspace({
             ) : <button disabled type="button" className="inline-flex h-8 items-center rounded-lg border border-border bg-card px-3 text-[12.5px] font-bold text-ink opacity-45">{t('answer.show')}</button>}
           </>}
           classId={classId}
-          connection={previewed || observation?.type !== 'PROGRAMMING_EXERCISE' ? observationConnection ?? live.state : live.state}
+          connection={selectedCodeIsCurrent
+            ? codingConnectionState(live.state, live.canEdit && live.session?.materialId === observation.materialId)
+            : previewed || observation?.type !== 'PROGRAMMING_EXERCISE' ? observationConnection ?? live.state : live.state}
           context={context}
           curriculum={
             <CurriculumTrigger
@@ -424,7 +432,8 @@ export function LiveWorkspace({
         </div>
       ) : null}
 
-      {!live.pendingRecovery && live.denied === 'MONITORING_REALTIME_UNAVAILABLE' ? (
+      {!live.pendingRecovery && (live.denied === 'MONITORING_REALTIME_UNAVAILABLE' ||
+        (live.denied === 'MONITORING_STUDENT_UNAVAILABLE' && selectedCodeIsCurrent)) ? (
         <div className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-2 text-[13px] text-sub" role="status">
           <span>{t('workspace.recovery_body')}</span>
           <button className="rounded-md border border-border px-2 py-1 font-semibold" onClick={live.follow} type="button">

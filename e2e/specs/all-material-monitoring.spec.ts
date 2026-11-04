@@ -55,6 +55,98 @@ async function pointerAt(page: Page, expected: { x: number; y: number }) {
 }
 
 for (const role of ['lab_head', 'instructor', 'tutor'] as const) {
+  test(`${role} recovers an unavailable coding watch after PDF without either person refreshing`, async ({ browser, page, request }, info) => {
+    test.setTimeout(240000);
+    const learnerContext = await browser.newContext({ baseURL: 'http://127.0.0.1:3309' });
+    const ownerContext = role === 'lab_head' ? null : await browser.newContext({ baseURL: 'http://127.0.0.1:3309' });
+    const learner = await learnerContext.newPage(); const owner = ownerContext ? await ownerContext.newPage() : page;
+    await page.addInitScript(() => {
+      const NativeWebSocket = window.WebSocket;
+      window.WebSocket = class extends NativeWebSocket {
+        constructor(url: string | URL, protocols?: string | string[]) {
+          super(String(url).replace('127.0.0.1:4319/socket.io', '127.0.0.1:4339/socket.io'), protocols);
+        }
+      };
+    });
+    await media(page.context()); await media(learnerContext); if (ownerContext) await media(ownerContext);
+    let refusals = 0; let studentSockets = 0; let documents = 0;
+    const protocol: Array<{ time: string; side: string; direction: string; packet: string }> = [];
+    for (const [side, target] of [['staff', page], ['student', learner]] as const) {
+      target.on('request', req => { if (req.resourceType() === 'document' && req.frame() === target.mainFrame()) documents++; });
+      target.on('websocket', socket => {
+        if (!socket.url().includes('/socket.io')) return;
+        if (side === 'student') studentSockets++;
+        const record = (direction: string, payload: string | Buffer) => {
+          if (typeof payload !== 'string') return;
+          if (side === 'staff' && direction === 'received' && payload.includes('MONITORING_STUDENT_UNAVAILABLE')) refusals++;
+          if (/watch\.|binding\.|document\.|observation\.|MONITORING_STUDENT_UNAVAILABLE/.test(payload))
+            protocol.push({ time: new Date().toISOString(), side, direction, packet: payload.slice(0, 2500) });
+        };
+        socket.on('framesent', event => record('sent', event.payload));
+        socket.on('framereceived', event => record('received', event.payload));
+      });
+    }
+    try {
+      const manager = await fixture(request, 'lab_head'); await enter(owner, manager);
+      const staff = role === 'lab_head' ? manager : await fixture(request, role, manager.id);
+      if (role !== 'lab_head') await enter(page, staff);
+      const student = await fixture(request, 'student', manager.id); await enter(learner, student);
+      const seeded = await request.post(provider + '/fixtures/' + manager.id + '/classroom', { data: { studentFixtureId: student.id, includePdf: true } });
+      expect(seeded.ok(), await seeded.text()).toBe(true);
+      const classroom = await seeded.json(); const classId: string = classroom.classes[0].id;
+      if (role === 'tutor') {
+        const member = await (await request.get(provider + '/fixtures/' + staff.id)).json();
+        const assigned = await rpc(owner, request, 'academyClasses/setTeacher', { academyId: manager.academy.id, classId,
+          teacherMembershipId: member.memberships[0].id, expectedUpdatedAt: classroom.classes[0].updatedAt });
+        expect(assigned.ok(), await assigned.text()).toBe(true);
+      }
+      await ownerContext?.close();
+      const root = '/academy/' + manager.academy.slug;
+      await learner.goto(`${root}/learn/documents/${classroom.pdfMaterialId}?classId=${classId}`);
+      await expect(learner.locator('.react-pdf__Page canvas')).toBeVisible();
+      await page.goto(`${root}/teach/classes/${classId}`);
+      await page.getByRole('link', { name: 'Open live', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Lesson reference PDF', exact: true })).toBeVisible();
+      await expect(page.getByTestId('observation-connection')).toHaveText('Live');
+      const initialDocuments = documents; const initialSockets = studentSockets;
+      for (let visit = 1; visit <= 2; visit++) {
+        const before = refusals;
+        await page.getByRole('complementary', { name: 'Course', exact: true }).getByRole('button').filter({ hasText: 'Add two numbers' }).click();
+        // Deliberately exhaust real rejected watch-start requests while the
+        // student is still on PDF. No response or presence event is mocked.
+        await expect.poll(() => refusals, { timeout: 30000 }).toBe(before + 4);
+        await learner.getByRole('complementary', { name: 'Course', exact: true }).getByRole('button').filter({ hasText: 'Add two numbers' }).click();
+        await expect(learner.getByRole('heading', { name: 'Add two numbers', exact: true })).toBeVisible();
+        // The monitor performs no Follow or refresh after the student arrives.
+        await expect.poll(() => editableEditor(page), { timeout: 60000 }).toBe(true);
+        await expect(learner.getByText('Teacher is helping', { exact: true })).toBeVisible();
+        await expect(page.getByTestId('observation-connection')).toHaveText('Live');
+        const teacherCode = `print("teacher recovered visit ${visit}")`;
+        await visibleCode(page, teacherCode); await expect.poll(() => visibleCode(learner)).toBe(teacherCode);
+        const studentCode = `print("student recovered visit ${visit}")`;
+        await visibleCode(learner, studentCode); await expect.poll(() => visibleCode(page)).toBe(studentCode);
+        await learner.locator('.monaco-editor').hover({ position: { x: 140, y: 30 } });
+        await expect(page.getByTestId('peer-pointer')).toBeVisible();
+        await page.locator('.monaco-editor').hover({ position: { x: 170, y: 35 } });
+        await expect(learner.getByTestId('peer-pointer')).toContainText('Teacher');
+        await expect(learner.locator('.cove-peer-cursor')).toHaveCount(0);
+        await expect(page.locator('.cove-peer-cursor')).toHaveCount(0);
+        await expect(learner.getByTestId('peer-pointer')).toHaveCount(0, { timeout: 5000 });
+        expect(documents).toBe(initialDocuments); expect(studentSockets).toBe(initialSockets);
+        await page.screenshot({ path: info.outputPath(`automatic-code-recovery-${visit}.png`) });
+        if (visit === 1) {
+          await learner.getByRole('complementary', { name: 'Course', exact: true }).getByRole('button').filter({ hasText: 'Lesson reference PDF' }).click();
+          await expect(page.getByTestId('student-current-material')).toContainText('Lesson reference PDF');
+          await page.getByRole('complementary', { name: 'Course', exact: true }).getByRole('button').filter({ hasText: 'Lesson reference PDF' }).click();
+          await expect(page.getByTestId('pdf-reader')).toBeVisible();
+        }
+      }
+    } finally {
+      await info.attach('unavailable-watch-recovery-protocol', { body: Buffer.from(JSON.stringify(protocol)), contentType: 'application/json' });
+      await learnerContext.close(); await ownerContext?.close();
+    }
+  });
+
   test(`${role} monitors live quiz, answers, PDF, video and actual Turtle output in one tab`, async ({ browser, page, request }, info) => {
     test.setTimeout(info.project.name === 'webkit' ? 900000 : 360000);
     const learnerContext = await browser.newContext({ baseURL: 'http://127.0.0.1:3309' });

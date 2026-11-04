@@ -74,11 +74,14 @@ export function useLiveWorkspace({
   classId,
   studentMembershipId,
   autoEdit = false,
+  availableCode,
 }: {
   academyId: string;
   classId: string;
   studentMembershipId: string;
   autoEdit?: boolean;
+  /** Selected-code availability is advisory; every retry is authorized by the server. */
+  availableCode?: { materialId: string; source: string } | null;
 }) {
   const { socket, state, report } = useMonitoringSocket({ classId, studentMembershipId });
   const [pendingUpdates] = React.useState(() => new PendingTeacherUpdates());
@@ -273,7 +276,11 @@ export function useLiveWorkspace({
       watchTokenRef.current = token;
       replacingVisitRef.current = sessionRef.current?.visitId ?? null;
       cancelCommand = retryMonitoringCommand<LiveWorkspaceSession>({
-        onRetry: unavailable,
+        retryUnavailableStudent: true,
+        onRetry: ack => {
+          if (ack && !ack.ok && ack.code === 'MONITORING_STUDENT_UNAVAILABLE') report({ type: 'recovery_failed' });
+          else unavailable();
+        },
         send: (done) => {
           if (!socket.connected) { done(undefined); return; }
           socket.emit(
@@ -297,6 +304,7 @@ export function useLiveWorkspace({
           if (!ack?.ok) {
             if (retained) setPendingRecovery('blocked');
             setDenied(ack?.code ?? 'MONITORING_REALTIME_UNAVAILABLE');
+            if (ack?.code === 'MONITORING_STUDENT_UNAVAILABLE') report({ type: 'recovery_failed' });
             if (!ack || ack.code === 'MONITORING_REALTIME_UNAVAILABLE') unavailable();
             if (ack?.code === 'MONITORING_ACCESS_DENIED') {
               report({ type: 'revoked' });
@@ -506,6 +514,24 @@ export function useLiveWorkspace({
   React.useEffect(() => {
     if (state === 'revoked' || refreshRequired) cancelWatchRef.current?.();
   }, [state, refreshRequired]);
+
+  // A settled refusal may precede the student's return to coding. Repeated
+  // observation heartbeats must not replace a healthy watch or loop forever.
+  const recoveredAvailabilityRef = React.useRef<string | null>(null);
+  const availableMaterialId = availableCode?.materialId;
+  const availableSource = availableCode?.source;
+  React.useEffect(() => {
+    if (!availableMaterialId || !availableSource) {
+      recoveredAvailabilityRef.current = null;
+      return;
+    }
+    const key = `${academyId}:${classId}:${studentMembershipId}:${availableMaterialId}:${availableSource}`;
+    if (!socket?.connected || state === 'revoked' || refreshRequired || switching || pendingRecovery ||
+      denied !== 'MONITORING_STUDENT_UNAVAILABLE' || recoveredAvailabilityRef.current === key) return;
+    recoveredAvailabilityRef.current = key;
+    follow();
+  }, [academyId, classId, studentMembershipId, availableMaterialId, availableSource, denied,
+    socket, state, refreshRequired, switching, pendingRecovery, follow]);
 
   /* ---------------------------------------------------------- the document */
 

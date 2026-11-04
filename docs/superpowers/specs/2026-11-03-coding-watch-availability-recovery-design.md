@@ -1,9 +1,10 @@
 # Recover coding monitoring after a material transition
 
 Date: 2026-11-03. Scope: the existing all-material monitoring feature branch.
-Status: Proposed; awaiting user approval before implementation.
+Status: Approved and implemented on 2026-11-04; local verification is recorded in
+the [verification report](../../research/2026-11-04-coding-watch-availability-recovery-verification.md).
 The user requested this spec after observing the failed state in native Safari
-(student) and Chrome (monitor). Implementation will begin only after approval.
+(student) and Chrome (monitor), and approved implementation on 2026-11-04.
 
 ## Evidence and problem
 

@@ -9,6 +9,8 @@ export function createMonitoringRouter(os: ORPCImplementer, deps: ORPCDeps) {
   const access = createAccess(os, deps);
 
   return {
+    getObservedMaterial: os.monitoring.getObservedMaterial.use(access.authenticated).handler(({ context, input }) =>
+      deps.monitoringService.getObservedMaterial(context.identity, input)),
     getMyActiveHelpRequest: os.monitoring.getMyActiveHelpRequest.use(access.authenticated).handler(({ context, input }) => {
       return deps.helpRequestService.getMyActiveHelpRequest(context.identity, input);
     }),

@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useVideoTranslation } from "./use-video-translation";
+import { useMaterialObservation, StudentObservationIndicator } from '@/lib/monitoring/use-material-observation';
 import { videoApi } from "@/lib/video-api";
 import { useAcademySlug } from "@/components/studio/academy-route-provider";
 import { routes } from "@/lib/routes";
@@ -49,6 +50,7 @@ export function VideoLesson({
     retryDelay: videoReadRetryDelay,
   });
   const data = query.data;
+  useMaterialObservation({ materialId, classId: chosen, courseId: data?.course.id, enabled: !preview && Boolean(data?.canTrack) });
   const { t: lt } = useLayoutTranslation('learn');
   const navigation = useMaterialNavigation({ academyId, materialId, classId: chosen, preview, courseId: data?.course.id, materials: data?.materials });
   const { open: panelOpen, panelId, triggerRef, toggle: togglePanel, close: closePanel } = useNavigatorPanel('material-course-outline');
@@ -120,6 +122,7 @@ export function VideoLesson({
             </Link>
           ) : null}
         <MediaStaffActions academyId={academyId} type="VIDEO_LESSON" data={data} permissions={permissions} />
+        <StudentObservationIndicator materialId={materialId} classId={chosen} />
       </LessonHeader>
       <div className="relative flex min-h-0 flex-1">
         <WorkspaceCurriculumNavigator context={navigation.context} displayedMaterialId={materialId} open={panelOpen} panelId={panelId}

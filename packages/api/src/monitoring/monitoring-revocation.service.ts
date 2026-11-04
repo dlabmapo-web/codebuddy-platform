@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import {
+  observationEvents,
   monitoringRooms,
   monitoringServerEvents,
   type MonitoringVisitEndReason,
@@ -208,6 +209,8 @@ export class MonitoringRevocationService {
             ),
           )
           .emit(monitoringServerEvents.watchSummary, summary);
+        server.to(monitoringRooms.student(student.academyId, student.studentMembershipId))
+          .emit(observationEvents.indicator, { watching: summary.watcherCount > 0, revision: summary.revision });
       } catch {
         // Revocation has already taken effect in the registry and the audit
         // log. A summary that could not be rebuilt is a stale indicator, not
@@ -249,6 +252,11 @@ export class MonitoringRevocationService {
   ): Promise<void> {
     const sockets = await server.in(teacherRoom).fetchSockets();
     for (const socket of sockets) {
+      const observation = (socket.data as RevocableSocketData).observation;
+      if (observation?.lease.visitId === visit.id) {
+        socket.emit(monitoringServerEvents.accessRevoked, { classId: visit.classId, studentMembershipId: observation.claim.studentMembershipId, reason });
+        await socket.leave(monitoringRooms.watchContext(visit.academyId, visit.classId, observation.claim.studentMembershipId));
+      }
       const watch = (socket.data as RevocableSocketData).teacher?.watch;
       if (watch?.visitId !== visit.id) continue;
       socket.emit(monitoringServerEvents.accessRevoked, {
@@ -317,6 +325,7 @@ export class MonitoringRevocationService {
  * the gateway in behind them.
  */
 type RevocableSocketData = {
+  observation?: { lease: { visitId: string }; claim: { studentMembershipId: string } };
   teacher?: {
     /** Undefined on a socket whose teacher state predates this field. */
     membershipId?: string;

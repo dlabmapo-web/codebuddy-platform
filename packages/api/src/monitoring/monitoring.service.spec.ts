@@ -287,6 +287,9 @@ function createService(options?: {
       studentMembershipId,
       studentUserId,
     }),
+    requireObservableMaterial: vi.fn().mockImplementation(() => options?.materialError
+      ? Promise.reject(options.materialError)
+      : Promise.resolve({ ...actor, classId, grantedAt: Date.now(), studentMembershipId, studentUserId, materialId, courseId })),
     requireMonitorableMaterial: vi.fn().mockImplementation(() =>
       options?.materialError
         ? Promise.reject(options.materialError)

@@ -14,6 +14,7 @@ import {
 import { classStatusSchema, type ClassStatus } from "../classes/class.js";
 import { learnExerciseSchema } from "../content/learn.js";
 import { memberAvatarUrlsShape } from "../profile/avatar.js";
+import { materialTypeSchema } from '../content/course.js';
 
 /**
  * Live teacher monitoring: the domain a class-scoped monitoring session is
@@ -177,6 +178,10 @@ export const collaborationSurfaces = [
   "editor",
   "terminal",
   "feedback",
+  "answer",
+  "drawing",
+  "pdf",
+  "video",
 ] as const;
 export const collaborationSurfaceSchema = z.enum(collaborationSurfaces);
 export type CollaborationSurface = z.infer<typeof collaborationSurfaceSchema>;
@@ -687,6 +692,7 @@ export type MonitoringRosterStudent = z.infer<
  */
 export const monitoringRosterExerciseSchema = z.object({
   materialId: z.uuid(),
+  type: materialTypeSchema.optional(),
   /** Course-relative and 1-based, matching the student's navigator. */
   number: z.number().int().positive(),
   title: z.string().min(1),

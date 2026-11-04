@@ -75,6 +75,14 @@ export function canActLive(state: MonitoringConnectionState): boolean {
   return state === 'live';
 }
 
+/** The selected live code preview cannot borrow observation's readiness. */
+export function codingConnectionState(
+  state: MonitoringConnectionState,
+  synchronized: boolean,
+): MonitoringConnectionState {
+  return state === 'live' && !synchronized ? 'resynchronizing' : state;
+}
+
 /**
  * A live transport is not sufficient after Follow swaps the collaborative
  * document. Mutations stay locked until the authoritative snapshot for the

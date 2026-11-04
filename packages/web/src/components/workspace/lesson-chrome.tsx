@@ -1,5 +1,6 @@
 'use client';
 
+import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, LogOut, Maximize2 } from 'lucide-react';
@@ -16,7 +17,7 @@ export function LessonHeader({ curriculum, courseTitle, lectureTitle, title, bad
   badge?: ReactNode; children?: ReactNode; leaveHref?: string;
 }) {
   const { t } = usePracticeTranslation();
-  return <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-4 py-2.5">
+  return <header {...surfaceProps('header')} className="flex min-h-16 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-4 py-2.5">
     {curriculum}
     <div className="min-w-0 flex-1 basis-40">
       <p className="truncate text-xs text-sub">{courseTitle}{lectureTitle ? ` / ${lectureTitle}` : ''}</p>

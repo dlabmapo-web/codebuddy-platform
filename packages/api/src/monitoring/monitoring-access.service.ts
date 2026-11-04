@@ -12,6 +12,7 @@ import {
 import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
+import { effectivelyVisibleActivityWhere } from '../learn/curriculum-visibility.js';
 
 /**
  * The one gate in front of every live monitoring read and command.
@@ -233,6 +234,18 @@ export class MonitoringAccessService {
       materialId: material.id,
       courseId: material.lecture.courseModule.courseId,
     };
+  }
+
+  /** Observation does not grant document, run, grading or write authority. */
+  async requireObservableMaterial(claim: MonitoringStudentClaim, materialId: string): Promise<MonitoringMaterialClaim> {
+    const row = await this.prisma.material.findFirst({
+      where: { id: materialId, AND: [effectivelyVisibleActivityWhere(claim.academyId), {
+        lecture: { courseModule: { course: { classAssignments: { some: { classId: claim.classId } } } } },
+      }] },
+      select: { id: true, lecture: { select: { courseModule: { select: { courseId: true } } } } },
+    });
+    if (!row) throw new AppException('MONITORING_STUDENT_UNAVAILABLE', HttpStatus.NOT_FOUND);
+    return { ...claim, materialId: row.id, courseId: row.lecture.courseModule.courseId };
   }
 
   /** Where clause form, for the read services that need to join through it. */

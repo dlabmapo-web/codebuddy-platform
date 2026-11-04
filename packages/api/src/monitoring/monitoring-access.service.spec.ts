@@ -34,6 +34,26 @@ const studentClaim = {
   studentUserId,
 };
 
+describe('material observation scope', () => {
+  it('includes non-code material relations while retaining the full visible ancestor and class predicate', async () => {
+    const { service, prisma } = createService();
+    await service.requireObservableMaterial(studentClaim, materialId);
+    expect(prisma.material.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      id: materialId, AND: [expect.objectContaining({ isVisible: true,
+        lecture: { isVisible: true, courseModule: { isVisible: true, course: { academyId, isVisible: true } } },
+        OR: expect.arrayContaining([{ pdfDocument: { isNot: null } }, { videoLesson: { isNot: null } }, { manualMaterial: { isNot: null } }]),
+      }), { lecture: { courseModule: { course: { classAssignments: { some: { classId } } } } } }],
+    } }));
+  });
+  it('does not broaden code document authorization', async () => {
+    const { service, prisma } = createService();
+    await service.requireMonitorableMaterial(studentClaim, materialId);
+    const query = vi.mocked(prisma.material.findFirst).mock.calls[0]![0];
+    expect(JSON.stringify(query)).toContain('programmingExercise');
+    expect(JSON.stringify(query)).not.toContain('pdfDocument');
+  });
+});
+
 function createService(options?: {
   role?: "TEACHER" | "TEAM_LEAD" | "MANAGER" | "STUDENT";
   /** Every role held, when it differs from `[role]`. */

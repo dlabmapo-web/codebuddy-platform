@@ -2,6 +2,7 @@ import { privateSolutions, solutionOrder } from "../content/exercise-solutions.j
 import type { ExerciseSolutionEntry } from "@cove/shared";
 import { referencePdfMetadata } from "../documents/pdf-reference.js";
 import { publicQuiz } from "@cove/shared";
+import { publicChoiceSchema, sourceFilesSchema, type ObservedMaterial } from '@cove/shared';
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   displayableEmail,
@@ -23,7 +24,7 @@ import { AppException } from "../common/app-exception.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { CurriculumOutlineService } from "../learn/curriculum-outline.service.js";
-import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
+import { effectivelyVisibleMaterialWhere, effectivelyVisibleActivityWhere } from "../learn/curriculum-visibility.js";
 import {
   memberAvatarSelect,
   noMemberAvatar,
@@ -225,12 +226,15 @@ export class MonitoringService {
     if (courseIds.length === 0) return [];
     const materials = await this.prisma.material.findMany({
       where: {
-        ...effectivelyVisibleMaterialWhere(academyId),
-        lecture: { courseModule: { courseId: { in: courseIds } } },
+        AND: [effectivelyVisibleActivityWhere(academyId),
+          { lecture: { courseModule: { courseId: { in: courseIds } } } }],
       },
       select: {
         id: true,
         title: true,
+        type: true,
+        pdfDocument: { select: { placement: true } },
+        videoLesson: { select: { placement: true } },
         lecture: {
           select: { courseModule: { select: { courseId: true } } },
         },
@@ -247,11 +251,11 @@ export class MonitoringService {
 
     // Course-relative, so a class assigned two courses numbers each from one.
     const counted = new Map<string, number>();
-    return materials.map((material) => {
+    return materials.filter(material => material.pdfDocument?.placement !== 'SUPPLEMENTARY' && material.videoLesson?.placement !== 'SUPPLEMENTARY').map((material) => {
       const courseId = material.lecture.courseModule.courseId;
       const number = (counted.get(courseId) ?? 0) + 1;
       counted.set(courseId, number);
-      return { materialId: material.id, number, title: material.title };
+      return { materialId: material.id, number, title: material.title, type: material.type };
     });
   }
 
@@ -315,6 +319,48 @@ export class MonitoringService {
    * somebody's progress — the caller has to be the teacher responsible for
    * them, in a class that is actually taught the course being asked about.
    */
+  async getObservedMaterial(identity: SupabaseIdentity, input: {
+    academyId: string; classId: string; membershipId: string; materialId: string;
+  }): Promise<ObservedMaterial> {
+    const claim = await this.requireClass(identity, input);
+    this.access.requireLiveWatch(claim);
+    const student = await this.access.requireMonitorableStudent(claim, input.membershipId);
+    await this.access.requireObservableMaterial(student, input.materialId);
+    const row = await this.prisma.material.findUniqueOrThrow({ where: { id: input.materialId },
+      include: { manualMaterial: true, videoLesson: true, programmingExercise: true } });
+    const [navigator, draft, submitted] = await Promise.all([
+      this.getStudentCurriculum(identity, input),
+      row.manualMaterial && !row.manualMaterial.shortAnswer && !row.manualMaterial.multipleChoice
+        ? this.prisma.manualDraft.findUnique({ where: { materialId_userId: { materialId: row.id, userId: student.studentUserId } } }) : null,
+      row.manualMaterial ? this.prisma.manualSubmission.findFirst({
+        where: { materialId: row.id, userId: student.studentUserId, classId: input.classId },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        select: { answer: true, files: true, createdAt: true },
+      }) : null,
+    ]);
+    const config = row.manualMaterial;
+    const choice = config?.multipleChoice ? publicChoiceSchema.parse(config.multipleChoice) : null;
+    let choices: string[] | undefined;
+    if (choice && submitted) {
+      try { const parsed: unknown = JSON.parse(submitted.answer);
+        if (parsed && typeof parsed === 'object' && 'selectedOptionIds' in parsed && Array.isArray(parsed.selectedOptionIds))
+          choices = parsed.selectedOptionIds.filter((id): id is string => typeof id === 'string' && choice.options.some(option => option.id === id));
+      } catch { /* Legacy responses may be plain text. */ }
+    }
+    const saved = draft ?? submitted;
+    return {
+      materialId: row.id, type: row.type, title: row.title,
+      description: config?.description ?? row.videoLesson?.description ?? row.programmingExercise?.description ?? '',
+      question: config?.shortAnswer && typeof config.shortAnswer === 'object' && 'question' in config.shortAnswer
+        ? String(config.shortAnswer.question) : choice?.question ?? null,
+      choice, navigator, hint: config?.hint ?? undefined, includeInScore: config?.includeInScore,
+      entryPoint: config?.entryPoint, files: row.type === 'TURTLE_EXERCISE' && config ? sourceFilesSchema.parse(config.files) : undefined,
+      automaticallyGraded: Boolean(choice || (config?.shortAnswer && typeof config.shortAnswer === 'object' && 'gradingMode' in config.shortAnswer && config.shortAnswer.gradingMode !== 'MANUAL')),
+      saved: saved ? { answer: saved.answer, files: sourceFilesSchema.parse(saved.files), ...(choices ? { choices } : {}) } : null,
+      savedAt: draft?.updatedAt.toISOString() ?? submitted?.createdAt.toISOString() ?? null,
+    };
+  }
+
   async getStudentCurriculum(
     identity: SupabaseIdentity,
     input: {
@@ -331,7 +377,7 @@ export class MonitoringService {
     );
     // Reachability through *this* class's assigned courses, so a student in two
     // classes never exposes one class's curriculum to the other's teacher.
-    const material = await this.access.requireMonitorableMaterial(
+    const material = await this.access.requireObservableMaterial(
       student,
       input.materialId,
     );

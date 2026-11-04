@@ -5,6 +5,34 @@ import type { MonitoringAckResult } from './types';
 afterEach(() => vi.useRealTimers());
 
 describe('monitoring command recovery', () => {
+  it('recovers a temporarily unavailable student only when watch-start opts in', async () => {
+    vi.useFakeTimers();
+    let attempts = 0;
+    const send = vi.fn(reply => reply(++attempts < 3
+      ? { ok: false, eventId: 'x', code: 'MONITORING_STUDENT_UNAVAILABLE' }
+      : { ok: true, eventId: 'x', data: 'attached' }));
+    const onResult = vi.fn();
+    const onRetry = vi.fn();
+    retryMonitoringCommand({ send, onResult, onRetry, retryUnavailableStudent: true });
+    await vi.runAllTimersAsync();
+    expect(send).toHaveBeenCalledTimes(3);
+    expect(onResult).toHaveBeenCalledExactlyOnceWith({ ok: true, eventId: 'x', data: 'attached' });
+    expect(onRetry).toHaveBeenCalledWith(expect.objectContaining({ code: 'MONITORING_STUDENT_UNAVAILABLE' }));
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each(['MONITORING_STUDENT_UNAVAILABLE', 'MONITORING_ACCESS_DENIED', 'MONITORING_REFRESH_REQUIRED'] as const)(
+    'bounds opt-in retries and respects terminal refusal %s', async code => {
+      vi.useFakeTimers();
+      const send = vi.fn(reply => reply({ ok: false, eventId: 'x', code }));
+      const onResult = vi.fn();
+      retryMonitoringCommand({ send, onResult, onRetry: vi.fn(), retryUnavailableStudent: true });
+      await vi.runAllTimersAsync();
+      expect(send).toHaveBeenCalledTimes(code === 'MONITORING_STUDENT_UNAVAILABLE' ? 4 : 1);
+      expect(onResult).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
   it('recovers an unanswered sync without a socket reconnect and ignores its late ack', async () => {
     vi.useFakeTimers();
     const replies: ((ack: MonitoringAckResult<string>) => void)[] = [];

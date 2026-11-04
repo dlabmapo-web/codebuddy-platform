@@ -69,6 +69,7 @@ export const exerciseNamespaces = [
  * the same list because a teacher moves between them through the class header.
  */
 export const teachNamespaces = [
+  'learn',
   "practice", "solutions", "pdf-practice", "content",
   "quiz",
   "sample-check",

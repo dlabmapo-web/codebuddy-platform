@@ -128,6 +128,8 @@ export const watchStartPayloadSchema = commandBase.extend({
   academyId: z.uuid(),
   classId: z.uuid(),
   studentMembershipId: z.uuid(),
+  /** Current monitoring UI requests editing as part of the authorized watch. */
+  autoEdit: z.boolean().optional(),
   /**
    * This workspace's own identity, generated at mount and held in memory only.
    *
@@ -146,6 +148,8 @@ export const watchStartPayloadSchema = commandBase.extend({
    */
   protocolVersion: z.number().int().positive().optional(),
 });
+
+export const studentBindingFetchSchema = commandBase.extend({ academyId: z.uuid(), classId: z.uuid(), materialId: z.uuid() });
 
 /** Stopping names the watch to stop, so a stale tab cannot close a live one. */
 export const watchStopPayloadSchema = commandBase.extend({
@@ -523,6 +527,7 @@ export const monitoringClientEvents = {
   watchMode: "student.watch.mode",
   /** Re-reads aggregate watch state after a gap, rather than inferring it. */
   watchSummaryFetch: "student.watch.summary",
+  studentBindingFetch: "student.binding.fetch",
   presencePublish: "presence.publish",
   documentSync: "document.sync",
   documentUpdate: "document.update",

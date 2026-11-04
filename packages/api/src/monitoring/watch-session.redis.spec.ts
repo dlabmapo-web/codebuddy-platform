@@ -11,7 +11,7 @@ describe.skipIf(!url)("watch leases on real Redis", () => {
   let a: WatchSessionRegistry;
   let b: WatchSessionRegistry;
   const prefix = randomUUID();
-  function lease(overrides: Partial<WatchLease> = {}): WatchLease {
+  function lease(overrides: Partial<WatchLease & { draftId: string }> = {}): WatchLease & { draftId: string } {
     return { visitId: randomUUID(), sessionId: randomUUID(), generation: 1,
       teacherMembershipId: prefix, academyId: prefix, classId: prefix,
       studentMembershipId: randomUUID(), draftId: randomUUID(), mode: "MONITORING", ...overrides };
@@ -25,6 +25,18 @@ describe.skipIf(!url)("watch leases on real Redis", () => {
     for (const watch of watches) expect(found.some((row) => row.visitId === watch.visitId)).toBe(true);
     await a.end(watches[0]!);
     expect(await b.isCurrent(watches[1]!)).not.toBeNull();
+  });
+  it('renews a material-neutral observation without creating a draft index', async () => {
+    const watch: WatchLease = { ...lease(), draftId: null };
+    expect((await a.register(watch)).ok).toBe(true);
+    expect(await b.renew(watch)).toBe(true);
+    expect(await b.isCurrent(watch)).toMatchObject({ draftId: null });
+    expect(await redis.exists('cove:mon:watch-by-draft:null')).toBe(0);
+    const summary = await a.summarize({ academyId: watch.academyId, classId: watch.classId,
+      studentMembershipId: watch.studentMembershipId, draftId: null });
+    expect(summary.watcherCount).toBe(1);
+    await a.end(watch);
+    expect(await b.isCurrent(watch)).toBeNull();
   });
   it("fences a superseded lease before asynchronous cleanup", async () => {
     const first = lease();

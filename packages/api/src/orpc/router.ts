@@ -1,3 +1,5 @@
+import { StudentWorkHistoryService } from "../teach/student-work-history.service.js";
+import { createStudentWorkHistoryRouter } from "../teach/student-work-history.router.js";
 import { StaffPracticeService } from "../learn/staff-practice.service.js";
 import { HelpRequestService } from "../monitoring/help-request.service.js";
 import type { NestExpressApplication } from "@nestjs/platform-express";
@@ -144,6 +146,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     monitoringService: app.get(MonitoringService, { strict: false }),
     profileService: app.get(ProfileService, { strict: false }),
     academyProfileService: app.get(AcademyProfileService, { strict: false }),
+    studentWorkHistoryService: app.get(StudentWorkHistoryService, { strict: false }),
     teacherProgressService: app.get(TeacherProgressService, { strict: false }),
     teacherOverviewService: app.get(TeacherOverviewService, { strict: false }),
     teamLeadOverviewService: app.get(TeamLeadOverviewService, { strict: false }),
@@ -263,6 +266,7 @@ function createORPCRouter(deps: ORPCDeps) {
     points: createPointsRouter(os, deps),
     monitoring: createMonitoringRouter(os, deps),
     teacherProgress: createTeacherProgressRouter(os, deps),
+    studentWorkHistory: createStudentWorkHistoryRouter(os, deps),
     academyCurriculumOverview: createAcademyCurriculumOverviewRouter(os, deps),
     academyTeacherOverview: createAcademyTeacherOverviewRouter(os, deps),
     academyTeacherStudents: createAcademyTeacherStudentsRouter(os, deps),

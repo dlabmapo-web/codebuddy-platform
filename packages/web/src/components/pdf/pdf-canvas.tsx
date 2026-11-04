@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { surfaceProps, anchorProps } from '@/lib/monitoring/awareness/surfaces';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { ensureReadableStreamIterator } from '@/lib/readable-stream-iterator';
 import {
@@ -15,6 +16,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { pdfApi } from '@/lib/pdf-api';
+import { useStudentPresence } from '@/lib/monitoring/student-presence';
 import 'react-pdf/dist/Page/TextLayer.css';
 // Keep the searchable/selectable text layer available on Safari as well as canvas rendering.
 ensureReadableStreamIterator();
@@ -37,11 +39,17 @@ export function PdfCanvas({
   materialId,
   preview = false,
   exerciseMaterialId,
+  initialPage,
+  alignmentRevision,
+  observing = false,
 }: {
   academyId: string;
   materialId: string;
   preview?: boolean;
   exerciseMaterialId?: string;
+  initialPage?: number;
+  alignmentRevision?: number;
+  observing?: boolean;
 }) {
   const { t } = useTranslation('content');
   const root = useRef<HTMLDivElement>(null);
@@ -55,7 +63,16 @@ export function PdfCanvas({
   const data = query.data;
   const [error, setError] = useState<string>();
   const [inputError, setInputError] = useState(false);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(initialPage ?? 1);
+  const [alignment, setAlignment] = useState({ page: initialPage, revision: alignmentRevision });
+  const { publishObservation } = useStudentPresence();
+  if (alignment.page !== initialPage || alignment.revision !== alignmentRevision) {
+    setAlignment({ page: initialPage, revision: alignmentRevision });
+    if (initialPage) setPage(initialPage);
+  }
+  useEffect(() => {
+    if (!observing && !preview && !exerciseMaterialId && data) publishObservation(materialId, { pdfPage: page });
+  }, [observing, preview, exerciseMaterialId, materialId, page, data, publishObservation]);
   const [zoom, setZoom] = useState(100);
   const [fit, setFit] = useState<'width' | 'page' | null>('width');
   const [size, setSize] = useState({ width: 800, height: 600 });
@@ -144,7 +161,7 @@ export function PdfCanvas({
           ? 'fixed inset-0 z-[100] flex flex-col bg-canvas'
           : 'flex h-full min-h-0 flex-col bg-canvas'
       }
-      data-testid="pdf-reader"
+      data-testid="pdf-reader" {...surfaceProps('pdf')}
     >
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-canvas/80 px-3 py-2.5" role="group" aria-label={t('pdf.controls')}>
         <div className={group}>
@@ -232,7 +249,7 @@ export function PdfCanvas({
             } else setError('PDF_NOT_AVAILABLE');
           }}
         >
-          <Page
+          <div className="mx-auto w-fit" {...anchorProps(`pdf-page:${page}`)}><Page
             key={page}
             className="mx-auto w-fit shadow-sm"
             pageNumber={page}
@@ -247,7 +264,7 @@ export function PdfCanvas({
               setOriginal({ width: view.width, height: view.height });
             }}
             loading={<p role="status">{t('pdf.loading')}</p>}
-          />
+          /></div>
         </Document>
       </div>
     </div>

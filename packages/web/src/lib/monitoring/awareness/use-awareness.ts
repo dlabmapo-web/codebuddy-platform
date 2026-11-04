@@ -1,4 +1,5 @@
 'use client';
+import { useHistoryCovered } from '../history-presentation';
 
 import {
   monitoringClientEvents,
@@ -140,6 +141,9 @@ export function useAwareness({
   peers: PeerAwarenessState[];
   publishCursor: (cursor: CollaborationCursor | null) => void;
 } {
+  const covered = useHistoryCovered();
+  const coveredRef = React.useRef(covered);
+  React.useEffect(() => { coveredRef.current = covered; }, [covered]);
   const [received, setReceived] = React.useState<PeerAwarenessMap>(noPeers);
 
   // Handlers outlive the render that created them, so the parts that change
@@ -238,15 +242,18 @@ export function useAwareness({
       channel.emit(monitoringClientEvents.awarenessUpdate, {
         draftId: currentDraft,
         sequence: nextAwarenessSequence(socket),
-        cursor: cursorRef.current,
-        pointer: pointerRef.current?.code ? null : pointerRef.current,
-        editorPointer: pointerRef.current?.code ? pointerRef.current : null,
+        cursor: coveredRef.current ? null : cursorRef.current,
+        pointer: coveredRef.current || pointerRef.current?.code ? null : pointerRef.current,
+        editorPointer: !coveredRef.current && pointerRef.current?.code ? pointerRef.current : null,
         ...(identityRef.current ? { identity: identityRef.current } : {}),
       });
     },
     [socket],
   );
 
+  React.useEffect(() => {
+    if (covered) { pointerRef.current = null; cursorRef.current = null; cancelCursorFlush(); cancelPointerFlush(); send(true); }
+  }, [covered, send, cancelCursorFlush, cancelPointerFlush]);
   /* ------------------------------------------------------------- outgoing */
 
   const publishCursor = React.useCallback(
@@ -326,7 +333,7 @@ export function useAwareness({
   }, [send, socket]);
 
   React.useEffect(() => {
-    if (!socket || !draftId || typeof document === 'undefined') return;
+    if (covered || !socket || !draftId || typeof document === 'undefined') return;
 
     const publishPoint = (
       point: PointerViewportPoint,
@@ -392,7 +399,7 @@ export function useAwareness({
       stopObservingFrames();
       document.removeEventListener('pointermove', onPointerMove, true);
     };
-  }, [draftId, publishPointer, socket]);
+  }, [covered, draftId, publishPointer, socket]);
 
   React.useEffect(() => {
     if (!socket || !draftId) return;

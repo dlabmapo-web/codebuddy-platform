@@ -553,6 +553,7 @@ export function useDraftAutosave({
 
   return {
     acceptCollaborationSnapshot,
+    hasLocalEdits: dirty,
     code,
     setCode,
     resetTo,

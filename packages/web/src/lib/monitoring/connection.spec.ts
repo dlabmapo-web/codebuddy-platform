@@ -7,6 +7,7 @@ import {
   canEditSynchronizedDraft,
   monitoringSocketUrl,
   nextConnectionState,
+  codingConnectionState,
   type MonitoringConnectionState,
 } from './connection';
 
@@ -80,6 +81,15 @@ describe('canActLive', () => {
     for (const state of states) expect(canActLive(state)).toBe(false);
     expect(canActLive('live')).toBe(true);
   });
+});
+
+it('requires a synchronized coding document even when observation is live', () => {
+  expect(codingConnectionState('live', false)).toBe('resynchronizing');
+  expect(codingConnectionState('live', true)).toBe('live');
+  for (const state of ['revoked', 'reconnecting', 'degraded', 'connecting'] as const) {
+    expect(codingConnectionState(state, false)).toBe(state);
+    expect(codingConnectionState(state, true)).toBe(state);
+  }
 });
 
 describe('canEditSynchronizedDraft', () => {

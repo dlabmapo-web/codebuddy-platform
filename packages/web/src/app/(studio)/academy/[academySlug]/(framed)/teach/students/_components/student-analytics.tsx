@@ -1,5 +1,6 @@
 'use client';
 
+import { StudentHistoryEntry } from "@/components/student-history/student-history-entry";
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 
 import {
@@ -27,7 +28,6 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
-import Link from 'next/link';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -54,7 +54,6 @@ import {
 } from '../../../_lib/overview-view';
 import { FilterSelector } from '../../../_components/teacher-overview/filter-selector';
 import { RangePicker } from '../../../_components/teacher-overview/range-picker';
-import { solutionStatusPath } from '../../../_lib/overview-url';
 import {
   useDebounced,
   useStudentsState,
@@ -289,11 +288,6 @@ function studentColumns(input: {
       meta: { label: t('table.student') },
       enableHiding: false,
       cell: ({ row }) => {
-        const href = solutionStatusPath({
-          academySlug,
-          classId: row.original.primaryClassId,
-          membershipId: row.original.membershipId,
-        });
         const body = (
           <>
             <span
@@ -313,16 +307,7 @@ function studentColumns(input: {
             </span>
           </>
         );
-        return href ? (
-          <Link
-            className="flex items-center gap-2.5 text-ink transition-colors hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            href={href}
-          >
-            {body}
-          </Link>
-        ) : (
-          <span className="flex items-center gap-2.5">{body}</span>
-        );
+        return <StudentHistoryEntry student={row.original} academySlug={academySlug}>{body}</StudentHistoryEntry>;
       },
     },
     {

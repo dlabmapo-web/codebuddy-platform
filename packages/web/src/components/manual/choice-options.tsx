@@ -1,4 +1,5 @@
 "use client";
+import { anchorProps } from '@/lib/monitoring/awareness/surfaces';
 import { useEffect, useState, useId } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { usePrivateImageResolver } from "@/components/editor/private-image-context";
@@ -121,7 +122,7 @@ export function ChoiceOptions({
       </p>
       {definition.options.map((o, i) => (
         <label
-          key={o.id}
+          key={o.id} {...anchorProps(`choice:${o.id}`)}
           className={`group flex min-h-13 min-w-0 items-start gap-3 rounded-md border px-4 py-3.5 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand ${selected.includes(o.id) ? 'border-brand bg-brand-soft/60' : 'border-transparent bg-canvas'} ${disabled ? 'cursor-default' : 'cursor-pointer hover:border-brand/50 hover:bg-brand-soft/30'}`}
           onClick={(e) => {
             if ((e.target as Element).closest("a")) e.stopPropagation();

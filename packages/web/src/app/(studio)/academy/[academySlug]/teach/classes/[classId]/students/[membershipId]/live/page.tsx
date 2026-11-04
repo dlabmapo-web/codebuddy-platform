@@ -1,6 +1,7 @@
 import { StudentSwitcher } from '@/components/monitoring/student-switcher';
 import { routes } from '@/lib/routes';
 import { requireAcademyRoute } from '@/lib/academy-route';
+import { canManageExercises } from '@/lib/academy-access-state';
 import type { MonitoringStudentContext } from '@cove/shared';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -10,23 +11,23 @@ import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { toApiError } from '@/lib/api-errors';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
-import { LiveWorkspace } from './_components/live-workspace';
+import { AllMaterialMonitor } from '@/components/monitoring/all-material-monitor';
 
 /**
  * Fullscreen: no `StudioShell`, because the whole viewport is the workspace.
  *
- * The exercise is deliberately not loaded here. Which one the student has open
- * is a live fact, and the socket's watch acknowledgement is what supplies it —
- * a material named in the URL would let a teacher open something the student
- * is not on.
+ * The watch supplies the student's current material. The optional URL material
+ * selects an independent staff view, authorized again by the material read API.
  */
 export default async function LiveStudentPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ academySlug: string; classId: string; membershipId: string }>;
+  searchParams: Promise<{ materialId?: string }>;
 }) {
   const { academySlug, classId, membershipId } = await params;
-  const { academyId } = await requireAcademyRoute(academySlug);
+  const { academyId, roles } = await requireAcademyRoute(academySlug);
 
   let context: MonitoringStudentContext | null = null;
   try {
@@ -61,13 +62,15 @@ export default async function LiveStudentPage({
   if (!context) notFound();
 
   return (
-    <LiveWorkspace
+    <AllMaterialMonitor
       key={`${academyId}:${classId}:${membershipId}`}
       academyId={academyId}
+      canEditProblem={canManageExercises(roles)}
       classId={classId}
       context={context}
       membershipId={membershipId}
       teacherMembershipRef={context.viewerMembershipId}
+      initialMaterialId={(await searchParams).materialId ?? null}
     />
   );
 }

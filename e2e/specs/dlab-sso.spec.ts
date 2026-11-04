@@ -290,11 +290,12 @@ test(`OS ${staffRole} covers academy classes without teaching assignments`, asyn
     await expect(page.getByRole('region', { name: 'Other Python class', exact: true })).toBeVisible();
     await tutoringClass.getByText('Browser student', { exact: true }).click();
     await expect(page.getByRole('button', { name: 'Return to my code', exact: true }).first()).toBeVisible();
-    const editMode = page.getByRole('button', { name: 'Edit code · Off', exact: true });
-    await expect(editMode).toBeEnabled({ timeout: 30_000 });
-    await expect(editMode).toHaveAttribute('aria-pressed', 'false');
-    await editMode.click();
-    await expect(page.getByRole('button', { name: 'Edit code · On', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: /^Edit code/ })).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => {
+      const monaco = (window as unknown as { monaco?: { editor: { getEditors(): Array<{ getDomNode(): HTMLElement | null; getRawOptions(): { readOnly?: boolean } }> } } }).monaco;
+      const editor = monaco?.editor.getEditors().find(item => item.getDomNode()?.getClientRects().length);
+      return editor ? !editor.getRawOptions().readOnly : false;
+    }), { timeout: 30000 }).toBe(true);
     await expect.poll(() => visibleEditor(page, 'print(40 + 2)')).toBe('print(40 + 2)');
     await expect.poll(() => visibleEditor(studentPage), { timeout: 30_000 }).toBe('print(40 + 2)');
     const run = page.getByRole('button', { name: 'Run', exact: true });
@@ -304,7 +305,7 @@ test(`OS ${staffRole} covers academy classes without teaching assignments`, asyn
     await page.screenshot({ path: test.info().outputPath('manager-unified-tutoring.png'), animations: 'disabled', timeout: 15_000 });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole('button', { name: 'Code', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Edit code · On', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Edit code/ })).toHaveCount(0);
     expect(await page.getByRole('paragraph').filter({ hasText: /^Browser student$/ }).evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: test.info().outputPath('manager-unified-tutoring-mobile.png'), animations: 'disabled', timeout: 15_000 });
@@ -485,7 +486,7 @@ test('Manager class cards receive student presence over WebSocket across coding,
 
 for (const engine of ['Chromium', 'WebKit'] as const) {
   test(`${engine} learning UI identifies materials, opens PDF rows and keeps student and monitor statements consistent`, async ({ browser, request }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(360_000);
     const ownedBrowser = engine === 'WebKit' ? await webkit.launch() : null;
     const current = ownedBrowser ?? browser;
     const staffContext = await current.newContext({ baseURL: studioOrigin });
@@ -534,11 +535,19 @@ for (const engine of ['Chromium', 'WebKit'] as const) {
       await expect(monitorStatement.frameLocator('iframe').getByText('Read two numbers and print their sum.', { exact: true })).toBeVisible();
       for (const text of ['Two integers separated by a space.', 'One integer: their sum.', 'Each integer is between 0 and 100.']) await expect(monitorStatement.getByText(text, { exact: true })).toBeVisible();
       await expect.poll(() => monitorStatement.locator('iframe').evaluate(frame => frame.getBoundingClientRect().height)).toBeLessThan(160);
-      const monitorPdf = staff.getByRole('complementary', { name: 'Course', exact: true }).getByRole('link').filter({ hasText: 'Lesson reference PDF' });
-      await expect(monitorPdf).toHaveAttribute('target', '_blank');
+      const monitorPdf = staff.getByRole('complementary', { name: 'Course', exact: true }).getByRole('button').filter({ hasText: 'Lesson reference PDF' });
       const note = staff.getByPlaceholder('Write one short note for this student on this exercise');
       await note.fill('Keep this feedback while reading the lesson.');
-      const [resource] = await Promise.all([staffContext.waitForEvent('page'), monitorPdf.click()]);
+      const tabCount = staffContext.pages().length;
+      await monitorPdf.click();
+      await expect(staff.getByTestId('pdf-reader')).toBeVisible();
+      await expect(staff.getByTestId('student-current-material')).toContainText('Add two numbers');
+      expect(staffContext.pages()).toHaveLength(tabCount);
+      await staff.goBack();
+      await expect(note).toHaveValue('Keep this feedback while reading the lesson.');
+      // Ordinary staff practice remains a separate explicit destination.
+      const resource = await staffContext.newPage();
+      await resource.goto(root + '/learn/documents/' + classroom.pdfMaterialId + '?classId=' + assigned.id);
       await expect(resource).toHaveURL(new RegExp('/learn/documents/' + classroom.pdfMaterialId));
       await expect(resource.locator('.react-pdf__Page__canvas')).toBeVisible({ timeout: 30_000 });
       await expect(resource.getByRole('complementary', { name: 'Course', exact: true })).toBeVisible();

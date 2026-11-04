@@ -1,3 +1,4 @@
+import { studentWorkHistoryContract } from "./orpc/student-work-history.contract.js";
 import {
   academyTeacherOverviewContract,
   academyTeacherStudentsContract,
@@ -52,6 +53,7 @@ import { academyCurriculumOverviewContract } from "./orpc/team-lead-overview.con
 import { teacherProgressContract } from "./orpc/teacher-progress.contract.js";
 
 export const appContract = {
+  studentWorkHistory: studentWorkHistoryContract,
   academyTurtle: academyTurtleContract,
   auth: authContract,
   academies: academiesContract,

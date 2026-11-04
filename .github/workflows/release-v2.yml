@@ -102,9 +102,14 @@ jobs:
           provenance: mode=max
           sbom: true
 
+      - name: Install verified Trivy release
+        run: bash deploy/scripts/install-trivy.sh
+
       - name: Scan published image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
+          version: v0.70.0
           image-ref: ${{ env.REGISTRY_NAMESPACE }}/${{ matrix.image }}:${{ env.IMAGE_TAG }}
           format: table
           severity: CRITICAL

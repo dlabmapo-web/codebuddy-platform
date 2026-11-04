@@ -9,6 +9,7 @@ import { DlabStateService, digest } from './dlab-state.service.js';
 import { DlabReconcilerService } from './dlab-reconciler.service.js';
 import { dlabTransaction, sourceWrite } from './dlab-transaction.js';
 import { DlabError } from './dlab-error.js';
+import { DlabCampusProvisioner, reconcileDlabCampus } from './dlab-campus-provisioner.js';
 export { sourceLock, sourceWrite } from './dlab-transaction.js';
 
 export function sourceOrder(previous: Date | null, incoming: Date | null, oldHash: string, newHash: string): 'apply' | 'noop' {
@@ -26,7 +27,7 @@ function sourcePayload(record: Pick<DlabIdentity, 'name' | 'grade' | 'userRole' 
 }
 @Injectable()
 export class DlabSourceService {
-  constructor(private readonly prisma: PrismaService, private readonly state: DlabStateService, private readonly reconciler: DlabReconcilerService, @Optional() private readonly revocation?: MonitoringRevocationService) {}
+  constructor(private readonly prisma: PrismaService, private readonly state: DlabStateService, private readonly reconciler: DlabReconcilerService, @Optional() private readonly revocation?: MonitoringRevocationService, @Optional() private readonly campusProvisioner?: DlabCampusProvisioner) {}
   async changed(membershipIds: string[] = []) {
     await this.state.optionalRedis()?.publish('cove:dlab:changed', 'recheck').catch(() => undefined);
     for (const id of new Set(membershipIds)) await this.revocation?.revokeMembership(id, 'ROLE_CHANGED');
@@ -37,19 +38,19 @@ export class DlabSourceService {
     const outcome = await dlabTransaction(this.prisma, async tx => {
       await sourceWrite(tx);
       const existing = await tx.dlabCampus.findUnique({ where: { externalCampusId: id } });
-      if (existing && sourceOrder(existing.sourceUpdatedAt, timestamp, existing.payloadHash, hash) === 'noop') return { record: existing, changed: [] as string[] };
+      if (existing && sourceOrder(existing.sourceUpdatedAt, timestamp, existing.payloadHash, hash) === 'noop') {
+        // Replaying current data can finish rollout of a previously staged row.
+        // A stale event cannot trigger provisioning or alter authoritative state.
+        if (existing.sourceUpdatedAt && timestamp && timestamp < existing.sourceUpdatedAt) return { record: existing, changed: [] as string[] };
+        const result = await this.campusProvisioner?.provision(tx, existing, requestId);
+        return { record: result?.campus ?? existing, changed: result?.created ? await reconcileDlabCampus(tx, this.reconciler, id) : [] };
+      }
       const accessChanged = existing && existing.status !== input.status;
       const record = await tx.dlabCampus.upsert({ where: { externalCampusId: id }, create: { externalCampusId: id, name: input.name, status: input.status, campusType: input.campus_type, payloadHash: hash, sourceUpdatedAt: timestamp }, update: { name: input.name, status: input.status, campusType: input.campus_type ?? null, payloadHash: hash, sourceUpdatedAt: timestamp ?? existing?.sourceUpdatedAt, receivedAt: new Date(), ...(accessChanged ? { accessRevision: { increment: 1 } } : {}) } });
-      const changed: string[] = [];
-      if (accessChanged) {
-        const identities = await tx.dlabIdentity.findMany({ where: { OR: [{ externalCampusId: id }, { externalCampusIds: { has: id } }, { bindings: { some: { externalCampusId: id } } }] }, orderBy: { externalUserId: 'asc' } });
-        for (const identity of identities) {
-          const updated = await tx.dlabIdentity.update({ where: { externalUserId: identity.externalUserId }, data: { generation: { increment: 1 }, revision: { increment: 1 } } });
-          changed.push(...await this.reconciler.reconcile(tx, updated));
-        }
-      }
+      const result = await this.campusProvisioner?.provision(tx, record, requestId);
+      const changed = accessChanged || result?.created ? await reconcileDlabCampus(tx, this.reconciler, id) : [];
       await tx.dlabIntegrationEvent.create({ data: { requestId, action: 'campus.updated', details: { externalCampusId: id, status: input.status } } });
-      return { record, changed };
+      return { record: result?.campus ?? record, changed };
     });
     await this.changed(outcome.changed);
     return outcome.record;

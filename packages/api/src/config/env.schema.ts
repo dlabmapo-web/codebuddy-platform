@@ -38,6 +38,7 @@ export const apiEnvironmentSchema = z.object({
   DLAB_SSO_ENABLED: z.preprocess(v => v === 'true' || v === true, z.boolean()).default(false),
   DLAB_OS_BASE_URL: z.literal(DLAB_OS_BASE_URL).default(DLAB_OS_BASE_URL),
   DLAB_SSO_ROLLOUT_MODE: z.enum(['allowlist', 'campus']).default('allowlist'),
+  DLAB_AUTO_PROVISION_CAMPUSES: z.preprocess(v => v === 'true' || v === true, z.boolean()).default(false),
   DLAB_CLIENT_ID: z.literal('cove').default('cove'),
   DLAB_CLIENT_SECRET: z.string().min(32).optional(),
   DLAB_INBOUND_SERVER_KEY: z.string().min(32).optional(),

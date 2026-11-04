@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { validateEnvironment } from '../../config/env.schema.js';
 const base = { NODE_ENV: 'test', WEB_ORIGIN: 'http://localhost:3000', SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SECRET_KEY: 'fake-service-key', DATABASE_URL: 'postgresql://test:test@localhost/test', DIRECT_URL: 'postgresql://test:test@localhost/test' };
 describe('DLAB environment validation', () => {
-  it('defaults to disabled and an empty rollout cohort', () => expect(validateEnvironment(base)).toMatchObject({ DLAB_SSO_ENABLED: false, DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS: [] }));
+  it('defaults to disabled and an empty rollout cohort', () => expect(validateEnvironment(base)).toMatchObject({ DLAB_SSO_ENABLED: false, DLAB_AUTO_PROVISION_CAMPUSES: false, DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS: [] }));
+  it('requires an explicit true provisioning flag independently from login admission', () => {
+    expect(validateEnvironment({ ...base, DLAB_AUTO_PROVISION_CAMPUSES: 'true' })).toMatchObject({ DLAB_AUTO_PROVISION_CAMPUSES: true, DLAB_SSO_ENABLED: false });
+    expect(validateEnvironment({ ...base, DLAB_AUTO_PROVISION_CAMPUSES: 'false' }).DLAB_AUTO_PROVISION_CAMPUSES).toBe(false);
+  });
   it('refuses enabling without credentials, trusted BFF configuration, Redis and callback', () => {
     expect(() => validateEnvironment({ ...base, DLAB_SSO_ENABLED: 'true' })).toThrow(/DLAB_CLIENT_SECRET.*DLAB_INBOUND_SERVER_KEY.*DLAB_REDIRECT_URI.*BFF_SHARED_SECRET.*REDIS_URL/);
   });

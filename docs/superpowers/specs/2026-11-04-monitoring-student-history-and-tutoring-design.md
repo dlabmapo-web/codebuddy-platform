@@ -1,9 +1,22 @@
 # Student history dashboard and submission tutoring
 
 Date: 2026-11-04.
-Status: **Proposed — pending user approval. No implementation authorized by this document.**
+Status: **Implemented locally on 2026-11-04. Automated verification passed; native Chrome/Safari qualification remains unavailable.** See the [verification report](../../research/2026-11-04-student-history-implementation-verification.md).
 Evidence: [Elice browser and Cove source research](../../research/2026-11-04-monitoring-student-history-elice-research.md).
 Updated 2026-11-04: the user clarified that the feature must also provide a dedicated staff dashboard with a persistent student picker, like the supplied Elice dashboard. A monitoring-only panel is insufficient.
+
+## User-directed revision: inline tutoring and full-page history
+
+The user's follow-up screenshots and explicit implementation request replace the original expanded monitoring panel with the following presentation:
+
+- Tutoring opens a compact material-specific student drawer inside the exercise. Rows show submission status and score; selecting a student opens their latest saved submission directly in that exercise's statement/editor area. No expanded dashboard dialog or modal is used.
+- Saved-work selection does not follow a different student's current material. Offline students remain selectable. If no submission exists, show an explicitly labelled saved draft/current starter; private edits and runs do not mutate that student. Live switching remains available when a student is working on the displayed exercise.
+- Each row in the existing top student switcher has its own History action. It opens the standalone class/student dashboard, with the correct membership selected. The toolbar History action has the same full-page behavior.
+- Reuse Studio selector components for course and result filters; browser-native select elements are not used in this feature.
+- With no active/selected material, load an authorized course outline and show a useful choose-material state. Do not wait indefinitely for an observation material that is absent.
+- The original watch/document stays mounted during inline tutoring. Clearly separate the monitored student from the saved work under review; resume live code/pointers on return. Full-page history is an explicit navigation and uses existing pending-edit safeguards.
+
+Verified locally: no-material landing, offline second student's submitted code in place, private-run isolation, per-student full-history links, custom filter controls, stale student responses, dirty-copy navigation cancellation, and live recovery after tutoring. The current browser matrix passed all six Manager/Team Lead/Teacher × Chromium/WebKit combinations, plus two focused navigation checks. Earlier overlay results describe the superseded presentation; native Chrome/Safari coverage remains unavailable.
 
 ## 1. Problem and intended result
 
@@ -19,11 +32,11 @@ Considered three approaches:
 
 | Approach | Benefit | Cost |
 | --- | --- | --- |
-| Contextual history panel plus expanded submission workspace — recommended | Immediate access, room for evidence and code, preserves live context | Requires explicit ownership of history state and private execution |
+| Contextual expanded history panel — original proposal, superseded | Immediate access, room for evidence and code, preserves live context | Requires explicit ownership of history state and private execution |
 | Deep link to existing analytics/review pages | Small initial change | Still leaves monitoring and does not add private runnable review |
 | Put history and statistics inside the student-switcher popover | Close to student identity | Crowds switching, gives insufficient room for curriculum and attempts |
 
-Choose the contextual panel for monitoring and a dedicated dashboard for standalone browsing. These are two presentations of one shared history/read/review feature, not competing history systems. The options above concern the monitoring entry; the standalone dashboard is now an explicit requirement. Reuse existing tutoring roster behavior, attempt read models, editor primitives, assessment rendering and execution infrastructure. Do not mount the existing tutoring or manual grading workspace unchanged: both have responsibilities that historical review must not inherit.
+Choose a compact material roster and inline submission review for monitoring, with a dedicated dashboard for full history browsing. These are two presentations of one shared history/read/review feature, not competing history systems. The options above concern the monitoring entry; the standalone dashboard is now an explicit requirement. Reuse existing tutoring roster behavior, attempt read models, editor primitives, assessment rendering and execution infrastructure. Do not mount the existing tutoring or manual grading workspace unchanged: both have responsibilities that historical review must not inherit.
 
 In scope: dedicated student-history dashboard, persistent searchable student selection, contextual student overview, grouped material history, tutoring by selected material, paginated attempts, private coding/Turtle reruns, read-only quiz/written responses, and monitoring continuity. Redesign the existing class Solution status By-student presentation for this purpose instead of leaving its current table/detail workflow as the main student-history experience.
 
@@ -62,35 +75,26 @@ The standalone dashboard does not open a monitoring watch just to read saved his
 
 **One implementation, two hosts**
 
-Extract shared student overview, grouped curriculum, attempt list and submission review components for the dashboard and monitoring panel. The dashboard host owns URL-backed selection and roster navigation; the monitoring host owns its local review state and continuing live watch. Both use identical history adapters and metric definitions. A dashboard UI should not be embedded inside monitoring with a second Studio sidebar.
+Extract shared student overview, grouped curriculum, attempt list and submission review components for the dashboard and inline tutoring. The dashboard host owns URL-backed selection and roster navigation; the monitoring host owns its local review state and continuing live watch. Both use identical history adapters and metric definitions. A dashboard UI should not be embedded inside monitoring with a second Studio sidebar.
 
 ## 3. Entry points and identity
 
-- Add a clearly labelled **Student history** button beside the student switcher in every monitoring material type, including saved previews and offline states when history access remains authorized.
-- Opening it selects the currently monitored student's history and initially filters to the displayed material's course. Offer **All assigned courses** and individual authorized course filters; the heading always states the active scope.
-- Add **Tutoring** in the material action area for materials with submissions. It opens the same history surface in **By material** mode, preselected to the displayed material and monitored student.
-- The panel has **By student** and **By material** views. Switching views keeps student/material selection where applicable. Student history is not hidden behind the switcher menu.
-- Keep `watchedMembershipId` separate from `reviewMembershipId`. In By material, choosing another student's historical work does not silently switch the live watch. Show “Monitoring [A]” and “Reviewing [B]” whenever they differ. Switching the actual live target continues to use the existing student switcher and its pending-edit guard.
-- Historical browsing works for authorized offline students. Online availability controls live actions, not whether a saved submission can be read.
-- All selections use academy/class/membership/material IDs. Display names and user IDs are not authorization keys.
+- Monitoring headers expose Student history and Tutoring for every material type, including saved previews and authorized offline states.
+- Student history opens the full class dashboard with the selected student's membership and current course. Each student row in the existing top selector also has its own History link; it opens that student's dashboard directly.
+- Tutoring opens a compact, searchable drawer for the displayed material, showing Submitted/Not submitted and score. Selecting a student opens their newest immutable submission directly in the statement/editor area, without a modal or expanded history window.
+- Selecting an offline student or one on another material from the top selector opens their saved work for the displayed problem. Online students working on that problem retain the existing guarded live-switch behavior.
+- Keep `watchedMembershipId` separate from `reviewMembershipId`; the inline strip identifies Monitoring [A] and Reviewing [B]. Saved-work selection never changes the student's current material or live watch target.
+- All selections use academy/class/membership/material IDs. Names, user IDs and online availability are not history authorization keys.
 
-## 4. History panel and student overview
+## 4. Student dashboard and tutoring presentation
 
-Use Cove's existing typography, colors, avatars, borders and controls. Adopt Elice's information hierarchy rather than its branding or entire application navigation. Fit the new actions into the existing header/toolbars; do not add permanent full-width banners or change the coding workspace geometry while history is closed.
+Use Cove's typography, colors, avatars, borders and custom Studio selector controls. The full dashboard has the persistent student rail described in §2.1, a compact selected-student summary and grouped material evidence. It is a full page; monitoring does not embed it in an expandable dialog.
 
-On desktop, open a right-side panel up to 960px wide, bounded by the viewport. Keep the monitoring header and live connection status available. Provide an expand control for a full workspace view. On narrow screens, use a full-width surface with explicit Back/Close actions; do not squeeze a large results table into the switcher popover.
+The summary shows required assessed materials completed / eligible total, separately labelled programming/manual submission counts, evaluated average score, recorded active learning time and last recorded activity. Explain incomplete coverage and pending assessments. Use enrollment dates only if supplied by the authorized read model.
 
-The top contains the selected student's identity, class, current live location/availability, course filter, and last-updated timestamp. Use enrollment information only when the existing authorized read model supplies it; do not invent an enrollment date from account creation.
+Tutoring uses a compact drawer inside the exercise body. Keep the monitoring header visible, preserve the mounted live owner, and display selected saved work in the familiar instructions/editor/output layout. Keep student identity, attempt timestamp and private-copy status explicit. On narrow screens the drawer is bounded by the viewport and review panes stack. Returning restores the live workspace without a refresh.
 
-Below it show a compact overview, then the material evidence:
-
-- Required assessed materials completed / eligible total.
-- Counted programming submissions and manual submissions, separately labelled.
-- Average evaluated score, with its included item count and denominator explanation.
-- Recorded active learning time for this class/course, with the recording period and coverage note.
-- Last recorded activity/submission, labelled according to the source.
-
-Large decorative charts are unnecessary. The curriculum table should appear within the first screen after the compact overview. The standalone class/student dashboard in §2.1 uses this same overview; the academy-wide aggregate overview remains outside scope.
+When no material is active or selected, load an authorized course outline and show an explicit choose-material state. Empty or failed outlines show unavailable/retry states instead of an indefinite loading message.
 
 ## 5. Curriculum history and metric definitions
 
@@ -116,7 +120,7 @@ Authorization is class-scoped, but existing programming work is stored per stude
 
 By material displays the selected material and a searchable class roster with submission status, latest result and submission count. Offer All / Submitted / Not submitted filters, with live availability as supporting information rather than a history-access gate.
 
-Selecting a student opens their attempts for that material. The default attempt is the newest available submitted attempt; it is never chosen by highest score implicitly. Clearly distinguish **Latest**, score and result. Provide explicit previous/next attempt navigation and a paginated newest-first list with stable timestamp/ID ordering.
+In inline tutoring, selecting a student opens their saved code immediately, with an attempt selector and pagination. In the standalone dashboard, selecting a student exposes their attempts for that material. The default attempt is the newest available submitted attempt; it is never chosen by highest score implicitly. Clearly distinguish **Latest**, score and result. Provide explicit previous/next attempt navigation and a paginated newest-first list with stable timestamp/ID ordering.
 
 Changing material in the review controls retains the review student where authorized. Student movement in the live session does not replace the selected historical attempt. A new submission can produce a “New submission available” action; it must not overwrite an editor being inspected.
 
@@ -124,7 +128,7 @@ Share roster filtering/presentation with the existing course tutoring drawer whe
 
 ## 7. Submission review and private execution
 
-Opening **Review submission** expands within its originating dashboard or monitoring shell, in the same browser tab. Keep an unambiguous header: student, material, attempt timestamp, result, score and **Historical submission · Private testing copy**. Historical content must never carry a Live badge. In the monitoring host, the separate monitoring connection indicator remains truthful. Standalone review does not acquire a live watch.
+Opening **Review submission** renders inside its originating dashboard or exercise body, in the same browser tab. Keep an unambiguous header: student, material, attempt timestamp, result, score and **Historical submission · Private testing copy**. Historical content must never carry a Live badge. In the monitoring host, the separate monitoring connection indicator remains truthful. Standalone review does not acquire a live watch.
 
 Use the familiar statement/editor/output layout. Show attempt results and sample-case evidence through a collapsible panel, preserving space for the editor. Display saved labels and statement snapshots where actually stored. If only the current statement/hierarchy is available, label it “Current material”; do not claim it was frozen at submission time.
 
@@ -155,7 +159,7 @@ Scratch state is memory-only, keyed by actor/academy/class/student/material/subm
 
 ## 8. Monitoring continuity and pointer isolation
 
-History is a presentation state above the coding/non-coding branches of `AllMaterialMonitor`. Opening/closing it must not remount the observation owner, destroy the coding document/session, or invoke an end-watch command. Keep the active coding owner mounted while hidden; background student transitions still use the approved availability recovery behavior.
+Inline tutoring is a presentation state above the coding/non-coding branches of `AllMaterialMonitor`. Opening/closing it must not remount the observation owner, destroy the coding document/session, or invoke an end-watch command. Keep the active coding owner mounted while hidden; background student transitions still use the approved availability recovery behavior.
 
 Historical review cannot change the live workspace's selected draft/material, change the student's route, hydrate the live Yjs text, reuse a live editor model, or write through manual draft APIs. Any extraction of session ownership must remain scoped to preserving these existing responsibilities, not redesign the monitoring protocol.
 
@@ -203,13 +207,13 @@ No new historical source of truth or run-count table is required. Reuse current 
 
 ## 11. Navigation, errors and accessibility
 
-In monitoring, use client-owned view state inside the mounted shell for the panel and review. Opening/closing history must not perform a Next route transition. Browser Back closes review first, then the history surface, before leaving the workspace; use the existing history/navigation coordinator so material selection and unsaved-edit guards still work. Shareable monitoring-overlay URLs are outside this release.
+In monitoring, use client-owned state for the Tutoring drawer and saved submission review. Opening/closing inline tutoring must not perform a Next route transition. Student history is explicit full-page navigation, using private-copy discard and pending-live-edit safeguards. Keep material selection coordinated with those safeguards. Shareable inline-review URLs are outside this release.
 
 In the standalone dashboard, class, student, course and curriculum filters are URL-backed, using the canonical progress route. Add namespaced roster search/page parameters so roster search does not collide with the material-title search. Keep material row pagination independent from roster pagination. Extend the existing parser/serializer centrally; retain legacy By-problem links and ignore invalid optional filters safely. A selected review can use additive `reviewMaterial`, `attemptKind` and `attempt` parameters, scoped again on the server. Back/Forward restores the prior dashboard selection and filters; returning from review restores its list/lecture scroll state. Do not put source code, private input, scratch code or terminal output in a URL. Full reload may discard private scratch state and should warn while dirty in either host.
 
 Keep loading/errors local to each region. Distinguish no work, no matching results, pending assessment, unavailable history and lost access. Retry uses the same explicit scope. A failed history request does not disconnect monitoring; an unavailable runtime does not hide saved work.
 
-Give the panel an accessible title and predictable focus return to its opener. Use a nonmodal desktop panel; use a focus-trapped modal surface on narrow screens, with the monitored identity and connection state inside its own header. Keep covered live editors mounted but inert so they cannot take focus or input. Use actual buttons/links for actions; selecting table text must not navigate. Escape closes the topmost surface subject to the dirty-scratch guard. Keep Run/Stop keyboard accessible, announce loading/execution/errors, and support fullscreen portals. At narrow widths, prioritize title, result and Review; put secondary measures in row details. Use existing localized date/number formatting and translation namespaces.
+Give the Tutoring drawer an accessible title and close action. Use the same inline surface at narrow widths, bounded by the viewport, with the monitoring header and selected review identity visible. Keep covered live editors mounted but inert so they cannot take focus or input. Use actual buttons/links for actions; selecting table text must not navigate. Escape closes the topmost surface subject to the dirty-scratch guard. Keep Run/Stop keyboard accessible, announce loading/execution/errors, and support fullscreen portals. At narrow widths, prioritize title, result and Review; put secondary measures in row details. Use existing localized date/number formatting and translation namespaces.
 
 ## 12. Implementation boundaries after approval
 
@@ -244,6 +248,37 @@ Local end-to-end matrix after implementation:
 5. Switch the actual monitored student through existing guards, then reopen history. In By material, inspect another/offline student's submissions without changing the live target; identities must remain explicit.
 6. Exercise dirty-copy cancellation, filters/pages/scroll restoration, failed reads, pending assessment, removed access, fullscreen and narrow viewport.
 7. Run Chromium and Playwright WebKit coverage. Also check the paired flow in actual Chrome and native Safari; WebKit automation alone must not be reported as native Safari verification. Record unavailable native coverage explicitly.
-8. Open Student history without starting monitoring, choose a class and several online/offline students from the persistent roster, inspect lecture-grouped results, open an older submission and privately run it. Return to the exact dashboard state; repeat from an analytics deep link, with Back/Forward, in desktop and narrow layouts. Compare metrics and the same attempt against the monitoring panel.
+8. Open Student history without starting monitoring, choose a class and several online/offline students from the persistent roster, inspect lecture-grouped results, open an older submission and privately run it. Return to the exact dashboard state; repeat from an analytics deep link, with Back/Forward, in desktop and narrow layouts. Compare the same saved attempt against inline tutoring.
 
-This spec has been reviewed for scope, metric ambiguity, live/private data separation and implementation dependencies. Implementation and verification remain pending approval.
+This spec has been reviewed for scope, metric ambiguity, live/private data separation and implementation dependencies. Implementation was approved by the user on 2026-11-04; verification is required before completion.
+
+## 14. Direct problem review revision (2026-11-04)
+
+The user requested that saved-work review retain the familiar problem workspace shown in live monitoring. From the student dashboard, both the material title and **Open work** action open the latest submission immediately. An intermediate attempt list is no longer the primary flow. The destination is an academy teaching route outside StudioShell, using the entire viewport rather than an editor card inside the dashboard. Returning preserves the dashboard's student and filters.
+
+The review displays an explicit student identity, problem title, submission time and score, a private-copy indicator, and the existing Studio attempt selector. Older attempts and additional attempt pages remain available without leaving the problem workspace. The course outline, grading notice, full problem statement, examples, reference PDF pane, editor font controls and terminal reuse the ordinary workspace components. The statement reflects the current authorized problem; source and saved results remain those of the selected historical submission. Current draft code returned with reference metadata must never populate the review editor.
+
+Tutoring uses the same submission presentation and private runner as dashboard review, while its underlying monitoring watch remains mounted. Switching a private review's material or attempt must honor the existing discard guard. Run, Stop and Reset operate only on the review copy/session; no Submit action is introduced. Fullscreen review authorizes the exact class, student and material before rendering the student identity. Its return destination is limited to that class's progress page.
+
+Verification must check direct latest-work navigation, older attempt selection and pagination, full viewport geometry with statement left/editor right, visible selected identity, private Run/Reset/discard behavior, identical statement components from Tutoring, and unchanged student draft/submission results. Run the role matrix in Chromium and WebKit.
+
+## 15. Consistent review and history design revision (2026-11-04)
+
+The follow-up request explicitly includes **unsubmitted coding and Turtle work**, which must use the same full workspace as submitted work. The earlier standalone draft editor and read-only observation viewer are removed from these review paths. Both sources use the ordinary course navigator, two-row workspace header, named student, full statement/examples, font controls, editable private source and private Run/Reset. A compact private-copy badge replaces the large explanatory banner; the output area retains the isolation notice. Coding uses the familiar dark output tabs and public sample controls. A historical result remains a separate saved-result tab, never a live student's output.
+
+Turtle uses the existing manual workspace grid, file tabs, keyboard/pointer resize control and drawing layout selector. Drawing and terminal occupy the available viewport beside the instructions. A history draft must never say "Waiting for live response" or disable its private Run merely because the student is not connected. Draft execution uses the current server-owned authorized material profile; submitted execution continues to use its immutable saved profile. Both remain under a reviewer-only runtime owner, reauthorize every operation, and create no student draft/submission/score mutations.
+
+The class chooser becomes a searchable responsive grid with recognizable class icons and compact Open history actions. The student dashboard keeps its persistent roster and Studio selectors, with distinct completion/score/submission/time cards, a measured completion bar, colored material icons and status badges. Preserve the existing metric definitions and show unavailable measurements honestly.
+
+Elice was inspected through the signed-in Chrome session before this revision: course lecture list, student Dashboard, per-material tutoring roster, selected submitted programming work and selected submitted Turtle work. The useful pattern is stable statement/editor geometry, student identity immediately visible above code, clear submission state and a persistent student list. Cove retains its own typography/tokens and private-copy semantics. No Elice edit, Run, Submit or regrade action was used.
+
+Acceptance adds explicit zero-submission cases for coding and Turtle, saved draft versus starter source, private execution with visible terminal/drawing, unchanged source records/counts, and visual checks of the class chooser/dashboard in addition to the submitted-work and inline-tutoring regressions.
+# Follow-up: empty work and course dashboard (2026-11-04)
+
+The user confirmed that actual unfinished drafts remain reviewable. When neither a saved draft nor a submission exists, history/Tutoring keeps the normal statement and course navigator but shows an empty work panel. Starter code is not presented as student work, and the empty panel has no editor or private execution actions. Inline review uses one compact selected-student toolbar instead of repeating the full problem header already supplied by monitoring.
+
+The student dashboard follows the supplied Elice references with Cove tokens: persistent roster; profile name/email; class enrollment period; separate Course Completion and Course Progress sections; then the existing grouped material list. Enrollment comes from `ClassEnrollment.enrolledAt`, not membership creation or first learning activity. Enrollment has no expiry in the current model; missing enrollment is explicitly unrecorded.
+
+Completion uses the existing required-assessed-exercise denominator. Zero eligible work does not imply completion. Total assessed score sums the actual current-revision scored values and their maxima; average score retains its existing definition. No Elice EPS or class-average metric is invented. Course Progress charts recorded learning minutes over the last 14 academy-local dates and shows required-work completion by assigned course. Both use the same authorized class/student/course scope as the dashboard, with grouped daily reads and no source-code reads or student writes. Filtering individual material rows does not change these overview totals.
+
+Qualification covers no-work coding and Turtle, saved drafts, submitted work, compact inline tutoring, enrollment distinct from first activity, missing dates, course-scoped daily activity and unchanged private-copy protections in Chromium and WebKit.

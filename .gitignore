@@ -90,3 +90,6 @@ packages/web/public/monaco/
 # Published immutable browser interpreter assets are host-owned release data.
 deploy/runtime/
 packages/web/.next-turtle-browser/
+
+# Disposable API builds used by isolated history browser tests.
+packages/api/.history-e2e-*/

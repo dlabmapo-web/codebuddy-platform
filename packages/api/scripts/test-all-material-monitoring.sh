@@ -12,17 +12,19 @@ observation_run="$(date +%s)-$$"
 observation_pg="cove-observation-pg-$observation_run"
 observation_redis="cove-observation-redis-$observation_run"
 observation_gui_pid=''
+observation_build=''
 observation_media="$(mktemp -d -t cove-observation-media)"
 cleanup() {
   if [[ -n "$observation_gui_pid" ]]; then kill "$observation_gui_pid" 2>/dev/null || true; fi
   docker rm -f "$observation_pg" "$observation_redis" >/dev/null 2>&1 || true
   rm -rf -- "$observation_media"
+  if [[ -n "$observation_build" ]]; then rm -rf -- "$observation_build"; fi
 }
 trap cleanup EXIT
 docker image inspect cove-turtle-trial:dev >/dev/null
 docker run -d --name "$observation_pg" -e POSTGRES_PASSWORD=cove-observation-local-only -e POSTGRES_DB=cove_dlab_test -p 127.0.0.1::5432 postgres:17-alpine >/dev/null
 docker run -d --name "$observation_redis" -p 127.0.0.1::6379 redis:7-alpine >/dev/null
-for observation_attempt in {1..60}; do
+for observation_attempt in {1..240}; do
   if docker exec "$observation_pg" pg_isready -h 127.0.0.1 -U postgres -d cove_dlab_test >/dev/null 2>&1; then break; fi
   sleep 0.5
 done
@@ -46,11 +48,18 @@ ffmpeg -hide_banner -loglevel error -i "$observation_media/video.mp4" -c copy -h
 ffmpeg -hide_banner -loglevel error -f lavfi -i color=c=blue:s=320x180 -frames:v 1 -y "$observation_media/poster.jpg"
 NODE_ENV=test GUI_INSTANCE_ID="observation-$observation_run" GUI_SERVICE_SECRET=local-observation-runtime-secret-never-production GUI_RUNTIME_IMAGE=cove-turtle-trial:dev GUI_ALLOWED_ORIGINS=http://127.0.0.1:3309 GUI_PORT=4029 GUI_SESSION_CAPACITY=2 GUI_BIND_ADDRESS=127.0.0.1 node packages/gui-runtime/src/server.mjs &
 observation_gui_pid=$!
-for observation_attempt in {1..60}; do
+for observation_attempt in {1..240}; do
   if curl --fail --silent -H 'Authorization: Bearer local-observation-runtime-secret-never-production' http://127.0.0.1:4029/health >/dev/null; then break; fi
   sleep 0.5
 done
 curl --fail --silent -H 'Authorization: Bearer local-observation-runtime-secret-never-production' http://127.0.0.1:4029/health >/dev/null
 pnpm --filter @cove/shared build
-pnpm --filter @cove/api build
-pnpm exec playwright test --config e2e/all-material-monitoring.playwright.config.ts "$@"
+if [[ "${COVE_HISTORY_E2E:-0}" == "1" ]]; then
+  observation_build="$(mktemp -d "$observation_root/packages/api/.history-e2e-XXXXXX")"
+  export COVE_DLAB_API_BUILD_DIR="file://$observation_build"
+  pnpm --filter @cove/api exec tsc -p tsconfig.build.json --outDir "$observation_build" --incremental false --declaration false --sourceMap false
+  pnpm exec playwright test --config e2e/student-history.playwright.config.ts "$@"
+else
+  pnpm --filter @cove/api build
+  pnpm exec playwright test --config e2e/all-material-monitoring.playwright.config.ts "$@"
+fi

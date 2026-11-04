@@ -5,7 +5,8 @@ import { createServer } from 'node:http';
 import { randomUUID, createHmac, timingSafeEqual } from 'node:crypto';
 import { Redis } from 'ioredis';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../dist/src/database/prisma.service.js';
+const apiBuild = new URL(process.env.COVE_DLAB_API_BUILD_DIR ? process.env.COVE_DLAB_API_BUILD_DIR.replace(/\/$/, '') + '/' : '../dist/', import.meta.url);
+const { PrismaService } = await import(new URL('src/database/prisma.service.js', apiBuild));
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -83,7 +84,7 @@ const server = createServer(async (req, res) => {
       const org = parent ? null : await db.organization.create({ data: { name: 'SSO browser fixture', slug: 'browser-' + id } });
       const academy = parent?.academy ?? await db.academy.create({ data: { organizationId: org.id, name: 'SSO Browser Academy', slug: 'sso-' + id } });
       if (!parent) await db.dlabCampus.create({ data: { externalCampusId: campus, name: academy.name, status: 'active', payloadHash: 'fixture', academyId: academy.id, ssoEnabled: input.enabled !== false } });
-      const os = { external_user_id: id, external_campus_id: campus, external_campus_ids: [campus], name: 'Browser ' + (input.role ?? 'student'), user_role: input.role ?? 'student', account_status: 'active' };
+      const os = { external_user_id: id, external_campus_id: campus, external_campus_ids: [campus], name: input.name ?? 'Browser ' + (input.role ?? 'student'), user_role: input.role ?? 'student', account_status: 'active' };
       fixtures.set(id, { os, academy, campus });
       if (input.legacy) {
         const email = 'legacy-' + id + '@example.test', user = authUser({ id, email, user_metadata: { full_name: os.name } });
@@ -158,9 +159,40 @@ const server = createServer(async (req, res) => {
         await db.classEnrollment.create({ data: { classId: classroom.id, membershipId: student.id, enrolledByUserId: owner.userId } });
         classes.push(classroom);
       }
-      await db.exerciseDraft.create({ data: { userId: student.userId, materialId: material.id, sourceMaterialId: material.id, courseId: course.id, code: 'print(2 + 3)' } });
+      let reviewStudentMembershipId;
+      if (input.reviewStudentFixtureId) {
+        const reviewIdentity = await db.dlabIdentity.findUniqueOrThrow({where:{externalUserId:input.reviewStudentFixtureId}});
+        const reviewMember = await db.academyMembership.findUniqueOrThrow({where:{academyId_userId:{academyId:fixture.academy.id,userId:reviewIdentity.userId}}});
+        reviewStudentMembershipId = reviewMember.id;
+        await db.classEnrollment.create({data:{classId:classes[0].id,membershipId:reviewMember.id,enrolledByUserId:owner.userId}});
+        await db.submission.create({data:{userId:reviewMember.userId,materialId:material.id,sourceMaterialId:material.id,courseId:course.id,classId:classes[0].id,
+          gradingRevision:1,engineVersion:'pyodide-0.27.5',language:'PYTHON',timeLimitMs:2000,memoryLimitMb:128,code:'print("OFFLINE STUDENT SUBMISSION")',status:'PASSED',totalCount:1,passedCount:1,score:100,
+          problemTitle:material.title,courseTitle:course.title,moduleTitle:module.title,lectureTitle:lecture.title,modulePosition:1,lecturePosition:1,problemPosition:1}});
+        await db.studentExerciseProgress.create({data:{userId:reviewMember.userId,materialId:material.id,status:'SOLVED',attemptCount:1,bestScore:100,bestPassed:1,gradingRevision:1}});
+      }
+      if (input.seedHistory) {
+        for (const [index, code] of ['print("HISTORICAL FIRST")', 'print("HISTORICAL LATEST")'].entries()) {
+          await db.submission.create({ data: { userId: student.userId, materialId: material.id, sourceMaterialId: material.id, courseId: course.id, classId: classes[0].id,
+            gradingRevision: 1, engineVersion: 'pyodide-0.27.5', language: 'PYTHON', timeLimitMs: 2000, memoryLimitMb: 128, code, status: 'PASSED', totalCount: 1, passedCount: 1, score: 100,
+            problemTitle: material.title, courseTitle: course.title, moduleTitle: module.title, lectureTitle: lecture.title, modulePosition: 1, lecturePosition: 1, problemPosition: 1,
+            createdAt: new Date(Date.now() - (2-index)*60000) } });
+        }
+        await db.studentExerciseProgress.create({ data: { userId: student.userId, materialId: material.id, status: 'SOLVED', attemptCount: 2, bestScore: 100, bestPassed: 1, gradingRevision: 1 } });
+        const config = await db.manualMaterial.findUniqueOrThrow({ where: { materialId: short.id } });
+        for (let index=0;index<35;index++) {
+          await db.manualSubmission.create({ data: { materialId: short.id, userId: student.userId, classId: classes[0].id, files: {}, answer: 'SAVED ANSWER '+index, profile: config, revision: 1, maximumHundredths: 10000, includeInScore: true, requestKey: randomUUID(), createdAt: new Date(Date.now()-(40-index)*60000) } });
+        }
+        if (turtleMaterialId) {
+          const turtle = await db.manualMaterial.findUniqueOrThrow({where:{materialId:turtleMaterialId}});
+          await db.manualSubmission.create({data:{materialId:turtleMaterialId,userId:student.userId,classId:classes[0].id,files:{'main.py':"import turtle\nprint('SAVED TURTLE', flush=True)\nturtle.circle(20)\nturtle.done()"},answer:'',profile:turtle,revision:1,maximumHundredths:10000,includeInScore:false,requestKey:randomUUID()}});
+        }
+      }
+      if (input.seedDrafts && turtleMaterialId) {
+        await db.manualDraft.create({data:{materialId:turtleMaterialId,userId:student.userId,files:{'main.py':"import turtle\nprint('SAVED TURTLE DRAFT', flush=True)\nturtle.circle(20)\nturtle.done()"},revision:1}});
+      }
+      if (!input.emptyWork) await db.exerciseDraft.create({ data: { userId: student.userId, materialId: material.id, sourceMaterialId: material.id, courseId: course.id, code: 'print(2 + 3)' } });
       await db.academyFeatureFlag.upsert({ where: { academyId_feature: { academyId: fixture.academy.id, feature: 'TEACHER_LIVE_MONITORING' } }, create: { academyId: fixture.academy.id, feature: 'TEACHER_LIVE_MONITORING', isEnabled: true }, update: { isEnabled: true } });
-      return json(res, { turtleMaterialId, pdfMaterialId, videoMaterialId, courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, shortMaterialId: short.id, quizMaterialId: quiz.id, studentMembershipId: student.id, classes });
+      return json(res, { reviewStudentMembershipId, turtleMaterialId, pdfMaterialId, videoMaterialId, courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, shortMaterialId: short.id, quizMaterialId: quiz.id, studentMembershipId: student.id, classes });
     }
     if (path.startsWith('/fixtures/') && req.method === 'PUT') {
       const id = path.split('/')[2], fixture = fixtures.get(id), input = await body(req);
@@ -246,5 +278,5 @@ globalThis.fetch = (input, init) => {
   return originalFetch(input, init);
 };
 // Compiled application's actual Nest bootstrap, controllers, RPC and socket gateways.
-await import('../dist/src/main.js');
+await import(new URL('src/main.js', apiBuild));
 process.on('SIGTERM', () => { if (server.listening) server.close(); void redis.quit(); void db.$disconnect(); });

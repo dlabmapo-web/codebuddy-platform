@@ -54,7 +54,7 @@ Paths beginning `...` use the common prefix `packages/web/src/app/(studio)/acade
 ## Design implications
 
 1. Add entry points inside monitoring, preserving the existing watch and switching guards.
-2. Present an Elice-inspired grouped history with explicit metric definitions, without rebuilding academy analytics.
+2. Present an Elice-inspired grouped history with explicit metric definitions. Following the user's clarification, provide both a standalone dashboard with persistent student selection and the contextual monitoring panel. Redesign the class Solution status By-student presentation for the standalone dashboard; the academy aggregate analytics table only needs direct history entry links.
 3. Load one immutable submission only when opened. Never substitute a saved draft under a submission label.
 4. Reuse read models, rendering and runtimes through focused shared components; keep historical scratch editing independent of live editing and grading.
 5. Unify programming/manual history behind narrow, authorized, paginated reads rather than downloading every student's files from manual roster endpoints.
@@ -62,3 +62,9 @@ Paths beginning `...` use the common prefix `packages/web/src/app/(studio)/acade
 7. Verify live connection, draft integrity and pointer isolation while opening/closing history and switching materials in Chromium, WebKit and native Safari.
 
 The proposed behavior and acceptance criteria are in the [design spec](../superpowers/specs/2026-11-04-monitoring-student-history-and-tutoring-design.md). Product choices in that document are proposals; they are not claims about Elice internals.
+
+## Follow-up: standalone dashboard clarification
+
+The user supplied another Elice member-dashboard screenshot and clarified that an administrative-style page for selecting students is required, because Cove's current student-history presentation is difficult to use. The first draft's monitoring panel did not cover that standalone experience.
+
+Source review confirms that `.../(framed)/teach/classes/[classId]/progress/page.tsx` and `_components/progress-workspace.tsx` already provide a class-scoped destination, By-student/By-problem navigation, and selected-student details. `_lib/progress-url.ts` already serializes student membership as `student` and the course filter as `course`. The revised spec keeps that destination and its existing links, replacing the By-student presentation with a persistent roster and adjacent student dashboard. This is planned behavior, not an existing Elice-style Cove screen.

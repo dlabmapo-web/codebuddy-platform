@@ -10,16 +10,21 @@ import { PrismaService } from '../dist/src/database/prisma.service.js';
 const dbUrl = process.env.COVE_DLAB_TEST_DATABASE_URL;
 const parsed = new URL(dbUrl ?? 'http://invalid');
 if (!['127.0.0.1', 'localhost'].includes(parsed.hostname) || parsed.pathname !== '/cove_dlab_test') throw new Error('Isolated local cove_dlab_test DB required');
-const origin = 'http://127.0.0.1:4320', studio = 'http://127.0.0.1:3309';
+const providerPort = Number(process.env.COVE_DLAB_TEST_PROVIDER_PORT ?? 4320);
+const apiPort = Number(process.env.COVE_DLAB_TEST_API_PORT ?? 4319);
+const origin = `http://127.0.0.1:${providerPort}`;
+const studio = `http://127.0.0.1:${Number(process.env.COVE_DLAB_TEST_WEB_PORT ?? 3309)}`;
+const api = `http://127.0.0.1:${apiPort}`;
 const clientSecret = 'local-e2e-client-secret-only-never-production';
 const bffSecret = 'local-e2e-bff-secret-only-never-production';
 const jwtSecret = 'local-e2e-jwt-secret-only-never-production';
 Object.assign(process.env, {
-  NODE_ENV: 'test', DATABASE_URL: dbUrl, DIRECT_URL: dbUrl, PORT: '4319', WEB_ORIGIN: studio,
+  NODE_ENV: 'test', DATABASE_URL: dbUrl, DIRECT_URL: dbUrl, PORT: String(apiPort), WEB_ORIGIN: studio,
   SUPABASE_URL: 'https://dlab-sso-provider.invalid', SUPABASE_SECRET_KEY: 'local-e2e-admin-key',
   BFF_SHARED_SECRET: bffSecret, REDIS_URL: process.env.COVE_DLAB_TEST_REDIS_URL,
   MONITORING_REDIS_URL: process.env.COVE_DLAB_TEST_REDIS_URL, DLAB_SSO_ENABLED: 'true',
   DLAB_OS_BASE_URL: 'https://os.dlabcampus.com/v1', DLAB_SSO_ROLLOUT_MODE: 'campus',
+  DLAB_AUTO_PROVISION_CAMPUSES: 'true',
   DLAB_CLIENT_ID: 'cove', DLAB_CLIENT_SECRET: clientSecret,
   DLAB_INBOUND_SERVER_KEY: 'local-e2e-inbound-key-only-never-production', DLAB_REDIRECT_URI: studio + '/sso/callback',
   GUI_ENABLED: 'false', VIDEO_LESSONS_ENABLED: 'true', SHORT_ANSWER_ENABLED: 'true', MULTIPLE_CHOICE_ENABLED: 'true',
@@ -66,9 +71,22 @@ const server = createServer(async (req, res) => {
       const parent = input.parentFixtureId ? fixtures.get(input.parentFixtureId) : null;
       if (input.parentFixtureId && !parent) return json(res, { error: 'unknown_parent' }, 400);
       const campus = parent?.campus ?? randomUUID();
-      const org = parent ? null : await db.organization.create({ data: { name: 'SSO browser fixture', slug: 'browser-' + id } });
-      const academy = parent?.academy ?? await db.academy.create({ data: { organizationId: org.id, name: 'SSO Browser Academy', slug: 'sso-' + id } });
-      if (!parent) await db.dlabCampus.create({ data: { externalCampusId: campus, name: academy.name, status: 'active', payloadHash: 'fixture', academyId: academy.id, ssoEnabled: input.enabled !== false } });
+      let academy = parent?.academy;
+      if (!parent && input.autoCampus) {
+        // Exercise the application's actual authenticated inbound controller;
+        // this path deliberately does not insert an academy or mapping fixture.
+        const synced = await fetch(api + '/api/integrations/dlab/v1/campuses/' + campus, {
+          method: 'PUT', headers: { Authorization: 'Bearer ' + process.env.DLAB_INBOUND_SERVER_KEY, 'Content-Type': 'application/json', 'X-Request-Id': randomUUID() },
+          body: JSON.stringify({ name: input.campusName ?? 'New HQ Browser Campus', status: 'active' }),
+        });
+        if (!synced.ok) throw new Error('Authenticated campus sync failed: ' + synced.status);
+        const received = await synced.json();
+        academy = await db.academy.findUniqueOrThrow({ where: { id: received.id } });
+      } else if (!parent) {
+        const org = await db.organization.create({ data: { name: 'SSO browser fixture', slug: 'browser-' + id } });
+        academy = await db.academy.create({ data: { organizationId: org.id, name: 'SSO Browser Academy', slug: 'sso-' + id } });
+        await db.dlabCampus.create({ data: { externalCampusId: campus, name: academy.name, status: 'active', payloadHash: 'fixture', academyId: academy.id, ssoEnabled: input.enabled !== false } });
+      }
       const os = { external_user_id: id, external_campus_id: campus, external_campus_ids: [campus], name: 'Browser ' + (input.role ?? 'student'), user_role: input.role ?? 'student', account_status: 'active' };
       fixtures.set(id, { os, academy, campus });
       if (input.legacy) {
@@ -145,7 +163,7 @@ const server = createServer(async (req, res) => {
       if (input.role) fixture.os.user_role = input.role;
       if (input.status) fixture.os.account_status = input.status;
       fixture.version = Math.max(Date.now(), (fixture.version ?? 0) + 1);
-      const response = await originalFetch('http://127.0.0.1:4319/api/integrations/dlab/v1/users/' + id, {
+      const response = await originalFetch(api + '/api/integrations/dlab/v1/users/' + id, {
         method: 'PUT', headers: { Authorization: 'Bearer ' + process.env.DLAB_INBOUND_SERVER_KEY, 'Content-Type': 'application/json', 'X-Request-Id': randomUUID() },
         body: JSON.stringify({ ...fixture.os, updated_at: new Date(fixture.version).toISOString() }),
       });
@@ -213,7 +231,7 @@ const server = createServer(async (req, res) => {
 // Dashboard compilation can outlast Node's default five-second idle timeout.
 server.keepAliveTimeout = 60_000;
 server.headersTimeout = 65_000;
-await new Promise(resolve => server.listen(4320, '127.0.0.1', resolve));
+await new Promise(resolve => server.listen(providerPort, '127.0.0.1', resolve));
 const originalFetch = globalThis.fetch;
 globalThis.fetch = (input, init) => {
   const url = new URL(typeof input === 'string' ? input : input.url ?? input.toString());

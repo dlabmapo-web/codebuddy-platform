@@ -1,8 +1,45 @@
 import { test, expect, webkit, type Page, type APIRequestContext } from '@playwright/test';
 import { resolve } from 'node:path';
 test.beforeEach(async ({ context }) => { await context.route('https://os.dlabcampus.com/**', route => route.abort()); });
-const fixtureOrigin = 'http://127.0.0.1:4320';
+const fixtureOrigin = `http://127.0.0.1:${Number(process.env.COVE_DLAB_TEST_PROVIDER_PORT ?? 4320)}`;
+const apiOrigin = `http://127.0.0.1:${Number(process.env.COVE_DLAB_TEST_API_PORT ?? 4319)}`;
+const studioOrigin = `http://127.0.0.1:${Number(process.env.COVE_DLAB_TEST_WEB_PORT ?? 3309)}`;
 type Fixture = { id: string; academy: { slug: string; id: string }; username?: string };
+
+for (const engine of ['chromium', 'webkit']) for (const role of ['lab_head', 'edu_manager', 'tutor', 'student']) {
+  test(`new HQ campus: ${role} first and repeated login stays isolated in ${engine}`, async ({ browser, request }) => {
+    const selected = engine === 'webkit' ? await webkit.launch() : browser;
+    const context = await selected.newContext({ baseURL: studioOrigin });
+    try {
+      const page = await context.newPage();
+      const own = await fixture(request, role, { autoCampus: true, campusName: 'HQ ' + role });
+      const other = await fixture(request, 'lab_head', { autoCampus: true, campusName: 'Other HQ branch' });
+      await enter(page, own);
+      await expect(page).toHaveURL(new RegExp('/academy/' + own.academy.slug + '$'));
+      const heading = { lab_head: 'Control tower', edu_manager: 'What HQ edu_manager teaches', tutor: 'Teaching overview', student: 'Hi, Browser student' }[role];
+      await expect(page.getByRole('heading', { name: heading, level: 1, exact: true })).toBeVisible();
+      const initial = await (await request.get(fixtureOrigin + '/fixtures/' + own.id)).json();
+      const localRole = { lab_head: 'MANAGER', edu_manager: 'TEAM_LEAD', tutor: 'TEACHER', student: 'STUDENT' }[role];
+      expect(initial.memberships).toHaveLength(1);
+      expect(initial.memberships[0].role).toBe(localRole);
+      expect((await rpc(page, request, 'learn/listCourses', { academyId: own.academy.id })).status()).toBe(200);
+      expect((await rpc(page, request, 'learn/listCourses', { academyId: other.academy.id })).status()).toBe(403);
+      // A fresh SSO entry reuses the same managed user and correct academy.
+      await enter(page, own);
+      await expect(page).toHaveURL(new RegExp('/academy/' + own.academy.slug + '$'));
+      await page.reload();
+      await expect(page).toHaveURL(new RegExp('/academy/' + own.academy.slug + '$'));
+      await expect(page.getByRole('heading', { name: heading, level: 1, exact: true })).toBeVisible();
+      const repeated = await (await request.get(fixtureOrigin + '/fixtures/' + own.id)).json();
+      expect(repeated.userId).toBe(initial.userId);
+      expect(repeated.memberships).toEqual(initial.memberships);
+      if (role === 'lab_head') await page.screenshot({ path: test.info().outputPath('new-campus-dashboard.png'), animations: 'disabled' });
+    } finally {
+      await context.close();
+      if (selected !== browser) await selected.close();
+    }
+  });
+}
 async function fixture(request: APIRequestContext, role: string, extra: object = {}): Promise<Fixture> {
   const response = await request.post(fixtureOrigin + '/fixtures', { data: { role, ...extra } });
   expect(response.ok()).toBeTruthy(); return response.json();
@@ -13,7 +50,7 @@ async function tokenFor(page: Page) {
   return JSON.parse(Buffer.from(value.replace(/^base64-/, ''), 'base64url').toString()).access_token as string;
 }
 async function rpc(page: Page, request: APIRequestContext, path: string, input: object) {
-  return request.post('http://127.0.0.1:4319/api/rpc/' + path, { headers: { Authorization: 'Bearer ' + await tokenFor(page) }, data: { json: input } });
+  return request.post(apiOrigin + '/api/rpc/' + path, { headers: { Authorization: 'Bearer ' + await tokenFor(page) }, data: { json: input } });
 }
 async function enter(page: Page, value: Fixture) {
   if (page.context().browser()?.browserType().name() === 'webkit') {
@@ -85,7 +122,7 @@ test('HQ admin demotion revokes console access and the fresh login receives only
   const value = await fixture(request, 'hq_admin'); await enter(page, value); await expect(page).toHaveURL(/\/admin\/academies$/);
   const oldToken = await tokenFor(page);
   expect((await request.put(fixtureOrigin + '/fixtures/' + value.id, { data: { role: 'edu_manager' } })).ok()).toBe(true);
-  expect((await request.post('http://127.0.0.1:4319/api/rpc/platformAcademies/get', { headers: { Authorization: 'Bearer ' + oldToken }, data: { json: { academyId: value.academy.id } } })).status()).toBe(401);
+  expect((await request.post(apiOrigin + '/api/rpc/platformAcademies/get', { headers: { Authorization: 'Bearer ' + oldToken }, data: { json: { academyId: value.academy.id } } })).status()).toBe(401);
   await page.goto('/login'); await expect(page.getByRole('heading', { name: 'Log in', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Log in with DLAB', exact: true }).click();
   await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
@@ -97,7 +134,7 @@ test('HQ admin deactivation revokes live platform access', async ({ page, reques
   const value = await fixture(request, 'hq_admin'); await enter(page, value); await expect(page).toHaveURL(/\/admin\/academies$/);
   const token = await tokenFor(page);
   expect((await request.put(fixtureOrigin + '/fixtures/' + value.id, { data: { status: 'inactive' } })).ok()).toBe(true);
-  const denied = await request.post('http://127.0.0.1:4319/api/rpc/platformAcademies/get', { headers: { Authorization: 'Bearer ' + token }, data: { json: { academyId: value.academy.id } } });
+  const denied = await request.post(apiOrigin + '/api/rpc/platformAcademies/get', { headers: { Authorization: 'Bearer ' + token }, data: { json: { academyId: value.academy.id } } });
   expect(denied.status()).toBe(403);
   const saved = await (await request.get(fixtureOrigin + '/fixtures/' + value.id)).json(); expect(saved.platformRole).toBe('USER');
 });
@@ -139,7 +176,7 @@ test('HQ deactivation blocks live tokens; reactivation requires a fresh SSO logi
   const oldToken = await tokenFor(page);
   const deactivate = await request.put(fixtureOrigin + '/fixtures/' + value.id, { data: { status: 'inactive' } });
   expect(deactivate.ok()).toBe(true);
-  const me = () => request.post('http://127.0.0.1:4319/api/rpc/auth/me', { headers: { Authorization: 'Bearer ' + oldToken }, data: { json: {} } });
+  const me = () => request.post(apiOrigin + '/api/rpc/auth/me', { headers: { Authorization: 'Bearer ' + oldToken }, data: { json: {} } });
   expect((await me()).status()).toBe(403);
   expect((await request.put(fixtureOrigin + '/fixtures/' + value.id, { data: { status: 'active' } })).ok()).toBe(true);
   expect((await me()).status()).toBe(401);
@@ -154,7 +191,7 @@ test('HQ role changes revoke the old session and the next login receives the new
   await enter(page, value); await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
   const oldToken = await tokenFor(page);
   expect((await request.put(fixtureOrigin + '/fixtures/' + value.id, { data: { role: 'edu_manager' } })).ok()).toBe(true);
-  expect((await request.post('http://127.0.0.1:4319/api/rpc/auth/me', { headers: { Authorization: 'Bearer ' + oldToken }, data: { json: {} } })).status()).toBe(401);
+  expect((await request.post(apiOrigin + '/api/rpc/auth/me', { headers: { Authorization: 'Bearer ' + oldToken }, data: { json: {} } })).status()).toBe(401);
   // Let the revoked protected layout unmount before starting another login.
   await page.goto('/login'); await expect(page.getByRole('heading', { name: 'Log in', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Log in with DLAB', exact: true }).click();
@@ -173,7 +210,7 @@ test('Cove logout removes the browser session', async ({ page, request }) => {
 
 
 async function manualRequest(page: Page, request: APIRequestContext, path: string, input: Record<string, unknown>, method: 'GET' | 'POST' = 'POST') {
-  return request.fetch('http://127.0.0.1:4319/api/manual' + path, {
+  return request.fetch(apiOrigin + '/api/manual' + path, {
     method, headers: { Authorization: 'Bearer ' + await tokenFor(page) },
     ...(method === 'GET' ? { params: input as Record<string, string> } : { data: input }),
   });
@@ -228,7 +265,7 @@ test(`OS ${staffRole} covers academy classes without teaching assignments`, asyn
     expect((await rpc(page, request, 'monitoring/getClassRoster', { ...base, classId: other.id })).ok()).toBe(true);
     expect((await rpc(leaderPage, request, 'monitoring/getClassRoster', base)).ok()).toBe(true);
     // A stale role-mode cookie cannot hide Manager identity or inherited actions.
-    await page.context().addCookies([{ name: 'cove_academy_role', value: manager.academy.id + ':TEACHER', url: 'http://127.0.0.1:3309' }]);
+    await page.context().addCookies([{ name: 'cove_academy_role', value: manager.academy.id + ':TEACHER', url: studioOrigin }]);
     await page.goto('/academy/' + manager.academy.slug);
     if (staffRole === 'lab_head') await expect(page.getByRole('heading', { name: 'Control tower', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'My classes', exact: true })).toBeVisible();
@@ -451,8 +488,8 @@ for (const engine of ['Chromium', 'WebKit'] as const) {
     test.setTimeout(180_000);
     const ownedBrowser = engine === 'WebKit' ? await webkit.launch() : null;
     const current = ownedBrowser ?? browser;
-    const staffContext = await current.newContext({ baseURL: 'http://127.0.0.1:3309' });
-    const studentContext = await current.newContext({ baseURL: 'http://127.0.0.1:3309' });
+    const staffContext = await current.newContext({ baseURL: studioOrigin });
+    const studentContext = await current.newContext({ baseURL: studioOrigin });
     for (const context of [staffContext, studentContext]) {
       await context.route('https://os.dlabcampus.com/**', route => route.abort());
       await context.route('https://dlab-sso-provider.invalid/storage/**', route => route.fulfill({

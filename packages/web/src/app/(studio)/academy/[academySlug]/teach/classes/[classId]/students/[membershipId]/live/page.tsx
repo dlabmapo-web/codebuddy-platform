@@ -1,6 +1,7 @@
 import { StudentSwitcher } from '@/components/monitoring/student-switcher';
 import { routes } from '@/lib/routes';
 import { requireAcademyRoute } from '@/lib/academy-route';
+import { canManageExercises } from '@/lib/academy-access-state';
 import type { MonitoringStudentContext } from '@cove/shared';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -26,7 +27,7 @@ export default async function LiveStudentPage({
   searchParams: Promise<{ materialId?: string }>;
 }) {
   const { academySlug, classId, membershipId } = await params;
-  const { academyId } = await requireAcademyRoute(academySlug);
+  const { academyId, roles } = await requireAcademyRoute(academySlug);
 
   let context: MonitoringStudentContext | null = null;
   try {
@@ -64,6 +65,7 @@ export default async function LiveStudentPage({
     <AllMaterialMonitor
       key={`${academyId}:${classId}:${membershipId}`}
       academyId={academyId}
+      canEditProblem={canManageExercises(roles)}
       classId={classId}
       context={context}
       membershipId={membershipId}

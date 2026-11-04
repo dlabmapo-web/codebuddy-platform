@@ -1,5 +1,9 @@
 'use client';
 import * as React from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { routes } from '@/lib/routes';
+import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +34,9 @@ export function StaffStudentPane(props: Props) {
 function StudentSession({ academyId, materialId, userId, student, context, starterCode, beforeChangeRef, close }: Props & { context: MonitoringStudentContext }) {
   const { t } = useTranslation('practice');
   const { t: tm } = useTranslation('monitoring');
+  const { t: th } = useTranslation('teach');
+  const slug=useAcademySlug(),router=useRouter();
+  const historyHref=`${routes.academyTeachProgress(slug,student.classId)}?view=students&student=${student.membershipId}`;
   const live = useLiveWorkspace({ academyId, classId: student.classId, studentMembershipId: student.membershipId, autoEdit: true });
   const runner = usePythonRunner();
   const [note, setNote] = React.useState('');
@@ -61,6 +68,7 @@ function StudentSession({ academyId, materialId, userId, student, context, start
       <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-soft font-bold text-brand">{[...student.displayName][0]}</span>
       <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{student.displayName}</p><p className="truncate text-xs text-sub">{student.identifier}</p></div>
       <button type="button" onClick={() => void close()} aria-label={t('tutoring_own_code')} className="rounded-lg p-2 text-sub hover:bg-canvas sm:order-last"><X className="size-4" /></button>
+      <Link href={historyHref} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-brand" onClick={event=>{if(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();void(async()=>{if(await(beforeChangeRef.current?.()??Promise.resolve(true)))router.push(historyHref);})();}}>{th('history.title')}</Link>
       <div className="col-span-3 flex min-w-0 flex-wrap items-center gap-3 sm:contents">
         <div className="text-xs text-sub sm:text-right"><p>{t('tutoring_last_submission')}</p><p className="mt-1 font-semibold text-ink">{latest ? new Date(latest.createdAt).toLocaleString() : t(history.isError ? 'tutoring_status_unknown' : 'tutoring_not_submitted')}</p></div>
         <div className="border-l border-border pl-3 text-right text-xs text-sub"><p>{t('tutoring_score')}</p><p className="mt-1 font-bold text-ink">{latest ? `${latest.score}/100` : '—'}</p></div>

@@ -1,4 +1,5 @@
 'use client';
+import { useHistoryCovered } from '@/lib/monitoring/history-presentation';
 
 import { pointerIsPlaceable, type CollaborationPointer } from '@cove/shared';
 import * as React from 'react';
@@ -72,7 +73,7 @@ function useHydrated(): boolean {
  * which is false; naming the pane they are looking at is true and is usually
  * the more useful sentence anyway.
  */
-export function RemotePointer({
+function RemotePointerContent({
   name,
   pointer,
   position,
@@ -311,3 +312,5 @@ function scrollPointerIntoView(pointer: CollaborationPointer): void {
     top: top - (surfaceBox.top + surfaceBox.height / 2),
   });
 }
+
+export function RemotePointer(props: React.ComponentProps<typeof RemotePointerContent>) { const covered = useHistoryCovered(); return covered ? null : <RemotePointerContent {...props} />; }

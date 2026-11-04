@@ -36,6 +36,7 @@ export function resolvePointerSurface(
   target: EventTarget | null,
 ): ResolvedPointerSurface | null {
   if (typeof Element === 'undefined' || !(target instanceof Element)) return null;
+  if (target.closest('[data-history-private]')) return null;
   const element = target.closest<HTMLElement>(
     `[${collaborationSurfaceAttribute}]`,
   );

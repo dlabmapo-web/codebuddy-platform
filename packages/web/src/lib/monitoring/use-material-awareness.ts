@@ -1,4 +1,5 @@
 'use client';
+import { useHistoryCovered } from './history-presentation';
 import { useEffect, useRef } from 'react';
 import type { Socket } from 'socket.io-client';
 import { observationEvents, type ObservationAwareness } from '@cove/shared';
@@ -13,9 +14,10 @@ const sequences = new WeakMap<object, number>();
 export function useMaterialPointerPublisher({ enabled, socket, academyId, materialId, classId, membershipId }: {
   enabled: boolean; socket: Socket | null; academyId: string | null; materialId?: string | null; classId?: string; membershipId?: string;
 }) {
+  const covered = useHistoryCovered();
   const value = useRef<Pick<ObservationAwareness, 'pointer' | 'focus' | 'editor'>>({ pointer: null, focus: null, editor: null });
   useEffect(() => {
-    if (!enabled || !socket || !academyId || !classId || !materialId) return;
+    if (covered || !enabled || !socket || !academyId || !classId || !materialId) return;
     value.current = { pointer: null, focus: null, editor: null };
     let dirty = false; let lastPoint: PointerViewportPoint | null = null;
     const event = membershipId ? observationEvents.teacherAwareness : observationEvents.awareness;
@@ -56,7 +58,7 @@ export function useMaterialPointerPublisher({ enabled, socket, academyId, materi
       clear(); clearInterval(timer); stopFrames(); socket.off(observationEvents.request, request); socket.off('connect', request);
       document.removeEventListener('pointermove', move, true); window.removeEventListener(codeGeometryEvent, geometry);
     };
-  }, [enabled, socket, academyId, classId, materialId, membershipId]);
+  }, [covered, enabled, socket, academyId, classId, materialId, membershipId]);
 }
 export function useMaterialAwareness(input: { enabled: boolean; materialId: string; classId?: string; activeFile?: string }) {
   const { socket, academyId } = useStudentPresence();

@@ -498,6 +498,7 @@ export function studioNavGroups({
     // under Teaching rather than beside the Overview link because it is scoped
     // to assigned classes, exactly as My classes is, and a teacher looking for
     // "my students" looks where "my classes" already is.
+    teaching.push({ href: routes.academyTeachHistory(academySlug), labelKey: 'link.student_history', icon: ClipboardList });
     teaching.push({
       href: routes.academyTeachAnalytics(academySlug),
       labelKey: 'link.student_analytics',

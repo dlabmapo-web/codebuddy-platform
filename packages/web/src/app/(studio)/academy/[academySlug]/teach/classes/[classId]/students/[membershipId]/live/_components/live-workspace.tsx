@@ -45,6 +45,8 @@ import { LiveEditor } from './live-editor';
 import { feedbackScope } from '@/lib/monitoring/feedback-draft-store';
 import { useFeedbackDraft } from '@/lib/monitoring/feedback-draft-provider';
 import { LiveHelpQueue } from '@/components/monitoring/help-queue';
+import { MonitoringTutorOutlet, MonitoringLiveContent } from '@/components/student-history/monitor-history';
+import { HistoryPresentationContext } from '@/lib/monitoring/history-presentation';
 import { StudentSwitcher } from '@/components/monitoring/student-switcher';
 
 import { FeedbackDock } from './live-feedback';
@@ -81,6 +83,7 @@ export function LiveWorkspace({
   observationConnection,
   onRegisterTransition,
   onReturnToObserved,
+  canEditProblem,
 }: {
   academyId: string;
   classId: string;
@@ -95,6 +98,7 @@ export function LiveWorkspace({
   observationConnection?: React.ComponentProps<typeof LiveHeader>['connection'];
   onRegisterTransition?: (prepare: (() => Promise<boolean>) | null) => void;
   onReturnToObserved?: () => void;
+  canEditProblem?: boolean;
 }) {
   const academySlug = useAcademySlug();
   const { t } = useTranslation('monitoring');
@@ -263,6 +267,10 @@ export function LiveWorkspace({
   // exactly; what differs is where the payload came from and what may be done
   // with it.
   const shown = previewed ?? liveExercise ?? (lastExercise?.exercise.materialId === selectedMaterialId ? lastExercise : null);
+  const setHistoryMaterial = React.useContext(HistoryPresentationContext)?.setMaterial;
+  React.useEffect(() => {setHistoryMaterial?.(selectedMaterialId ?? materialId ?? context.exercise?.exercise.materialId ?? null,
+    shown?.breadcrumb.course.id, 'PROGRAMMING_EXERCISE', shown?.exercise.title);},
+    [selectedMaterialId,materialId,context.exercise?.exercise.materialId,shown?.breadcrumb.course.id,shown?.exercise.title,setHistoryMaterial]);
   const sampleTestCases = React.useMemo(
     () => (previewed ? [] : (liveExercise?.exercise.sampleTestCases ?? [])),
     [liveExercise, previewed],
@@ -369,6 +377,7 @@ export function LiveWorkspace({
 
       <div className="shrink-0" {...surfaceProps('header')}>
         <LiveHeader
+          canEditProblem={canEditProblem}
           helpQueue={<LiveHelpQueue academyId={academyId} classId={classId} currentMembershipId={membershipId} prepare={live.prepareStudentSwitch} cancel={live.cancelStudentSwitch} />}
           studentSwitcher={<StudentSwitcher academyId={academyId} classId={classId} membershipId={membershipId} name={context.student.displayName ?? context.student.email ?? membershipId} className={context.class.name} prepare={live.prepareStudentSwitch} cancel={live.cancelStudentSwitch} />}
           answer={<>
@@ -478,7 +487,8 @@ export function LiveWorkspace({
 
       {/* The panel and the panes share one row, so opening the course takes
           width from the workspace rather than covering it. */}
-      <div className={navigatorRow}>
+      <div className={`relative ${navigatorRow}`}>
+        <MonitoringLiveContent>
         <WorkspaceCurriculumNavigator
           resourceHref={onSelectMaterial ? undefined : (id) => {
             for (const courseModule of display.navigator?.course.modules ?? []) for (const lecture of courseModule.lectures) {
@@ -671,6 +681,8 @@ export function LiveWorkspace({
               </div>
           </section>
         </div>
+        </MonitoringLiveContent>
+        <MonitoringTutorOutlet />
       </div>
     </div>
   );

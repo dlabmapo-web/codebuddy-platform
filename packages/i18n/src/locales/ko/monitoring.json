@@ -43,7 +43,7 @@
     "never_seen": "없음",
     "membership_inactive": "비활성 멤버십",
     "in_exercise": "학습 자료 보는 중",
-    "solution_status": "풀이 현황"
+    "solution_status": "학생 학습 기록"
   },
   "state": {
     "ONLINE": "접속",
@@ -75,6 +75,7 @@
     "revoked_body": "더 이상 이 반의 담당 강사가 아닙니다."
   },
   "workspace": {
+    "edit_problem": "문제 편집",
     "recovery_body": "실시간 모니터링을 일시적으로 사용할 수 없습니다. 자동으로 재연결을 시도하며, 계속 연결되지 않으면 다시 시도할 수 있습니다. 동기화가 완료될 때까지 편집이 중지됩니다.",
     "retry_connection": "연결 다시 시도",
     "title": "실시간 지도",
@@ -269,6 +270,7 @@
     "rate_limited": "요청이 너무 많습니다. 1분 후 다시 시도해 주세요."
   },
   "observation": {
+    "choose_material": "선택한 자료가 없습니다. 강의 목차에서 자료를 선택하면 학생의 작업을 확인할 수 있습니다.",
     "materials": "학습 자료",
     "student_on": "학생의 현재 자료: {{title}}",
     "no_material": "온라인 · 열어 둔 자료 없음",

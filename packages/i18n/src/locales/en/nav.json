@@ -33,7 +33,8 @@
     "resources": "Resources",
     "lessons": "Lessons",
     "shared_courses": "Courses",
-    "content_management": "Content management"
+    "content_management": "Content management",
+    "student_history": "Student history"
   },
   "academy_switcher": {
     "select": "Select academy",

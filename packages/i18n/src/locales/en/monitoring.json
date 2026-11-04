@@ -45,7 +45,7 @@
     "never_seen": "Never",
     "membership_inactive": "Inactive membership",
     "in_exercise": "Viewing a material",
-    "solution_status": "Solution status"
+    "solution_status": "Student history"
   },
   "state": {
     "ONLINE": "Online",
@@ -77,6 +77,7 @@
     "revoked_body": "You are no longer the assigned teacher for this class."
   },
   "workspace": {
+    "edit_problem": "Edit problem",
     "recovery_body": "Live monitoring is temporarily unavailable. Reconnection is attempted automatically; you can retry if it remains unavailable. Editing is paused until synchronization completes.",
     "retry_connection": "Retry connection",
     "title": "Live help",
@@ -271,6 +272,7 @@
     "rate_limited": "Too many requests. Wait a minute, then retry."
   },
   "observation": {
+    "choose_material": "No material is selected. Choose one from the course outline to inspect this student’s work.",
     "materials": "Materials",
     "student_on": "Student is on {{title}}",
     "no_material": "Online — no material open",

@@ -1,4 +1,8 @@
 'use client';
+import { useContext, useEffect } from 'react';
+import { HistoryPresentationContext } from '@/lib/monitoring/history-presentation';
+import { MonitoringHistoryActions } from '@/components/student-history/monitor-history';
+import { MonitoringProblemEditLink } from '@/components/monitoring/problem-edit-link';
 
 import { routes } from '@/lib/routes';
 
@@ -43,6 +47,7 @@ export function LiveHeader({
   helpQueue,
   materialTitle,
   saveStatus,
+  canEditProblem = false,
 }: {
   studentSwitcher: React.ReactNode;
   classId: string;
@@ -72,7 +77,10 @@ export function LiveHeader({
   helpQueue?: React.ReactNode;
   materialTitle?: string;
   saveStatus?: string;
+  canEditProblem?: boolean;
 }) {
+  const setHistoryConnection=useContext(HistoryPresentationContext)?.setConnection;
+  useEffect(()=>{setHistoryConnection?.(connection);},[connection,setHistoryConnection]);
   const academySlug = useAcademySlug();
   const { t } = useTranslation('monitoring');
   const { t: tc } = useLayoutTranslation('courses');
@@ -97,7 +105,7 @@ export function LiveHeader({
             {exercise ? <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${difficultyStyles[exercise.exercise.difficulty]}`}>{tc(`exercise.difficulty.${exercise.exercise.difficulty}`)}</span> : null}
           </div>
         </div>
-        <div className="flex max-w-full flex-wrap items-center gap-2">{helpQueue}{helpMode}{answer}</div>
+        <div className="flex max-w-full flex-wrap items-center gap-2">{helpQueue}{helpMode}<MonitoringHistoryActions /><MonitoringProblemEditLink canEdit={canEditProblem} exercise={exercise} />{answer}</div>
       </div>
     </header>
   );

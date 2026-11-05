@@ -84,19 +84,28 @@ transaction and the separate `managed()` pre-check are no longer needed.
 - **Narrower result type.** The result is a narrow projection. The typecheck
   confirms that no consumer reads a dropped field.
 
-### 4.2 Whether DLAB governs an account, in the same snapshot
+### 4.2 DLAB policy facts inside the access reads
 
-`readAcademyPermission` and `readAccount` also return
-`EXISTS (dlab_identities for this user)`.
+The eligibility read is a SQL fragment (`dlabEligibilityJson`), correlated to
+the user row. `readAcademyPermission` and `readAccount` embed it, so permission
+facts and DLAB facts come from one statement and one snapshot. (An earlier
+revision returned only whether a DLAB identity existed.)
 
-- `AcademyAccessService.requirePermission` reads DLAB policy only when that fact
-  is true. For a governed account, the policy still runs live on every request.
-- `AuthService.present` skips `dlabAcademyIds` only when the fact is explicitly
-  `false`. Other callers pass full user records without the fact and keep
-  checking as before.
-- The platform permission check is unchanged. It serves only administrator
-  pages, and folding it would have meant replacing its tested Prisma read for
-  one statement.
+- **Academy permissions.** `AcademyAccessService.requirePermission` calls
+  `DlabPolicyService.assertAcademyFrom` on the embedded facts. For an ordinary
+  account the facts are null, and no policy runs.
+- **Account reads.** `AuthService.present` calls `dlabAcademyIdsFrom` on facts
+  from `readAccount`. Callers that pass full user records without facts keep
+  reading the policy themselves.
+- **Decision code.** The policy's decision (`decide`) is the former snapshot
+  logic, unchanged. It now applies the rollout mode's `ssoEnabled` rule in code
+  to candidate campuses that carry the flag, so the fragment needs no
+  configuration.
+- **Platform permissions.** The platform permission check is unchanged. It
+  serves only administrator pages.
+
+A DLAB account's academy request therefore costs two statements before its
+data: the session gate and one permission read. It used to cost about 25.
 
 ### 4.3 Reuse of checks already made within one call
 
@@ -178,6 +187,81 @@ The same race reset a browser test's direct API request (`ECONNRESET`).
   idle for 7 s was reused rather than closed. `docker compose config` resolves
   the variable for `studio`.
 
+### 4.9 Targeted DLAB re-checks
+
+Every DLAB login and every HQ user sync published `recheck` to every live
+socket, including no-op syncs. Each socket then re-verified its token and read
+policy. At 400 sockets and 30 logins at the start of a class, that is about
+12,000 checks in a minute through a 10-connection pool.
+
+- **Login and user sync.** These now publish `recheck:<authUserId>`.
+  `DlabPolicyService.watch(listener, authUserId)` wakes only that account's
+  sessions.
+- **Unchanged broadcasts.** Campus changes and the operator CLI still publish
+  plain `recheck`, which wakes everyone. Anything unrecognised also wakes
+  everyone, so an unknown message can only over-check.
+- **No-op syncs** wake nobody. The 10-second periodic check is unchanged.
+
+A change to one account cannot alter another account's policy facts, so no
+outcome changes.
+
+### 4.10 DLAB login
+
+The login was measured end to end at 35 ms per round trip (returning user,
+average):
+
+| Step | Before | After |
+|---|---|---|
+| `complete` | 56 statements / 2.29 s | 45 / 1.86 s |
+| `activate` | 11 / 0.45 s | 4 / 0.17 s |
+| First `auth.me` | 25 / 1.02 s | 2 / 0.10 s |
+
+`desiredDlabCampuses` no longer loads each campus's academy row. The reconcile
+needs only `academyId`, which the filter guarantees.
+
+The remaining cost is three locked transactions per login. They hold the one
+platform-wide `cove:dlab:write` advisory lock for about 48 round trips. That is
+about 1.7 s per login today, so 30 simultaneous logins queue for about 50 s;
+in Seoul it would be about 2 s. The serialization is intentional, so changing
+the lock is a separate design decision.
+
+### 4.11 One-statement curriculum hierarchy
+
+`learn/curriculum-read.ts` (`readCurricula`, `withCurriculum`, `withCurricula`)
+reads each course's hierarchy in one statement instead of Prisma's nine or so.
+
+- **Exact match.** It applies the same visibility filters (none in preview),
+  the same `position, id` order and the same narrowed fields. It rebuilds the
+  objects in the same key order, with `Date` and `BigInt` restored. Video byte
+  sizes travel as text.
+- **Call sites.** The learn service (catalog, outline, preview, workspace
+  material), the outline service, the student overview, the class pages, video,
+  PDF and manual (both reads) all load plain course rows and attach the
+  hierarchy. Class pages attach every assigned course in one statement.
+- **Types.** `visibleCurriculumInclude` remains the type source and the parity
+  baseline.
+
+### 4.12 Short-answer grading on submit
+
+A queued short answer was graded only by a one-second poll, which ran two
+statements every second even when idle.
+
+- **Wake on queue.** Submission, resubmission and retry now call
+  `requestDrain()`, so grading starts immediately.
+- **No waiting between rounds.** A drain requested while one runs runs right
+  after it. A drain that returns a full batch continues at once, so bursts no
+  longer wait a second per batch of four.
+- **Recovery.** The poll remains as recovery (expired leases, other processes)
+  every five seconds.
+
+### 4.13 Dashboard and console stages
+
+- **Manager overview.** Reads academy media and role and class totals in its
+  first parallel round instead of two later rounds.
+- **Admin console.** The academy overview, course detail and class detail
+  pages request their data beside the academy read. Existing 404, "load
+  failed" and "access denied" outcomes are unchanged.
+
 ## 5. Rejected alternatives
 
 | Alternative | Result | Decision |
@@ -185,6 +269,8 @@ The same race reset a browser test's direct API request (`ECONNRESET`).
 | Prisma `relationJoins` | At 35 ms: −43% statements, −30% time. At 0 ms with the large course: 4.2 s → 6.5 s total; course list 98 → 364 ms; exercise bootstrap 118 → 325 ms. Postgres CPU builds per-row LATERAL JSON for wide curriculum trees. | Rejected. It loses once the app sits next to the database (planned AWS Seoul move), loads the Micro compute CPU, and is still a preview feature. |
 | Prisma 7.10.1 | Same 34 `IN (NULL)` statements as 7.9.0 in the sample | Rejected; no benefit. |
 | Reusing eligibility per request | Conflicts with the request-context rule; after 4.1–4.2 it would save about one statement per request | Not done. |
+| Starting page data before `auth.me` | Needs every page (about 40) to guess its academy id from a cache and re-check it; saves one `auth.me` round trip (about 0.1 s today, about 10 ms in Seoul) | Not done; the risk to access paths outweighs the gain. |
+| Trimming `auth.bootstrap` | Serves only password and social sign-ins, which an all-DLAB platform does not use | Not done. |
 
 ## 6. Verification
 
@@ -228,14 +314,54 @@ The same race reset a browser test's direct API request (`ECONNRESET`).
     and it fails identically on unchanged `b9ab8851`.
   - Full repository `pnpm typecheck` passes.
 
-Results on identical data:
+Results on identical data (`b9ab8851` vs this branch, demo dataset with a
+1,604-material course, DLAB teacher and student):
 
 | Scope | Statements | Time |
 |---|---|---|
-| 80 page-load reads, 35 ms link | 1,827 → 1,112 (−39%) | 61.3 s → 32.0 s (−48%) |
-| Same, 0 ms link | 1,825 → 1,112 | 4.20 s → 3.61 s (−14%) |
-| 11 DLAB teacher/student page calls, 35 ms link | 422 → 82 (−81%) | 14.8 s → 3.1 s (−79%) |
-| DLAB `auth.me`, every page | 25 → 3 | 1,028 → 140 ms |
+| 80 page-load reads, 35 ms link | 1,829 → 1,004 (−45%) | 61.3 s → 28.6 s (−53%) |
+| Same, 0 ms link | 1,828 → 1,003 | 4.40 s → 3.80 s (−14%) |
+| DLAB student, 15 calls, 35 ms | 610 → 225 | 21.0 s → 6.9 s (−67%) |
+| DLAB teacher, 16 calls, 35 ms | 666 → 261 | 25.1 s → 8.3 s (−67%) |
+| DLAB returning login, 35 ms | 92 → 48 | 3.94 s → 2.04 s (−48%) |
+
+### Browser page-to-page navigation
+
+Production builds of the original `b9ab8851` and this branch were each run
+against the real API and a fresh disposable database. The database sat behind
+a 35 ms link, and Chromium had 45 ms of added latency (Korea → Tokyo). All
+users were DLAB accounts created through the real SSO flow: a manager, a team
+lead, a teacher and 15 students in one academy, with a 1,600-material course.
+
+Each role clicked through its menus the way a person does. Time runs from the
+click until no page, RSC, API or script request is pending; link prefetches
+are excluded. Each journey ran twice; the warm second pass is shown.
+
+| Role | Pages | Total (warm) | First visit | Statements |
+|---|---|---|---|---|
+| Manager | home, courses, course, problem editor, classes, class, people, students, student, staff, points, settings | 37.7 s → 11.5 s (−70%) | −67% | 1,379 → 333 |
+| Team lead | home, courses, course, problem editor, classes, class, students, student, points | 27.7 s → 10.3 s (−63%) | −56% | 1,065 → 246 |
+| Teacher | home, classes, roster, progress, student work, students, analytics, history, courses, course | 26.3 s → 6.4 s (−76%) | −73% | 1,031 → 116 |
+| Student | home, courses, course, exercise, quiz, video, PDF, classes, class, records, points, my page | 38.5 s → 13.0 s (−66%) | −66% | 2,092 → 506 |
+
+Typical page switches are now 0.4–1.0 s, down from 2.2–3.5 s. The slowest
+remaining are the student exercise page (2.4 s) and quiz page (1.8 s). Both
+are now bound by the browser, not the database:
+
+- **Exercise.** The Pyodide runtime and the editor load, then six client calls
+  run in parallel.
+- **Quiz.** The page loads `/api/manual` before it asks for the outline and the
+  latest submission.
+
+The final round also covers the new code:
+
+- **Tests added.** Parity tests for embedded DLAB facts and the one-statement
+  curriculum read (values, `Date`/`BigInt` types and key order), unit tests
+  for targeted re-check notices and short-answer wake-ups, and a real-Redis
+  test that a user sync re-checks only that account.
+- **Totals.** API 1,638 unit and 87 integration tests pass, and web 1,483.
+  Official `pnpm test:dlab` on fresh containers passes every stage
+  (17 + 169 + 69 + 16) and all 37 browser tests.
 
 ## 7. Next candidates (not in this change)
 

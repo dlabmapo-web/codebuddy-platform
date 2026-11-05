@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { canManageAcademySettings } from '@/lib/academy-access-state';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { getAcademyFeatures } from '@/lib/orpc-server';
 
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import { FeatureSettings } from './_components/feature-settings';
@@ -30,7 +30,8 @@ export default async function AcademySettingsPage({
 
   let features: AcademyFeatureList | null = null;
   try {
-    features = await createServerORPCClient().academyFeatures.list({ academyId });
+    // Shared with the studio frame's read in this same render.
+    features = await getAcademyFeatures(academyId);
   } catch {
     // The client owns the retry and can say what happened.
   }

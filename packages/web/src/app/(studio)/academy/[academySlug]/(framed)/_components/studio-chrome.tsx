@@ -29,7 +29,7 @@ import { sessionNamespaces, supportNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { activeSupportGrant, inspectAcademyRoute } from '@/lib/academy-route';
 import { heldRoles } from '@/lib/academy-view-role';
-import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
+import { getAcademyFeatures, getAccount } from '@/lib/orpc-server';
 import { StudioSidebar, type StudioAcademy } from './studio-sidebar';
 
 /**
@@ -287,9 +287,7 @@ export async function StudioChrome({
  */
 async function academyPointsEnabled(academyId: string): Promise<boolean> {
   try {
-    const { features } = await createServerORPCClient().academyFeatures.list({
-      academyId,
-    });
+    const { features } = await getAcademyFeatures(academyId);
     return features.some(
       (feature) => feature.feature === 'STUDENT_POINTS' && feature.isEnabled,
     );

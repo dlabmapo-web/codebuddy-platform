@@ -28,6 +28,17 @@ export default async function ExercisePage({
   // write control from an operator the API would have allowed.
   const { academyId, roles } = await requireAcademyRoute(academySlug);
   const client = createServerORPCClient();
+  const canEdit = canManageExercises(roles);
+  // Requested beside the exercise rather than after it; the role decides
+  // whether it is needed, and it is only consulted once the exercise exists.
+  const solutionsRequest = canEdit
+    ? client.academyCourses
+      .getExerciseSolution({ academyId, courseId, lectureId, materialId })
+      .then(
+        (solution) => ({ solutions: solution.solutions }),
+        (error: unknown) => ({ error }),
+      )
+    : null;
   let context;
   let solutions: ExerciseSolutionEntry[] = [];
   try {
@@ -50,12 +61,11 @@ export default async function ExercisePage({
     });
     notFound();
   }
-  const canEdit = canManageExercises(roles);
-  if (canEdit) {
+  if (solutionsRequest) {
     // Fail closed: an unread collection must not be overwritten by an empty draft.
-    solutions = await client.academyCourses
-      .getExerciseSolution({ academyId, courseId, lectureId, materialId })
-      .then((solution) => solution.solutions);
+    const read = await solutionsRequest;
+    if ('error' in read) throw read.error;
+    solutions = read.solutions;
   }
 
   return (

@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { canManageAcademySettings } from '@/lib/academy-access-state';
 import { requireAcademyRoute } from '@/lib/academy-route';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { createServerORPCClient, getAcademyFeatures } from '@/lib/orpc-server';
 
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import { PointPolicyForm } from './_components/point-policy-form';
@@ -31,16 +31,16 @@ export default async function PointPolicyPage({
   // Explicitly off is a 404; unknown is not. A page that hid itself whenever
   // the features read had a bad moment would be a settings page that
   // disappears during an outage, which reads as a permission problem.
+  // Asked alongside the feature check rather than after it; a points-off
+  // academy still answers 404 below and the unused policy is discarded.
+  const policyRequest = createServerORPCClient().points.policy.get({ academyId })
+    // The client owns the retry and can say what happened.
+    .then((value): PointPolicyState | null => value, () => null);
   if ((await pointsEnabled(academyId)) === false) notFound();
 
   const { t } = await getServerTranslation(['points']);
 
-  let state: PointPolicyState | null = null;
-  try {
-    state = await createServerORPCClient().points.policy.get({ academyId });
-  } catch {
-    // The client owns the retry and can say what happened.
-  }
+  const state = await policyRequest;
 
   return (
     <StudioPage
@@ -55,9 +55,7 @@ export default async function PointPolicyPage({
 /** True, false, or null when the academy could not be asked. */
 async function pointsEnabled(academyId: string): Promise<boolean | null> {
   try {
-    const { features } = await createServerORPCClient().academyFeatures.list({
-      academyId,
-    });
+    const { features } = await getAcademyFeatures(academyId);
     return features.some(
       (feature) => feature.feature === 'STUDENT_POINTS' && feature.isEnabled,
     );

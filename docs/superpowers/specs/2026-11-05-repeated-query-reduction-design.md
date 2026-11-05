@@ -327,31 +327,58 @@ Results on identical data (`b9ab8851` vs this branch, demo dataset with a
 
 ### Browser page-to-page navigation
 
-Production builds of the original `b9ab8851` and this branch were each run
-against the real API and a fresh disposable database. The database sat behind
-a 35 ms link, and Chromium had 45 ms of added latency (Korea → Tokyo). All
-users were DLAB accounts created through the real SSO flow: a manager, a team
-lead, a teacher and 15 students in one academy, with a 1,600-material course.
+Production builds of the original `b9ab8851` (API and web) and of this branch
+(API and web) were each served against a fresh disposable database. The
+runner checks that the web server on port 3309 runs from that variant's build
+folder; an earlier run had reused one web server for both variants, and its
+figures were withdrawn.
 
-Each role clicked through its menus the way a person does. Time runs from the
-click until no page, RSC, API or script request is pending; link prefetches
-are excluded. Each journey ran twice; the warm second pass is shown.
+- **Latency.** The database sat behind a 35 ms link, and Chromium had 45 ms of
+  added latency (Korea → Tokyo).
+- **Users.** All users were DLAB accounts created through the real SSO flow: a
+  manager, a team lead, a teacher and 15 students in one academy, with a
+  1,600-material course.
+- **Method.** Each role clicked through its menus the way a person does. Time
+  runs from the click until no page, RSC, API or script request is pending;
+  link prefetches are excluded. Every step landed on its page with no server
+  errors.
 
-| Role | Pages | Total (warm) | First visit | Statements |
+| Role | Pages | Warm pass | First visit | Statements |
 |---|---|---|---|---|
-| Manager | home, courses, course, problem editor, classes, class, people, students, student, staff, points, settings | 37.7 s → 11.5 s (−70%) | −67% | 1,379 → 333 |
-| Team lead | home, courses, course, problem editor, classes, class, students, student, points | 27.7 s → 10.3 s (−63%) | −56% | 1,065 → 246 |
-| Teacher | home, classes, roster, progress, student work, students, analytics, history, courses, course | 26.3 s → 6.4 s (−76%) | −73% | 1,031 → 116 |
-| Student | home, courses, course, exercise, quiz, video, PDF, classes, class, records, points, my page | 38.5 s → 13.0 s (−66%) | −66% | 2,092 → 506 |
+| Manager | home, courses, course, problem editor, classes, class, people, students, student, staff, points, settings | 40.2 s → 10.8 s (−73%) | −67% | 1,394 → 333 |
+| Team lead | home, courses, course, problem editor, classes, class, students, student, points | 29.2 s → 10.9 s (−63%) | −61% | 1,062 → 247 |
+| Teacher | home, classes, roster, progress, student work, students, analytics, history, courses, course | 26.3 s → 6.5 s (−75%) | −75% | 1,035 → 116 |
+| Student | home, courses, course, exercise, quiz, written answer, Turtle, video, PDF, classes, class, records, points, my page | 46.1 s → 16.0 s (−65%) | −67% | 2,505 → 586 |
 
-Typical page switches are now 0.4–1.0 s, down from 2.2–3.5 s. The slowest
-remaining are the student exercise page (2.4 s) and quiz page (1.8 s). Both
-are now bound by the browser, not the database:
+Typical page switches are now 0.4–1.1 s, down from 2.2–3.5 s.
 
-- **Exercise.** The Pyodide runtime and the editor load, then six client calls
-  run in parallel.
-- **Quiz.** The page loads `/api/manual` before it asks for the outline and the
-  latest submission.
+### 4.14 Activity pages arrive with their activity (web)
+
+The quiz, written-answer and Turtle pages read the activity in the browser
+after hydration, and everything else waited for that read.
+
+- **Server read.** The pages now make that same read during the server render
+  (`lib/manual-server.ts`: same endpoint, token and view-role header) and hand
+  it to `ManualWorkspace`. Any failure falls back to the browser read.
+- **One-time use.** Each server read carries a one-time token
+  (`claimServerRead`). The browser uses the data only the first time it sees
+  the token, so a payload replayed on back/forward navigation reads as before.
+  The data applies only to the class it was read for.
+- **Seeded status.** `useSubmissionStatus` no longer re-reads a settled seed
+  (graded, recorded, or no attempt) on mount. An in-progress seed is still read
+  at once, so grading feedback and its polling keep their timing.
+
+Measured: quiz 4.87 s → 1.53 s, written answer 4.73 s → 1.51 s.
+
+**Exercise page (6.21 s → 2.87 s).** Its client calls already run in
+parallel. The remaining wait is the server bootstrap's sequential reads, about
+30 at about 35 ms each, then editor hydration. A Seoul deployment reduces those
+reads to roughly 50 ms; collapsing the workspace-material read with a
+parity-tested reader is the code-side candidate.
+
+**Team lead home (2.54 s → 2.32 s).** This page barely improved. It is the
+next dashboard to profile: its aggregate queries scale with curriculum size
+rather than round trips.
 
 The final round also covers the new code:
 

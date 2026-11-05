@@ -830,6 +830,7 @@ export class ManualService {
           where: { submissionId: existing.id, status: "ERROR" },
           data: { status: "PENDING" },
         });
+        this.shortAnswers.requestDrain();
       }
       return { submissionId: existing.id };
     }
@@ -952,6 +953,8 @@ export class ManualService {
         }
         throw error;
       });
+    // Grade now rather than at the worker's next recovery tick.
+    if (config.shortAnswer) this.shortAnswers.requestDrain();
     return { submissionId: submission.id };
   }
   capabilities() {
@@ -1135,6 +1138,7 @@ export class ManualService {
       where: { submissionId: input.submissionId, status: "ERROR" },
       data: { status: "PENDING" },
     });
+    this.shortAnswers.requestDrain();
     return { submissionId: input.submissionId };
   }
   private reviewScope(actor: AcademyAccess, academyId: string) {

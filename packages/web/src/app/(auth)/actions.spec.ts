@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   resolveSignInEmail: vi.fn(),
   checkUsernameAvailable: vi.fn(),
   beginStudentSession: vi.fn(),
+  bootstrap: vi.fn(),
   redirect: vi.fn(),
   signInWithPassword: vi.fn(),
   signOut: vi.fn(),
@@ -35,6 +36,7 @@ vi.mock('@/lib/config', () => ({ publicConfig: mocks.config }));
 vi.mock('@/lib/orpc-server', () => ({
   createServerORPCClient: () => ({
     auth: {
+      bootstrap: mocks.bootstrap,
       checkUsernameAvailable: mocks.checkUsernameAvailable,
       resolveSignInEmail: mocks.resolveSignInEmail,
       signUpStudent: mocks.signUpStudent,
@@ -71,6 +73,17 @@ import {
   startSocialAuthAction,
 } from './actions';
 
+function accountWith(memberships: Array<{ academy: { id: string; name: string; slug: string } }>) {
+  return {
+    user: {
+      id: '30000000-0000-4000-8000-000000000001', authUserId: '40000000-0000-4000-8000-000000000001',
+      email: 'minsu@example.com', username: 'minsu', displayName: 'Minsu', avatarUrl: null, imageUrl: null,
+      emailIsPlaceholder: false, platformRole: 'USER', status: 'ACTIVE', applications: [],
+      memberships: memberships.map(({ academy }) => ({ academy, role: 'STUDENT', roles: ['STUDENT'], status: 'ACTIVE', imageUrl: null })),
+    },
+  };
+}
+
 function formData(entries: Record<string, string>): FormData {
   const data = new FormData();
   for (const [key, value] of Object.entries(entries)) data.append(key, value);
@@ -105,6 +118,8 @@ beforeEach(() => {
   mocks.resolveSignInEmail.mockResolvedValue({ email: 'minsu@example.com' });
   mocks.checkUsernameAvailable.mockResolvedValue({ available: true });
   mocks.beginStudentSession.mockResolvedValue({});
+  // An account with no academy yet: its landing really is the welcome page.
+  mocks.bootstrap.mockResolvedValue(accountWith([]));
   mocks.signInWithPassword.mockResolvedValue({
     data: { session: null },
     error: { code: 'captcha_failed' },
@@ -549,5 +564,37 @@ describe('logoutAction', () => {
     mocks.signOut.mockResolvedValue({ error });
     await expect(logoutAction()).rejects.toBe(error);
     expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+});
+
+describe('sign-in landing', () => {
+  const academy = { id: '20000000-0000-4000-8000-000000000001', name: 'Mapo', slug: 'mapo' };
+
+  it('sends a member straight to their academy instead of through /welcome', async () => {
+    mocks.signInWithPassword.mockResolvedValue({ data: { session: { access_token: 'access-token' } }, error: null });
+    mocks.bootstrap.mockResolvedValue(accountWith([{ academy }]));
+
+    await loginAction({}, formData({ ...loginFields, captchaToken: 'turnstile-token' }));
+
+    expect(mocks.bootstrap).toHaveBeenCalledOnce();
+    expect(mocks.redirect).toHaveBeenCalledWith('/academy/mapo', 'replace');
+  });
+
+  it('sends a new signup with a session straight to its landing page', async () => {
+    mocks.signUp.mockResolvedValue({ data: { session: { access_token: 'access-token' }, user: { identities: [{}] } }, error: null });
+    mocks.bootstrap.mockResolvedValue(accountWith([{ academy }]));
+
+    await signupAction({}, formData({ ...signupFields, captchaToken: 'turnstile-token' }));
+
+    expect(mocks.redirect).toHaveBeenCalledWith('/academy/mapo', 'replace');
+  });
+
+  it('falls back to /welcome, which explains the failure, when the account cannot be read', async () => {
+    mocks.signInWithPassword.mockResolvedValue({ data: { session: { access_token: 'access-token' } }, error: null });
+    mocks.bootstrap.mockRejectedValue(new Error('api unavailable'));
+
+    await loginAction({}, formData({ ...loginFields, captchaToken: 'turnstile-token' }));
+
+    expect(mocks.redirect).toHaveBeenCalledWith('/welcome', 'replace');
   });
 });

@@ -13,6 +13,7 @@ import {
 } from '@cove/shared';
 
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
+import { authDestination } from '@/lib/academy-access-state';
 import { toApiError } from '@/lib/api-errors';
 import { publicConfig } from '@/lib/config';
 import { createServerORPCClient } from '@/lib/orpc-server';
@@ -160,7 +161,7 @@ export async function loginAction(
   if ((await cookies()).has('cove_invitation')) {
     redirect('/invite', RedirectType.replace);
   }
-  redirect('/welcome', RedirectType.replace);
+  redirect(await landingPath(data.session.access_token), RedirectType.replace);
 }
 
 /** Provider failures retain their own messages, including CAPTCHA and limits. */
@@ -302,7 +303,7 @@ export async function signupAction(
     // nowhere until an invitation or an approval makes it one.
     await beginStudentSession(data.session.access_token);
     redirect(
-      hasInvitation ? '/invite' : '/welcome',
+      hasInvitation ? '/invite' : await landingPath(data.session.access_token),
       RedirectType.replace,
     );
   }
@@ -523,6 +524,26 @@ export async function logoutAction(): Promise<void> {
   redirect('/login', RedirectType.replace);
 }
 
+
+/**
+ * Where a just-authenticated account lands, decided before the browser moves.
+ *
+ * The welcome page used to make this call after a second navigation, so every
+ * sign-in briefly showed `/welcome` and paid for an extra page render. The same
+ * bootstrap and the same `authDestination` now run here instead. `/welcome`
+ * stays the answer for an account that still needs it (no username, no
+ * academy) and for any failure, where it shows its unavailable card as before.
+ */
+async function landingPath(accessToken: string): Promise<string> {
+  try {
+    return authDestination(
+      await createServerORPCClient(accessToken, await clientAddress())
+        .auth.bootstrap({}),
+    );
+  } catch {
+    return '/welcome';
+  }
+}
 
 async function beginStudentSession(accessToken: string): Promise<boolean> {
   try {

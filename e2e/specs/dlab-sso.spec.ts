@@ -393,8 +393,13 @@ for (const osRole of ['tutor', 'edu_manager', 'lab_head'] as const) {
           if (kind === 'short') {
             const hint = editor.getByLabel('Input hint', { exact: true });
             await hint.fill('Use the language name.');
-            // The workspace polls every three seconds; it must not reset the open editor.
-            await staffPage.waitForResponse(response => new URL(response.url()).pathname === '/api/manual' && new URL(response.url()).searchParams.get('preview') === 'false', { timeout: 10_000 });
+            // A background refetch of the workspace must not reset the open
+            // editor. The workspace no longer polls on a timer (only a light
+            // submission-status check does), so trigger the refetch it does
+            // perform: the one on returning to the tab.
+            const refetched = staffPage.waitForResponse(response => new URL(response.url()).pathname === '/api/manual' && new URL(response.url()).searchParams.get('preview') === 'false', { timeout: 10_000 });
+            await staffPage.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
+            await refetched;
             await expect(hint).toHaveValue('Use the language name.');
           }
           await editor.getByRole('button', { name: 'Save activity', exact: true }).click();

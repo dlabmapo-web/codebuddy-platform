@@ -106,6 +106,7 @@ export class StudentOverviewService {
       trackedSince,
       records,
       standing,
+      drafts,
     ] = await Promise.all([
       settle(
         ["continue", "courses"],
@@ -174,22 +175,22 @@ export class StudentOverviewService {
         () => this.resolveStanding(scope, periodBounds, window),
         null,
       ),
+      // Independent of every read above, so it no longer waits for them.
+      settle(
+        ["continue"],
+        () =>
+          this.prisma.exerciseDraft.findMany({
+            where: {
+              userId: scope.userId,
+              materialId: { in: scope.materialIds },
+            },
+            orderBy: { updatedAt: "desc" },
+            take: STUDENT_MAX_CONTINUE_ROWS,
+            select: { materialId: true, code: true, updatedAt: true },
+          }),
+        [],
+      ),
     ]);
-
-    const drafts = await settle(
-      ["continue"],
-      () =>
-        this.prisma.exerciseDraft.findMany({
-          where: {
-            userId: scope.userId,
-            materialId: { in: scope.materialIds },
-          },
-          orderBy: { updatedAt: "desc" },
-          take: STUDENT_MAX_CONTINUE_ROWS,
-          select: { materialId: true, code: true, updatedAt: true },
-        }),
-      [],
-    );
 
     const activitySeconds = activityDays.reduce(
       (total, day) => total + day.activeSeconds,

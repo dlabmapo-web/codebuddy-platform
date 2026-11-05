@@ -57,6 +57,9 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     credentials: true,
     origin: configService.get("WEB_ORIGIN", { infer: true }),
+    // Every authenticated browser RPC is preflighted. Without a max age the
+    // browser forgets the answer after seconds and repeats the extra round trip.
+    maxAge: 600,
   });
   app.enableShutdownHooks();
   registerORPCRoutes(app);

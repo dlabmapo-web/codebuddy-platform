@@ -38,11 +38,20 @@ export const visibleCurriculumInclude = {
           materials: {
             where: { isVisible: true },
             orderBy: [{ position: "asc" }, { id: "asc" }],
+            // Only what outlines, summaries and progress read. Exercise text,
+            // starter code, solutions and manual content are loaded by the
+            // workspace that shows them, not once per material of a course.
             include: {
-              programmingExercise: true,
-              manualMaterial: true,
-              videoLesson: { include: { asset: true } },
-              pdfDocument: { include: { asset: true } },
+              programmingExercise: { select: { difficulty: true, submissionPolicy: true, referencePdfMaterialId: true } },
+              manualMaterial: { select: { includeInScore: true, maximumHundredths: true } },
+              videoLesson: {
+                select: { assetId: true, revision: true, placement: true, includeInScore: true, maximumHundredths: true,
+                  asset: { select: { state: true, durationMs: true, filename: true, byteSize: true } } },
+              },
+              pdfDocument: {
+                select: { placement: true, revision: true,
+                  asset: { select: { state: true, originalFilename: true, byteSize: true, pageCount: true } } },
+              },
             },
           },
         },

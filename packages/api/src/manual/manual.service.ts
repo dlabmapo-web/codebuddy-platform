@@ -53,9 +53,9 @@ import {
   nextMaterialPosition,
   compactMaterialPositions,
 } from "../content/content-positions.js";
-import { visibleCurriculumInclude } from "../learn/curriculum-outline.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { GuiClientService } from "./gui-client.service.js";
+import { withCurricula, withCurriculum } from "../learn/curriculum-read.js";
 type Target = { academyId: string; materialId: string };
 @Injectable()
 export class ManualService {
@@ -420,8 +420,7 @@ export class ManualService {
     const [outline, draft, attempts, classes, tutoringClasses] = await Promise.all([
       this.db.course.findUnique({
         where: { id: row.lecture.courseModule.course.id },
-        include: visibleCurriculumInclude,
-      }),
+      }).then((found) => found && withCurriculum(this.db, found)),
       staffPractice || config.shortAnswer || config.multipleChoice
         ? Promise.resolve(null)
         : this.db.manualDraft.findUnique({
@@ -1199,14 +1198,13 @@ export class ManualService {
     const where = this.reviewScope(actor, input.academyId);
     const row = await this.db.class.findFirst({
       where: { id: input.classId, ...where },
-      include: {
-        courseAssignments: {
-          include: { course: { include: visibleCurriculumInclude } },
-        },
-      },
+      include: { courseAssignments: { include: { course: true } } },
     });
     if (!row) throw new NotFoundException();
-    return row.courseAssignments.flatMap((a) =>
+    // Every assigned course's hierarchy in one statement.
+    const courses = await withCurricula(this.db, row.courseAssignments.map((a) => a.course));
+    const assignments = row.courseAssignments.map((a, index) => ({ ...a, course: courses[index]! }));
+    return assignments.flatMap((a) =>
       a.course.modules.flatMap((m) =>
         m.lectures.flatMap((l) =>
           l.materials

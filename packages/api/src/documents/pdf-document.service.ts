@@ -19,7 +19,6 @@ import { AuditService } from "../academies/audit.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AppException } from "../common/app-exception.js";
 import { learningScopeFor } from "../classes/assigned-course-access.js";
-import { visibleCurriculumInclude } from "../learn/curriculum-outline.service.js";
 import {
   bumpContentRevision,
   nextMaterialPosition,
@@ -27,6 +26,7 @@ import {
 } from "../content/content-positions.js";
 import { PdfStorageService } from "./pdf-storage.service.js";
 import { receivePdf, safePdfFilename, validatePdf } from "./pdf-files.js";
+import { withCurriculum } from "../learn/curriculum-read.js";
 
 type Target = { academyId: string; courseId: string; lectureId: string };
 export async function lockPdfAsset(tx: Prisma.TransactionClient, id: string) {
@@ -333,10 +333,10 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
     const course = material.lecture.courseModule.course;
     if (exerciseCourseId && course.id !== exerciseCourseId) throw new AppException("PDF_NOT_AVAILABLE", 404);
     if (input.exerciseMaterialId && material.pdfDocument.placement === "MAIN") throw new AppException("PDF_NOT_AVAILABLE", 404);
-    const outline = input.exerciseMaterialId ? null : await this.prisma.course.findUnique({
+    const found = input.exerciseMaterialId ? null : await this.prisma.course.findUnique({
       where: { id: course.id },
-      include: visibleCurriculumInclude,
     });
+    const outline = found && await withCurriculum(this.prisma, found);
     const materials: PdfReadResult["materials"] = [];
     const resources: PdfReadResult["resources"] = [];
     for (const module of outline?.modules ?? [])

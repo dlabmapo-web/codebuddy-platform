@@ -11,6 +11,7 @@ import {
 
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
+import { withCurriculum } from "./curriculum-read.js";
 
 /**
  * One course, shaped as an outline, for one person's progress.
@@ -91,9 +92,8 @@ export class CurriculumOutlineService {
   ): Promise<LearnCourseOutline | null> {
     const course = await this.prisma.course.findFirst({
       where: { id: courseId, academyId, isVisible: true },
-      include: visibleCurriculumInclude,
     });
-    return course ? this.outlineFor(course, userId) : null;
+    return course ? this.outlineFor(await withCurriculum(this.prisma, course), userId) : null;
   }
 
   /** The same fold, for a caller that already read the course graph. */

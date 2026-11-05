@@ -26,6 +26,12 @@ export default async function PlatformClassDetailPage({
   const { from } = await searchParams;
   const { academyId } = await requirePlatformAcademyRoute(academySlug);
   const client = createPlatformServerORPCClient();
+  // Requested beside the academy read rather than after it; consulted only
+  // once the academy is known to exist.
+  const detailRequest = client.academyClasses.get({ academyId, classId }).then(
+    (detail) => ({ detail, denied: false }),
+    (error: unknown) => ({ detail: null, denied: isAccessDeniedError(error) }),
+  );
   const academy = await client.platformAcademies
     .get({ academyId })
     .catch(() => null);
@@ -33,13 +39,7 @@ export default async function PlatformClassDetailPage({
 
   const { t } = await getServerTranslation(['classes', 'platform-content']);
   const contentPaths = createContentPaths(academySlug, 'console');
-  let detail = null;
-  let denied = false;
-  try {
-    detail = await client.academyClasses.get({ academyId, classId });
-  } catch (error) {
-    denied = isAccessDeniedError(error);
-  }
+  const { detail, denied } = await detailRequest;
 
   const locale = await getLocale();
   const { resources } = await initTranslations(locale, pointsNamespaces);

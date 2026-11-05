@@ -24,6 +24,12 @@ export default async function PlatformCourseBuilderPage({
   const { from } = await searchParams;
   const { academyId } = await requirePlatformAcademyRoute(academySlug);
   const client = createPlatformServerORPCClient();
+  // Requested beside the academy read rather than after it; consulted only
+  // once the academy is known to exist.
+  const treeRequest = client.academyCourses.getOutline({ academyId, courseId }).then(
+    (tree) => ({ tree, loadFailed: false }),
+    (error: unknown) => ({ tree: null, loadFailed: !isAccessDeniedError(error) }),
+  );
   const academy = await client.platformAcademies
     .get({ academyId })
     .catch(() => null);
@@ -31,13 +37,7 @@ export default async function PlatformCourseBuilderPage({
 
   const { t } = await getServerTranslation(['content', 'platform-content']);
   const contentPaths = createContentPaths(academySlug, 'console');
-  let initialTree = null;
-  let loadFailed = false;
-  try {
-    initialTree = await client.academyCourses.getOutline({ academyId, courseId });
-  } catch (error) {
-    loadFailed = !isAccessDeniedError(error);
-  }
+  const { tree: initialTree, loadFailed } = await treeRequest;
 
   const back = consoleBackTarget(
     from,

@@ -22,6 +22,7 @@ import Link from 'next/link';
 import { useMemo, useState, type ReactNode } from 'react';
 
 import { DataTable } from '@/components/studio/data-table';
+import { Tooltip, TooltipProvider } from '@/components/studio/primitives';
 import { DeleteConfirmDialog } from '@/components/studio/delete-confirm-dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
@@ -54,34 +55,39 @@ function CoursesCell({ courses }: { courses: AssignedCourseSummary[] }) {
   const shown = courses.slice(0, CHIP_LIMIT);
   const rest = courses.length - shown.length;
   return (
-    // The chips are decoration for a reader who can see them; the accessible
-    // name carries the complete list, so `+2` is never the whole answer.
-    <span
-      aria-label={t('courses_cell.aria', {
-        count: courses.length,
-        titles: courses.map((course) => course.title).join(', '),
-      })}
-      className="flex flex-wrap items-center gap-1"
-      role="group"
+    <Tooltip
+      side="top"
+      content={
+        <ul className="max-w-72 space-y-1 text-left text-[12.5px] font-medium">
+          {courses.map((course) => (
+            <li className="break-words" key={course.id}>{course.title}</li>
+          ))}
+        </ul>
+      }
     >
-      {shown.map((course) => (
-        <span
-          aria-hidden
-          className="max-w-[11rem] truncate rounded-md bg-brand-soft px-2 py-0.5 text-[12.5px] font-semibold text-brand"
-          key={course.id}
-        >
-          {course.title}
-        </span>
-      ))}
-      {rest > 0 ? (
-        <span
-          aria-hidden
-          className="rounded-md bg-canvas px-2 py-0.5 font-mono text-[12.5px] font-bold text-sub tabular-nums"
-        >
-          {t('courses_cell.more', { count: rest })}
-        </span>
-      ) : null}
-    </span>
+      <span
+        aria-label={t('courses_cell.aria', {
+          count: courses.length,
+          titles: courses.map((course) => course.title).join(', '),
+        })}
+        className="flex w-fit max-w-full flex-col items-start gap-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+        role="group"
+        tabIndex={0}
+      >
+        {shown.map((course, index) => (
+          <span aria-hidden className="flex min-w-0 max-w-full items-center gap-1" key={course.id}>
+            <span className="min-w-0 truncate rounded-md bg-brand-soft/70 px-2 py-1 text-[12px] font-medium leading-tight text-brand">
+              {course.title}
+            </span>
+            {rest > 0 && index === shown.length - 1 ? (
+              <span className="shrink-0 rounded-md bg-canvas px-1.5 py-1 text-[12px] font-semibold leading-tight text-sub tabular-nums">
+                {t('courses_cell.more', { count: rest })}
+              </span>
+            ) : null}
+          </span>
+        ))}
+      </span>
+    </Tooltip>
   );
 }
 
@@ -128,10 +134,15 @@ function TeacherCell({
     <span
       aria-label={
         effective
-          ? t('teacher_cell.aria_assigned', { name })
+          ? `${t('teacher_cell.aria_assigned', { name })} · ${
+              assistantCount > 0
+                ? t('teacher_cell.with_assistants', { count: assistantCount })
+                : t('teacher_cell.role')
+            }`
           : t('teacher_cell.aria_unavailable', { name })
       }
       className="flex min-w-0 items-center gap-2"
+      role="group"
     >
       <span
         aria-hidden
@@ -142,9 +153,9 @@ function TeacherCell({
         {name.trim().charAt(0).toUpperCase()}
       </span>
       <span aria-hidden className="min-w-0">
-        <span className="block truncate text-[14px] font-semibold">{name}</span>
+        <span className="block truncate text-[14px] font-semibold" title={name}>{name}</span>
         {effective ? (
-          <span className="block truncate text-[12.5px] text-sub">
+          <span className="mt-0.5 block text-[12px] leading-4 text-sub">
             {assistantCount > 0
               ? t('teacher_cell.with_assistants', { count: assistantCount })
               : t('teacher_cell.role')}
@@ -187,13 +198,21 @@ export function ClassesTable({
         cell: ({ row }) => {
           const teacher = row.original.assignedTeacher;
           return (
-            <div className="min-w-0 max-w-md">
-              <span className="text-[15px] font-bold">{row.original.name}</span>
-              <p className="mt-0.5 line-clamp-1 text-[13.5px] text-sub">
-                {row.original.description || t('no_description')}
-              </p>
-              {/* The teacher column is dropped on a narrow viewport rather
-                  than pushing the table sideways, so its answer moves here. */}
+            <div className="min-w-0">
+              <Link
+                href={contentPaths.class(row.original.id)}
+                className="line-clamp-2 break-words rounded-sm text-[14px] font-bold leading-6 text-ink outline-none hover:text-brand focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                title={row.original.name}
+              >
+                {row.original.name}
+              </Link>
+              {row.original.description ? (
+                <p className="mt-1 line-clamp-1 text-[12.5px] leading-5 text-sub" title={row.original.description}>
+                  {row.original.description}
+                </p>
+              ) : null}
+              {/* On narrow viewports, teacher information stays with the
+                  class name while the other columns scroll inside the table. */}
               {isMobile ? (
                 <p className="mt-1 truncate text-[12.5px] font-semibold text-sub">
                   {teacher
@@ -219,6 +238,7 @@ export function ClassesTable({
       },
       {
         id: 'status',
+        size: 120,
         accessorFn: (record) => record.status,
         header: t('column.status'),
         filterFn: 'arrIncludesSome',
@@ -226,6 +246,7 @@ export function ClassesTable({
       },
       {
         id: 'courses',
+        size: 192,
         accessorFn: (record) =>
           record.courses.map((course) => course.title).join(' '),
         header: t('column.courses'),
@@ -234,11 +255,13 @@ export function ClassesTable({
       },
       {
         id: 'students',
+        size: 112,
+        meta: { align: 'right' },
         accessorFn: (record) => record.studentCount,
         header: t('column.students'),
         cell: ({ row }) => (
           <span
-            className={`font-mono text-[15px] tabular-nums ${
+            className={`text-[14px] tabular-nums ${
               row.original.studentCount === 0
                 ? 'text-sub/50'
                 : 'font-bold text-ink'
@@ -250,6 +273,7 @@ export function ClassesTable({
       },
       {
         id: 'teacher',
+        size: 176,
         // Sorting and search both run on the name, so an unassigned class
         // sorts with the other blanks rather than under a literal label.
         accessorFn: (record) => record.assignedTeacher?.displayName ?? '',
@@ -263,6 +287,7 @@ export function ClassesTable({
       },
       {
         id: 'updated',
+        size: 112,
         accessorFn: (record) => record.updatedAt,
         header: t('column.updated'),
         cell: ({ row }) => (
@@ -273,6 +298,8 @@ export function ClassesTable({
       },
       {
         id: 'actions',
+        size: 144,
+        meta: { align: 'right' },
         header: t('column.actions'),
         enableSorting: false,
         cell: ({ row }) => {
@@ -281,7 +308,7 @@ export function ClassesTable({
           return (
             <div className="flex items-center justify-end gap-1">
               <Link
-                className="group inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-soft px-3.5 text-[13.5px] font-bold text-brand transition-colors hover:bg-brand hover:text-on-brand"
+                className="group inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand/15 bg-brand-soft/60 px-2.5 text-[13px] font-semibold text-brand outline-none transition-colors hover:border-brand hover:bg-brand hover:text-on-brand focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-card"
                 href={contentPaths.class(record.id)}
               >
                 {t('open')}
@@ -291,7 +318,7 @@ export function ClassesTable({
                 <DropdownMenuTrigger asChild>
                   <button
                     aria-label={t('row_menu_aria', { name: record.name })}
-                    className="grid size-8 shrink-0 place-items-center rounded-md text-sub transition-colors hover:bg-canvas hover:text-ink data-[state=open]:bg-canvas data-[state=open]:text-ink"
+                    className="grid size-8 shrink-0 place-items-center rounded-md text-sub outline-none transition-colors hover:bg-canvas hover:text-ink focus-visible:ring-2 focus-visible:ring-brand data-[state=open]:bg-canvas data-[state=open]:text-ink"
                     type="button"
                   >
                     <MoreHorizontal className="size-4" />
@@ -344,10 +371,13 @@ export function ClassesTable({
   );
 
   return (
-    <>
+    <TooltipProvider delayDuration={200}>
       <DataTable
+        className="[&_button]:focus-visible:outline-none [&_button]:focus-visible:ring-2 [&_button]:focus-visible:ring-brand [&_button]:focus-visible:ring-offset-2 [&_button]:focus-visible:ring-offset-card"
+        layout="fixed"
+        tableClassName="min-w-[900px] md:min-w-[1080px] [&_th]:py-3 [&_td]:py-4 [&_tbody_tr:focus-within]:bg-canvas/70"
         columns={
-          // Six columns do not fit a phone. The teacher answer is not dropped,
+          // Seven columns do not fit a phone. The teacher answer is not dropped,
           // only moved into the class cell above.
           isMobile ? columns.filter((column) => column.id !== 'teacher') : columns
         }
@@ -400,6 +430,6 @@ export function ClassesTable({
           studentCount={toArchive.studentCount}
         />
       ) : null}
-    </>
+    </TooltipProvider>
   );
 }

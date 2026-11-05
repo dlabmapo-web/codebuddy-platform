@@ -77,6 +77,14 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
+  // Caddy keeps idle upstream connections for two minutes, but Node closes
+  // them after five seconds by default. A request Caddy sends on one Node has
+  // just closed fails, and a POST (every RPC) cannot be retried, so the user
+  // sees a 502. Outlast the proxy instead; headersTimeout must exceed this.
+  const server = app.getHttpServer();
+  server.keepAliveTimeout = 125_000;
+  server.headersTimeout = 126_000;
+
   await app.listen(configService.get("PORT", { infer: true }));
 }
 

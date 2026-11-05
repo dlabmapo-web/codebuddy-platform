@@ -162,6 +162,22 @@ fields it reads. The typecheck proves that no consumer reads a dropped field.
 - **Student home.** On the API, the student home reads its "continue" drafts
   in the same parallel group as its other independent sections.
 
+### 4.8 Keep-alive outlasts the proxy
+
+Caddy keeps idle upstream connections for two minutes. Node closes them after
+five seconds by default, so Caddy could send a request on a connection Node had
+just closed. A POST (every RPC) is not retried, and the user would see a 502.
+The same race reset a browser test's direct API request (`ECONNRESET`).
+
+- **API.** The HTTP server's `keepAliveTimeout` is now 125 s, and
+  `headersTimeout` 126 s.
+- **Web.** Compose sets `KEEP_ALIVE_TIMEOUT=125000` for `studio`. The Next
+  standalone server reads it, as the installed Next.js docs recommend behind a
+  proxy.
+- **Verified.** The API answers `Keep-Alive: timeout=125`. A connection left
+  idle for 7 s was reused rather than closed. `docker compose config` resolves
+  the variable for `studio`.
+
 ## 5. Rejected alternatives
 
 | Alternative | Result | Decision |
@@ -194,10 +210,15 @@ fields it reads. The typecheck proves that no consumer reads a dropped field.
   - API unit tests: 148 files, 1,631 tests pass.
   - Official `pnpm test:dlab` on fresh containers, run to completion
     (`--max-failures=100`): all vitest stages pass (17 + 164 + 69 + 16 tests).
-    Browser tests: 35 pass and 2 fail. The failures are the edu_manager and
-    lab_head variants of "tutors short answers and quizzes", both timing out
-    on the 3-second manual poll. On unchanged `b9ab8851` all three variants of
-    that test fail, so the failure predates this change.
+    Browser tests: 35 pass. The "tutors short answers and quizzes" variants
+    also failed on unchanged `b9ab8851`, for two reasons:
+    - The test waited for a 3-second workspace poll that `47e4385a`
+      (2026-10-27) replaced with a lighter status check. The test now triggers
+      the workspace's real refetch, on returning to the tab, and still proves
+      that a refetch does not reset the open editor.
+    - A keep-alive race reset a direct API request (4.8).
+
+    After both fixes, all three variants pass.
   - Web: typecheck clean; 193 test files and 1,483 tests pass, including new
     sign-in landing tests.
   - The five browser password-login tests (student, teacher, team lead,
@@ -229,10 +250,7 @@ Results on identical data:
    own data, because the academy id comes from the account.
 5. **Admin console pages.** Several still load two to four reads one after
    another; they serve a few operators.
-6. **Stale or timing-sensitive tests.** Repair the `sample-check` integration
-   fixture, and the "tutors short answers and quizzes" browser test. That test
-   fails on unchanged `b9ab8851` (all three variants, waiting on the 3-second
-   manual poll).
+6. **Stale fixture.** Repair the `sample-check` integration fixture.
 
 ## 8. Rollout and rollback
 

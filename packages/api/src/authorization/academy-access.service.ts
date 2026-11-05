@@ -107,7 +107,9 @@ export class AcademyAccessService {
       throw new AppException("USER_SUSPENDED", HttpStatus.FORBIDDEN);
     }
 
-    const managed = await this.dlab?.assertAcademy(authUserId, academyId);
+    // The same snapshot says whether DLAB governs this account; only then does
+    // its live policy need reading.
+    const managed = user.dlabManaged ? await this.dlab?.assertAcademy(authUserId, academyId) : null;
     // HQ admins use normal platform inspection/support rules, not historic OS memberships.
     const membership = managed?.isPlatformAdmin ? null : user.membership;
     if (!membership) {

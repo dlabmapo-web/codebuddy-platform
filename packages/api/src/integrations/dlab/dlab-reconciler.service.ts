@@ -11,9 +11,15 @@ export function dlabAdmitted(config: ConfigService<ApiEnvironment, true>, id: st
   return config.get('DLAB_SSO_ROLLOUT_MODE', { infer: true }) === 'campus'
     || (config.get('DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS', { infer: true }) ?? []).includes(id);
 }
-export async function desiredDlabCampuses(tx: Prisma.TransactionClient, config: ConfigService<ApiEnvironment, true>, identity: DlabIdentity) {
-  const ids = dlabEffectiveScope(identity.userRole, identity.externalCampusId, identity.externalCampusIds);
+/** Campus ids an identity may use; empty when the account or allowlist excludes it. */
+export function dlabCampusScope(config: ConfigService<ApiEnvironment, true>, identity: Pick<DlabIdentity, 'userRole' | 'externalCampusId' | 'externalCampusIds' | 'accountStatus' | 'externalUserId'>) {
   if (identity.accountStatus !== 'active' || !dlabAdmitted(config, identity.externalUserId)) return [];
+  return dlabEffectiveScope(identity.userRole, identity.externalCampusId, identity.externalCampusIds);
+}
+// Keep these predicates in step with readDlabEligibility's candidate campuses.
+export async function desiredDlabCampuses(tx: Prisma.TransactionClient, config: ConfigService<ApiEnvironment, true>, identity: DlabIdentity) {
+  const ids = dlabCampusScope(config, identity);
+  if (!ids.length) return [];
   return tx.dlabCampus.findMany({
     where: { externalCampusId: { in: ids }, status: 'active', academy: { kind: 'ACADEMY', status: 'ACTIVE' }, ...(config.get('DLAB_SSO_ROLLOUT_MODE', { infer: true }) === 'campus' ? { ssoEnabled: true } : {}) },
     include: { academy: true }, orderBy: { externalCampusId: 'asc' },

@@ -1,9 +1,9 @@
 import { Injectable, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { dlabAcademyRole, dlabMembershipRolesMatch, dlabPlatformRole } from '@cove/shared';
-import type { Prisma } from '../../generated/prisma/client.js';
 import type { ApiEnvironment } from '../../config/env.schema.js';
-import { desiredDlabCampuses } from './dlab-reconciler.service.js';
+import { dlabCampusScope } from './dlab-reconciler.service.js';
+import { readDlabEligibility } from './dlab-eligibility-read.js';
 import { dlabTransaction } from './dlab-transaction.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import type { SupabaseIdentity } from '../../auth/auth.types.js';
@@ -32,17 +32,16 @@ export class DlabPolicyService implements OnModuleInit, OnModuleDestroy {
     if (await this.managed(authUserId)) throw new DlabError('dlab_managed_identity', 403);
   }
   async eligible(authUserId: string) {
-    // Ordinary logins never contend on the integration write lock.
-    if (!await this.managed(authUserId)) return null;
-    return this.prisma.$transaction(tx => this.snapshot(tx, authUserId), { isolationLevel: 'RepeatableRead' });
+    // One statement is one snapshot, so no transaction is needed; ordinary
+    // logins read zero rows and never contend on the integration write lock.
+    return this.snapshot(this.prisma, authUserId);
   }
-  private async snapshot(tx: Prisma.TransactionClient, authUserId: string) {
-      const identity = await tx.dlabIdentity.findFirst({
-        where: { user: { authUserId } },
-        include: { user: true, bindings: { include: { membership: { include: { academy: true, extraRoles: true } } } } },
-      });
-      if (!identity) return null;
-      const campuses = await desiredDlabCampuses(tx, this.config, identity);
+  private async snapshot(db: Pick<PrismaService, '$queryRaw'>, authUserId: string) {
+      const read = await readDlabEligibility(db, authUserId, this.config.get('DLAB_SSO_ROLLOUT_MODE', { infer: true }) === 'campus');
+      if (!read) return null;
+      const { identity } = read;
+      const scope = dlabCampusScope(this.config, identity);
+      const campuses = read.candidateCampuses.filter(c => scope.includes(c.externalCampusId));
       const role = dlabAcademyRole(identity.userRole);
       if (identity.user?.status !== 'ACTIVE') throw new DlabError('dlab_access_unavailable', 403);
       if (dlabPlatformRole(identity.userRole) === 'ADMIN') {

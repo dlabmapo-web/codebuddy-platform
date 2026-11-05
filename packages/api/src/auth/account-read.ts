@@ -10,6 +10,9 @@ export type AccountRead = {
   emailIsPlaceholder: boolean; username: string | null; displayName: string | null;
   avatarUrl: string | null; platformRole: User["platformRole"];
   status: User["status"];
+  /** Whether a DLAB identity governs this account, read in the same snapshot.
+   * Absent means unknown, so callers keep checking DLAB policy themselves. */
+  dlabManaged?: boolean;
   avatarAsset: { id: string; bucket: string; objectKey: string } | null;
   memberships: Array<{
     academyId: string;
@@ -41,6 +44,7 @@ export async function readAccount(prisma: Pick<PrismaService, "$queryRaw">, auth
       u.email_is_placeholder AS "emailIsPlaceholder", u.username,
       u.display_name AS "displayName", u.avatar_url AS "avatarUrl",
       u.platform_role AS "platformRole", u.status,
+      EXISTS (SELECT 1 FROM dlab_identities d WHERE d.user_id = u.id) AS "dlabManaged",
       (SELECT jsonb_build_object('id', a.id, 'bucket', a.bucket, 'objectKey', a.object_key)
         FROM media_assets a WHERE a.id = u.avatar_asset_id) AS "avatarAsset",
       coalesce((SELECT jsonb_agg(jsonb_build_object(

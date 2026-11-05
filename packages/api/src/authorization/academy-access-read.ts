@@ -4,6 +4,8 @@ import type { PrismaService } from "../database/prisma.service.js";
 export type AcademyPermissionRead = {
   id: string;
   status: User["status"];
+  /** Whether a DLAB identity governs this account; its policy then runs live. */
+  dlabManaged: boolean;
   academy: Pick<Academy, "status" | "kind"> | null;
   membership: (Pick<AcademyMembership, "role" | "status"> & {
     academy: Pick<Academy, "status">;
@@ -22,6 +24,7 @@ export async function readAcademyPermission(
 ): Promise<AcademyPermissionRead | null> {
   const rows = await prisma.$queryRaw<AcademyPermissionRead[]>(Prisma.sql`
     SELECT u.id, u.status,
+      EXISTS (SELECT 1 FROM dlab_identities d WHERE d.user_id = u.id) AS "dlabManaged",
       CASE WHEN a.id IS NULL THEN NULL ELSE
         jsonb_build_object('status', a.status, 'kind', a.kind) END AS academy,
       CASE WHEN m.id IS NULL THEN NULL ELSE jsonb_build_object(

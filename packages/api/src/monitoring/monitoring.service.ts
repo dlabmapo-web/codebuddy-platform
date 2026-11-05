@@ -34,6 +34,7 @@ import { ProfileMediaService } from "../profile/profile-media.service.js";
 import {
   MonitoringAccessService,
   type MonitoringClassClaim,
+  type MonitoringMaterialClaim,
 } from "./monitoring-access.service.js";
 import { MonitoringFeedbackBroadcaster } from "./monitoring-feedback-broadcaster.js";
 
@@ -325,11 +326,12 @@ export class MonitoringService {
     const claim = await this.requireClass(identity, input);
     this.access.requireLiveWatch(claim);
     const student = await this.access.requireMonitorableStudent(claim, input.membershipId);
-    await this.access.requireObservableMaterial(student, input.materialId);
+    const material = await this.access.requireObservableMaterial(student, input.materialId);
     const row = await this.prisma.material.findUniqueOrThrow({ where: { id: input.materialId },
       include: { manualMaterial: true, videoLesson: true, programmingExercise: true } });
     const [navigator, draft, submitted] = await Promise.all([
-      this.getStudentCurriculum(identity, input),
+      // The checks above are getStudentCurriculum's, plus the live watch.
+      this.navigatorFor(material),
       row.manualMaterial && !row.manualMaterial.shortAnswer && !row.manualMaterial.multipleChoice
         ? this.prisma.manualDraft.findUnique({ where: { materialId_userId: { materialId: row.id, userId: student.studentUserId } } }) : null,
       row.manualMaterial ? this.prisma.manualSubmission.findFirst({
@@ -381,11 +383,16 @@ export class MonitoringService {
       student,
       input.materialId,
     );
+    return this.navigatorFor(material);
+  }
 
+  private async navigatorFor(
+    material: MonitoringMaterialClaim,
+  ): Promise<WorkspaceNavigatorContext> {
     const outline = await this.curriculum.outlineForCourse(
       material.courseId,
-      claim.academyId,
-      student.studentUserId,
+      material.academyId,
+      material.studentUserId,
     );
     const navigator = outline && toNavigatorContext(outline, material.materialId);
     if (!navigator) {

@@ -6,6 +6,7 @@ import { dlabEnabled, dlabCookieName, parseAttempt, dlabPost, dlabFailure, dlabC
 import { createClient } from '@/lib/supabase/server';
 import { createServerORPCClient } from '@/lib/orpc-server';
 import { routes } from '@/lib/routes';
+import { academyEntryPath } from '@/lib/academy-entry';
 
 export async function GET(request: NextRequest) {
   let issuedSession = false;
@@ -36,7 +37,10 @@ export async function GET(request: NextRequest) {
       if (account.user.platformRole !== 'ADMIN') throw new Error('Invalid admin session');
     } else if (!target || account.user.platformRole === 'ADMIN' || (target.role === 'STUDENT') !== activated.requiresStudentSession) throw new Error('Invalid academy session');
     await clearDlabContext();
-    const response = authResponse(destination);
+    // Keep explicit lesson/class deep links; only replace the academy root.
+    const response = authResponse(target && destination === routes.academy(target.academy.slug)
+      ? academyEntryPath(target.academy.slug, target.role)
+      : destination);
     response.cookies.set({ ...dlabCookie(''), maxAge: 0 });
     return response;
   } catch {

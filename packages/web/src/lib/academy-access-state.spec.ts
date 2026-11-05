@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { AuthMeResponse } from '@cove/shared';
 
+import { academyEntryPath } from './academy-entry';
+
 import {
   authDestination,
   academyRoleFor,
@@ -58,6 +60,12 @@ function application(status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED') 
 }
 
 describe('resolveAcademyAccessState', () => {
+  it('uses the primary role even when a member also holds higher permissions', () => {
+    expect(authDestination(account({
+      memberships: [{ academy, role: 'TEACHER', roles: ['MANAGER', 'TEACHER'], status: 'ACTIVE', imageUrl: null }],
+    }))).toBe(`/academy/${academy.slug}/teach/classes`);
+  });
+
   it.each(['STUDENT', 'TEACHER', 'TEAM_LEAD', 'MANAGER'] as const)(
     'asks a legacy %s for a username before academy landing',
     (role) => {
@@ -67,7 +75,7 @@ describe('resolveAcademyAccessState', () => {
       });
       expect(authDestination(input)).toBe('/welcome');
       input.user.username = 'claimed-user';
-      expect(authDestination(input)).toBe(`/academy/${academy.slug}`);
+      expect(authDestination(input)).toBe(academyEntryPath(academy.slug, role));
     },
   );
 
@@ -88,7 +96,7 @@ describe('resolveAcademyAccessState', () => {
     expect(result.kind).toBe('active');
     expect(authDestination(account({
       memberships: [{ academy, role: 'TEACHER', roles: ['TEACHER'], status: 'ACTIVE', imageUrl: null }],
-    }))).toBe(`/academy/${academy.slug}`);
+    }))).toBe(`/academy/${academy.slug}/teach/classes`);
   });
 
   it('routes a suspended membership to the pending access surface', () => {
@@ -205,7 +213,7 @@ describe('resolveAcademyAccessState', () => {
           ],
         }),
       ),
-    ).toBe(`/academy/${academy.slug}`);
+    ).toBe(`/academy/${academy.slug}/classes`);
   });
 
   it('exposes academy management only to managers', () => {
@@ -285,13 +293,11 @@ describe('resolveAcademyAccessState', () => {
     expect(isStudent([])).toBe(false);
   });
 
-  it('lands a student on the academy overview, not the catalog', () => {
-    // The overview is the one surface that knows which problem they stopped
-    // in the middle of. Sending them past it to My Courses would skip it.
+  it('lands a student on the existing course catalog', () => {
     const destination = authDestination(account({
       memberships: [{ academy, role: 'STUDENT', roles: ['STUDENT'], status: 'ACTIVE', imageUrl: null }],
     }));
-    expect(destination).toBe(`/academy/${academy.slug}`);
+    expect(destination).toBe(`/academy/${academy.slug}/learn/courses`);
   });
 
   it('resolves only active membership roles for the selected academy', () => {

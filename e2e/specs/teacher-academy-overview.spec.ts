@@ -9,7 +9,8 @@ import { routes } from '../../packages/web/src/lib/routes';
 import { signInAs } from '../support/auth';
 
 /**
- * The teaching overview and Student analytics, from the academy root.
+ * Student analytics and preserved teacher Overview API authorization.
+ * Overview UI scenarios are paused while the academy root redirects to class work.
  *
  * Requires `pnpm --filter @cove/api db:seed` and `db:seed:e2e`.
  *
@@ -129,24 +130,21 @@ function studentsUrl(search = ''): string {
 }
 
 test.beforeAll(async ({ browser }) => {
-  // The dev server compiles a route on its first request, and this one pulls
-  // in Recharts. Warming it once keeps every later navigation inside the
-  // ordinary per-test timeout.
+  // Warm the active student analytics surface; Overview no longer renders.
   test.setTimeout(240_000);
   teacherContext = await browser.newContext();
   teacherPage = await teacherContext.newPage();
   academySlug = await signIn(teacherPage, TEACHER_EMAIL);
-  await teacherPage.goto(overviewUrl(), { timeout: 180_000 });
-  await expect(teacherPage.getByTestId('student-participation')).toBeVisible({
-    timeout: 120_000,
-  });
+  await teacherPage.goto(studentsUrl(), { timeout: 180_000 });
+  await expect(teacherPage.getByRole('table')).toBeVisible({ timeout: 120_000 });
 });
 
 test.afterAll(async () => {
   await teacherContext.close();
 });
 
-test('every section occupies its own row, in the approved order', async () => {
+// Restore these scenarios when the temporary Overview entry-point removal ends.
+test.skip('every section occupies its own row, in the approved order', async () => {
   const page = teacherPage;
   await page.goto(overviewUrl());
 
@@ -167,7 +165,7 @@ test('every section occupies its own row, in the approved order', async () => {
   }
 });
 
-test('the queue comes before the numbers that explain it', async () => {
+test.skip('the queue comes before the numbers that explain it', async () => {
   const page = teacherPage;
   await page.goto(overviewUrl());
 
@@ -178,7 +176,7 @@ test('the queue comes before the numbers that explain it', async () => {
   expect(queue!.y).toBeLessThan(ledger!.y);
 });
 
-test('the ledger carries every number with its denominator', async () => {
+test.skip('the ledger carries every number with its denominator', async () => {
   const page = teacherPage;
   await page.goto(overviewUrl());
 
@@ -194,7 +192,7 @@ test('the ledger carries every number with its denominator', async () => {
   ).toBeVisible();
 });
 
-test('the period is printed with its dates and timezone, not only as "7 days"', async () => {
+test.skip('the period is printed with its dates and timezone, not only as "7 days"', async () => {
   const page = teacherPage;
   await page.goto(overviewUrl());
   await expect(page.getByText(/Asia\/Seoul/).first()).toBeVisible();
@@ -203,7 +201,7 @@ test('the period is printed with its dates and timezone, not only as "7 days"', 
   ).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('participation keeps the grouped bars and an equal table', async () => {
+test.skip('participation keeps the grouped bars and an equal table', async () => {
   const page = teacherPage;
   await page.goto(overviewUrl());
 
@@ -224,7 +222,7 @@ test('participation keeps the grouped bars and an equal table', async () => {
   ).toBeVisible();
 });
 
-test('the activity preview switches ends without losing the scope', async () => {
+test.skip('the activity preview switches ends without losing the scope', async () => {
   const page = teacherPage;
   await page.goto(overviewUrl());
 
@@ -240,7 +238,7 @@ test('the activity preview switches ends without losing the scope', async () => 
   ).toHaveAttribute('href', /sort=activeTime&direction=asc/);
 });
 
-test('class, course, and range selections survive a reload and a deep link', async () => {
+test.skip('class, course, and range selections survive a reload and a deep link', async () => {
   const page = teacherPage;
   await page.goto(overviewUrl());
 
@@ -258,7 +256,7 @@ test('class, course, and range selections survive a reload and a deep link', asy
   ).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('an unknown class in the address renders the whole scope instead of failing', async () => {
+test.skip('an unknown class in the address renders the whole scope instead of failing', async () => {
   const page = teacherPage;
   // A class from no academy at all. §5.3 removes it rather than refusing.
   await page.goto(
@@ -270,7 +268,7 @@ test('an unknown class in the address renders the whole scope instead of failing
   ).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('the superseded participation lens is dropped from the address', async () => {
+test.skip('the superseded participation lens is dropped from the address', async () => {
   const page = teacherPage;
   await page.goto(overviewUrl('participation=work&range=30d'));
   // §5.3 — canonicalization removes it; the range it travelled with survives.
@@ -278,7 +276,7 @@ test('the superseded participation lens is dropped from the address', async () =
   await expect(page).toHaveURL(/range=30d/);
 });
 
-test('a preview link opens Student analytics on the same scope', async () => {
+test.skip('a preview link opens Student analytics on the same scope', async () => {
   const page = teacherPage;
   await page.goto(overviewUrl());
 
@@ -298,7 +296,7 @@ test('a preview link opens Student analytics on the same scope', async () => {
   await expect(page.getByRole('table')).toBeVisible({ timeout: 60_000 });
 });
 
-test('a queue row opens the student in class-scoped Solution status', async () => {
+test.skip('a queue row opens the student in class-scoped Solution status', async () => {
   const page = teacherPage;
   await page.goto(overviewUrl());
 
@@ -317,7 +315,7 @@ test('a queue row opens the student in class-scoped Solution status', async () =
   });
 });
 
-test('every queue row states the measurement behind its reason', async () => {
+test.skip('every queue row states the measurement behind its reason', async () => {
   const page = teacherPage;
   await page.goto(overviewUrl());
 
@@ -483,7 +481,7 @@ test('a student is redirected and a manager never receives teacher analytics', a
   const managerPage = await managerContext.newPage();
   const managerAcademy = await signIn(managerPage, MANAGER_EMAIL);
   await managerPage.goto(routes.academy(managerAcademy));
-  // The management overview, not the teaching one.
+  await expect(managerPage).toHaveURL(/\/classes$/);
   await expect(managerPage.getByTestId('teaching-queue')).toHaveCount(0);
 
   const managerDenial = await rpc(managerPage, 'academyTeacherOverview/get', {

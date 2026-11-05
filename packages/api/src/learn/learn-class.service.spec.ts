@@ -13,6 +13,14 @@ import type { LearningClassContextService } from "./learning-class-context.servi
 import type { SubmissionService } from "./submission.service.js";
 import { ProfileMediaService } from "../profile/profile-media.service.js";
 
+vi.mock("./curriculum-read.js", () => ({
+  // Unit fixtures already carry each course's hierarchy, as the include did;
+  // the one-statement reader itself is proven against Prisma by
+  // curriculum-read.integration.spec.ts.
+  withCurriculum: async (_db: unknown, course: unknown) => course,
+  withCurricula: async (_db: unknown, courses: unknown) => courses,
+}));
+
 const identity: SupabaseIdentity = {
   authUserId: "10000000-0000-4000-8000-000000000001",
   email: "student@example.com",

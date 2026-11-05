@@ -15,6 +15,7 @@ export class ShortAnswerService implements OnModuleInit, OnModuleDestroy {
   readonly evaluator = new ShortAnswerEvaluator();
   private timer?: ReturnType<typeof setInterval>;
   private running = false;
+  private requested = false;
   private readonly logger = new Logger(ShortAnswerService.name);
   constructor(
     private readonly db: PrismaService,
@@ -29,12 +30,20 @@ export class ShortAnswerService implements OnModuleInit, OnModuleDestroy {
     return this.config.get<boolean>("SHORT_ANSWER_ENABLED") === true;
   }
   onModuleInit() {
-    this.timer = setInterval(() => {
-      void this.drain().catch(() =>
-        this.logger.error("Short-answer evaluation recovery failed"),
-      );
-    }, 1000);
+    // Recovery only: queued work is drained as soon as it is queued
+    // (requestDrain). The tick catches expired leases, work queued by another
+    // process and any missed wake-up; it no longer gates every new answer.
+    this.timer = setInterval(() => this.requestDrain(), RECOVERY_INTERVAL_MS);
     this.timer.unref();
+  }
+  /** Grade queued work now. A request made during a drain runs one more drain
+   * right after it, so newly queued work never waits for the recovery tick. */
+  requestDrain() {
+    this.requested = true;
+    if (this.running) return;
+    void this.drain().catch(() =>
+      this.logger.error("Short-answer evaluation recovery failed"),
+    );
   }
   onModuleDestroy() {
     if (this.timer) clearInterval(this.timer);
@@ -42,6 +51,8 @@ export class ShortAnswerService implements OnModuleInit, OnModuleDestroy {
   async drain() {
     if (this.running || !this.enabled()) return;
     this.running = true;
+    this.requested = false;
+    let full = false;
     try {
       const now = new Date();
       const jobs = await this.db.shortAnswerAssessment.findMany({
@@ -52,9 +63,10 @@ export class ShortAnswerService implements OnModuleInit, OnModuleDestroy {
           ],
         },
         orderBy: { submission: { createdAt: "asc" } },
-        take: 4,
+        take: BATCH_SIZE,
         include: { submission: true },
       });
+      full = jobs.length === BATCH_SIZE;
       await Promise.all(
         jobs.map(async (job) => {
           const lease = new Date(Date.now() + 30000);
@@ -117,5 +129,11 @@ export class ShortAnswerService implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.running = false;
     }
+    // A full batch may have more behind it, and work may have been queued
+    // meanwhile; either continues at once instead of waiting a tick.
+    if (full || this.requested) this.requestDrain();
   }
 }
+
+const BATCH_SIZE = 4;
+const RECOVERY_INTERVAL_MS = 5000;

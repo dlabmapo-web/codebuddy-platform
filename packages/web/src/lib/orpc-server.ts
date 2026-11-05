@@ -78,6 +78,18 @@ export function createPlatformServerORPCClient(): ContractRouterClient<AppContra
  * Throws when there is no session, so a caller that treats an unreadable
  * account as signed-out keeps its existing `try`/`catch` or `.catch(() => null)`.
  */
+/**
+ * An academy's feature switches, fetched once per request.
+ *
+ * The studio frame reads them to draw its navigation, and the settings pages
+ * read them again for their own decisions; within one render that was the
+ * same API call twice. A failure reaches every caller, each of which keeps
+ * its own fallback.
+ */
+export const getAcademyFeatures = cache((academyId: string) =>
+  createServerORPCClient().academyFeatures.list({ academyId }),
+);
+
 export const getAccount = cache(async (): Promise<AuthMeResponse> => {
   const { data } = await (await createClient()).auth.getSession();
   if (!data.session) throw new Error('No authenticated session');

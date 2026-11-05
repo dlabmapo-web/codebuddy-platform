@@ -12,9 +12,9 @@ import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import {
   nonemptyModules,
-  visibleCurriculumInclude,
   type VisibleCourse,
 } from "./curriculum-outline.service.js";
+import { withCurricula } from "./curriculum-read.js";
 
 /**
  * The one gate in front of the student overview.
@@ -125,9 +125,8 @@ export class StudentOverviewAccessService {
             some: { class: enrolledClassWhere(academyId, actor.userId) },
           },
         },
-        include: visibleCurriculumInclude,
         orderBy: [{ title: "asc" }, { id: "asc" }],
-      }),
+      }).then((rows) => withCurricula(this.prisma, rows)),
       this.comparisonFor(academyId),
     ]);
 

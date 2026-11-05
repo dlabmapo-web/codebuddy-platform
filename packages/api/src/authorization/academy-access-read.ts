@@ -1,9 +1,13 @@
 import { Prisma, type Academy, type AcademyMembership, type User } from "../generated/prisma/client.js";
+import { dlabEligibilityJson, parseDlabEligibility, type DlabEligibilityRead } from "../integrations/dlab/dlab-eligibility-read.js";
 import type { PrismaService } from "../database/prisma.service.js";
 
 export type AcademyPermissionRead = {
   id: string;
   status: User["status"];
+  /** DLAB policy facts from the same snapshot, or null when DLAB does not
+   * govern the account. The policy still decides on them every request. */
+  dlab: DlabEligibilityRead | null;
   academy: Pick<Academy, "status" | "kind"> | null;
   membership: (Pick<AcademyMembership, "role" | "status"> & {
     academy: Pick<Academy, "status">;
@@ -20,8 +24,9 @@ export async function readAcademyPermission(
   authUserId: string,
   academyId: string,
 ): Promise<AcademyPermissionRead | null> {
-  const rows = await prisma.$queryRaw<AcademyPermissionRead[]>(Prisma.sql`
+  const rows = await prisma.$queryRaw<Array<Omit<AcademyPermissionRead, "dlab"> & { dlab: unknown }>>(Prisma.sql`
     SELECT u.id, u.status,
+      ${dlabEligibilityJson} AS dlab,
       CASE WHEN a.id IS NULL THEN NULL ELSE
         jsonb_build_object('status', a.status, 'kind', a.kind) END AS academy,
       CASE WHEN m.id IS NULL THEN NULL ELSE jsonb_build_object(
@@ -35,5 +40,6 @@ export async function readAcademyPermission(
     LEFT JOIN academy_memberships m ON m.academy_id = a.id AND m.user_id = u.id
     WHERE u.auth_user_id = ${authUserId}::uuid
   `);
-  return rows[0] ?? null;
+  const row = rows[0];
+  return row ? { ...row, dlab: parseDlabEligibility(row.dlab) } : null;
 }

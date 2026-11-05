@@ -8,6 +8,14 @@ import type { ManualAssetsService } from "./manual-assets.service.js";
 import type { PointAwardService } from "../points/point-award.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import type { ManualPracticeService } from "./manual-practice.service.js";
+
+vi.mock("../learn/curriculum-read.js", () => ({
+  // Unit fixtures already carry each course's hierarchy, as the include did;
+  // the one-statement reader itself is proven against Prisma by
+  // curriculum-read.integration.spec.ts.
+  withCurriculum: async (_db: unknown, course: unknown) => course,
+  withCurricula: async (_db: unknown, courses: unknown) => courses,
+}));
 const identity = { authUserId: "auth-student" } as SupabaseIdentity;
 const target = { academyId: "academy", materialId: "material" };
 function fixture(practice?: ManualPracticeService) {

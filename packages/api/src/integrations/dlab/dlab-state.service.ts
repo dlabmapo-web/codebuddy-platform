@@ -44,3 +44,16 @@ export class DlabStateService {
     finally { await redis.eval("if redis.call('GET',KEYS[1]) == ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0", 1, key, owner); }
   }
 }
+
+/** `recheck` asks every live session to re-verify; `recheck:<authUserId>,…` only
+ * those accounts'. Operator tooling publishes the plain form. */
+export function dlabRecheckMessage(authUserIds: readonly string[]): string {
+  return `recheck:${[...new Set(authUserIds)].join(',')}`;
+}
+/** The accounts a message names, or null when it addresses everyone. Anything
+ * unrecognised addresses everyone, so an unknown sender can only over-check. */
+export function dlabRecheckTargets(message: string): ReadonlySet<string> | null {
+  if (!message.startsWith('recheck:')) return null;
+  const ids = message.slice('recheck:'.length).split(',').filter(Boolean);
+  return ids.length ? new Set(ids) : null;
+}

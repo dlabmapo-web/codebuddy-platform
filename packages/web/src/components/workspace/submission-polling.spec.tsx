@@ -47,6 +47,22 @@ describe('bounded result polling', () => {
       expect(complete).toHaveBeenCalledTimes(1);
     } finally { await act(async () => root.unmount()); client.clear(); host.remove(); }
   });
+  it('does not repeat the workspace read for a settled seed, but reads an in-progress one at once', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+    const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+    const graded = { ...pending, status: 'GRADED' as const, scoreHundredths: 0 };
+    const settledRead = vi.fn(async () => graded), pendingRead = vi.fn(async () => pending);
+    function Probe() {
+      useSubmissionStatus({ queryKey: ['settled-seed'], enabled: true, read: settledRead, seed: graded });
+      useSubmissionStatus({ queryKey: ['pending-seed'], enabled: true, read: pendingRead, seed: pending });
+      return null;
+    }
+    try {
+      await act(async () => { root.render(<QueryClientProvider client={client}><Probe /></QueryClientProvider>); await pause(30); });
+      expect(settledRead).not.toHaveBeenCalled();
+      expect(pendingRead).toHaveBeenCalled();
+    } finally { await act(async () => root.unmount()); client.clear(); host.remove(); }
+  });
   it('separates automatic execution, human review, terminal states and access failures', () => {
     const now = Date.parse(pending.createdAt);
     expect(submissionPollInterval(pending, now)).toBe(1000);

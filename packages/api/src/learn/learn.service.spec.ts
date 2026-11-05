@@ -9,6 +9,15 @@ import { CurriculumOutlineService } from "./curriculum-outline.service.js";
 import { LearnService } from "./learn.service.js";
 import type { LearningClassContextService } from "./learning-class-context.service.js";
 import type { SubmissionService } from "./submission.service.js";
+import { withCurriculum } from "./curriculum-read.js";
+
+vi.mock("./curriculum-read.js", () => ({
+  // Unit fixtures already carry each course's hierarchy, as the include did;
+  // the one-statement reader itself is proven against Prisma by
+  // curriculum-read.integration.spec.ts.
+  withCurriculum: vi.fn(async (_db: unknown, course: unknown) => course),
+  withCurricula: vi.fn(async (_db: unknown, courses: unknown) => courses),
+}));
 
 const identity: SupabaseIdentity = {
   authUserId: "10000000-0000-4000-8000-000000000001",
@@ -254,7 +263,8 @@ describe("LearnService visible curriculum", () => {
     const query = vi.mocked(prisma.course.findFirst).mock.calls[0][0]!;
     expect(query.where).toMatchObject({ id: courseId, academyId });
     expect(query.where).not.toHaveProperty('isVisible');
-    expect(query.include).toHaveProperty('modules');
+    // The complete (preview) hierarchy is attached, never the visible-only one.
+    expect(vi.mocked(withCurriculum)).toHaveBeenCalledWith(prisma, expect.objectContaining({ id: courseId }), true);
   });
   it("lists only visible courses and visible descendants", async () => {
     const { service, prisma } = createService();

@@ -26,8 +26,9 @@ import {
 import { useManualTranslation } from "./use-manual-translation";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { effectiveManualResult, type ManualSession } from "@cove/shared";
+import { effectiveManualResult, type ManualSession, type ManualWorkspace as ManualWorkspaceData } from "@cove/shared";
 import { manualApi } from "@/lib/manual-api";
+import { claimServerRead, SERVER_READ_FRESH_MS } from "@/lib/server-read";
 import { CodeEditor } from "@/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/code-editor";
 import { RichTextFrame } from "@/components/studio/rich-text-frame";
 import { GuiViewer } from "./gui-viewer";
@@ -44,24 +45,34 @@ export function ManualWorkspace({
   userId,
   classId,
   preview = false,
+  initialWorkspace,
 }: {
   academyId: string;
   materialId: string;
   userId: string;
   classId?: string;
   preview?: boolean;
+  /** The server render's read of this activity, used once (see claimServerRead). */
+  initialWorkspace?: { workspace: ManualWorkspaceData; token: string } | null;
 }) {
   const { t: mt } = useManualTranslation();
   const { t: pt } = usePracticeTranslation();
   const router = useRouter();
   const { t: lt } = useLayoutTranslation('learn');
   const [deliveryClass, setDeliveryClass] = useState(classId);
+  const [serverRead] = useState(() =>
+    initialWorkspace && claimServerRead(initialWorkspace.token) ? initialWorkspace.workspace : undefined);
   const target = { academyId, materialId };
   const query = useQuery({
     queryKey: ["manual", userId, academyId, materialId, preview, deliveryClass],
     queryFn: () =>
       manualApi.read({ ...target, preview, classId: deliveryClass }),
-    retry: false, staleTime: 0, refetchOnWindowFocus: true,
+    // The server already read this activity for this render; repeating the
+    // read on mount only delayed everything that depends on it. Another class
+    // choice, a replayed payload or the next refetch reads as before.
+    initialData: () => (deliveryClass === classId ? serverRead : undefined),
+    staleTime: (current) => serverRead && current.state.dataUpdateCount === 0 ? SERVER_READ_FRESH_MS : 0,
+    retry: false, refetchOnWindowFocus: true,
   });
   const data = query.data;
   const short = data?.config.shortAnswer;

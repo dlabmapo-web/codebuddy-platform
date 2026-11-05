@@ -477,7 +477,11 @@ export class AuthService {
    * costs nothing and only a person who chose a photo pays for it.
    */
   private async present(user: AccountRead): Promise<AuthMeResponse> {
-    const allowed = user.authUserId ? await this.supabaseAuth.dlabAcademyIds?.(user.authUserId) : null;
+    // An account read already carries its DLAB facts; decide on them rather
+    // than reading the policy a second time.
+    const allowed = !user.authUserId ? null
+      : user.dlab !== undefined ? this.supabaseAuth.dlabAcademyIdsFrom?.(user.dlab) ?? null
+      : await this.supabaseAuth.dlabAcademyIds?.(user.authUserId);
     if (allowed) user = { ...user, memberships: user.memberships.filter(m => allowed.includes(m.academyId)) };
 
     const assets = [

@@ -98,3 +98,35 @@ it("never reinterprets a snapshot from an unsupported evaluator version", async 
   });
   expect(points.awardManualCompletion).not.toHaveBeenCalled();
 });
+
+describe("short-answer wake-ups", () => {
+  it("grades a newly queued answer immediately instead of waiting for the recovery tick", async () => {
+    const { service, db } = fixture();
+    db.shortAnswerAssessment.findMany.mockResolvedValueOnce([]);
+    service.requestDrain();
+    await vi.waitFor(() => expect(db.shortAnswerAssessment.findMany).toHaveBeenCalledOnce());
+  });
+
+  it("runs one more drain for work queued while a drain was running", async () => {
+    const { service, db } = fixture();
+    let release!: () => void;
+    db.shortAnswerAssessment.findMany
+      .mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve([]); }))
+      .mockResolvedValue([]);
+    service.requestDrain();
+    await vi.waitFor(() => expect(db.shortAnswerAssessment.findMany).toHaveBeenCalledTimes(1));
+    service.requestDrain(); // queued while the first drain is still reading
+    release();
+    await vi.waitFor(() => expect(db.shortAnswerAssessment.findMany).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps draining while batches come back full, then stops", async () => {
+    const { service, db, job } = fixture();
+    const batch = Array.from({ length: 4 }, (_, i) => ({ ...job, submissionId: `attempt-${i}` }));
+    db.shortAnswerAssessment.findMany.mockResolvedValueOnce(batch).mockResolvedValueOnce([job]).mockResolvedValue([]);
+    service.requestDrain();
+    await vi.waitFor(() => expect(db.shortAnswerAssessment.findMany).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(db.shortAnswerAssessment.findMany).toHaveBeenCalledTimes(2);
+  });
+});

@@ -196,13 +196,32 @@ describe.skipIf(!databaseUrl)("navigation projections against PostgreSQL", () =>
   it("preserves account membership roles, feature flags and application timestamps", async () => {
     const old = await client.user.findUniqueOrThrow({ where: { authUserId }, include: legacyAccountInclude });
     const current = await readAccount(prisma, authUserId);
-    expect(old).toMatchObject(current!);
+    const { dlab, ...projected } = current!;
+    expect(dlab).toBeNull();
+    expect(old).toMatchObject(projected);
     const result = await auth.me(identity);
     expect(result.user.memberships[0]?.roles).toEqual(["TEACHER", "MANAGER"]);
     expect(result.user.applications[0]?.reviewedAt).toBe("2026-10-26T12:34:56.123Z");
     expect(await readAccount(prisma, randomUUID())).toBeNull();
-    const filteredAuth = new AuthService(prisma, {} as never, {} as never, { dlabAcademyIds: async () => [] } as never);
+    const dlabAcademyIds = vi.fn(async () => [] as string[]);
+    const dlabAcademyIdsFrom = vi.fn((read: unknown) => (read ? [] : null));
+    const filteredAuth = new AuthService(prisma, {} as never, {} as never, { dlabAcademyIds, dlabAcademyIdsFrom } as never);
+    // DLAB policy filters only an account a DLAB identity governs.
+    expect((await filteredAuth.me(identity)).user.memberships).toEqual(result.user.memberships);
+    expect(dlabAcademyIdsFrom).toHaveBeenCalledWith(null);
+    expect(dlabAcademyIds).not.toHaveBeenCalled();
+    const externalUserId = `fixture-${randomUUID()}`;
+    await client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('cove.dlab_sync', 'on', true)`;
+      await tx.dlabIdentity.create({ data: { externalUserId, userId, name: "Fixture manager", userRole: "lab_head", accountStatus: "active",
+        externalCampusId: "fixture", externalCampusIds: ["fixture"], payloadHash: "fixture" } });
+    });
+    expect((await readAccount(prisma, authUserId))?.dlab?.identity.externalUserId).toBe(externalUserId);
     expect((await filteredAuth.me(identity)).user.memberships).toEqual([]);
+    await client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('cove.dlab_sync', 'on', true)`;
+      await tx.dlabIdentity.delete({ where: { externalUserId } });
+    });
     await client.user.update({ where: { id: userId }, data: { status: "SUSPENDED" } });
     await expect(auth.me(identity)).rejects.toMatchObject({ code: "USER_SUSPENDED" });
     await client.user.update({ where: { id: userId }, data: { status: "ACTIVE" } });

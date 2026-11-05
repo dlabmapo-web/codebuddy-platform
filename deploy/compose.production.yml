@@ -106,6 +106,9 @@ services:
       - ./secrets/studio.env
     environment:
       NODE_ENV: production
+      # Outlast Caddy's two-minute upstream keep-alive so it never reuses a
+      # connection Next has already closed (read by the standalone server).
+      KEEP_ALIVE_TIMEOUT: 125000
       NODE_OPTIONS: --max-old-space-size=1024
       HOSTNAME: 0.0.0.0
       PORT: 3000

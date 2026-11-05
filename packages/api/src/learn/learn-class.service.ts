@@ -28,6 +28,7 @@ import {
   visibleCurriculumInclude,
   type ProgressByMaterial,
 } from "./curriculum-outline.service.js";
+import { withCurricula } from "./curriculum-read.js";
 
 /**
  * The classes a student learns through.
@@ -92,6 +93,25 @@ type StudentClass = Prisma.ClassGetPayload<{
   select: ReturnType<typeof studentClassSelect>;
 }>;
 
+/** The same select with plain course columns; `withClassCurricula` attaches
+ * every assigned course's hierarchy in one statement for all the classes. */
+function studentClassReadSelect(academyId: string) {
+  const select = studentClassSelect(academyId);
+  return { ...select, courseAssignments: { ...select.courseAssignments, select: { course: true } } } as const satisfies Prisma.ClassSelect;
+}
+
+async function withClassCurricula(
+  db: Pick<PrismaService, "$queryRaw">,
+  records: Array<Prisma.ClassGetPayload<{ select: ReturnType<typeof studentClassReadSelect> }>>,
+): Promise<StudentClass[]> {
+  const courses = new Map((await withCurricula(db, records.flatMap((record) => record.courseAssignments.map((assignment) => assignment.course))))
+    .map((course) => [course.id, course]));
+  return records.map((record) => ({
+    ...record,
+    courseAssignments: record.courseAssignments.map((assignment) => ({ ...assignment, course: courses.get(assignment.course.id)! })),
+  }));
+}
+
 /**
  * Progress belongs to a student and an exercise, never to an access path. The
  * list reports a count and no progress, so it folds the shared projection over
@@ -113,14 +133,14 @@ export class LearnClassService {
     academyId: string,
   ): Promise<{ classes: LearnClassSummary[] }> {
     const userId = await this.requireStudent(identity, academyId);
-    const classes = await this.prisma.class.findMany({
+    const classes = await withClassCurricula(this.prisma, await this.prisma.class.findMany({
       where: enrolledClassWhere(academyId, userId),
-      select: studentClassSelect(academyId),
+      select: studentClassReadSelect(academyId),
       // Class names are deliberately not unique — an academy reuses "Level 1"
       // every term — so the id settles the tie and the order holds between
       // reads.
       orderBy: [{ name: "asc" }, { id: "asc" }],
-    });
+    }));
 
     const photos = await teacherPhotos(classes, academyId, this.media);
 
@@ -138,14 +158,15 @@ export class LearnClassService {
   ): Promise<LearnClassDetail> {
     const { academyId, classId } = input;
     const userId = await this.requireStudent(identity, academyId);
-    const record = await this.prisma.class.findFirst({
+    const found = await this.prisma.class.findFirst({
       // The whole accessible-class predicate is in the query. Reading the class
       // by id and checking enrollment afterwards would answer a probe with a
       // different failure than a nonexistent id, which is the difference §7.1
       // exists to remove.
       where: { id: classId, ...enrolledClassWhere(academyId, userId) },
-      select: studentClassSelect(academyId),
+      select: studentClassReadSelect(academyId),
     });
+    const record = found ? (await withClassCurricula(this.prisma, [found]))[0]! : null;
     if (!record) {
       // One result for nonexistent, archived, cross-academy, and unenrolled, so
       // a guessed or remembered URL reveals nothing about which classes exist.

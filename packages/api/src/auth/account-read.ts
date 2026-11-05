@@ -1,6 +1,7 @@
 import type { User, AcademyMembership, AcademyJoinRequest, AcademyFeatureFlag } from "../generated/prisma/client.js";
 import { Prisma } from "../generated/prisma/client.js";
 import type { PrismaService } from "../database/prisma.service.js";
+import { dlabEligibilityJson, parseDlabEligibility, type DlabEligibilityRead } from "../integrations/dlab/dlab-eligibility-read.js";
 
 /** Only the fields used to resolve navigation and display account identity.
  * No credentials, contact details, student profiles or course graphs.
@@ -10,6 +11,9 @@ export type AccountRead = {
   emailIsPlaceholder: boolean; username: string | null; displayName: string | null;
   avatarUrl: string | null; platformRole: User["platformRole"];
   status: User["status"];
+  /** DLAB policy facts from the same snapshot (null: DLAB does not govern the
+   * account). Absent means unread, so callers read DLAB policy themselves. */
+  dlab?: DlabEligibilityRead | null;
   avatarAsset: { id: string; bucket: string; objectKey: string } | null;
   memberships: Array<{
     academyId: string;
@@ -31,7 +35,7 @@ export type AccountRead = {
  * cross products and preserving the previous relation ordering and filters.
  */
 export async function readAccount(prisma: Pick<PrismaService, "$queryRaw">, authUserId: string): Promise<AccountRead | null> {
-  type Row = Omit<AccountRead, "joinRequests"> & { joinRequests: Array<
+  type Row = Omit<AccountRead, "joinRequests" | "dlab"> & { dlab: unknown; joinRequests: Array<
     Omit<AccountRead["joinRequests"][number], "createdAt" | "reviewedAt"> & {
       createdAt: string; reviewedAt: string | null;
     }
@@ -41,6 +45,7 @@ export async function readAccount(prisma: Pick<PrismaService, "$queryRaw">, auth
       u.email_is_placeholder AS "emailIsPlaceholder", u.username,
       u.display_name AS "displayName", u.avatar_url AS "avatarUrl",
       u.platform_role AS "platformRole", u.status,
+      ${dlabEligibilityJson} AS dlab,
       (SELECT jsonb_build_object('id', a.id, 'bucket', a.bucket, 'objectKey', a.object_key)
         FROM media_assets a WHERE a.id = u.avatar_asset_id) AS "avatarAsset",
       coalesce((SELECT jsonb_agg(jsonb_build_object(
@@ -67,6 +72,7 @@ export async function readAccount(prisma: Pick<PrismaService, "$queryRaw">, auth
   const row = rows[0];
   return row ? {
     ...row,
+    dlab: parseDlabEligibility(row.dlab),
     joinRequests: row.joinRequests.map((r) => ({ ...r,
       createdAt: new Date(r.createdAt), reviewedAt: r.reviewedAt ? new Date(r.reviewedAt) : null,
     })),

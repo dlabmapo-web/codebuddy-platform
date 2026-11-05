@@ -1,6 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 import { ConfigService } from "@nestjs/config";
 import { VideoService } from "./video.service.js";
+
+vi.mock("../learn/curriculum-read.js", () => ({
+  // Unit fixtures already carry each course's hierarchy, as the include did;
+  // the one-statement reader itself is proven against Prisma by
+  // curriculum-read.integration.spec.ts.
+  withCurriculum: async (_db: unknown, course: unknown) => course,
+  withCurricula: async (_db: unknown, courses: unknown) => courses,
+}));
 const id = "00000000-0000-4000-8000-000000000001",
   assetId = "00000000-0000-4000-8000-000000000002",
   classId = "00000000-0000-4000-8000-000000000003";

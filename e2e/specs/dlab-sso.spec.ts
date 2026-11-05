@@ -154,6 +154,8 @@ test('a forged callback is rejected without creating a session', async ({ page }
 for (const role of ['STUDENT', 'TEACHER', 'TEAM_LEAD', 'MANAGER', 'ADMIN']) {
   test(`legacy ${role} password login remains available`, async ({ page, request }) => {
     const value = await fixture(request, role, { legacy: true });
+    const visited: string[] = [];
+    page.on('framenavigated', frame => { if (frame === page.mainFrame()) visited.push(new URL(frame.url()).pathname); });
     await page.goto('/login');
     const password = page.getByLabel(/^(Password|비밀번호)$/i, { exact: true });
     // No external CAPTCHA in this isolated provider harness. Confirm hydration
@@ -167,6 +169,8 @@ for (const role of ['STUDENT', 'TEACHER', 'TEAM_LEAD', 'MANAGER', 'ADMIN']) {
     await page.getByLabel(/^(Password|비밀번호)$/i, { exact: true }).fill('LocalLegacyTest123!');
     await page.getByRole('button', { name: /^(Log in|로그인|Sign in)$/i }).click();
     await expect(page).toHaveURL(role === 'ADMIN' ? /\/admin(?:\/academies)?$/ : new RegExp('/academy/' + value.academy.slug + '$'));
+    // Sign-in resolves the landing page on the server; it never stops at /welcome.
+    expect(visited).not.toContain('/welcome');
   });
 }
 
@@ -389,8 +393,13 @@ for (const osRole of ['tutor', 'edu_manager', 'lab_head'] as const) {
           if (kind === 'short') {
             const hint = editor.getByLabel('Input hint', { exact: true });
             await hint.fill('Use the language name.');
-            // The workspace polls every three seconds; it must not reset the open editor.
-            await staffPage.waitForResponse(response => new URL(response.url()).pathname === '/api/manual' && new URL(response.url()).searchParams.get('preview') === 'false', { timeout: 10_000 });
+            // A background refetch of the workspace must not reset the open
+            // editor. The workspace no longer polls on a timer (only a light
+            // submission-status check does), so trigger the refetch it does
+            // perform: the one on returning to the tab.
+            const refetched = staffPage.waitForResponse(response => new URL(response.url()).pathname === '/api/manual' && new URL(response.url()).searchParams.get('preview') === 'false', { timeout: 10_000 });
+            await staffPage.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
+            await refetched;
             await expect(hint).toHaveValue('Use the language name.');
           }
           await editor.getByRole('button', { name: 'Save activity', exact: true }).click();

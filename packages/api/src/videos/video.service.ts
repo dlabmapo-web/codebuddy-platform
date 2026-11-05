@@ -32,7 +32,6 @@ import {
   taughtClassWhere,
   learningScopeFor,
 } from "../classes/assigned-course-access.js";
-import { visibleCurriculumInclude } from "../learn/curriculum-outline.service.js";
 import {
   bumpContentRevision,
   nextMaterialPosition,
@@ -58,6 +57,7 @@ const include = {
   lecture: { include: { courseModule: { include: { course: true } } } },
 } as const;
 import { videoAssetSummary } from "./video-metadata.js";
+import { withCurriculum } from "../learn/curriculum-read.js";
 const progressDTO = (p: {
   positionMs: number;
   watchedMs: number;
@@ -704,10 +704,10 @@ export class VideoService {
             },
           })
         : null;
-    const course = await this.db.course.findUnique({
+    const found = await this.db.course.findUnique({
       where: { id: row.lecture.courseModule.course.id },
-      include: visibleCurriculumInclude,
     });
+    const course = found && await withCurriculum(this.db, found);
     const materials: VideoReadResult["materials"] = [],
       resources: VideoReadResult["resources"] = [];
     for (const module of course?.modules ?? [])

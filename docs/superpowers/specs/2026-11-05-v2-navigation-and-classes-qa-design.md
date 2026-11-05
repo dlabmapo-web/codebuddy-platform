@@ -3,7 +3,7 @@
 - Date: 2026-11-05
 - Branch: `fix/v2-qa`
 - Base branch: `feat/cove-studio-v2`
-- Status: Ready for review; implementation pending.
+- Status: Implemented; local validation recorded in the [verification report](../../research/2026-11-05-v2-navigation-and-classes-qa-verification.md). Hosted end-to-end verification remains outstanding.
 
 ## User direction
 

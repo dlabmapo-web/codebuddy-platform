@@ -13,6 +13,7 @@ import {
 import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
 import type { SupabaseIdentity } from "./auth.types.js";
+import type { DlabEligibilityRead } from '../integrations/dlab/dlab-eligibility-read.js';
 
 export type PasswordIdentityStatus = "present" | "absent" | "unavailable";
 
@@ -85,9 +86,11 @@ export class SupabaseAuthService {
     return identity;
   }
 
-  watchAccessToken(token: string, invalid: () => void): () => void {
+  /** `authUserId` (the token's own account) limits change notices to ones
+   * about this account or about everyone; the periodic check is unchanged. */
+  watchAccessToken(token: string, invalid: () => void, authUserId?: string): () => void {
     const check = () => { void this.verifyAccessToken(token).catch(invalid); };
-    const unwatch = this.dlab?.watch(check);
+    const unwatch = this.dlab?.watch(check, authUserId);
     const timer = setInterval(check, 10_000);
     timer.unref();
     return () => { clearInterval(timer); unwatch?.(); };
@@ -95,6 +98,11 @@ export class SupabaseAuthService {
 
   async dlabAcademyIds(authUserId: string): Promise<string[] | null> {
     const allowed = await this.dlab?.eligible(authUserId);
+    return allowed ? allowed.bindings.map(b => b.membership.academyId) : null;
+  }
+  /** The same answer for DLAB facts an account read already embedded. */
+  dlabAcademyIdsFrom(read: DlabEligibilityRead | null): string[] | null {
+    const allowed = this.dlab?.decide(read);
     return allowed ? allowed.bindings.map(b => b.membership.academyId) : null;
   }
   async isDlabManaged(authUserId: string) { return Boolean(await this.dlab?.managed(authUserId)); }

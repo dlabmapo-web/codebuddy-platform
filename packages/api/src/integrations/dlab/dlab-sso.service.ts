@@ -59,7 +59,8 @@ export class DlabSsoService {
         await tx.dlabIdentity.update({ where: { externalUserId: saved.externalUserId }, data: { userId: user.id, provisioningStatus: 'READY' } });
         return this.reconciler.reconcile(tx, { ...current, userId: user.id });
       });
-      await this.source.changed(changed);
+      // Only this login's account changed; other sessions need not re-verify.
+      await this.source.changed(changed, [authUserId]);
       const eligible = await this.policy.eligible(authUserId);
       if (!eligible) throw new DlabError('identity_not_bound', 403);
       const tokenHash = await this.auth.dlabTokenHash(authUserId, email);

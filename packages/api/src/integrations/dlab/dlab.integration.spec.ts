@@ -88,6 +88,19 @@ describe.skipIf(!databaseUrl || !redisUrl)('DLAB with isolated PostgreSQL and Re
       await received;
     } finally { unwatch(); }
   });
+  it('rechecks only the updated account\'s sessions after a source update', async () => {
+    const other = vi.fn();
+    let unwatch: () => void = () => {}, unwatchOther: () => void = () => {};
+    const received = new Promise<void>((resolve) => { unwatch = policy.watch(resolve, authId); });
+    unwatchOther = policy.watch(other, randomUUID());
+    try {
+      await source.user(id, { ...osUser, name: 'Renamed fixture', updated_at: '2026-01-01T12:30:00Z' } as never);
+      await received;
+      // Notices arrive in order on one subscriber, so the other account's
+      // listener has already been passed over.
+      expect(other).not.toHaveBeenCalled();
+    } finally { unwatch(); unwatchOther(); }
+  });
   it('does not clear a local suspension when OS remains active', async () => {
     const user = await prisma.user.findUniqueOrThrow({ where: { authUserId: authId } });
     await prisma.user.update({ where: { id: user.id }, data: { status: 'SUSPENDED' } });

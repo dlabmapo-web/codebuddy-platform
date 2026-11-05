@@ -11,27 +11,28 @@ export type DlabEligibilityRead = {
       };
     }>;
   };
-  /** Superset of the effective scope; the policy narrows it with dlabCampusScope. */
-  candidateCampuses: Array<Pick<DlabCampus, 'externalCampusId' | 'academyId'>>;
+  /** Superset of the effective scope; the policy narrows it with dlabCampusScope
+   * and applies the rollout mode's `ssoEnabled` requirement itself. */
+  candidateCampuses: Array<Pick<DlabCampus, 'externalCampusId' | 'academyId' | 'ssoEnabled'>>;
 };
 
-/** Every fact the DLAB policy decides on, in one statement and so one snapshot.
- * No authority is cached. The campus predicates mirror desiredDlabCampuses;
- * keep the two in step (the parity integration test compares them).
+/** The facts for the DLAB identity of the user row aliased `u`, as one JSON
+ * value (NULL when DLAB does not govern the account). Embedded by every read
+ * that decides access, so policy facts share that read's snapshot. The campus
+ * predicates mirror desiredDlabCampuses; keep the two in step (the parity
+ * integration test compares them).
  */
-export async function readDlabEligibility(db: Pick<PrismaService, '$queryRaw'>, authUserId: string, campusMode: boolean): Promise<DlabEligibilityRead | null> {
-  type Row = Omit<DlabEligibilityRead['identity'], 'bindings'> & {
-    bindings: Array<Omit<DlabEligibilityRead['identity']['bindings'][number], 'localSuspendedAt'> & { localSuspendedAt: string | null }>;
-    candidateCampuses: DlabEligibilityRead['candidateCampuses'];
-  };
-  const rows = await db.$queryRaw<Row[]>(Prisma.sql`
-    SELECT i.external_user_id AS "externalUserId", i.user_id AS "userId",
-      i.user_role AS "userRole", i.account_status AS "accountStatus",
+export const dlabEligibilityJson = Prisma.sql`(
+  SELECT jsonb_build_object(
+    'identity', jsonb_build_object(
+      'externalUserId', i.external_user_id, 'userId', i.user_id,
+      'userRole', i.user_role, 'accountStatus', i.account_status,
       -- Prisma reads a NULL list as empty, and an empty scope grants nothing;
       -- passing NULL through would widen it to the primary campus.
-      i.external_campus_id AS "externalCampusId", coalesce(i.external_campus_ids, '{}'::text[]) AS "externalCampusIds", i.generation,
-      jsonb_build_object('status', u.status, 'platformRole', u.platform_role) AS "user",
-      coalesce((SELECT jsonb_agg(jsonb_build_object(
+      'externalCampusId', i.external_campus_id, 'externalCampusIds', coalesce(to_jsonb(i.external_campus_ids), '[]'::jsonb),
+      'generation', i.generation,
+      'user', jsonb_build_object('status', u.status, 'platformRole', u.platform_role),
+      'bindings', coalesce((SELECT jsonb_agg(jsonb_build_object(
           'externalCampusId', b.external_campus_id, 'membershipId', b.membership_id,
           'sourceAccessStatus', b.source_access_status, 'localSuspendedAt', b.local_suspended_at,
           'membership', jsonb_build_object('academyId', m.academy_id, 'userId', m.user_id, 'status', m.status, 'role', m.role,
@@ -41,20 +42,36 @@ export async function readDlabEligibility(db: Pick<PrismaService, '$queryRaw'>, 
         FROM dlab_membership_bindings b
         JOIN academy_memberships m ON m.id = b.membership_id
         JOIN academies a ON a.id = m.academy_id
-        WHERE b.external_user_id = i.external_user_id), '[]'::jsonb) AS bindings,
-      coalesce((SELECT jsonb_agg(jsonb_build_object('externalCampusId', c.external_campus_id, 'academyId', c.academy_id) ORDER BY c.external_campus_id)
-        FROM dlab_campuses c JOIN academies ca ON ca.id = c.academy_id
-        WHERE (c.external_campus_id = i.external_campus_id OR c.external_campus_id = ANY(i.external_campus_ids))
-          AND c.status = 'active' AND ca.kind = 'ACADEMY' AND ca.status = 'ACTIVE'
-          AND (NOT ${campusMode}::boolean OR c.sso_enabled)), '[]'::jsonb) AS "candidateCampuses"
-    FROM dlab_identities i JOIN users u ON u.id = i.user_id
-    WHERE u.auth_user_id = ${authUserId}::uuid
-  `);
-  const row = rows[0];
-  if (!row) return null;
-  const { candidateCampuses, ...identity } = row;
+        WHERE b.external_user_id = i.external_user_id), '[]'::jsonb)),
+    'candidateCampuses', coalesce((SELECT jsonb_agg(jsonb_build_object(
+        'externalCampusId', c.external_campus_id, 'academyId', c.academy_id, 'ssoEnabled', c.sso_enabled) ORDER BY c.external_campus_id)
+      FROM dlab_campuses c JOIN academies ca ON ca.id = c.academy_id
+      WHERE (c.external_campus_id = i.external_campus_id OR c.external_campus_id = ANY(i.external_campus_ids))
+        AND c.status = 'active' AND ca.kind = 'ACADEMY' AND ca.status = 'ACTIVE'), '[]'::jsonb))
+  FROM dlab_identities i WHERE i.user_id = u.id
+)`;
+
+type EligibilityJson = Omit<DlabEligibilityRead, 'identity'> & {
+  identity: Omit<DlabEligibilityRead['identity'], 'bindings'> & {
+    bindings: Array<Omit<DlabEligibilityRead['identity']['bindings'][number], 'localSuspendedAt'> & { localSuspendedAt: string | null }>;
+  };
+};
+
+/** Restores the types JSON cannot carry (timestamps). */
+export function parseDlabEligibility(json: unknown): DlabEligibilityRead | null {
+  if (!json) return null;
+  const { identity, candidateCampuses } = json as EligibilityJson;
   return {
     identity: { ...identity, bindings: identity.bindings.map(b => ({ ...b, localSuspendedAt: b.localSuspendedAt ? new Date(b.localSuspendedAt) : null })) },
     candidateCampuses,
   };
+}
+
+/** Every fact the DLAB policy decides on, in one statement and so one snapshot.
+ * No authority is cached. */
+export async function readDlabEligibility(db: Pick<PrismaService, '$queryRaw'>, authUserId: string): Promise<DlabEligibilityRead | null> {
+  const rows = await db.$queryRaw<Array<{ dlab: unknown }>>(Prisma.sql`
+    SELECT ${dlabEligibilityJson} AS dlab FROM users u WHERE u.auth_user_id = ${authUserId}::uuid
+  `);
+  return parseDlabEligibility(rows[0]?.dlab);
 }

@@ -22,7 +22,9 @@ export async function desiredDlabCampuses(tx: Prisma.TransactionClient, config: 
   if (!ids.length) return [];
   return tx.dlabCampus.findMany({
     where: { externalCampusId: { in: ids }, status: 'active', academy: { kind: 'ACADEMY', status: 'ACTIVE' }, ...(config.get('DLAB_SSO_ROLLOUT_MODE', { infer: true }) === 'campus' ? { ssoEnabled: true } : {}) },
-    include: { academy: true }, orderBy: { externalCampusId: 'asc' },
+    // The academy is only ever needed by id, which the campus row carries; the
+    // filter above guarantees it exists. Loading it cost a round trip per call.
+    orderBy: { externalCampusId: 'asc' },
   });
 }
 
@@ -46,7 +48,7 @@ export class DlabReconcilerService {
     }
     const changed: string[] = [];
     if (role) for (const campus of desired) {
-      const academyId = campus.academy!.id;
+      const academyId = campus.academyId!;
       let membership = await tx.academyMembership.findUnique({ where: { academyId_userId: { academyId, userId: user.id } }, include: { dlabBinding: true, extraRoles: true } });
       if (membership && (!membership.dlabBinding || membership.dlabBinding.externalUserId !== identity.externalUserId || membership.dlabBinding.externalCampusId !== campus.externalCampusId)) throw new DlabError('membership_conflict', 409);
       if (!membership) membership = await tx.academyMembership.create({ data: { academyId, userId: user.id, role, status: user.status === 'ACTIVE' ? 'ACTIVE' : 'SUSPENDED', joinedAt: new Date() }, include: { dlabBinding: true, extraRoles: true } });

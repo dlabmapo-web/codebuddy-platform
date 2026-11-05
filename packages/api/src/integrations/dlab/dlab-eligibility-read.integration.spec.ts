@@ -5,6 +5,9 @@ import { dlabAcademyRole, dlabEffectiveScope, dlabMembershipRolesMatch, dlabPlat
 import { PrismaService } from '../../database/prisma.service.js';
 import type { Prisma } from '../../generated/prisma/client.js';
 import { DlabError } from './dlab-error.js';
+import { readDlabEligibility } from './dlab-eligibility-read.js';
+import { readAcademyPermission } from '../../authorization/academy-access-read.js';
+import { readAccount } from '../../auth/account-read.js';
 import { DlabPolicyService } from './dlab-policy.service.js';
 import { dlabAdmitted } from './dlab-reconciler.service.js';
 import { sourceWrite } from './dlab-transaction.js';
@@ -114,6 +117,7 @@ describe.skipIf(!databaseUrl)('one-statement DLAB eligibility matches the previo
   it.each(['allowlist', 'campus'] as const)('returns the same decision for every case in %s rollout mode', async mode => {
     const run = randomUUID().slice(0, 8);
     const compared: Array<{ name: string; legacy: unknown; current: unknown }> = [];
+    const embedded: Array<{ name: string; permission: unknown; account: unknown; standalone: unknown }> = [];
     await prisma.$transaction(async tx => {
       await sourceWrite(tx);
       const org = await tx.organization.create({ data: { name: 'Eligibility parity', slug: `parity-${run}` } });
@@ -152,10 +156,14 @@ describe.skipIf(!databaseUrl)('one-statement DLAB eligibility matches the previo
       subjects.push({ spec: { name: 'ordinary account', role: '', primary: '', ids: null }, authUserId: stranger.authUserId! });
       for (const { spec, authUserId } of subjects) {
         compared.push({ name: spec.name, legacy: await settle(() => legacyEligible(tx, config, authUserId)), current: await settle(() => policy.eligible(authUserId)) });
+        // Access reads embed the same facts in their own statement.
+        const standalone = await readDlabEligibility(tx, authUserId);
+        embedded.push({ name: spec.name, permission: (await readAcademyPermission(tx, authUserId, academies.A!.id))?.dlab ?? null, account: (await readAccount(tx, authUserId))?.dlab ?? null, standalone });
       }
       throw new RollbackParityFixtures();
     }).catch(error => { if (!(error instanceof RollbackParityFixtures)) throw error; });
     for (const { name, legacy, current } of compared) expect({ name, outcome: current }).toEqual({ name, outcome: legacy });
+    for (const { name, permission, account, standalone } of embedded) expect({ name, permission, account }).toEqual({ name, permission: standalone, account: standalone });
     // Both allowed and denied decisions were exercised, not just one kind.
     expect(compared.some(c => 'value' in (c.legacy as object) && (c.legacy as { value: unknown }).value)).toBe(true);
     expect(compared.some(c => 'error' in (c.legacy as object))).toBe(true);

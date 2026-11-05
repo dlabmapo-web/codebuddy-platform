@@ -37,6 +37,19 @@ export async function lockPdfAsset(tx: Prisma.TransactionClient, id: string) {
   return asset;
 }
 
+/**
+ * `lockPdfAsset` for a whole course copy, in one round trip instead of two per
+ * asset. Rows lock in id order, as a sorted series of single locks would, and
+ * the state is read under the lock, so a deletion claim is still refused.
+ */
+export async function lockPdfAssets(tx: Prisma.TransactionClient, ids: string[]) {
+  const unique = [...new Set(ids)];
+  if (!unique.length) return;
+  const locked = await tx.$queryRaw<Array<{ state: string }>>`SELECT state::text AS state FROM pdf_assets WHERE id = ANY(${unique}::uuid[]) ORDER BY id FOR UPDATE`;
+  if (locked.length !== unique.length || locked.some((asset) => asset.state !== "READY"))
+    throw new AppException("PDF_UPLOAD_EXPIRED", 409);
+}
+
 @Injectable()
 export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
   private activeUploads = 0;

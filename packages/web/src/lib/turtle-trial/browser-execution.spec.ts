@@ -19,6 +19,21 @@ function setup(request = vi.fn(async (_path: string, method?: string, data?: unk
 }
 afterEach(() => { for (const e of alive.splice(0)) e.dispose(); vi.useRealTimers(); });
 describe('browser execution authority and lifecycle', () => {
+  it('leaves the status alone when it stops defensively while nothing has run', async () => {
+    const { execution, bridge } = setup();
+    await execution.stop();
+    expect(execution.state.state).toBe('IDLE');
+    await execution.stop(true);
+    expect(execution.state.state).toBe('STOPPED');
+    expect(bridge.send).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'stop', clear: true }));
+  });
+  it('reports a failed runtime until one is ready again', () => {
+    const { execution } = setup();
+    execution.event({ kind: 'prepare-failed' });
+    expect(execution.state).toMatchObject({ ready: false, fullPython: true, runtimeFailed: true });
+    execution.event({ kind: 'ready' });
+    expect(execution.state).toMatchObject({ ready: true, fullPython: false, runtimeFailed: false });
+  });
   it('sends only frozen metadata to admission and source only to the isolated surface', async () => {
     const { execution, bridge, request } = setup();
     await execution.run('print("private")', 'drawing');

@@ -129,5 +129,6 @@
   "ask_teacher_for_code": "코드를 모르겠다면 선생님께 물어보세요.",
   "browser_unavailable": "브라우저 터틀을 사용할 수 없습니다. 전체 Python 실행을 선택해 주세요.",
   "run_with_full_python": "전체 Python으로 실행",
+  "retry_browser_turtle": "브라우저 터틀 다시 시도",
   "use_browser_turtle": "브라우저 터틀 사용"
 }

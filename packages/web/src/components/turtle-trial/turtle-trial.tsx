@@ -84,7 +84,9 @@ export function TurtleTrial({ enabled, browserConfig }: { enabled: boolean; brow
   const [grantBrowser, setGrantBrowser] = useState<TurtleBrowserProfile>();
   const [fullPython, setFullPython] = useState(false);
   const [browserUnavailable, setBrowserUnavailable] = useState(false);
-  const [browserState, setBrowserState] = useState<BrowserState>({ ready: false, pending: false, running: false, state: 'IDLE', output: '', fullPython: false });
+  const [browserState, setBrowserState] = useState<BrowserState>({ ready: false, pending: false, running: false, state: 'IDLE', output: '', fullPython: false, runtimeFailed: false });
+  /** Bumped by an explicit retry: a new surface starts its restart budget afresh. */
+  const [runtimeRetry, setRuntimeRetry] = useState(0);
   const browserError = useRef<(error: unknown) => void>(() => {});
   const [browserExecution] = useState(() => new BrowserTurtleExecution(setBrowserState, error => browserError.current(error)));
   const browserMode = (!!grantBrowser || browserUnavailable) && !fullPython;
@@ -369,6 +371,7 @@ export function TurtleTrial({ enabled, browserConfig }: { enabled: boolean; brow
       runPending={busy || (browserMode && browserState.pending)} stopDisabled={busy || !running} clearDisabled={busy}
       theme={theme} onThemeChange={setTheme} status={executionStatus} browser={browserMode ? browserState : undefined}
       onRun={() => void run()} onStop={() => void stop()} onClear={() => void stop(true)}>
+      {browserMode && browserState.runtimeFailed && runtimeProfile && <button type="button" disabled={busy} onClick={() => setRuntimeRetry(n => n + 1)}>{t('retry_browser_turtle')}</button>}
       {browserMode && (browserState.fullPython || browserUnavailable) && <button type="button" disabled={busy} onClick={() => void switchToFullPython()}>{t('run_with_full_python')}</button>}
       {!browserMode && grantBrowser && <button type="button" disabled={busy} onClick={() => void switchToBrowser()}>{t('use_browser_turtle')}</button>}
     </TurtleToolbar>
@@ -381,7 +384,7 @@ export function TurtleTrial({ enabled, browserConfig }: { enabled: boolean; brow
       <SplitHandle value={split} onChange={n => setSplit(Math.min(70, Math.max(30, n)))} label={t('resize_code_and_drawing')} />
       <div className={styles.results} style={{ gridTemplateRows: `minmax(0,${100 - consoleSize}fr) 6px minmax(0,${consoleSize}fr)` }}>
         <section className={styles.drawing} data-visible={mobileTab === 'drawing'} aria-label={t('drawing')} ref={drawing}>
-          {runtimeProfile && <BrowserTurtleSurface key={runtimeProfile.runtimeId} profile={runtimeProfile} execution={browserExecution} visible={browserMode} title={t('drawing')} />}
+          {runtimeProfile && <BrowserTurtleSurface key={`${runtimeProfile.runtimeId}:${runtimeRetry}`} profile={runtimeProfile} execution={browserExecution} visible={browserMode} title={t('drawing')} />}
           {!browserMode && (retainedFrame ? <Image src={retainedFrame} width={1024} height={640} unoptimized alt={t('last_turtle_drawing')} className={styles.frame} /> : !busy && running && session && session.state !== 'QUEUED' ? <GuiViewer session={session} minimal onFrame={keepFrame} onError={viewerError} /> : <div className={styles.empty}><span className="sr-only">{session?.state === 'QUEUED' ? t('your_code_starts_when_a_drawing_space_is') : t('write_code_on_the_left_then_press_run')}</span></div>)}
         </section>
         <SplitHandle vertical value={consoleSize} onChange={setConsoleSize} label={t('resize_output')} />

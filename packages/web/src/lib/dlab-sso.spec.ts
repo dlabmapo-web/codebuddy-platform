@@ -51,7 +51,7 @@ describe('DLAB browser start and callback', () => {
     expect(m.verify).toHaveBeenCalledWith({ token_hash: 'private-hash', type: 'email' });
     expect(fetcher.mock.calls[1]![1].headers.Authorization).toBe('Bearer fake-access');
     expect(m.begin).toHaveBeenCalledOnce(); expect(m.me).toHaveBeenCalledOnce();
-    expect(result.headers.get('location')).toBe('https://cs.coveedu.com/academy/dlab-mapo');
+    expect(result.headers.get('location')).toBe('https://cs.coveedu.com/academy/dlab-mapo/learn/courses');
     expect(result.headers.get('set-cookie')).toContain('Max-Age=0');
     expect(result.headers.get('location')).not.toMatch(/code|state|token|hash/);
   });
@@ -79,7 +79,7 @@ describe('DLAB browser start and callback', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ tokenHash: 'private-hash', authUserId: uid, ticket }))).mockResolvedValueOnce(new Response(JSON.stringify({ destination: '/academy/dlab-mapo', requiresStudentSession: false }))));
     m.me.mockResolvedValue({ user: { authUserId: uid, memberships: [{ academy: { slug: 'dlab-mapo' }, status: 'ACTIVE', role: 'TEACHER' }] } });
     const result = await callback(new NextRequest(`https://internal.test/sso/callback?state=${state}&code=private-code`));
-    expect(result.headers.get('location')).toBe('https://cs.coveedu.com/academy/dlab-mapo');
+    expect(result.headers.get('location')).toBe('https://cs.coveedu.com/academy/dlab-mapo/teach/classes');
     expect(m.begin).not.toHaveBeenCalled();
   });
   it('admits a verified platform admin to the fixed console destination without an academy membership', async () => {

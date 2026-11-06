@@ -59,7 +59,7 @@ describe('signed-out-only route policy', () => {
         status: 'ACTIVE',
         imageUrl: null,
       }],
-    }))).toBe('/academy/cove-development');
+    }))).toBe('/academy/cove-development/learn/courses');
   });
 
   it('preserves pending, welcome, and platform-admin destination policy', () => {

@@ -577,7 +577,7 @@ describe('sign-in landing', () => {
     await loginAction({}, formData({ ...loginFields, captchaToken: 'turnstile-token' }));
 
     expect(mocks.bootstrap).toHaveBeenCalledOnce();
-    expect(mocks.redirect).toHaveBeenCalledWith('/academy/mapo', 'replace');
+    expect(mocks.redirect).toHaveBeenCalledWith('/academy/mapo/learn/courses', 'replace');
   });
 
   it('sends a new signup with a session straight to its landing page', async () => {
@@ -586,7 +586,7 @@ describe('sign-in landing', () => {
 
     await signupAction({}, formData({ ...signupFields, captchaToken: 'turnstile-token' }));
 
-    expect(mocks.redirect).toHaveBeenCalledWith('/academy/mapo', 'replace');
+    expect(mocks.redirect).toHaveBeenCalledWith('/academy/mapo/learn/courses', 'replace');
   });
 
   it('falls back to /welcome, which explains the failure, when the account cannot be read', async () => {

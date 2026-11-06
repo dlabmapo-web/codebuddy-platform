@@ -99,12 +99,14 @@ function setup(options: {
   compare?: ComparisonResult;
   engineVersion?: string;
   capacity?: ExecutionCapacity;
+  timeScale?: number;
 } = {}) {
   const store = new MemoryStore();
   const initial = record(options.record);
   store.records.set(initial.checkId, initial);
   const engine = {
     version: options.engineVersion ?? "pyodide-0.27.5",
+    timeScale: options.timeScale,
     run: vi.fn(
       options.run ??
         (async () => ({ stdout: "hello\n", stderr: "", outcome: "PASSED" as const, runtimeMs: 12 })),
@@ -340,6 +342,31 @@ describe("SampleCheckRunner", () => {
       expect.objectContaining({ status: "TIMED_OUT", failure: "DEADLINE", result: null }),
     );
   }, 10_000);
+
+  // The same wall-clock allowance Submit gives a scaled engine. Only Date is
+  // faked, so the run moves the clock exactly as far as it says.
+  it.each([
+    [1, "TIMED_OUT"],
+    [2.5, "COMPLETED"],
+  ] as const)("at scale %s, a check 5.1 s past a 50 ms budget ends %s", async (timeScale, status) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const { runner, store, checkId } = setup({
+        timeScale,
+        record: { snapshot: { ...record().snapshot, totalTimeLimitMs: 50 } },
+        run: async () => {
+          vi.setSystemTime(Date.now() + 5_100);
+          return { stdout: "hello\n", stderr: "", outcome: "PASSED", runtimeMs: 5 };
+        },
+      });
+
+      await runner.run(checkId);
+
+      expect(store.records.get(checkId)!).toMatchObject({ status });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it("records an engine failure as ours", async () => {
     const { runner, store, checkId } = setup({

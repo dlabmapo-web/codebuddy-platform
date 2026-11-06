@@ -22,6 +22,7 @@ import { SampleCheckStore } from "./sample-check.store.js";
 import type { ExecutionEngine } from "./execution-engine.js";
 import { PyodideExecutionEngine } from "./pyodide-engine.js";
 import { SandboxExecutionEngine } from "./sandbox-engine.js";
+import { staleRunningAfterMs, TimeScaledEngine } from "./time-scaled-engine.js";
 
 /**
  * The judge is its own process, not a thread inside the API.
@@ -34,8 +35,6 @@ import { SandboxExecutionEngine } from "./sandbox-engine.js";
  */
 const SWEEP_INTERVAL_MS = 60_000;
 const QUEUED_STALE_AFTER_MS = 30_000;
-/** Longer than any legitimate submission: 50 cases at the 60s ceiling. */
-const STALE_AFTER_MS = 10 * 60_000;
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger("Judge");
@@ -86,11 +85,17 @@ async function bootstrap(): Promise<void> {
       environment.JUDGE_CONCURRENCY,
     );
   }
+  // Pyodide is slower than the native CPython limits are authored for; grading
+  // runs in native-equivalent time (`time-scaled-engine.ts`).
+  const timeScale = environment.JUDGE_TIME_SCALE;
+  const execution = timeScale === 1 ? engine : new TimeScaledEngine(engine, timeScale);
+  /** Longer than any legitimate run on this engine; see `staleRunningAfterMs`. */
+  const staleAfterMs = staleRunningAfterMs(timeScale);
   const telemetry = new ExecutionTelemetry();
   const comparator = new ComparatorPool(environment.JUDGE_COMPARATOR_POOL_SIZE, {}, telemetry);
   const grading = new GradingService(
     prisma,
-    engine,
+    execution,
     new PointAwardService(prisma),
     comparator,
     telemetry,
@@ -146,7 +151,7 @@ async function bootstrap(): Promise<void> {
   // short-lived records.
   const samples = new SampleCheckRunner(
     new SampleCheckStore(() => queue.redis()),
-    engine,
+    execution,
     comparator,
     capacity,
   );
@@ -166,7 +171,8 @@ async function bootstrap(): Promise<void> {
     queues: () => queue.diagnostics() });
   logger.log(JSON.stringify({ event: "judge.config", concurrency: environment.JUDGE_CONCURRENCY,
     comparatorPool: environment.JUDGE_COMPARATOR_POOL_SIZE, backgroundConcurrency: environment.REGRADE_CONCURRENCY,
-    sampleConcurrency: environment.SAMPLE_CHECK_CONCURRENCY, readinessGuard: environment.JUDGE_READINESS_GUARD, traceTimings: environment.JUDGE_TRACE_TIMINGS }));
+    sampleConcurrency: environment.SAMPLE_CHECK_CONCURRENCY, readinessGuard: environment.JUDGE_READINESS_GUARD, traceTimings: environment.JUDGE_TRACE_TIMINGS,
+    timeScale, staleAfterMs }));
 
   const sweeper = setInterval(() => {
     void prisma.staffPracticeAttempt.findMany({
@@ -175,14 +181,14 @@ async function bootstrap(): Promise<void> {
     }).then((rows) => Promise.all(rows.map((row) => queue.enqueuePractice(row.id))))
       .catch((error) => logger.error(`practice sweeper failed: ${String(error)}`));
     void prisma.staffPracticeAttempt.updateMany({
-      where: { status: "RUNNING", startedAt: { lt: new Date(Date.now() - STALE_AFTER_MS) } },
+      where: { status: "RUNNING", startedAt: { lt: new Date(Date.now() - staleAfterMs) } },
       data: { status: "ERRORED", gradedAt: new Date() },
     }).catch((error) => logger.error(`practice recovery failed: ${String(error)}`));
 
     void grading
       .sweepStale({
         queuedOlderThanMs: QUEUED_STALE_AFTER_MS,
-        runningOlderThanMs: STALE_AFTER_MS,
+        runningOlderThanMs: staleAfterMs,
       })
       .then(({ requeue }) =>
         Promise.all(requeue.map((submissionId) => queue.enqueue(submissionId))),

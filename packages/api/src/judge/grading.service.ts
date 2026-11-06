@@ -23,6 +23,7 @@ import {
   type ResolvedGradingProfile,
 } from "./grading-profile.js";
 import type { GradingProgress } from "./judge.queue.js";
+import { timeScaleOf } from "./time-scaled-engine.js";
 
 const gradingInclude = {
   gradingCases: { orderBy: { position: "asc" } },
@@ -124,7 +125,7 @@ export class GradingService {
     comparator: OutputComparator,
     readonly telemetry = new ExecutionTelemetry(),
   ) {
-    this.engine = { get version() { return engine.version; }, run: request => this.telemetry.time("engine", () => engine.run(request)), dispose: () => engine.dispose() };
+    this.engine = { get version() { return engine.version; }, get timeScale() { return engine.timeScale; }, run: request => this.telemetry.time("engine", () => engine.run(request)), dispose: () => engine.dispose() };
     this.comparator = { get version() { return comparator.version; }, compare: request => this.telemetry.time("compare", () => comparator.compare(request)) };
   }
 
@@ -315,7 +316,8 @@ export class GradingService {
     sink?: GradeSink,
   ): Promise<void> {
     const submissionId = submission.id;
-    const deadline = claimedAt + profile.totalTimeLimitMs + GRADING_OVERHEAD_MS;
+    // Wall clock: a scaled engine spends `timeScale` times the authored budget.
+    const deadline = claimedAt + Math.ceil(profile.totalTimeLimitMs * timeScaleOf(this.engine)) + GRADING_OVERHEAD_MS;
     let executionBudgetMs = profile.totalTimeLimitMs;
     const results: CaseRow[] = [];
     const cases = submission.gradingCases;

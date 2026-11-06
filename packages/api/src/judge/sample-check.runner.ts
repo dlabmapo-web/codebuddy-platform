@@ -8,6 +8,7 @@ import type { ExecutionEngine } from "./execution-engine.js";
 import { caseOutcomeFor } from "./grading.js";
 import { sampleInputPromptPolicy } from "./sample-check-snapshot.js";
 import { runtimeMismatch } from "./grading-profile.js";
+import { timeScaleOf } from "./time-scaled-engine.js";
 import type {
   SampleCheckRecord,
   SampleCheckStore,
@@ -116,7 +117,8 @@ export class SampleCheckRunner {
       return;
     }
 
-    const deadlineAt = dispatchedAt + snapshot.totalTimeLimitMs + GRADING_OVERHEAD_MS;
+    // The same wall-clock budget Submit gives this case on a scaled engine.
+    const deadlineAt = dispatchedAt + Math.ceil(snapshot.totalTimeLimitMs * timeScaleOf(this.engine)) + GRADING_OVERHEAD_MS;
     let evaluation;
     try {
       evaluation = await evaluateEnhancedCase(

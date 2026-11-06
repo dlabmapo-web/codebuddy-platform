@@ -92,3 +92,22 @@ describe("enhanced case execution deadlines", () => {
     expect(comparator.compare).not.toHaveBeenCalled();
   });
 });
+
+describe("enhanced case execution on a scaled engine", () => {
+  it("converts the wall-clock time left into the engine's time", async () => {
+    const { engine, comparator, input } = fixture(100);
+    input.deadlineAt = Date.now() + 1_000;
+    const evaluation = evaluateEnhancedCase({ engine: { ...engine, timeScale: 2.5 }, comparator }, input);
+    await vi.advanceTimersByTimeAsync(100);
+    await evaluation;
+    expect(engine.run).toHaveBeenCalledWith(expect.objectContaining({ timeLimitMs: 400 }));
+  });
+
+  it("keeps the case limit when the deadline is not the tighter bound", async () => {
+    const { engine, comparator, input } = fixture(100);
+    const evaluation = evaluateEnhancedCase({ engine: { ...engine, timeScale: 2.5 }, comparator }, input);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await evaluation).toMatchObject({ kind: "verdict", outcome: "PASSED" });
+    expect(engine.run).toHaveBeenCalledWith(expect.objectContaining({ timeLimitMs: 3_000 }));
+  });
+});

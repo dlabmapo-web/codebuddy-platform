@@ -9,11 +9,14 @@ export function ShortAnswerFields({
   value,
   onChange,
   locked,
+  onImageUpload,
 }: {
   academyId: string;
   value: ShortAnswerDefinition;
   onChange: (value: ShortAnswerDefinition) => void;
   locked: boolean;
+  /** Stores an explanation picture privately; it shows only once an attempt is completed. */
+  onImageUpload?: (file: File) => Promise<string>;
 }) {
   const { t } = useManualTranslation();
   const [mode, setMode] = useState<"EXACT" | "REGEX">(
@@ -149,6 +152,7 @@ export function ShortAnswerFields({
           <RichEditor
             value={value.explanation}
             onChange={(next) => field("explanation", next)}
+            onImageUpload={onImageUpload}
           />
         </div>
       ) : null}

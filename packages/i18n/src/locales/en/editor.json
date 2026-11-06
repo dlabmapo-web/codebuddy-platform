@@ -19,7 +19,6 @@
   "insert_table": "Insert a 3×3 table; add or remove rows and columns inside it",
   "insert_link": "Insert link",
   "attach_image": "Attach image; drag the right handle to resize",
-  "attach_file": "Attach file",
   "edit_table": "Edit table",
   "row": "Row",
   "column": "Column",
@@ -36,5 +35,7 @@
   "delete_table_label": "Delete table",
   "link_prompt": "Enter the link URL",
   "image_upload_failed": "Could not upload the image. Try again.",
+  "image_too_large": "This image is still over 5 MB after shrinking. Use a smaller image.",
+  "image_too_large_unshrinkable": "GIF and SVG images must be 5 MB or smaller.",
   "resize_image": "Drag to resize the image"
 }

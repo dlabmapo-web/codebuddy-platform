@@ -11,6 +11,7 @@ import { AnswerRecordsService } from "./answer-records.service.js";
 import { CurriculumOutlineService } from "./curriculum-outline.service.js";
 import { LearnClassService } from "./learn-class.service.js";
 import { LearnService } from "./learn.service.js";
+import { ManualAssetsService } from "../manual/manual-assets.service.js";
 import { LearningClassContextService } from "./learning-class-context.service.js";
 import { StudentOverviewAccessService } from "./student-overview-access.service.js";
 import { StudentOverviewRepository } from "./student-overview.repository.js";
@@ -33,6 +34,8 @@ import { SubmissionService } from "./submission.service.js";
     CurriculumOutlineService,
     LearnClassService,
     LearnService,
+    // Problem descriptions show private lesson pictures; only the store is shared.
+    ManualAssetsService,
     StaffPracticeService,
     LearningClassContextService,
     StudentOverviewAccessService,

@@ -9,6 +9,8 @@ export function createLearnRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) => deps.learnService.getLatestSubmission(context.identity, input)),
     getMaterialType: os.learn.getMaterialType.use(access.studentAuthenticated)
       .handler(({ context, input }) => deps.learnService.getMaterialType(context.identity, input)),
+    getExerciseImage: os.learn.getExerciseImage.use(access.studentAuthenticated)
+      .handler(({ context, input }) => deps.learnService.getExerciseImage(context.identity, input)),
     savePracticeDraft: os.learn.savePracticeDraft.use(access.authenticated)
       .handler(({ context, input }) => deps.staffPracticeService.saveDraft(context.identity, input)),
     submitPractice: os.learn.submitPractice.use(access.authenticated)

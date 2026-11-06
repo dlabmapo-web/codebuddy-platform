@@ -38,6 +38,8 @@ import {
 } from "./curriculum-outline.service.js";
 import { withCurricula, withCurriculum } from "./curriculum-read.js";
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
+import { lessonImageIds } from "../content/lesson-images.js";
+import { ManualAssetsService } from "../manual/manual-assets.service.js";
 import { SubmissionService } from "./submission.service.js";
 import { LearningClassContextService } from "./learning-class-context.service.js";
 import { automaticLatestSubmission } from './latest-submission.js';
@@ -93,6 +95,7 @@ export class LearnService {
     private readonly submissions: SubmissionService,
     private readonly classContext: LearningClassContextService,
     @Optional() private readonly practice?: StaffPracticeService,
+    @Optional() private readonly lessonImages?: ManualAssetsService,
   ) {}
 
   async listCourses(
@@ -121,6 +124,30 @@ export class LearnService {
     }) : await this.requireVisibleMaterial(input.academyId, input.materialId, scope);
     if (!row) throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
     return { type: row.type };
+  }
+
+  /**
+   * Authorised exactly as opening the problem is: a reachable material, or a
+   * reviewer's preview. Showing the image in the current description is what
+   * grants it, which is also how a copied course keeps its source's pictures.
+   */
+  async getExerciseImage(identity: SupabaseIdentity, input: { academyId: string; materialId: string; assetId: string; preview?: boolean }) {
+    const { scope, role, roles } = await this.requireLearner(identity, input.academyId);
+    if (input.preview && !rolesHavePermission(roles ?? [role], 'curriculum.review'))
+      throw new AppException('PERMISSION_DENIED', HttpStatus.FORBIDDEN);
+    const row = await this.prisma.material.findFirst({
+      where: {
+        id: input.materialId,
+        ...(input.preview ? { AND: [scope.material, { lecture: { courseModule: { course: { academyId: input.academyId } } } }] } : reachableMaterialWhere(input.academyId, scope)),
+      },
+      select: { programmingExercise: { select: { description: true } } },
+    });
+    if (!row?.programmingExercise || !lessonImageIds(row.programmingExercise.description).includes(input.assetId.toLowerCase()))
+      throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
+    if (!this.lessonImages) throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.SERVICE_UNAVAILABLE);
+    const url = await this.lessonImages.imageDataUrl(input.assetId);
+    if (!url) throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
+    return { url };
   }
 
   async getLatestSubmission(identity: SupabaseIdentity, input: {

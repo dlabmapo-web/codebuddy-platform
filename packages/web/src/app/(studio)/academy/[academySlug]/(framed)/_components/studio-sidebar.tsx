@@ -8,7 +8,6 @@ import {
   ClipboardList,
   Coins,
   GraduationCap,
-  LayoutDashboard,
   Mail,
   MonitorPlay,
   Presentation,
@@ -49,6 +48,7 @@ import { NavPendingHint } from './nav-pending-hint';
 import { NavCountBadge, NavCountDot } from './nav-count-badge';
 import { usePendingApplicationsCount } from '../_hooks/use-pending-applications';
 import { activeNavHref } from '@/lib/nav-active';
+import { academyEntryPath } from '@/lib/academy-entry';
 import { MyPageRow, type MyPageViewer } from '@/components/studio/nav/my-page-row';
 import { RoleBadge } from '@/components/studio/role-badge';
 import { routes } from '@/lib/routes';
@@ -152,10 +152,7 @@ export function StudioSidebar({
     isStudent,
   });
   const myPageHref = routes.academyMe(academySlug);
-  // Decided across every group: the Overview link prefixes all the others, so
-  // only the most specific match can be the active one. My Page is in the set
-  // although it is in no group — it is a page of this academy, and left out
-  // the overview's prefix would claim its path.
+  // Match shared detail pages against the most specific navigation owner.
   const activeHref = activeNavHref(pathname, [
     ...groups.flatMap((group) =>
       group.items.map((item) => ({
@@ -184,7 +181,7 @@ export function StudioSidebar({
         />
       </SidebarHeader> : null}
       <SidebarSeparator />
-      <SidebarContent>
+      <SidebarContent className="group-data-[collapsible=icon]:overflow-y-auto">
         {groups.map((group) => (
           <NavSection
             teacherView={viewRole === 'TEACHER'}
@@ -223,8 +220,8 @@ function NavSection({
   const collapsed = state === 'collapsed' && !isMobile;
 
   return (
-    <SidebarGroup>
-      {!teacherView ? <SidebarGroupLabel>{t(group.labelKey)}</SidebarGroupLabel> : null}
+    <SidebarGroup className={group.id === 'maintenance' ? 'mt-auto shrink-0 border-t border-sidebar-border' : undefined}>
+      {!teacherView && group.id !== 'maintenance' ? <SidebarGroupLabel>{t(group.labelKey)}</SidebarGroupLabel> : null}
       <SidebarMenu>
         {group.items.map((item) => {
           const active = item.href === activeHref;
@@ -251,7 +248,11 @@ function NavSection({
                     : undefined
                 }
               >
-                <Link href={item.href} onClick={() => setOpenMobile(false)}>
+                <Link
+                  aria-label={collapsed ? label : undefined}
+                  href={item.href}
+                  onClick={() => setOpenMobile(false)}
+                >
                   <item.icon />
                   <span>{label}</span>
                   {/* Hidden while the rail is collapsed to icons: there is no
@@ -356,7 +357,7 @@ function AcademySwitcher({
       align="start"
       drawerTitle={t('academy_switcher.switch')}
       list={shown}
-      onSelect={(academy) => router.push(routes.academy(academy.slug))}
+      onSelect={(academy) => router.push(academyEntryPath(academy.slug, academy.role))}
       placeholder={t('academy_switcher.search')}
       popoverClassName="w-60"
       renderItem={(academy) => (
@@ -399,13 +400,7 @@ export function studioNavGroups({
   isStudent: boolean;
 }): NavGroup[] {
   const base = routes.academy(academySlug);
-  const groups: NavGroup[] = [
-    {
-      id: 'overview',
-      labelKey: 'group.overview',
-      items: [{ href: base, labelKey: 'link.overview', icon: LayoutDashboard }],
-    },
-  ];
+  const groups: NavGroup[] = [];
 
   if (canLearn) {
     const learning: NavLink[] = [
@@ -445,22 +440,6 @@ export function studioNavGroups({
       }
     }
     groups.push({ id: 'learning', labelKey: 'group.learning', items: learning });
-  }
-
-  if (canRunMaintenance) {
-    const content: NavLink[] = [];
-    // Under Curriculum rather than a group of its own: what it repairs is the
-    // damage a curriculum edit does to work already answered, and the person
-    // who reaches for it has just come from the course they edited. A group
-    // holding one row would also be a heading for a page opened twice a term.
-    if (canRunMaintenance) {
-      content.push({
-        href: `${base}/maintenance`,
-        labelKey: 'link.maintenance',
-        icon: Wrench,
-      });
-    }
-    groups.push({ id: 'content', labelKey: 'group.content', items: content });
   }
 
   // One group, two audiences, two routes. `/classes` is the management view a
@@ -548,7 +527,7 @@ export function studioNavGroups({
       // One member page serves all three roles, and it does not sit under any
       // of their lists. A manager's Students link prefixes it and lights up on
       // its own; a teacher's list lives under `/teach`, so it has to claim the
-      // path or the academy index wins by prefix and marks Overview current.
+      // path so the Students row stays current on a member detail page.
       alsoCurrentOn: [routes.academyStudents(academySlug)],
     });
   }
@@ -590,6 +569,18 @@ export function studioNavGroups({
       });
     }
     groups.push({ id: 'settings', labelKey: 'group.settings', items: settings });
+  }
+
+  if (canRunMaintenance) {
+    groups.push({
+      id: 'maintenance',
+      labelKey: 'group.settings',
+      items: [{
+        href: routes.academyMaintenance(academySlug),
+        labelKey: 'link.maintenance',
+        icon: Wrench,
+      }],
+    });
   }
 
   return groups;

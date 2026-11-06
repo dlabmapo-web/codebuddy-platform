@@ -33,7 +33,7 @@ function peopleLinks(options: {
   return group?.items.map(({ href }) => href) ?? [];
 }
 
-function curriculumLinks(options: {
+function maintenanceLinks(options: {
   canManageContent: boolean;
   canRunMaintenance: boolean;
 }) {
@@ -44,14 +44,28 @@ function curriculumLinks(options: {
     canReviewApplications: false,
     ...options,
   })
-    .find(({ id }) => id === 'content');
+    .find(({ id }) => id === 'maintenance');
   return group?.items.map(({ href }) => href) ?? [];
 }
 
-describe('curriculum maintenance in the rail', () => {
+describe('maintenance in the rail', () => {
+  it('places maintenance after all normal navigation groups', () => {
+    const groups = studioNavGroups({
+      ...common,
+      canManageAcademy: true,
+      canManageClasses: true,
+      canRunMaintenance: true,
+      canReadAcademyMembers: true,
+      canReviewApplications: true,
+      canMonitor: true,
+    });
+    expect(groups.at(-1)?.id).toBe('maintenance');
+    expect(groups.some(({ id }) => id === 'content' || id === 'overview')).toBe(false);
+  });
+
   it('shows the maintenance row to somebody who may re-grade', () => {
     expect(
-      curriculumLinks({ canManageContent: true, canRunMaintenance: true }),
+      maintenanceLinks({ canManageContent: true, canRunMaintenance: true }),
     ).toEqual([
       '/academy/cove-development/maintenance',
     ]);
@@ -59,16 +73,33 @@ describe('curriculum maintenance in the rail', () => {
 
   it('hides it from a teacher, who may read curriculum but not repair it', () => {
     expect(
-      curriculumLinks({ canManageContent: true, canRunMaintenance: false }),
+      maintenanceLinks({ canManageContent: true, canRunMaintenance: false }),
     ).toEqual([]);
   });
 
   it('leaves the group out entirely when neither row is held', () => {
     // A student. An empty heading would be worse than no heading.
     expect(
-      curriculumLinks({ canManageContent: false, canRunMaintenance: false }),
+      maintenanceLinks({ canManageContent: false, canRunMaintenance: false }),
     ).toEqual([]);
   });
+});
+
+it.each([
+  { isStudent: true },
+  { canMonitor: true },
+  { canManageClasses: true, canReadAcademyMembers: true },
+  { canManageAcademy: true, canManageClasses: true, canRunMaintenance: true },
+])('never offers Overview for role capabilities %j', (capabilities) => {
+  const links = studioNavGroups({
+    ...common,
+    canManageAcademy: false,
+    canReadAcademyMembers: false,
+    canReviewApplications: false,
+    ...capabilities,
+  }).flatMap(({ items }) => items);
+  expect(links.some(({ labelKey }) => labelKey === 'link.overview')).toBe(false);
+  expect(links.some(({ href }) => href === '/academy/cove-development')).toBe(false);
 });
 
 describe('studio application navigation', () => {

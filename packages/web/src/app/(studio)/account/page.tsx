@@ -1,3 +1,4 @@
+import type { AcademyRole } from '@cove/shared';
 import { redirect } from 'next/navigation';
 
 import { PageTranslationsProvider } from '@/i18n';
@@ -40,14 +41,17 @@ export default async function MyPage({
   const { t } = await getServerTranslation(['profile']);
   const { academy: requested, from } = await searchParams;
 
-  let firstAcademySlug: string | null = null;
+  let firstAcademy: { slug: string; role: AcademyRole } | null = null;
   let isPlatformAdmin = false;
   let scopedSlug: string | null = null;
   try {
     const account = await getAccount();
-    firstAcademySlug = account.user.memberships.find(
-      (membership) => membership.status === 'ACTIVE',
-    )?.academy.slug ?? null;
+    const membership = account.user.memberships.find(
+      (entry) => entry.status === 'ACTIVE',
+    );
+    firstAcademy = membership
+      ? { slug: membership.academy.slug, role: membership.role }
+      : null;
     isPlatformAdmin = account.user.platformRole === 'ADMIN';
     scopedSlug = redirectSlugFor(
       account.user.memberships.map((membership) => ({
@@ -72,7 +76,7 @@ export default async function MyPage({
 
   const back = myPageBackDestination({
     origin: isAccountOrigin(from) ? from : null,
-    firstAcademySlug,
+    firstAcademy,
     isPlatformAdmin,
   });
 

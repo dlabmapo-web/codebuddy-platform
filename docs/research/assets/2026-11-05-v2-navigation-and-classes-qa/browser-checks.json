@@ -1,0 +1,28 @@
+{
+  "checks": [
+    "heading visible below header and no page overflow",
+    "Overview absent, Korean Courses label, maintenance last",
+    "search narrows and clears",
+    "status filter narrows archived classes",
+    "column visibility toggles and restores",
+    "pagination forwards and back",
+    "keyboard reveals complete course titles",
+    "Open and class title navigate to same destination",
+    "edit action retains callback",
+    "archive still requires confirmation",
+    "restore remains available for archived classes",
+    "New class button retains callback",
+    "mobile scroll stays inside table and teacher moves into class cell",
+    "maintenance reachable in short sidebar",
+    "collapsed sidebar keeps maintenance reachable",
+    "TEACHER navigation has no Overview",
+    "STUDENT navigation has no Overview",
+    "TEAM_LEAD navigation has no Overview",
+    "numeric sorting and clear",
+    "typed deletion confirmation and callback",
+    "mobile sidebar maintenance and dismissal",
+    "English status and actions fit",
+    "assistant counts remain visible and accessible in Korean and English"
+  ],
+  "errors": []
+}

@@ -1,3 +1,6 @@
+import type { AcademyRole } from '@cove/shared';
+
+import { academyEntryPath } from '@/lib/academy-entry';
 import { routes, type AccountOrigin } from '@/lib/routes';
 
 /**
@@ -14,7 +17,8 @@ import { routes, type AccountOrigin } from '@/lib/routes';
  *    so today, and only an operator may be sent there — the origin arrives in
  *    a URL anybody can type, so it selects between answers this account is
  *    already entitled to rather than granting a destination.
- * 2. **Their first academy.** The ordinary answer for a member.
+ * 2. **Their first academy**, at that role's entry page rather than the root,
+ *    which would only redirect there. The ordinary answer for a member.
  * 3. **The console**, for an operator holding no membership at all.
  * 4. **Sign-in**, for an account with neither — the only case where there is
  *    genuinely nowhere else to go.
@@ -31,17 +35,17 @@ import { routes, type AccountOrigin } from '@/lib/routes';
  */
 export function myPageBackDestination(input: {
   origin: AccountOrigin | null;
-  firstAcademySlug: string | null;
+  firstAcademy: { slug: string; role: AcademyRole } | null;
   isPlatformAdmin: boolean;
 }): { href: string; labelKey: 'back_to_console' | 'back_to_studio' } {
-  const { origin, firstAcademySlug, isPlatformAdmin } = input;
+  const { origin, firstAcademy, isPlatformAdmin } = input;
 
   if (origin === 'admin' && isPlatformAdmin) {
     return { href: routes.admin, labelKey: 'back_to_console' };
   }
-  if (firstAcademySlug) {
+  if (firstAcademy) {
     return {
-      href: routes.academy(firstAcademySlug),
+      href: academyEntryPath(firstAcademy.slug, firstAcademy.role),
       labelKey: 'back_to_studio',
     };
   }

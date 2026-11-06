@@ -5,6 +5,15 @@ const fixtureOrigin = `http://127.0.0.1:${Number(process.env.COVE_DLAB_TEST_PROV
 const apiOrigin = `http://127.0.0.1:${Number(process.env.COVE_DLAB_TEST_API_PORT ?? 4319)}`;
 const studioOrigin = `http://127.0.0.1:${Number(process.env.COVE_DLAB_TEST_WEB_PORT ?? 3309)}`;
 type Fixture = { id: string; academy: { slug: string; id: string }; username?: string };
+// Sign-in lands on the role's work page; the academy root only redirects there.
+const entry = {
+  MANAGER: { path: '/classes', heading: 'Classes' },
+  TEAM_LEAD: { path: '/classes', heading: 'Classes' },
+  TEACHER: { path: '/teach/classes', heading: 'My classes' },
+  STUDENT: { path: '/learn/courses', heading: 'My courses' },
+} as const;
+const landing = (slug: string, role: keyof typeof entry) => new RegExp('/academy/' + slug + entry[role].path + '$');
+const inAcademy = (slug: string) => new RegExp('/academy/' + slug + '/(?:classes|teach/classes|learn/courses)$');
 
 for (const engine of ['chromium', 'webkit']) for (const role of ['lab_head', 'edu_manager', 'tutor', 'student']) {
   test(`new HQ campus: ${role} first and repeated login stays isolated in ${engine}`, async ({ browser, request }) => {
@@ -14,21 +23,21 @@ for (const engine of ['chromium', 'webkit']) for (const role of ['lab_head', 'ed
       const page = await context.newPage();
       const own = await fixture(request, role, { autoCampus: true, campusName: 'HQ ' + role });
       const other = await fixture(request, 'lab_head', { autoCampus: true, campusName: 'Other HQ branch' });
+      const localRole = ({ lab_head: 'MANAGER', edu_manager: 'TEAM_LEAD', tutor: 'TEACHER', student: 'STUDENT' } as const)[role as 'lab_head' | 'edu_manager' | 'tutor' | 'student'];
       await enter(page, own);
-      await expect(page).toHaveURL(new RegExp('/academy/' + own.academy.slug + '$'));
-      const heading = { lab_head: 'Control tower', edu_manager: 'What HQ edu_manager teaches', tutor: 'Teaching overview', student: 'Hi, Browser student' }[role];
+      await expect(page).toHaveURL(landing(own.academy.slug, localRole));
+      const heading = entry[localRole].heading;
       await expect(page.getByRole('heading', { name: heading, level: 1, exact: true })).toBeVisible();
       const initial = await (await request.get(fixtureOrigin + '/fixtures/' + own.id)).json();
-      const localRole = { lab_head: 'MANAGER', edu_manager: 'TEAM_LEAD', tutor: 'TEACHER', student: 'STUDENT' }[role];
       expect(initial.memberships).toHaveLength(1);
       expect(initial.memberships[0].role).toBe(localRole);
       expect((await rpc(page, request, 'learn/listCourses', { academyId: own.academy.id })).status()).toBe(200);
       expect((await rpc(page, request, 'learn/listCourses', { academyId: other.academy.id })).status()).toBe(403);
       // A fresh SSO entry reuses the same managed user and correct academy.
       await enter(page, own);
-      await expect(page).toHaveURL(new RegExp('/academy/' + own.academy.slug + '$'));
+      await expect(page).toHaveURL(landing(own.academy.slug, localRole));
       await page.reload();
-      await expect(page).toHaveURL(new RegExp('/academy/' + own.academy.slug + '$'));
+      await expect(page).toHaveURL(landing(own.academy.slug, localRole));
       await expect(page.getByRole('heading', { name: heading, level: 1, exact: true })).toBeVisible();
       const repeated = await (await request.get(fixtureOrigin + '/fixtures/' + own.id)).json();
       expect(repeated.userId).toBe(initial.userId);
@@ -83,9 +92,8 @@ for (const [osRole, role] of [['student', 'STUDENT'], ['instructor', 'TEAM_LEAD'
   test(`OS ${osRole} automatically enters Cove as ${role} and reuses the account`, async ({ page, request }) => {
     const value = await fixture(request, osRole);
     await enter(page, value);
-    await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
-    if (role === 'STUDENT') await expect(page.getByRole('heading', { name: 'Hi, Browser ' + osRole, exact: true })).toBeVisible();
-    else await expect(page.getByRole('heading', { name: role === 'TEACHER' ? 'Teaching overview' : role === 'MANAGER' ? 'Control tower' : 'What SSO Browser Academy teaches', level: 1, exact: true })).toBeVisible();
+    await expect(page).toHaveURL(landing(value.academy.slug, role));
+    await expect(page.getByRole('heading', { name: entry[role].heading, level: 1, exact: true })).toBeVisible();
     await page.screenshot({ path: test.info().outputPath('dashboard.png'), animations: 'disabled', timeout: 15_000 });
     const first = await (await request.get(fixtureOrigin + '/fixtures/' + value.id, { maxRetries: 2 })).json();
     expect(first.studentLeaseCount).toBe(role === 'STUDENT' ? 1 : 0);
@@ -93,8 +101,8 @@ for (const [osRole, role] of [['student', 'STUDENT'], ['instructor', 'TEAM_LEAD'
     const expectedRoles = role === 'MANAGER' ? ['MANAGER', 'TEAM_LEAD', 'TEACHER'] : role === 'TEAM_LEAD' ? ['TEAM_LEAD', 'TEACHER'] : [role];
     expect(first.memberships[0].roles.sort()).toEqual(expectedRoles.sort());
     if (role === 'MANAGER' || role === 'TEAM_LEAD') await expect(page.getByRole('link', { name: 'My classes', exact: true })).toBeVisible();
-    await page.reload(); await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
-    await page.goto('/sso/start'); await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
+    await page.reload(); await expect(page).toHaveURL(landing(value.academy.slug, role));
+    await page.goto('/sso/start'); await expect(page).toHaveURL(landing(value.academy.slug, role));
     const again = await (await request.get(fixtureOrigin + '/fixtures/' + value.id, { maxRetries: 2 })).json();
     expect(again.userId).toBe(first.userId); expect(again.memberships[0].id).toBe(first.memberships[0].id);
     const denied = await rpc(page, request, 'platformAcademies/get', { academyId: value.academy.id });
@@ -125,7 +133,7 @@ test('HQ admin demotion revokes console access and the fresh login receives only
   expect((await request.post(apiOrigin + '/api/rpc/platformAcademies/get', { headers: { Authorization: 'Bearer ' + oldToken }, data: { json: { academyId: value.academy.id } } })).status()).toBe(401);
   await page.goto('/login'); await expect(page.getByRole('heading', { name: 'Log in', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Log in with DLAB', exact: true }).click();
-  await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
+  await expect(page).toHaveURL(landing(value.academy.slug, 'TEAM_LEAD'));
   const saved = await (await request.get(fixtureOrigin + '/fixtures/' + value.id)).json();
   expect(saved.platformRole).toBe('USER'); expect(saved.memberships[0].role).toBe('TEAM_LEAD');
   expect((await rpc(page, request, 'platformAcademies/get', { academyId: value.academy.id })).status()).toBe(403);
@@ -168,7 +176,7 @@ for (const role of ['STUDENT', 'TEACHER', 'TEAM_LEAD', 'MANAGER', 'ADMIN']) {
     await page.getByRole('textbox', { name: /ID|아이디|username/i }).fill(value.username!);
     await page.getByLabel(/^(Password|비밀번호)$/i, { exact: true }).fill('LocalLegacyTest123!');
     await page.getByRole('button', { name: /^(Log in|로그인|Sign in)$/i }).click();
-    await expect(page).toHaveURL(role === 'ADMIN' ? /\/admin(?:\/academies)?$/ : new RegExp('/academy/' + value.academy.slug + '$'));
+    await expect(page).toHaveURL(role === 'ADMIN' ? /\/admin(?:\/academies)?$/ : inAcademy(value.academy.slug));
     // Sign-in resolves the landing page on the server; it never stops at /welcome.
     expect(visited).not.toContain('/welcome');
   });
@@ -176,7 +184,7 @@ for (const role of ['STUDENT', 'TEACHER', 'TEAM_LEAD', 'MANAGER', 'ADMIN']) {
 
 test('HQ deactivation blocks live tokens; reactivation requires a fresh SSO login', async ({ page, request }) => {
   const value = await fixture(request, 'instructor');
-  await enter(page, value); await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
+  await enter(page, value); await expect(page).toHaveURL(inAcademy(value.academy.slug));
   const oldToken = await tokenFor(page);
   const deactivate = await request.put(fixtureOrigin + '/fixtures/' + value.id, { data: { status: 'inactive' } });
   expect(deactivate.ok()).toBe(true);
@@ -187,25 +195,25 @@ test('HQ deactivation blocks live tokens; reactivation requires a fresh SSO logi
   // Let the revoked protected layout unmount before starting another login.
   await page.goto('/login'); await expect(page.getByRole('heading', { name: 'Log in', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Log in with DLAB', exact: true }).click();
-  await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
+  await expect(page).toHaveURL(inAcademy(value.academy.slug));
   expect((await rpc(page, request, 'auth/me', {})).ok()).toBe(true);
 });
 test('HQ role changes revoke the old session and the next login receives the new role', async ({ page, request }) => {
   const value = await fixture(request, 'tutor');
-  await enter(page, value); await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
+  await enter(page, value); await expect(page).toHaveURL(inAcademy(value.academy.slug));
   const oldToken = await tokenFor(page);
   expect((await request.put(fixtureOrigin + '/fixtures/' + value.id, { data: { role: 'edu_manager' } })).ok()).toBe(true);
   expect((await request.post(apiOrigin + '/api/rpc/auth/me', { headers: { Authorization: 'Bearer ' + oldToken }, data: { json: {} } })).status()).toBe(401);
   // Let the revoked protected layout unmount before starting another login.
   await page.goto('/login'); await expect(page.getByRole('heading', { name: 'Log in', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Log in with DLAB', exact: true }).click();
-  await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
+  await expect(page).toHaveURL(inAcademy(value.academy.slug));
   const saved = await (await request.get(fixtureOrigin + '/fixtures/' + value.id, { maxRetries: 2 })).json();
   expect(saved.memberships[0].role).toBe('TEAM_LEAD'); expect(saved.studentLeaseCount).toBe(0);
 });
 test('Cove logout removes the browser session', async ({ page, request }) => {
   const value = await fixture(request, 'instructor');
-  await enter(page, value); await expect(page).toHaveURL(new RegExp('/academy/' + value.academy.slug + '$'));
+  await enter(page, value); await expect(page).toHaveURL(inAcademy(value.academy.slug));
   await page.getByRole('button', { name: 'My page', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Sign out', exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
@@ -239,8 +247,8 @@ test(`OS ${staffRole} covers academy classes without teaching assignments`, asyn
   const studentContext = await browser.newContext(); const studentPage = await studentContext.newPage();
   const leaderContext = await browser.newContext(); const leaderPage = await leaderContext.newPage();
   try {
-    await enter(studentPage, student); await expect(studentPage).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
-    await enter(leaderPage, leader); await expect(leaderPage).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+    await enter(studentPage, student); await expect(studentPage).toHaveURL(inAcademy(manager.academy.slug));
+    await enter(leaderPage, leader); await expect(leaderPage).toHaveURL(inAcademy(manager.academy.slug));
     const seeded = await request.post(fixtureOrigin + '/fixtures/' + manager.id + '/classroom', { data: { studentFixtureId: student.id } });
     expect(seeded.ok(), await seeded.text()).toBe(true);
     const classroom = await seeded.json();
@@ -271,7 +279,7 @@ test(`OS ${staffRole} covers academy classes without teaching assignments`, asyn
     // A stale role-mode cookie cannot hide Manager identity or inherited actions.
     await page.context().addCookies([{ name: 'cove_academy_role', value: manager.academy.id + ':TEACHER', url: studioOrigin }]);
     await page.goto('/academy/' + manager.academy.slug);
-    if (staffRole === 'lab_head') await expect(page.getByRole('heading', { name: 'Control tower', exact: true })).toBeVisible();
+    if (staffRole === 'lab_head') await expect(page.getByRole('heading', { name: 'Classes', level: 1, exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'My classes', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'My page', exact: true }).click();
     await expect(page.getByRole('menuitemradio')).toHaveCount(0);
@@ -337,14 +345,14 @@ for (const osRole of ['tutor', 'edu_manager', 'lab_head'] as const) {
     test.setTimeout(180_000);
     const manager = await fixture(request, 'lab_head');
     await enter(page, manager);
-    await expect(page).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+    await expect(page).toHaveURL(inAcademy(manager.academy.slug));
     const member = osRole === 'lab_head' ? manager : await fixture(request, osRole, { parentFixtureId: manager.id });
     const student = await fixture(request, 'student', { parentFixtureId: manager.id });
     const staffContext = await browser.newContext(), studentContext = await browser.newContext();
     const staffPage = await staffContext.newPage(), studentPage = await studentContext.newPage();
     try {
-      await enter(staffPage, member); await expect(staffPage).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
-      await enter(studentPage, student); await expect(studentPage).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+      await enter(staffPage, member); await expect(staffPage).toHaveURL(inAcademy(manager.academy.slug));
+      await enter(studentPage, student); await expect(studentPage).toHaveURL(inAcademy(manager.academy.slug));
       const seeded = await request.post(fixtureOrigin + '/fixtures/' + manager.id + '/classroom', { data: { studentFixtureId: student.id } });
       expect(seeded.ok(), await seeded.text()).toBe(true);
       const classroom = await seeded.json(), [assigned, other] = classroom.classes;
@@ -452,7 +460,7 @@ test('Manager class cards receive student presence over WebSocket across coding,
   test.setTimeout(180_000);
   const manager = await fixture(request, 'lab_head');
   await enter(page, manager);
-  await expect(page).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+  await expect(page).toHaveURL(inAcademy(manager.academy.slug));
   const student = await fixture(request, 'student', { parentFixtureId: manager.id });
   const studentContext = await browser.newContext();
   const studentPage = await studentContext.newPage();
@@ -461,7 +469,7 @@ test('Manager class cards receive student presence over WebSocket across coding,
   page.on('websocket', socket => managerSockets.push(socket.url()));
   try {
     await enter(studentPage, student);
-    await expect(studentPage).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+    await expect(studentPage).toHaveURL(inAcademy(manager.academy.slug));
     const seeded = await request.post(fixtureOrigin + '/fixtures/' + manager.id + '/classroom', { data: { studentFixtureId: student.id } });
     expect(seeded.ok(), await seeded.text()).toBe(true);
     const classroom = await seeded.json(), [assigned] = classroom.classes;
@@ -512,10 +520,10 @@ for (const engine of ['Chromium', 'WebKit'] as const) {
       const staffRole = engine === 'WebKit' ? 'edu_manager' : 'lab_head';
       const manager = await fixture(request, staffRole);
       await enter(staff, manager);
-      await expect(staff).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+      await expect(staff).toHaveURL(inAcademy(manager.academy.slug));
       const student = await fixture(request, 'student', { parentFixtureId: manager.id });
       await enter(learner, student);
-      await expect(learner).toHaveURL(new RegExp('/academy/' + manager.academy.slug + '$'));
+      await expect(learner).toHaveURL(inAcademy(manager.academy.slug));
       const seeded = await request.post(fixtureOrigin + '/fixtures/' + manager.id + '/classroom', { data: { studentFixtureId: student.id, includePdf: true } });
       expect(seeded.ok(), await seeded.text()).toBe(true);
       const classroom = await seeded.json(), [assigned] = classroom.classes;

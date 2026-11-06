@@ -80,6 +80,25 @@ No student time, memory, output or comparison budget is increased. The result
 still waits for real process exit and bounded pipe draining. Grading, progress
 and points remain in the existing transaction.
 
+## Native-equivalent time limits (`JUDGE_TIME_SCALE`)
+
+Time limits are authored for native CPython, the speed Elice grades at. Pyodide
+runs the same program about 2.5 times slower (a 50-house combinations search:
+562–623 ms native, 1,464–1,566 ms Pyodide on one machine), so solutions Elice
+accepts used to time out. The judge now grades in native-equivalent time: each
+case gets `limit × JUDGE_TIME_SCALE` of Pyodide time and reports its runtime
+÷ the scale. Verdicts, whole-run budgets, penalty thresholds and displayed
+runtimes therefore keep their authored meaning. Wall-clock deadlines for
+weighted grading and public sample checks scale by the same factor, and the
+stale `RUNNING` sweep waits `max(10 min, 300 s × scale + 1 min)`.
+
+Production passes `JUDGE_TIME_SCALE` (default 2.5 in Compose, 1–5) to the
+judge only; the sandbox enforces whatever limit it receives. Change it in
+`/opt/cove/deployment.env` and redeploy; the judge logs it in its
+`judge.config` record. Runtimes stored after the change are native-equivalent;
+earlier ones are raw Pyodide time. A native-CPython engine uses scale 1. See the
+[design](../superpowers/specs/2026-11-06-elice-equivalent-time-limits-design.md).
+
 ## Reproducible local checks
 
 Run from the repository root with Docker available:

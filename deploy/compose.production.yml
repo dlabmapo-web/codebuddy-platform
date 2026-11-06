@@ -246,6 +246,8 @@ services:
       JUDGE_HEALTH_PORT: 4101
       JUDGE_TRACE_TIMINGS: ${JUDGE_TRACE_TIMINGS:-false}
       JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
+      # Native-equivalent time on Pyodide; see judge/time-scaled-engine.ts.
+      JUDGE_TIME_SCALE: ${JUDGE_TIME_SCALE:-2.5}
       JUDGE_SANDBOX_SOCKET: /run/cove-sandbox/judge.sock
       PYODIDE_VERSION: ${PYODIDE_VERSION:-0.27.5}
     networks:

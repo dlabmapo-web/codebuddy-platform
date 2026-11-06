@@ -1013,30 +1013,41 @@ export class ManualService {
         },
         include: {
           multipleChoiceAssessment: true,
+          shortAnswerAssessment: true,
           reviews: { orderBy: { version: "desc" } },
         },
       });
-      if (!attempt?.multipleChoiceAssessment || !input.classId)
-        throw new NotFoundException();
+      if (!attempt || !input.classId) throw new NotFoundException();
       if (!input.preview)
         await this.explanation(identity, {
           ...input,
           classId: input.classId,
           submissionId: input.submissionId,
         });
-      const definition = multipleChoiceSchema.parse(
-        attempt.multipleChoiceAssessment.definition,
-      );
-      publicHtml = [
-        definition.problemDescription,
-        ...definition.options.map((o) => o.content),
-        (attempt.profile as { description?: string }).description ?? "",
-      ];
-      if (
-        effectiveManualResult(attempt)?.completed &&
-        definition.explanationEnabled
-      )
-        privateHtml = definition.explanation;
+      if (attempt.multipleChoiceAssessment) {
+        const definition = multipleChoiceSchema.parse(
+          attempt.multipleChoiceAssessment.definition,
+        );
+        publicHtml = [
+          definition.problemDescription,
+          ...definition.options.map((o) => o.content),
+          (attempt.profile as { description?: string }).description ?? "",
+        ];
+        if (
+          effectiveManualResult(attempt)?.completed &&
+          definition.explanationEnabled
+        )
+          privateHtml = definition.explanation;
+      } else {
+        // A short answer shows its frozen instructions, and its explanation
+        // only once the attempt is completed, as `explanation` does.
+        publicHtml = [(attempt.profile as { description?: string }).description ?? ""];
+        const definition = attempt.shortAnswerAssessment
+          ? shortAnswerSchema.parse(attempt.shortAnswerAssessment.definition)
+          : null;
+        if (definition?.explanationEnabled && effectiveManualResult(attempt)?.completed)
+          privateHtml = definition.explanation;
+      }
     } else if (config.multipleChoice) {
       const definition = multipleChoiceSchema.parse(config.multipleChoice);
       publicHtml = [
@@ -1045,6 +1056,12 @@ export class ManualService {
         ...definition.options.map((o) => o.content),
       ];
       if (input.preview) privateHtml = definition.explanation;
+    } else {
+      // Written, Turtle and short-answer instructions. A short answer's
+      // explanation is private until completion, so only a reviewer previews it.
+      publicHtml = [config.description];
+      if (input.preview && config.shortAnswer)
+        privateHtml = shortAnswerSchema.parse(config.shortAnswer).explanation;
     }
     if (
       ![...publicHtml, privateHtml].some((html) =>
@@ -1052,13 +1069,9 @@ export class ManualService {
       )
     )
       throw new NotFoundException();
-    const asset = await this.db.manualAsset.findUnique({
-      where: { id: input.assetId },
-    });
-    if (!asset?.mimeType.startsWith("image/")) throw new NotFoundException();
-    return {
-      url: `data:${asset.mimeType};base64,${await this.assets.bytes(input.assetId)}`,
-    };
+    const url = await this.assets.imageDataUrl(input.assetId);
+    if (!url) throw new NotFoundException();
+    return { url };
   }
   async matchingPreview(
     identity: SupabaseIdentity,

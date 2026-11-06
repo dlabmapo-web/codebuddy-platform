@@ -57,7 +57,7 @@ function fixture(practice?: ManualPracticeService) {
   const access = { requirePermission: vi.fn().mockResolvedValue(actor) },
     audit = { write: vi.fn() },
     gui = { request: vi.fn() },
-    assets = { bytes: vi.fn() },
+    assets = { bytes: vi.fn(), imageDataUrl: vi.fn().mockResolvedValue("data:image/png;base64,AAAA") },
     points = { awardManualCompletion: vi.fn() };
   const service = new ManualService(
     db as unknown as PrismaService,
@@ -74,7 +74,7 @@ function fixture(practice?: ManualPracticeService) {
     { enabled: () => true, assertEnabled: () => {} } as never,
     practice,
   );
-  return { service, db, access, audit, gui, points, row, config };
+  return { service, db, access, audit, gui, points, row, config, assets };
 }
 describe("manual assessment boundaries", () => {
   it('reads only the authorized class result summary without drafts, content, solutions or history', async () => {
@@ -370,5 +370,39 @@ describe("multiple-choice read and admission boundaries", () => {
       }),
     ).rejects.toThrow("explicit Submit");
     expect(db.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe("private pictures in plain lesson statements", () => {
+  const picture = "11111111-1111-4111-8111-111111111111";
+  const elsewhere = "22222222-2222-4222-8222-222222222222";
+  const html = (id: string) => `<p>See</p><img src="cove-asset:${id}" alt="map.png">`;
+  const shortAnswer = { question: "Why?", gradingMode: "MANUAL", explanationEnabled: true, explanation: html(elsewhere) };
+
+  it("shows a learner a picture of Turtle or written instructions, and nothing the instructions do not show", async () => {
+    const { service, config, assets } = fixture();
+    Object.assign(config, { description: html(picture) });
+    await expect(service.choiceImage(identity, { ...target, assetId: picture })).resolves.toEqual({ url: "data:image/png;base64,AAAA" });
+    expect(assets.imageDataUrl).toHaveBeenCalledWith(picture);
+    await expect(service.choiceImage(identity, { ...target, assetId: elsewhere })).rejects.toThrow();
+  });
+
+  it("keeps a short answer's explanation picture private until completion, except in a reviewer's preview", async () => {
+    const { service, config, access } = fixture();
+    Object.assign(config, { description: "<p>Answer briefly</p>", shortAnswer });
+    await expect(service.choiceImage(identity, { ...target, assetId: elsewhere })).rejects.toThrow();
+    access.requirePermission.mockResolvedValue({ role: "MANAGER", roles: ["MANAGER"], userId: "manager", via: "membership" } as never);
+    await expect(service.choiceImage(identity, { ...target, assetId: elsewhere, preview: true })).resolves.toEqual({ url: "data:image/png;base64,AAAA" });
+  });
+
+  it("shows an explanation picture with a learner's own attempt only once it is completed", async () => {
+    const { service, config, db } = fixture();
+    Object.assign(config, { description: "<p>Answer briefly</p>", shortAnswer });
+    const attempt = (completed: boolean) => ({ id: "attempt", profile: { description: "<p>Answer briefly</p>" }, reviews: [{ completed, scoreHundredths: completed ? 10000 : 0 }],
+      shortAnswerAssessment: { definition: shortAnswer, status: "GRADED", completed, scoreHundredths: completed ? 10000 : 0 }, multipleChoiceAssessment: null });
+    db.manualSubmission.findFirst.mockResolvedValue(attempt(false) as never);
+    await expect(service.choiceImage(identity, { ...target, assetId: elsewhere, classId: "class", submissionId: "attempt" })).rejects.toThrow();
+    db.manualSubmission.findFirst.mockResolvedValue(attempt(true) as never);
+    await expect(service.choiceImage(identity, { ...target, assetId: elsewhere, classId: "class", submissionId: "attempt" })).resolves.toEqual({ url: "data:image/png;base64,AAAA" });
   });
 });

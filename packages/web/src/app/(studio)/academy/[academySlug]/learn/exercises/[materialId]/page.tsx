@@ -1,4 +1,5 @@
 import { StaffWorkspace } from "./_components/staff-workspace";
+import { ExerciseImageProvider } from '@/components/studio/lesson-image-providers';
 import { routes } from '@/lib/routes';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import type { LearnExerciseBootstrap } from '@cove/shared';
@@ -103,14 +104,16 @@ export default async function ExerciseWorkspacePage({
       namespaces={exerciseNamespaces}
       resources={resources}
     >
-      {staffPractice ? <StaffWorkspace key={materialId} academyId={academyId} bootstrap={bootstrap} userId={user.id} /> : <Workspace
-        academyId={academyId}
-        bootstrap={bootstrap}
-        classId={bootstrap.classContext.classId!}
-        returnTo={returnTo}
-        submissionRequested={Boolean(submissionId)}
-        userId={user.id}
-      />}
+      <ExerciseImageProvider academyId={academyId} materialId={materialId} preview={staffPractice && (bootstrap.access?.preview ?? false)}>
+        {staffPractice ? <StaffWorkspace key={materialId} academyId={academyId} bootstrap={bootstrap} userId={user.id} /> : <Workspace
+          academyId={academyId}
+          bootstrap={bootstrap}
+          classId={bootstrap.classContext.classId!}
+          returnTo={returnTo}
+          submissionRequested={Boolean(submissionId)}
+          userId={user.id}
+        />}
+      </ExerciseImageProvider>
     </PageTranslationsProvider>
   );
 }

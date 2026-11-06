@@ -5,7 +5,32 @@ import * as React from 'react';
 import { iframePointerMoveEvent } from '@/lib/monitoring/awareness/iframe-pointer-capture';
 import { useTheme } from '@/lib/theme/theme-provider';
 
+import { usePrivateImageResolver } from '@/components/editor/private-image-context';
+import { privateImageIds, withPrivateImages } from '@/lib/lesson-images';
+
 import { withAnonymousImageCors } from './rich-text-html';
+
+/**
+ * The content with its `cove-asset:` images resolved through the page's
+ * `PrivateImageContext`. The frame is a separate, script-free document, so
+ * the pictures are swapped in before it is built. Without a resolver, or for
+ * an image the reader may not see, the alt text stays in a neutral box.
+ */
+function usePrivateImages(content: string) {
+  const resolve = usePrivateImageResolver();
+  const ids = React.useMemo(() => privateImageIds(content), [content]);
+  const key = ids.join(',');
+  const [urls, setUrls] = React.useState<ReadonlyMap<string, string | null>>(new Map());
+  React.useEffect(() => {
+    if (!key || !resolve) return;
+    let active = true;
+    void Promise.all(key.split(',').map(async (id) => [id, await resolve(`cove-asset:${id}`).catch(() => null)] as const))
+      .then((entries) => { if (active) setUrls(new Map(entries)); });
+    return () => { active = false; };
+  }, [key, resolve]);
+  if (!key) return content;
+  return withPrivateImages(content, resolve ? urls : new Map(ids.map((id) => [id, null])));
+}
 
 /**
  * Authored HTML stays in an iframe so it can never restyle or script the
@@ -33,6 +58,7 @@ export function RichTextFrame({
   // The shell is rebuilt when the theme changes, which reloads the frame. That
   // is the point: a separate document cannot be restyled from out here.
   const { theme } = useTheme();
+  const html = usePrivateImages(content);
 
   React.useEffect(() => {
     const frame = frameRef.current;
@@ -111,7 +137,7 @@ export function RichTextFrame({
       observer?.disconnect();
       detachPointerBridge();
     };
-  }, [content, minHeight, theme]);
+  }, [html, minHeight, theme]);
 
   return (
     <iframe
@@ -120,7 +146,7 @@ export function RichTextFrame({
       ref={frameRef}
       sandbox="allow-same-origin"
       scrolling="no"
-      srcDoc={previewDocument(content, padding, theme)}
+      srcDoc={previewDocument(html, padding, theme)}
       style={{ height: measured ?? fallbackHeight }}
       title={title}
     />
@@ -190,6 +216,7 @@ strong,b{font-weight:700}
 em,i{font-style:italic}
 s{text-decoration:line-through}
 img{max-width:100%;height:auto;border-radius:8px;display:block;margin:0.5em 0}
+.cove-image-missing{display:inline-block;margin:0.5em 0;padding:0.5em 0.75em;border:1px dashed ${palette.rule};border-radius:8px;color:${palette.quote};font-size:0.9em}
 code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.9em;background:${palette.codeBackground};padding:0.15em 0.35em;border-radius:4px}
 pre{margin:0 0 0.75em;padding:12px 14px;background:#0f172a;color:#e2e8f0;border-radius:8px;overflow-x:auto;white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.85em;line-height:1.6}
 pre code{background:none;padding:0;color:inherit;font-size:1em}

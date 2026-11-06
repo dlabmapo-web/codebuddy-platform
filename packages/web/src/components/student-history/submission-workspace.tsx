@@ -47,6 +47,7 @@ import { FontSizeControls } from "@/components/workspace/font-size-controls";
 import { useEditorPreferences } from "@/lib/workspace/use-editor-preferences";
 import { useSplitPane } from "@/lib/workspace/use-split-pane";
 import { useAcademySlug } from "@/components/studio/academy-route-provider";
+import { ExerciseImageProvider, ManualImageProvider } from "@/components/studio/lesson-image-providers";
 import { routes } from "@/lib/routes";
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from "@/lib/monaco/theme";
 import {
@@ -203,7 +204,16 @@ export function DraftWorkspace({
       };
   return <ReviewCopy {...props} data={data} />;
 }
-function ReviewCopy({ data, ...props }: PrivateProps & { data: ReviewData }) {
+/** History statements show their private pictures through the material's own reviewer reads. */
+function ReviewCopy(props: PrivateProps & { data: ReviewData }) {
+  const body = <ReviewCopyBody {...props} />;
+  return props.data.kind === "programming" ? (
+    <ExerciseImageProvider academyId={props.academyId} materialId={props.materialId} staff>{body}</ExerciseImageProvider>
+  ) : (
+    <ManualImageProvider scope={{ academyId: props.academyId, materialId: props.materialId, classId: props.classId, submissionId: props.submissionId, preview: true }}>{body}</ManualImageProvider>
+  );
+}
+function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData }) {
   const { t } = useTranslation("teach"),
     locale = useLocale();
   const { t: tc } = useLayoutTranslation("courses");

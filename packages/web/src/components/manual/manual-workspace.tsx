@@ -31,6 +31,7 @@ import { manualApi } from "@/lib/manual-api";
 import { claimServerRead, SERVER_READ_FRESH_MS } from "@/lib/server-read";
 import { CodeEditor } from "@/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/code-editor";
 import { RichTextFrame } from "@/components/studio/rich-text-frame";
+import { ManualImageProvider } from "@/components/studio/lesson-image-providers";
 import { GuiViewer } from "./gui-viewer";
 import { AddSourceFile } from './add-source-file';
 import { Button } from '@/components/studio/button';
@@ -514,10 +515,12 @@ export function ManualWorkspace({
                   }}
                 />
               ) : (
-                <RichTextFrame
-                  content={explanation.data.explanation}
-                  title={mt("explanation")}
-                />
+                <ManualImageProvider scope={{ ...target, classId: selectedClass, submissionId: attempt?.id }}>
+                  <RichTextFrame
+                    content={explanation.data.explanation}
+                    title={mt("explanation")}
+                  />
+                </ManualImageProvider>
               )}
             </section>
           ) : null}</>;
@@ -567,10 +570,10 @@ export function ManualWorkspace({
               scope={{ ...target, classId: selectedClass, preview }}
             />
           ) : (
-            <div {...anchorProps('statement:instructions')}><RichTextFrame
+            <div {...anchorProps('statement:instructions')}><ManualImageProvider scope={{ ...target, classId: selectedClass, preview }}><RichTextFrame
               content={data.config.description}
               title={mt("activity_instructions")}
-            /></div>
+            /></ManualImageProvider></div>
           )}
           {preview && data.config.modelAnswer ? (
             <details className="mt-6 rounded-xl border border-border bg-canvas/60 p-4">

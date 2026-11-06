@@ -7,6 +7,7 @@ import { VideoPlayer } from "@/components/video/video-player";
 import { videoApi } from "@/lib/video-api";
 import { orpc } from "@/lib/orpc";
 import { RichTextFrame } from "@/components/studio/rich-text-frame";
+import { ExerciseImageProvider, ManualImageProvider } from "@/components/studio/lesson-image-providers";
 import type { HistoryMaterial } from "@cove/shared";
 import { historyAction, HistoryError } from "./history-ui";
 
@@ -82,10 +83,15 @@ export function HistoryMaterialPreview({
               <p className="mb-4 text-xs text-sub">
                 {t("history.current_instructions")}
               </p>
-              <RichTextFrame
-                title={t("history.current_instructions")}
-                content={content.data.description}
-              />
+              {material.type === "PROGRAMMING_EXERCISE" ? (
+                <ExerciseImageProvider academyId={academyId} materialId={material.materialId} staff>
+                  <RichTextFrame title={t("history.current_instructions")} content={content.data.description} />
+                </ExerciseImageProvider>
+              ) : (
+                <ManualImageProvider scope={{ academyId, materialId: material.materialId, classId, preview: true }}>
+                  <RichTextFrame title={t("history.current_instructions")} content={content.data.description} />
+                </ManualImageProvider>
+              )}
               {content.data.question ? (
                 <p className="mt-5 font-semibold">{content.data.question}</p>
               ) : null}

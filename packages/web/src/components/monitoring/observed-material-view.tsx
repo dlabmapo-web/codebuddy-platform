@@ -7,6 +7,7 @@ import { VideoPlayer } from '@/components/video/video-player';
 import { videoApi } from '@/lib/video-api';
 import { BookOpen, ListChecks, FileCode2, Play, Square, Terminal, Turtle, Expand } from 'lucide-react';
 import { RichTextFrame } from '@/components/studio/rich-text-frame';
+import { ManualImageProvider } from '@/components/studio/lesson-image-providers';
 import { WrittenAnswerCard } from '@/components/manual/assessment-ui';
 import { DrawingLayoutControl, DrawingIconButton } from '@/components/manual/drawing-panel-controls';
 import { WorkspaceResizeHandle } from '@/components/manual/workspace-resize-handle';
@@ -67,7 +68,7 @@ function ObservedManual({ material, work, live, alignRevision, academyId, classI
     <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${drawing ? 'md:flex-row' : 'gap-4 overflow-y-auto p-4 sm:p-6 md:flex-row md:overflow-hidden md:p-8'}`}>
       {instructions ? <aside {...surfaceProps('statement')} className={drawing ? 'max-h-[25dvh] shrink-0 overflow-auto border-b border-border bg-card p-5 md:max-h-none md:w-[32%] md:max-w-xl md:resize-x md:border-r md:border-b-0 sm:p-7' : 'min-h-48 min-w-0 shrink-0 rounded-lg border border-border bg-card p-6 md:min-h-0 md:w-[calc(50%-8px)] md:overflow-y-auto'}>
         <h2 className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-sub"><BookOpen aria-hidden className="size-4" />{mt('activity_instructions')}</h2>
-        {material.choice ? <ChoiceRich content={material.description} scope={{ academyId, classId, materialId: material.materialId }} /> : <div {...anchorProps('statement:instructions')}><RichTextFrame content={material.description} title={mt('activity_instructions')} /></div>}
+        {material.choice ? <ChoiceRich content={material.description} scope={{ academyId, classId, materialId: material.materialId }} /> : <div {...anchorProps('statement:instructions')}><ManualImageProvider scope={{ academyId, classId, materialId: material.materialId }}><RichTextFrame content={material.description} title={mt('activity_instructions')} /></ManualImageProvider></div>}
       </aside> : null}
       {drawing ? <ObservedTurtle work={work} material={material} alignRevision={alignRevision} live={live} lastSeen={lastSeen} /> : <section className={`flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-border bg-card ${instructions ? '' : 'mx-auto w-full max-w-3xl'}`} aria-label={mt('ui.answer_workspace')}>
         <div {...surfaceProps('answer')} className="min-h-0 flex-1 overflow-y-auto">

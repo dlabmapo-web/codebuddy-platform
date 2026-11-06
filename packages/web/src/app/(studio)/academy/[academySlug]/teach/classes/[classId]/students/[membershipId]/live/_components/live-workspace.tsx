@@ -24,6 +24,7 @@ import { QuizFeedback } from '@/components/workspace/quiz-feedback';
 import { GradingNotice } from '@/components/pdf/grading-notice';
 import { ExerciseReferencePane } from '@/components/pdf/exercise-reference-pane';
 import { ProblemStatement } from '@/components/workspace/problem-statement';
+import { ExerciseImageProvider } from '@/components/studio/lesson-image-providers';
 import { useLayoutTranslation } from '@/i18n';
 import { orpc } from '@/lib/orpc';
 import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
@@ -548,11 +549,13 @@ export function LiveWorkspace({
               <>
               <GradingNotice exercise={shown.exercise} />
               <ExerciseReferencePane key={shown.exercise.materialId} academyId={academyId} exercise={shown.exercise} teacher>
+              <ExerciseImageProvider academyId={academyId} materialId={shown.exercise.materialId} staff>
               <ProblemStatement
                 collaborating={live.collaborating}
                 exercise={shown.exercise}
                 revealedHints={shown.exercise.hints.length}
               />
+              </ExerciseImageProvider>
               </ExerciseReferencePane>
               </>
             ) : (

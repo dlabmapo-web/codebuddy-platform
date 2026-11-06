@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { myPageBackDestination } from './back-destination';
 
+const mapo = { slug: 'mapo-dlab', role: 'MANAGER' as const };
 const operatorManager = {
   origin: 'admin' as const,
-  firstAcademySlug: 'mapo-dlab',
+  firstAcademy: mapo,
   isPlatformAdmin: true,
 };
 
@@ -24,7 +25,7 @@ describe('the way back from My Page', () => {
   it('sends the same person to their academy when they came from there', () => {
     expect(
       myPageBackDestination({ ...operatorManager, origin: null }),
-    ).toEqual({ href: '/academy/mapo-dlab', labelKey: 'back_to_studio' });
+    ).toEqual({ href: '/academy/mapo-dlab/classes', labelKey: 'back_to_studio' });
   });
 
   /*
@@ -36,27 +37,39 @@ describe('the way back from My Page', () => {
     expect(
       myPageBackDestination({
         origin: 'admin',
-        firstAcademySlug: 'mapo-dlab',
+        firstAcademy: mapo,
         isPlatformAdmin: false,
       }),
-    ).toEqual({ href: '/academy/mapo-dlab', labelKey: 'back_to_studio' });
+    ).toEqual({ href: '/academy/mapo-dlab/classes', labelKey: 'back_to_studio' });
   });
 
   it('gives a member with no origin their first academy', () => {
     expect(
       myPageBackDestination({
         origin: null,
-        firstAcademySlug: 'mapo-dlab',
+        firstAcademy: mapo,
         isPlatformAdmin: false,
       }),
-    ).toEqual({ href: '/academy/mapo-dlab', labelKey: 'back_to_studio' });
+    ).toEqual({ href: '/academy/mapo-dlab/classes', labelKey: 'back_to_studio' });
+  });
+
+  // The academy root only redirects to this page, so linking it would cost a hop.
+  it("lands a teacher or student on their role's entry page, not the academy root", () => {
+    const back = (role: 'TEACHER' | 'STUDENT') =>
+      myPageBackDestination({
+        origin: null,
+        firstAcademy: { slug: 'mapo-dlab', role },
+        isPlatformAdmin: false,
+      }).href;
+    expect(back('TEACHER')).toBe('/academy/mapo-dlab/teach/classes');
+    expect(back('STUDENT')).toBe('/academy/mapo-dlab/learn/courses');
   });
 
   it('gives an operator with no membership the console', () => {
     expect(
       myPageBackDestination({
         origin: null,
-        firstAcademySlug: null,
+        firstAcademy: null,
         isPlatformAdmin: true,
       }),
     ).toEqual({ href: '/admin', labelKey: 'back_to_console' });
@@ -71,7 +84,7 @@ describe('the way back from My Page', () => {
     expect(
       myPageBackDestination({
         origin: null,
-        firstAcademySlug: null,
+        firstAcademy: null,
         isPlatformAdmin: false,
       }),
     ).toEqual({ href: '/login', labelKey: 'back_to_studio' });
@@ -83,11 +96,11 @@ describe('the way back from My Page', () => {
    */
   it('never labels a console destination as the studio', () => {
     for (const origin of [null, 'admin' as const]) {
-      for (const firstAcademySlug of [null, 'mapo-dlab']) {
+      for (const firstAcademy of [null, mapo]) {
         for (const isPlatformAdmin of [false, true]) {
           const back = myPageBackDestination({
             origin,
-            firstAcademySlug,
+            firstAcademy,
             isPlatformAdmin,
           });
           expect(back.href === '/admin').toBe(

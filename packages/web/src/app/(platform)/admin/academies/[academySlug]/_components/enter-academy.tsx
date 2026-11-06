@@ -14,7 +14,7 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/studio/button';
-import { routes } from '@/lib/routes';
+import { academyEntryPath } from '@/lib/academy-entry';
 
 import { enterAcademyAs } from '../../../_lib/enter-academy';
 
@@ -60,7 +60,7 @@ export function EnterAcademyPanel({
         </div>
         <Button
           onClick={() =>
-            enterAcademyAs(role, routes.academy(academy.slug))
+            enterAcademyAs(role, academyEntryPath(academy.slug, role))
           }
           variant="outline"
         >

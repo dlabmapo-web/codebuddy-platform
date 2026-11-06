@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useLocale } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
-import { routes } from '@/lib/routes';
+import { academyEntryPath } from '@/lib/academy-entry';
 
 import { SignOutControl } from '../../_components/sign-out-control';
 import type { PendingApprovalState } from '../_hooks/use-pending-approval';
@@ -23,7 +23,10 @@ export function PendingActions({
       {manager.state.kind === 'active' ? (
         <Link
           className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-brand px-5 font-bold text-on-brand hover:bg-brand-deep"
-          href={routes.academy(manager.state.membership.academy.slug)}
+          href={academyEntryPath(
+            manager.state.membership.academy.slug,
+            manager.state.membership.role,
+          )}
         >
           {t('pending.enter_academy')}
         </Link>

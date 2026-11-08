@@ -20,13 +20,23 @@ RUN --mount=type=cache,id=cove-native-pnpm,target=/pnpm/store pnpm --filter @cov
  && pnpm --filter @cove/api deploy --prod /opt/cove/worker \
  && cp -R packages/api/dist /opt/cove/worker/dist \
  && node deploy/native/worker-closure.mjs --finalize /opt/cove/worker /source/packages/api
-# This is a private artifact/runtime, not a catch-all privileged container.
-FROM guest AS runtime
+# Bind the exported launcher to its own library closure (only host glibc >= 2.36).
+FROM guest AS package
 COPY deploy/native/package-launcher.py /opt/cove/package-launcher.py
 RUN apt-get update && apt-get install -y --no-install-recommends patchelf \
  && rm -rf /var/lib/apt/lists/* \
  && python3 /opt/cove/package-launcher.py && cp /usr/local/bin/node /opt/cove/node \
  && readelf -d /opt/cove/nsjail | grep -F '$ORIGIN/launcher-lib'
+# This is a private artifact/runtime, not a catch-all privileged container.
+# Only the measured /opt/cove artifact leaves the guest build: no compilers,
+# VCS or headers. The outer image takes current Debian security fixes; the
+# learner root inside the artifact, and so the runtime identity, are unchanged.
+FROM node:22.22.0-bookworm-slim@sha256:dd9d21971ec4395903fa6143c2b9267d048ae01ca6d3ea96f16cb30df6187d94 AS runtime
+# The node runs its own bundled Node; package managers add unused attack surface.
+RUN apt-get update && apt-get -y upgrade && rm -rf /var/lib/apt/lists/* \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+ && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
+COPY --from=package /opt/cove /opt/cove
 COPY --from=builder /opt/cove/worker /opt/cove/worker
 RUN rm -f /opt/cove/worker/.env.example
 COPY deploy/native /opt/cove/tools

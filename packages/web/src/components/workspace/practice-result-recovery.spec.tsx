@@ -8,6 +8,8 @@ const rpc = vi.hoisted(() => ({ getLatestSubmission: vi.fn(), getPracticeResult:
 vi.mock('@/lib/orpc', () => ({ orpc: { learn: rpc } }));
 vi.stubGlobal('React', React);
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+// A stream that never delivers: polling and focus recovery must still finish the result.
+vi.stubGlobal('EventSource', class extends EventTarget { constructor(readonly url: string) { super(); } close() {} });
 const pause = (ms:number) => new Promise(resolve => setTimeout(resolve, ms));
 it('stops automatic polling after the budget and recovers a terminal result on focus', async () => {
  let current = Date.now(), status = 'RUNNING';

@@ -4,7 +4,7 @@ import type { AcademyAccessService } from "../authorization/academy-access.servi
 import type { AuditService } from "../academies/audit.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import type { PdfStorageService } from "./pdf-storage.service.js";
-import { PdfDocumentService, lockPdfAsset } from "./pdf-document.service.js";
+import { PdfDocumentService, lockPdfAsset, lockPdfAssets } from "./pdf-document.service.js";
 const identity = { authUserId: "auth" } as SupabaseIdentity;
 const target = {
   academyId: "academy",
@@ -111,6 +111,19 @@ describe("PDF authorization and asset lifecycle", () => {
       code: "PDF_UPLOAD_EXPIRED",
     });
     expect(prisma.$queryRaw).toHaveBeenCalledOnce();
+  });
+  it("locks a batch in one read and refuses it when any asset is claimed or gone", async () => {
+    const { prisma } = setup();
+    prisma.$queryRaw.mockResolvedValueOnce([{ state: "READY" }, { state: "READY" }]);
+    await lockPdfAssets(prisma as never, ["b", "a", "b"]);
+    expect(prisma.$queryRaw).toHaveBeenCalledOnce();
+    expect(prisma.$queryRaw.mock.calls[0]![1]).toEqual(["b", "a"]);
+    for (const locked of [[{ state: "READY" }, { state: "DELETING" }], [{ state: "READY" }]]) {
+      prisma.$queryRaw.mockResolvedValueOnce(locked);
+      await expect(lockPdfAssets(prisma as never, ["a", "b"])).rejects.toMatchObject({ code: "PDF_UPLOAD_EXPIRED" });
+    }
+    await lockPdfAssets(prisma as never, []);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
   });
   it("does not delete a file that acquired a library or course reference", async () => {
     const { prisma, storage, service } = setup();

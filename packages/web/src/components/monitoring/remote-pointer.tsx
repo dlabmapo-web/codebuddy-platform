@@ -1,4 +1,5 @@
 'use client';
+import { useHistoryCovered } from '@/lib/monitoring/history-presentation';
 
 import { pointerIsPlaceable, type CollaborationPointer } from '@cove/shared';
 import * as React from 'react';
@@ -72,13 +73,18 @@ function useHydrated(): boolean {
  * which is false; naming the pane they are looking at is true and is usually
  * the more useful sentence anyway.
  */
-export function RemotePointer({
+function RemotePointerContent({
   name,
   pointer,
+  position,
+  project,
 }: {
   /** The peer, as this reader is allowed to know them. */
   name: string;
   pointer: CollaborationPointer | null;
+  /** A snapshot editor projects its own model; the marker presentation is shared. */
+  position?: { left: number; top: number } | null;
+  project?: () => { left: number; top: number } | null;
 }) {
   const { t } = useTranslation('monitoring');
   const [placement, setPlacement] = React.useState<Placement | null>(null);
@@ -94,7 +100,8 @@ export function RemotePointer({
       // One placement per frame: scroll and resize fire far faster than the
       // screen can show, and `getBoundingClientRect` forces layout.
       frame = requestAnimationFrame(() => {
-        setPlacement({ key, view: measure(pointer) });
+        const projected = project ? project() : position;
+        setPlacement({ key, view: projected === undefined ? measure(pointer) : projected ? { kind: 'arrow', ...projected } : { kind: 'elsewhere' } });
       });
     };
 
@@ -104,6 +111,12 @@ export function RemotePointer({
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place);
     // Ancestors cover sibling-driven movement as well as the pane's own size.
     let element: HTMLElement | null = findCanvasElement(pointer.surface) ?? findSurfaceElement(pointer.surface);
+    if (!element) {
+      // A PDF/player may mount after its first awareness frame arrives.
+      // Observe the containing document until that surface exists as well.
+      mutations?.observe(document.body, { childList: true, subtree: true });
+      observer?.observe(document.body);
+    }
     while (element) {
       observer?.observe(element);
       mutations?.observe(element, { attributes: true, attributeFilter: ['class', 'style'], childList: true });
@@ -127,7 +140,7 @@ export function RemotePointer({
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-  }, [pointer]);
+  }, [pointer, position, project]);
 
   // The portal target only exists in the browser, and a placement is only ever
   // drawn for the pointer it was measured from — which is why nothing has to
@@ -299,3 +312,5 @@ function scrollPointerIntoView(pointer: CollaborationPointer): void {
     top: top - (surfaceBox.top + surfaceBox.height / 2),
   });
 }
+
+export function RemotePointer(props: React.ComponentProps<typeof RemotePointerContent>) { const covered = useHistoryCovered(); return covered ? null : <RemotePointerContent {...props} />; }

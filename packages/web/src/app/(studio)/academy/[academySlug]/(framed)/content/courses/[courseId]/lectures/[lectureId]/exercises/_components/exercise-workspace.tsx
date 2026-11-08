@@ -3,6 +3,9 @@
 import type { ExerciseSolutionEntry } from "@cove/shared";
 
 import { Code2, ListChecks } from 'lucide-react';
+import * as React from 'react';
+import { ExerciseImageProvider } from '@/components/studio/lesson-image-providers';
+import { manualApi } from '@/lib/manual-api';
 import { ChoiceSelector } from '@/components/studio/choice-selector';
 import { useSearchParams } from 'next/navigation';
 import { ReferencePdfPicker } from '@/components/pdf/reference-pdf-picker';
@@ -47,6 +50,15 @@ export function ExerciseWorkspace({
     requireReferencePdf,
   });
   const { draft, editable, update } = authoring;
+  // Pictures uploaded in this session show from memory until the problem is saved.
+  const [localImages] = React.useState(() => new Map<string, string>());
+  React.useEffect(() => () => { for (const url of localImages.values()) URL.revokeObjectURL(url); }, [localImages]);
+  const uploadImage = React.useCallback(async (file: File) => {
+    const asset = await manualApi.upload({ academyId, courseId }, file);
+    const src = `cove-asset:${asset.assetId}`;
+    localImages.set(src, URL.createObjectURL(file));
+    return src;
+  }, [academyId, courseId, localImages]);
 
   const assessmentEditors = (<>
         {editable ? (
@@ -64,6 +76,7 @@ export function ExerciseWorkspace({
   </>);
 
   return (
+    <ExerciseImageProvider academyId={academyId} materialId={authoring.savedMaterialId ?? undefined} preview local={localImages}>
     <div className="mx-auto max-w-6xl space-y-5">
       <ExerciseHeader authoring={authoring} context={initialContext} />
 
@@ -87,6 +100,7 @@ export function ExerciseWorkspace({
           authoring={authoring}
           draft={draft}
           editable={editable}
+          onImageUpload={uploadImage}
           update={update}
         />
         {draft.quiz ? <QuizEditor value={draft.quiz} disabled={!editable} onChange={(quiz) => update('quiz', quiz)} /> : <>
@@ -121,5 +135,6 @@ export function ExerciseWorkspace({
         <PreviewModal draft={draft} onClose={authoring.closePreview} />
       ) : null}
     </div>
+    </ExerciseImageProvider>
   );
 }

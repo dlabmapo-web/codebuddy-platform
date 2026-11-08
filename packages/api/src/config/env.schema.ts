@@ -38,6 +38,7 @@ export const apiEnvironmentSchema = z.object({
   DLAB_SSO_ENABLED: z.preprocess(v => v === 'true' || v === true, z.boolean()).default(false),
   DLAB_OS_BASE_URL: z.literal(DLAB_OS_BASE_URL).default(DLAB_OS_BASE_URL),
   DLAB_SSO_ROLLOUT_MODE: z.enum(['allowlist', 'campus']).default('allowlist'),
+  DLAB_AUTO_PROVISION_CAMPUSES: z.preprocess(v => v === 'true' || v === true, z.boolean()).default(false),
   DLAB_CLIENT_ID: z.literal('cove').default('cove'),
   DLAB_CLIENT_SECRET: z.string().min(32).optional(),
   DLAB_INBOUND_SERVER_KEY: z.string().min(32).optional(),
@@ -143,6 +144,14 @@ export const apiEnvironmentSchema = z.object({
   JUDGE_TRACE_TIMINGS: z.preprocess(v => v === "true" || v === true, z.boolean()).default(false),
   JUDGE_HEALTH_BIND: z.enum(["127.0.0.1", "0.0.0.0"]).default("127.0.0.1"),
   JUDGE_READINESS_GUARD: z.preprocess(v => v === "true" || v === true, z.boolean()).default(false),
+  /**
+   * How much slower than native CPython the grader's Python runs. Limits are
+   * authored in native time, so each case gets `limit × scale` and reports
+   * runtimes ÷ scale (`judge/time-scaled-engine.ts`). 1 grades in raw engine
+   * time; production sets the measured Pyodide factor. At most 5, which keeps
+   * the 60 s case maximum within the sandbox's 300 s ceiling.
+   */
+  JUDGE_TIME_SCALE: z.coerce.number().min(1).max(5).default(1),
   /**
    * How many repairs a maintenance re-grade runs at once.
    *

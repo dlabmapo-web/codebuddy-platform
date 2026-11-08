@@ -8,6 +8,7 @@ import { pdfApi } from '@/lib/pdf-api';
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/lib/pdf-api', () => ({ pdfApi: { read: vi.fn() } }));
+vi.mock('@/lib/monitoring/student-presence', () => ({ useStudentPresence: () => ({ publishObservation: vi.fn() }) }));
 vi.mock('react-pdf', () => ({
   pdfjs: { GlobalWorkerOptions: {} },
   // React-PDF's Suspense mode propagates failed loads to the page boundary.
@@ -28,7 +29,7 @@ vi.mock('react-pdf', () => ({
     }
     return <div>PDF ready{children}</div>;
   },
-  Page: () => <div>PDF page</div>,
+  Page: ({ pageNumber }: { pageNumber: number }) => <div>PDF page {pageNumber}</div>,
 }));
 
 class WorkspaceBoundary extends Component<{ children: React.ReactNode }, { failed: boolean }> {
@@ -61,6 +62,29 @@ it('renews a failed PDF without losing the surrounding code workspace', async ()
     expect(pdfApi.read).toHaveBeenCalledTimes(2);
     expect(host.querySelector<HTMLInputElement>('input[aria-label="Code draft"]')?.value).toBe('print("kept")');
     expect(host.textContent).not.toContain('Workspace failed');
+  } finally {
+    await act(() => root.unmount()); queryClient.clear(); host.remove();
+  }
+});
+
+it('realigns to an unchanged student page only on an explicit alignment', async () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  vi.mocked(pdfApi.read).mockResolvedValue({ url: 'ready', pdf: { pageCount: 2, originalFilename: 'lesson.pdf' } } as never);
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host);
+  const render = (revision: number) => act(() => root.render(<QueryClientProvider client={queryClient}>
+    <PdfCanvas academyId="academy" materialId="pdf" observing initialPage={1} alignmentRevision={revision} />
+  </QueryClientProvider>));
+  try {
+    await render(1);
+    await vi.waitFor(async () => { await act(async () => { await Promise.resolve(); }); expect(host.textContent).toContain('PDF page 1'); });
+    await act(() => host.querySelector<HTMLButtonElement>('button[aria-label="pdf.next_page"]')!.click());
+    expect(host.textContent).toContain('PDF page 2');
+    await render(1);
+    expect(host.textContent).toContain('PDF page 2');
+    await render(2);
+    expect(host.textContent).toContain('PDF page 1');
   } finally {
     await act(() => root.unmount()); queryClient.clear(); host.remove();
   }

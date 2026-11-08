@@ -64,13 +64,13 @@ export function QuizWorkspace({
   const presence = useStudentPresence();
   const { markActive, setOpenMaterial } = presence;
   React.useEffect(() => {
-    setOpenMaterial({
+    const release = setOpenMaterial({
       classId,
       courseId: workspace.breadcrumb.course.id,
       materialId: exercise.materialId,
     });
     markActive();
-    return () => setOpenMaterial(null);
+    return release;
   }, [
     classId,
     exercise.materialId,

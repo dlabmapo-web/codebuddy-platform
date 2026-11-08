@@ -3,8 +3,11 @@ import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StaffStudentPane } from './staff-student-pane';
+import { AcademyRouteProvider } from '@/components/studio/academy-route-provider';
+import { routes } from '@/lib/routes';
 const mocks = vi.hoisted(() => ({ live: false, helping: false, materialId: 'problem', editor: vi.fn(), setMode: vi.fn() }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/lib/orpc', () => ({ orpc: {} }));
 vi.mock('next/dynamic', () => ({ default: () => (props: { value: string; options: { readOnly: boolean } }) => <pre data-readonly={props.options.readOnly}>{props.value}</pre> }));
 vi.mock('@/lib/monaco/theme', () => ({ EDITOR_FONT_FAMILY: 'monospace', registerPaircodeTheme: vi.fn() }));
@@ -20,24 +23,25 @@ vi.mock('@tanstack/react-query', () => ({ useQuery: ({ queryKey }: { queryKey: s
   ? { viewerMembershipId: 'teacher', exercise: { draftCode: 'saved student code' } }
   : queryKey[0] === 'tutoring-last-attempt' ? { attempts: [{ score: 80, createdAt: '2026-10-20T00:00:00Z' }] } : { feedback: [] }, refetch: vi.fn() }) }));
 const props = { academyId: 'academy', materialId: 'problem', userId: 'teacher', starterCode: 'starter', student: { classId: 'class', membershipId: 'student', displayName: 'Student name', identifier: 'student@example.test' }, beforeChangeRef: { current: null }, close: vi.fn(async () => true) };
+function renderPane() { return renderToStaticMarkup(<AcademyRouteProvider academySlug="test-academy"><StaffStudentPane {...props} /></AcademyRouteProvider>); }
 beforeEach(() => { vi.clearAllMocks(); mocks.live = false; mocks.helping = false; mocks.materialId = 'problem'; });
 describe('in-place student pane', () => {
   it('opens an offline student saved snapshot read-only with their score', () => {
-    const html = renderToStaticMarkup(<StaffStudentPane {...props} />);
+    const html = renderPane();
     expect(html).toContain('saved student code'); expect(html).toContain('data-readonly="true"'); expect(html).toContain('80/100');
-    expect(html).not.toContain('href='); expect(mocks.setMode).not.toHaveBeenCalled();
+    expect(html).toContain(routes.academyTeachProgress('test-academy', 'class') + '?view=students&amp;student=student'); expect(mocks.setMode).not.toHaveBeenCalled();
   });
   it('keeps the live editor read-only until the server grants helping mode', () => {
     mocks.live = true;
-    renderToStaticMarkup(<StaffStudentPane {...props} />);
+    renderPane();
     expect(mocks.editor).toHaveBeenLastCalledWith(expect.objectContaining({ readOnly: true }));
     mocks.helping = true;
-    renderToStaticMarkup(<StaffStudentPane {...props} />);
+    renderPane();
     expect(mocks.editor).toHaveBeenLastCalledWith(expect.objectContaining({ readOnly: false }));
   });
   it('does not show or edit a different problem when the student moves', () => {
     mocks.live = true; mocks.helping = true; mocks.materialId = 'another-problem';
-    const html = renderToStaticMarkup(<StaffStudentPane {...props} />);
+    const html = renderPane();
     expect(html).toContain('saved student code'); expect(html).not.toContain('live student code'); expect(mocks.editor).not.toHaveBeenCalled();
   });
 });

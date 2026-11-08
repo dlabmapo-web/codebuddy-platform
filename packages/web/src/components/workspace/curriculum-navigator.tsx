@@ -72,7 +72,7 @@ export function WorkspaceCurriculumNavigator({
   /** Null while the course is still loading or failed to load. */
   context: WorkspaceNavigatorContext | null;
   allowPdfNavigation?: boolean;
-  /** Staff can read non-code resources in a new tab without abandoning a live student. */
+  /** Legacy standalone resource destinations. Monitoring uses onSelect in the same shell. */
   resourceHref?: (materialId: string) => string | null;
   displayedMaterialId: string;
   /** The exercise the watched student has open. Teacher surfaces only. */
@@ -301,6 +301,7 @@ function ModuleBranch({
     <li className="mb-1">
       <Branch
         anchorKey={`module:${courseModule.id}`}
+        live={courseModule.lectures.some(lecture => containsLiveMaterial(lecture, liveMaterialId))}
         label={t('outline.module_label', { position: courseModule.position })}
         onToggle={() => onToggle(courseModule.id)}
         open={open}
@@ -314,6 +315,7 @@ function ModuleBranch({
               <li className="mb-2" key={lecture.id}>
                 <Branch
                   anchorKey={`lecture:${lecture.id}`}
+                  live={containsLiveMaterial(lecture, liveMaterialId)}
                   label={t('outline.lecture_label', {
                     position: lecture.position,
                   })}
@@ -357,6 +359,7 @@ function ModuleBranch({
                               if (href) return <Link href={href} target="_blank" rel="noopener noreferrer"
                                 className="flex min-h-16 w-full items-center gap-2 rounded-xl border border-transparent px-2 py-2.5 hover:border-border hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
                                 <MaterialIdentity compact title={item.title} number={materialNumbers.get(item.materialId)} type={row.kind === 'video' ? 'VIDEO_LESSON' : row.kind === 'pdf' ? 'PDF_DOCUMENT' : row.manual.type} />
+                                {liveMaterialId === item.materialId ? <span className="shrink-0 rounded-full bg-danger/10 px-1.5 py-0.5 text-[9.5px] font-bold uppercase text-danger">{t('navigator.live')}</span> : null}
                                 <ExternalLink aria-hidden className="size-3.5 shrink-0 text-sub" /><span className="sr-only">{t('materials.new_tab')}</span>
                               </Link>;
                               return <button type="button" {...anchorProps(`material:${item.materialId}`)}
@@ -364,6 +367,7 @@ function ModuleBranch({
                                 className={`flex min-h-16 w-full items-center gap-2 rounded-xl border px-2 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 ${selected ? 'border-brand/20 bg-brand-soft' : 'border-transparent hover:border-border hover:bg-canvas'}`}
                                 onClick={() => onSelect(item.materialId)}>
                                 <MaterialIdentity compact title={item.title} number={materialNumbers.get(item.materialId)} type={row.kind === 'video' ? 'VIDEO_LESSON' : row.kind === 'pdf' ? 'PDF_DOCUMENT' : row.manual.type} />
+                                {liveMaterialId === item.materialId ? <span className="shrink-0 rounded-full bg-danger/10 px-1.5 py-0.5 text-[9.5px] font-bold uppercase text-danger">{t('navigator.live')}</span> : null}
                                 {busy ? <LoaderCircle aria-hidden className="size-4 shrink-0 animate-spin text-brand" /> : <ChevronRight aria-hidden className="size-3.5 shrink-0 text-sub" />}
                               </button>;
                             })()}
@@ -382,6 +386,7 @@ function ModuleBranch({
 }
 
 function Branch({
+  live = false,
   anchorKey,
   label,
   onToggle,
@@ -389,6 +394,7 @@ function Branch({
   small,
   title,
 }: {
+  live?: boolean;
   /**
    * Names this row to a watching peer, so a pointer over it lands on the same
    * row on a screen whose outline is a different height.
@@ -400,6 +406,7 @@ function Branch({
   small?: boolean;
   title: string;
 }) {
+  const { t } = useLayoutTranslation('learn');
   const Icon = open ? ChevronDown : ChevronRight;
   return (
     <button
@@ -417,8 +424,13 @@ function Branch({
         <span className="block text-[10px] font-semibold uppercase tracking-wide text-sub">{label}</span>
         <span className={`mt-0.5 block truncate ${small ? 'font-semibold' : 'font-bold'}`} title={title}>{title}</span>
       </span>
+      {live && !open ? <span className="rounded-full bg-danger/10 px-1.5 py-0.5 text-[9.5px] font-bold text-danger">{t('navigator.live')}</span> : null}
     </button>
   );
+}
+
+function containsLiveMaterial(lecture: WorkspaceNavigatorContext['course']['modules'][number]['lectures'][number], id: string | null) {
+  return Boolean(id && [...lecture.exercises, ...(lecture.documents ?? []), ...(lecture.videos ?? []), ...(lecture.manualMaterials ?? [])].some(item => item.materialId === id));
 }
 
 function ExerciseRow({

@@ -37,6 +37,7 @@
     "judge:try": "tsx scripts/judge-try.mts",
     "dev:video": "tsx src/videos/video-worker.ts",
     "start:video": "node dist/src/videos/video-worker.js",
+    "dlab:provision-campuses": "tsx src/integrations/dlab/scripts/provision-campuses.ts",
     "dlab:map-campus": "tsx src/integrations/dlab/scripts/operator.ts map",
     "dlab:set-campus-access": "tsx src/integrations/dlab/scripts/operator.ts access",
     "dlab:invalidate-sessions": "tsx src/integrations/dlab/scripts/operator.ts invalidate",

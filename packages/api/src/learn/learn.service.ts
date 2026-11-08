@@ -35,9 +35,11 @@ import {
   exerciseMaterialIds,
   nonemptyModules,
   visibleCurriculumInclude,
-  previewCurriculumInclude,
 } from "./curriculum-outline.service.js";
+import { withCurricula, withCurriculum } from "./curriculum-read.js";
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
+import { lessonImageIds } from "../content/lesson-images.js";
+import { ManualAssetsService } from "../manual/manual-assets.service.js";
 import { SubmissionService } from "./submission.service.js";
 import { LearningClassContextService } from "./learning-class-context.service.js";
 import { automaticLatestSubmission } from './latest-submission.js';
@@ -56,6 +58,13 @@ const workspaceMaterialInclude = {
       courseModule: { include: { course: { include: visibleCurriculumInclude } } },
     },
   },
+} as const satisfies Prisma.MaterialInclude;
+
+/** The same read with plain course columns; `withCurriculum` then attaches the
+ * hierarchy in one statement instead of Prisma's one per relation level. */
+const workspaceMaterialReadInclude = {
+  ...workspaceMaterialInclude,
+  lecture: { include: { courseModule: { include: { course: true } } } },
 } as const satisfies Prisma.MaterialInclude;
 
 /**
@@ -86,6 +95,7 @@ export class LearnService {
     private readonly submissions: SubmissionService,
     private readonly classContext: LearningClassContextService,
     @Optional() private readonly practice?: StaffPracticeService,
+    @Optional() private readonly lessonImages?: ManualAssetsService,
   ) {}
 
   async listCourses(
@@ -93,11 +103,10 @@ export class LearnService {
     academyId: string,
   ): Promise<{ courses: LearnCourseSummary[] }> {
     const { userId, scope, role, roles } = await this.requireLearner(identity, academyId);
-    const courses = await this.prisma.course.findMany({
+    const courses = await withCurricula(this.prisma, await this.prisma.course.findMany({
       where: { ...scope.course, isVisible: true },
-      include: visibleCurriculumInclude,
       orderBy: [{ title: "asc" }, { id: "asc" }],
-    });
+    }));
     const materialIds = courses.flatMap(exerciseMaterialIds);
     const statuses = rolesHavePermission(roles ?? [role], "practice.own.create") ? new Map() : await this.curriculum.statusByMaterial(userId, materialIds);
 
@@ -115,6 +124,30 @@ export class LearnService {
     }) : await this.requireVisibleMaterial(input.academyId, input.materialId, scope);
     if (!row) throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
     return { type: row.type };
+  }
+
+  /**
+   * Authorised exactly as opening the problem is: a reachable material, or a
+   * reviewer's preview. Showing the image in the current description is what
+   * grants it, which is also how a copied course keeps its source's pictures.
+   */
+  async getExerciseImage(identity: SupabaseIdentity, input: { academyId: string; materialId: string; assetId: string; preview?: boolean }) {
+    const { scope, role, roles } = await this.requireLearner(identity, input.academyId);
+    if (input.preview && !rolesHavePermission(roles ?? [role], 'curriculum.review'))
+      throw new AppException('PERMISSION_DENIED', HttpStatus.FORBIDDEN);
+    const row = await this.prisma.material.findFirst({
+      where: {
+        id: input.materialId,
+        ...(input.preview ? { AND: [scope.material, { lecture: { courseModule: { course: { academyId: input.academyId } } } }] } : reachableMaterialWhere(input.academyId, scope)),
+      },
+      select: { programmingExercise: { select: { description: true } } },
+    });
+    if (!row?.programmingExercise || !lessonImageIds(row.programmingExercise.description).includes(input.assetId.toLowerCase()))
+      throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
+    if (!this.lessonImages) throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.SERVICE_UNAVAILABLE);
+    const url = await this.lessonImages.imageDataUrl(input.assetId);
+    if (!url) throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
+    return { url };
   }
 
   async getLatestSubmission(identity: SupabaseIdentity, input: {
@@ -153,11 +186,11 @@ export class LearnService {
     if (input.preview && (student || !rolesHavePermission(roles ?? [role], "curriculum.review"))) {
       throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
     }
+    const previewed = input.preview
+      ? await this.prisma.course.findFirst({ where: { ...scope.course, id: input.courseId } })
+      : null;
     const course = input.preview
-      ? await this.prisma.course.findFirst({
-          where: { ...scope.course, id: input.courseId },
-          include: previewCurriculumInclude,
-        })
+      ? previewed && await withCurriculum(this.prisma, previewed, true)
       : await this.requireVisibleCourse(input, scope);
     if (!course) throw new AppException("COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
     // Delivery is a student's relationship to a course: the class decides
@@ -334,12 +367,14 @@ export class LearnService {
         id: input.materialId,
         ...(preview ? { AND: [scope.material, { lecture: { courseModule: { course: { academyId: input.academyId } } } }] } : reachableMaterialWhere(input.academyId, scope)),
       },
-      include: preview ? { ...workspaceMaterialInclude, lecture: { include: { courseModule: { include: { course: { include: previewCurriculumInclude } } } } } } : workspaceMaterialInclude,
+      include: workspaceMaterialReadInclude,
     });
     if (!material?.programmingExercise) {
       throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
     }
-    return material as WorkspaceMaterial;
+    const { courseModule } = material.lecture;
+    const course = await withCurriculum(this.prisma, courseModule.course, preview);
+    return { ...material, lecture: { ...material.lecture, courseModule: { ...courseModule, course } } } as WorkspaceMaterial;
   }
 
   /** One material's own payload. Nothing here reads the course a second time. */
@@ -560,14 +595,13 @@ export class LearnService {
   ) {
     const course = await this.prisma.course.findFirst({
       where: { ...scope.course, id: input.courseId, isVisible: true },
-      include: visibleCurriculumInclude,
     });
     if (!course) {
       // Deliberately the same response as a hidden or nonexistent course: an
       // unassigned course must not be distinguishable by its error.
       throw new AppException("COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
     }
-    return course;
+    return withCurriculum(this.prisma, course);
   }
 
   private async requireVisibleMaterial(

@@ -19,7 +19,6 @@ import { AuditService } from "../academies/audit.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AppException } from "../common/app-exception.js";
 import { learningScopeFor } from "../classes/assigned-course-access.js";
-import { visibleCurriculumInclude } from "../learn/curriculum-outline.service.js";
 import {
   bumpContentRevision,
   nextMaterialPosition,
@@ -27,6 +26,7 @@ import {
 } from "../content/content-positions.js";
 import { PdfStorageService } from "./pdf-storage.service.js";
 import { receivePdf, safePdfFilename, validatePdf } from "./pdf-files.js";
+import { withCurriculum } from "../learn/curriculum-read.js";
 
 type Target = { academyId: string; courseId: string; lectureId: string };
 export async function lockPdfAsset(tx: Prisma.TransactionClient, id: string) {
@@ -35,6 +35,19 @@ export async function lockPdfAsset(tx: Prisma.TransactionClient, id: string) {
   if (!asset || asset.state !== "READY")
     throw new AppException("PDF_UPLOAD_EXPIRED", 409);
   return asset;
+}
+
+/**
+ * `lockPdfAsset` for a whole course copy, in one round trip instead of two per
+ * asset. Rows lock in id order, as a sorted series of single locks would, and
+ * the state is read under the lock, so a deletion claim is still refused.
+ */
+export async function lockPdfAssets(tx: Prisma.TransactionClient, ids: string[]) {
+  const unique = [...new Set(ids)];
+  if (!unique.length) return;
+  const locked = await tx.$queryRaw<Array<{ state: string }>>`SELECT state::text AS state FROM pdf_assets WHERE id = ANY(${unique}::uuid[]) ORDER BY id FOR UPDATE`;
+  if (locked.length !== unique.length || locked.some((asset) => asset.state !== "READY"))
+    throw new AppException("PDF_UPLOAD_EXPIRED", 409);
 }
 
 @Injectable()
@@ -333,10 +346,10 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
     const course = material.lecture.courseModule.course;
     if (exerciseCourseId && course.id !== exerciseCourseId) throw new AppException("PDF_NOT_AVAILABLE", 404);
     if (input.exerciseMaterialId && material.pdfDocument.placement === "MAIN") throw new AppException("PDF_NOT_AVAILABLE", 404);
-    const outline = input.exerciseMaterialId ? null : await this.prisma.course.findUnique({
+    const found = input.exerciseMaterialId ? null : await this.prisma.course.findUnique({
       where: { id: course.id },
-      include: visibleCurriculumInclude,
     });
+    const outline = found && await withCurriculum(this.prisma, found);
     const materials: PdfReadResult["materials"] = [];
     const resources: PdfReadResult["resources"] = [];
     for (const module of outline?.modules ?? [])

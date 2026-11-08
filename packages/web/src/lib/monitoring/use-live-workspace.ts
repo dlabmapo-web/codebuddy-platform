@@ -73,10 +73,15 @@ export function useLiveWorkspace({
   academyId,
   classId,
   studentMembershipId,
+  autoEdit = false,
+  availableCode,
 }: {
   academyId: string;
   classId: string;
   studentMembershipId: string;
+  autoEdit?: boolean;
+  /** Selected-code availability is advisory; every retry is authorized by the server. */
+  availableCode?: { materialId: string; source: string } | null;
 }) {
   const { socket, state, report } = useMonitoringSocket({ classId, studentMembershipId });
   const [pendingUpdates] = React.useState(() => new PendingTeacherUpdates());
@@ -271,7 +276,11 @@ export function useLiveWorkspace({
       watchTokenRef.current = token;
       replacingVisitRef.current = sessionRef.current?.visitId ?? null;
       cancelCommand = retryMonitoringCommand<LiveWorkspaceSession>({
-        onRetry: unavailable,
+        retryUnavailableStudent: true,
+        onRetry: ack => {
+          if (ack && !ack.ok && ack.code === 'MONITORING_STUDENT_UNAVAILABLE') report({ type: 'recovery_failed' });
+          else unavailable();
+        },
         send: (done) => {
           if (!socket.connected) { done(undefined); return; }
           socket.emit(
@@ -281,6 +290,7 @@ export function useLiveWorkspace({
               academyId,
               classId,
               studentMembershipId,
+              autoEdit,
               sessionId: sessionIdRef.current,
               protocolVersion: monitoringProtocolVersion,
             },
@@ -294,6 +304,7 @@ export function useLiveWorkspace({
           if (!ack?.ok) {
             if (retained) setPendingRecovery('blocked');
             setDenied(ack?.code ?? 'MONITORING_REALTIME_UNAVAILABLE');
+            if (ack?.code === 'MONITORING_STUDENT_UNAVAILABLE') report({ type: 'recovery_failed' });
             if (!ack || ack.code === 'MONITORING_REALTIME_UNAVAILABLE') unavailable();
             if (ack?.code === 'MONITORING_ACCESS_DENIED') {
               report({ type: 'revoked' });
@@ -424,13 +435,14 @@ export function useLiveWorkspace({
                 });
               };
               // The previous edit intent does not grant a new visit permission.
-              // Ask the server, replay only the retained operations, then lock.
+              // Reauthorize and replay only retained operations. Automatic
+              // editing retains the new grant; older callers return to reading.
               changeRecoveryMode('HELPING', () => {
                 pendingUpdates.resume();
                 void pendingUpdates.settle().then((applied) => {
                   if (watchTokenRef.current !== token || sessionRef.current?.visitId !== ack.data.visitId) return;
                   if (!applied) { unavailable(); return; }
-                  changeRecoveryMode('MONITORING', () => {
+                  const finishRecovery = () => {
                     recoveringRef.current = false;
                     pendingDocumentRef.current = null;
                     preservePendingBufferRef.current = false;
@@ -438,7 +450,9 @@ export function useLiveWorkspace({
                     setDenied(null);
                     setSyncedDraftId(ack.data.draftId);
                     report({ type: 'synchronized' });
-                  });
+                  };
+                  if (autoEdit) finishRecovery();
+                  else changeRecoveryMode('MONITORING', finishRecovery);
                 });
               });
             },
@@ -494,11 +508,30 @@ export function useLiveWorkspace({
     report,
     socket,
     studentMembershipId,
+    autoEdit,
   ]);
 
   React.useEffect(() => {
     if (state === 'revoked' || refreshRequired) cancelWatchRef.current?.();
   }, [state, refreshRequired]);
+
+  // A settled refusal may precede the student's return to coding. Repeated
+  // observation heartbeats must not replace a healthy watch or loop forever.
+  const recoveredAvailabilityRef = React.useRef<string | null>(null);
+  const availableMaterialId = availableCode?.materialId;
+  const availableSource = availableCode?.source;
+  React.useEffect(() => {
+    if (!availableMaterialId || !availableSource) {
+      recoveredAvailabilityRef.current = null;
+      return;
+    }
+    const key = `${academyId}:${classId}:${studentMembershipId}:${availableMaterialId}:${availableSource}`;
+    if (!socket?.connected || state === 'revoked' || refreshRequired || switching || pendingRecovery ||
+      denied !== 'MONITORING_STUDENT_UNAVAILABLE' || recoveredAvailabilityRef.current === key) return;
+    recoveredAvailabilityRef.current = key;
+    follow();
+  }, [academyId, classId, studentMembershipId, availableMaterialId, availableSource, denied,
+    socket, state, refreshRequired, switching, pendingRecovery, follow]);
 
   /* ---------------------------------------------------------- the document */
 
@@ -940,8 +973,8 @@ export function useLiveWorkspace({
      * Whether Monaco may be writable.
      *
      * Everything `canEdit` requires, plus server-confirmed edit permission.
-     * A workspace opens read-only, a reconnect returns to read-only because
-     * the new watch starts in MONITORING, and losing the connection disables
+     * The current UI requests editing with the watch; older callers may still
+     * start in MONITORING. Both wait for synchronization; disconnect disables
      * it through `state`. The server enforces the same rule independently, so
      * this is the UI agreeing with the gate rather than being it.
      */

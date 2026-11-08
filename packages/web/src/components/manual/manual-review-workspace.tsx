@@ -2,6 +2,7 @@
 import { ArrowLeft, Search, Users, FileCheck2, LockKeyhole, History, Clock3, Trophy, UserRound } from 'lucide-react';
 import { ManualStaffActions } from './manual-staff-actions';
 import { RichTextFrame } from '@/components/studio/rich-text-frame';
+import { ManualImageProvider } from "@/components/studio/lesson-image-providers";
 import { ReviewGradingPanel, AssessmentDrawer, AssessmentStatus, assessmentAction } from './assessment-ui';
 import { ChoiceAttempt } from "./choice-options";
 import { useManualTranslation } from "./use-manual-translation";
@@ -373,7 +374,7 @@ export function ManualReviewWorkspace({
                 <summary className="cursor-pointer text-sm font-semibold">{mt('ui.question')}</summary>
                 <div className="mt-4 space-y-3 text-sm leading-7">
                   <p className="font-semibold">{content.data.config.shortAnswer?.question ?? content.data.config.multipleChoice?.question}</p>
-                  <RichTextFrame content={content.data.config.description} title={mt('activity_instructions')} />
+                  <ManualImageProvider scope={{ academyId, materialId, classId, preview: true }}><RichTextFrame content={content.data.config.description} title={mt('activity_instructions')} /></ManualImageProvider>
                   {content.data.config.modelAnswer ? <><h3 className="font-semibold text-sub">{mt('model_answer_private')}</h3><p className="whitespace-pre-wrap">{content.data.config.modelAnswer}</p></> : null}
                 </div>
               </details>

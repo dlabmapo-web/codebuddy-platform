@@ -124,7 +124,9 @@ export class ManagerOverviewService {
     // the whole control tower as "the academy's own totals are missing" — a
     // sentence that was not true, on a page whose entire value is being
     // trusted.
-    const [academy, analytics] = await Promise.all([
+    // The media and the totals depend only on the academy, so they are read in
+    // this same round rather than after it.
+    const [academy, analytics, academyMedia, [roleTotals, classTotals]] = await Promise.all([
       this.prisma.academy.findUniqueOrThrow({
         where: { id: actor.academyId },
         select: {
@@ -145,27 +147,26 @@ export class ManagerOverviewService {
         },
       }),
       this.scopes.resolveAnalyticsScope(actor),
+      // No images is a legitimate answer — most academies have none — so a
+      // failure and the empty case land in the same place and the plate renders
+      // identically for both.
+      this.media
+        .presentForAcademy(actor.academyId)
+        .catch((error: unknown) => {
+          this.logger.warn(
+            `academy media unavailable: ${
+              error instanceof Error ? error.message : "unknown"
+            }`,
+          );
+          return { cover: null, gallery: [] };
+        }),
+      Promise.all([
+        this.repository.roleTotals(actor.academyId),
+        this.repository.classTotals(actor.academyId),
+      ]),
     ]);
-
-    // No images is a legitimate answer — most academies have none — so a
-    // failure and the empty case land in the same place and the plate renders
-    // identically for both.
-    const academyMedia = await this.media
-      .presentForAcademy(actor.academyId)
-      .catch((error: unknown) => {
-        this.logger.warn(
-          `academy media unavailable: ${
-            error instanceof Error ? error.message : "unknown"
-          }`,
-        );
-        return { cover: null, gallery: [] };
-      });
 
     const scope = analytics.scope;
-    const [roleTotals, classTotals] = await Promise.all([
-      this.repository.roleTotals(actor.academyId),
-      this.repository.classTotals(actor.academyId),
-    ]);
     const scale = buildScale(roleTotals, classTotals);
 
     /* -------------------------------------------------------- the evidence */

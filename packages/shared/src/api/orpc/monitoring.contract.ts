@@ -3,6 +3,7 @@ import { oc } from "@orpc/contract";
 import { z } from "zod";
 
 import { workspaceNavigatorContextSchema } from "../../content/learn.js";
+import { observedMaterialSchema } from '../../monitoring/observation.js';
 import {
   listFeedbackInputSchema,
   listMyFeedbackInputSchema,
@@ -35,6 +36,7 @@ import {
  * assigned teacher and to nobody else.
  */
 export const monitoringContract = {
+  getObservedMaterial: oc.input(monitoringMaterialInputSchema).output(observedMaterialSchema),
   getMyActiveHelpRequest: oc.input(helpClassInputSchema).output(myHelpRequestSchema),
   requestHelp: oc.input(requestHelpInputSchema).output(helpMutationResultSchema),
   cancelMyHelpRequest: oc.input(changeHelpRequestInputSchema).output(helpMutationResultSchema),

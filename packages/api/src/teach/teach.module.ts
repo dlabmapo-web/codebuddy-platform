@@ -1,3 +1,4 @@
+import { StudentWorkHistoryService } from "./student-work-history.service.js";
 import { Module } from "@nestjs/common";
 
 import { AuthorizationModule } from "../authorization/authorization.module.js";
@@ -51,6 +52,7 @@ import { TeacherProgressService } from "./teacher-progress.service.js";
     TeacherProgressAccessService,
     TeacherProgressRepository,
     TeacherProgressService,
+    StudentWorkHistoryService,
     TeacherOverviewAccessService,
     TeacherOverviewRepository,
     TeacherOverviewService,
@@ -59,6 +61,7 @@ import { TeacherProgressService } from "./teacher-progress.service.js";
   ],
   exports: [
     TeacherProgressService,
+    StudentWorkHistoryService,
     TeacherOverviewService,
     TeacherRosterService,
     TeacherStudentsService,

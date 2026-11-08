@@ -244,6 +244,7 @@ export function ManualAuthorDialog({
                 minHeight={200}
                 value={config.description}
                 onChange={(value) => field("description", value)}
+                onImageUpload={(file) => uploadImage(file)}
               />
             </div>
             <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl border border-border bg-canvas/60 p-4 text-sm">
@@ -296,6 +297,7 @@ export function ManualAuthorDialog({
                 value={config.shortAnswer}
                 onChange={(value) => field("shortAnswer", value)}
                 locked={locked}
+                onImageUpload={(file) => uploadImage(file, true)}
               />
             ) : null}
             {kind !== "MULTIPLE_CHOICE" ? (

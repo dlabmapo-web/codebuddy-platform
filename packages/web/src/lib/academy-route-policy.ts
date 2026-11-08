@@ -12,8 +12,7 @@ export type AcademyRouteIdentity = {
    * identity as a member today can start treating an applicant as one.
    */
   via: 'membership' | 'grant' | 'platform' | 'application';
-  /** The actor's highest role in this academy. Routes that are *about* one
-   *  role — which overview to render — branch on this. */
+  /** The actor's primary role, which selects their academy entry page. */
   role: AcademyRole;
   /**
    * Every role the actor holds here.

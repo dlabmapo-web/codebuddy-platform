@@ -3,7 +3,7 @@ import { AppException } from "../../common/app-exception.js";
 import { randomUUID } from "node:crypto";
 import { ConflictException, HttpStatus } from "@nestjs/common";
 import { multipleChoiceSchema } from "@cove/shared";
-import { lockPdfAsset } from "../../documents/pdf-document.service.js";
+import { lockPdfAssets } from "../../documents/pdf-document.service.js";
 import { Prisma } from "../../generated/prisma/client.js";
 
 function remapChoiceDefinition(raw: unknown) {
@@ -95,7 +95,7 @@ export async function copyCourseTree(
   const materials: Prisma.MaterialCreateManyInput[] = [];
   const documents: Prisma.PdfDocumentCreateManyInput[] = [];
   const materialIds = new Map<string, string>();
-  const references: Array<{ materialId: string; referenceId: string }> = [];
+  const references: Array<{ exercise: Prisma.ProgrammingExerciseCreateManyInput; referenceId: string }> = [];
   const copiedSolutions: Prisma.ProgrammingExerciseSolutionCreateManyInput[] = [];
   const videos: Prisma.VideoLessonCreateManyInput[] = [];
   const manuals: Prisma.ManualMaterialCreateManyInput[] = [];
@@ -131,7 +131,6 @@ export async function copyCourseTree(
       for (const material of lecture.materials) {
         const materialId = randomUUID();
         materialIds.set(material.id, materialId);
-        if (material.programmingExercise?.referencePdfMaterialId) references.push({ materialId, referenceId: material.programmingExercise.referencePdfMaterialId });
         materials.push({
           id: materialId,
           lectureId,
@@ -210,7 +209,7 @@ export async function copyCourseTree(
         if (!exercise) continue;
         const preparedSolutions = prepareExerciseSolutions(materialId, privateSolutions(exercise.solutions));
         copiedSolutions.push(...preparedSolutions.rows);
-        exercises.push({
+        const copiedExercise: Prisma.ProgrammingExerciseCreateManyInput = {
           materialId,
           externalKey: exercise.externalKey,
           difficulty: exercise.difficulty,
@@ -239,7 +238,9 @@ export async function copyCourseTree(
           exitStatusPolicy: exercise.exitStatusPolicy,
           materialMaximumHundredths: exercise.materialMaximumHundredths,
           materialScorePolicy: exercise.materialScorePolicy,
-        });
+        };
+        exercises.push(copiedExercise);
+        if (exercise.referencePdfMaterialId) references.push({ exercise: copiedExercise, referenceId: exercise.referencePdfMaterialId });
         for (const testCase of exercise.testCases) {
           testCases.push({
             exerciseMaterialId: materialId,
@@ -270,12 +271,13 @@ export async function copyCourseTree(
   if (modules.length) await tx.courseModule.createMany({ data: modules });
   if (lectures.length) await tx.lecture.createMany({ data: lectures });
   if (materials.length) await tx.material.createMany({ data: materials });
-  for (const assetId of [...new Set(documents.map((d) => d.assetId))].sort())
-    await lockPdfAsset(tx, assetId);
-  for (const assetId of [...new Set(videos.map((v) => v.assetId))].sort()) {
-    await tx.$queryRaw`SELECT id FROM video_assets WHERE id=${assetId}::uuid FOR UPDATE`;
-    const asset = await tx.videoAsset.findUnique({ where: { id: assetId } });
-    if (asset?.state !== "READY") {
+  // One locking read per asset kind, not two round trips per asset: a course
+  // with a hundred PDFs otherwise spends the whole transaction budget here.
+  await lockPdfAssets(tx, documents.map((d) => d.assetId));
+  const videoAssetIds = [...new Set(videos.map((v) => v.assetId))];
+  if (videoAssetIds.length) {
+    const locked = await tx.$queryRaw<Array<{ state: string }>>`SELECT state FROM video_assets WHERE id = ANY(${videoAssetIds}::uuid[]) ORDER BY id FOR UPDATE`;
+    if (locked.length !== videoAssetIds.length || locked.some((asset) => asset.state !== "READY")) {
       if (policy === "PRESERVE_VISIBILITY")
         throw new AppException(
           "LIBRARY_IMPORT_CONTENT_INVALID",
@@ -287,15 +289,18 @@ export async function copyCourseTree(
   if (videos.length) await tx.videoLesson.createMany({ data: videos });
   if (documents.length) await tx.pdfDocument.createMany({ data: documents });
   if (manuals.length) await tx.manualMaterial.createMany({ data: manuals });
+  // Remapped only now that every material has its new id, since an exercise can
+  // precede the PDF it reads; the copied documents are inserted above, so the
+  // exercises can carry the reference in the same bulk insert.
+  for (const { exercise, referenceId } of references) {
+    const target = materialIds.get(referenceId);
+    if (!target) throw new ConflictException("Reference PDF is outside the copied course");
+    exercise.referencePdfMaterialId = target;
+  }
   if (exercises.length) {
     await tx.programmingExercise.createMany({ data: exercises });
   }
   if (copiedSolutions.length) await tx.programmingExerciseSolution.createMany({ data: copiedSolutions });
-  for (const reference of references) {
-    const target = materialIds.get(reference.referenceId);
-    if (!target) throw new ConflictException("Reference PDF is outside the copied course");
-    await tx.programmingExercise.update({ where: { materialId: reference.materialId }, data: { referencePdfMaterialId: target } });
-  }
   if (testCases.length) {
     await tx.exerciseTestCase.createMany({ data: testCases });
   }

@@ -19,7 +19,6 @@
   "insert_table": "표 삽입 (3×3) — 표 안에서 행/열 추가·삭제 가능",
   "insert_link": "링크 삽입",
   "attach_image": "이미지 첨부 (오른쪽 핸들 드래그로 크기 조절)",
-  "attach_file": "파일 첨부",
   "edit_table": "표 편집",
   "row": "행",
   "column": "열",
@@ -36,5 +35,7 @@
   "delete_table_label": "표 삭제",
   "link_prompt": "링크 URL을 입력하세요",
   "image_upload_failed": "이미지를 업로드하지 못했습니다. 다시 시도하세요.",
+  "image_too_large": "이미지를 줄여도 5MB를 넘어요. 더 작은 이미지를 사용하세요.",
+  "image_too_large_unshrinkable": "GIF와 SVG 이미지는 5MB 이하여야 해요.",
   "resize_image": "드래그로 이미지 너비 조절"
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import type { LatestSubmission } from '@cove/shared';
+import { SERVER_READ_FRESH_MS } from '@/lib/server-read';
 
 function denied(error: unknown) {
   if (!error || typeof error !== 'object') return false;
@@ -19,6 +20,9 @@ export function submissionPollInterval(latest: LatestSubmission | null | undefin
   return latest?.status === 'PENDING' ? 1000 : false;
 }
 
+function settledSeed(seed: LatestSubmission | null | undefined) {
+  return seed === null || (seed !== undefined && !['PENDING', 'AWAITING_REVIEW'].includes(seed.status));
+}
 /** Shared polling policy. Query keys retain owner, class, role and revision scope. */
 export function useSubmissionStatus(options: {
   queryKey: QueryKey; read: (signal: AbortSignal) => Promise<LatestSubmission | null>;
@@ -28,7 +32,13 @@ export function useSubmissionStatus(options: {
   const failures = useRef({ key, count: 0 });
   const observed = useRef<{ key: string; value?: LatestSubmission | null }>({ key, value: options.seed });
   const query = useQuery({
-    queryKey: options.queryKey, enabled: options.enabled, retry: false, staleTime: 0,
+    queryKey: options.queryKey, enabled: options.enabled, retry: false,
+    // A settled seed (graded, recorded, or no attempt) comes from the full
+    // workspace response read moments earlier; refetching it on mount only
+    // repeated that read. It counts as current for a few seconds, until its
+    // first real update. An in-progress seed is read at once, as before, so
+    // grading feedback and its polling keep their timing.
+    staleTime: (current) => settledSeed(options.seed) && current.state.dataUpdateCount === 0 ? SERVER_READ_FRESH_MS : 0,
     initialData: options.seed,
     queryFn: async ({ signal }) => {
       if (failures.current.key !== key) failures.current = { key, count: 0 };

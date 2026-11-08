@@ -41,12 +41,12 @@ describe.skipIf(!url)("scoped revocation across real Redis adapters", () => {
     await Promise.all(servers.map(server => new Promise<void>(resolve => server.close(() => resolve()))));
     await Promise.all(connections.map(redis => redis.quit()));
   });
-  function lease(): WatchLease {
+  function lease(): WatchLease & { draftId: string } {
     return { sessionId: randomUUID(), visitId: randomUUID(), generation: 1,
       teacherMembershipId: prefix, academyId: prefix, classId: randomUUID(),
       studentMembershipId: randomUUID(), draftId: randomUUID(), mode: "MONITORING" };
   }
-  async function connect(watch: WatchLease): Promise<{ client: Socket; socket: ServerSocket }> {
+  async function connect(watch: WatchLease & { draftId: string }): Promise<{ client: Socket; socket: ServerSocket }> {
     const socketPromise = new Promise<ServerSocket>(resolve => servers[1]!.once("connection", resolve));
     const client = io(`http://127.0.0.1:${ownerPort}`, { transports: ["websocket"], forceNew: true });
     clients.push(client);
@@ -96,4 +96,24 @@ describe.skipIf(!url)("scoped revocation across real Redis adapters", () => {
     expect(peer.socket.rooms.has(monitoringRooms.classPresence(prefix, otherClass))).toBe(true);
     expect(peer.socket.connected).toBe(true);
   }, 15_000);
+  it('evicts a material-neutral observation on another API instance', async () => {
+    const watch: WatchLease = { ...lease(), draftId: null };
+    const connected = new Promise<ServerSocket>(resolve => servers[1]!.once('connection', resolve));
+    const client = io(`http://127.0.0.1:${ownerPort}`, { transports: ['websocket'], forceNew: true });
+    clients.push(client);
+    const socket = await connected;
+    socket.data.observation = { lease: watch, claim: { studentMembershipId: watch.studentMembershipId } };
+    const room = monitoringRooms.watchContext(watch.academyId, watch.classId, watch.studentMembershipId);
+    await socket.join([monitoringRooms.teacher(watch.academyId, watch.teacherMembershipId), room]);
+    await ownerRegistry.register(watch);
+    const received = new Promise<void>(resolve => client.once(monitoringServerEvents.accessRevoked, () => resolve()));
+    const visits = { endOpenVisits: vi.fn().mockResolvedValue([{ id: watch.visitId, academyId: watch.academyId,
+      classId: watch.classId, teacherMembershipRef: watch.teacherMembershipId, studentMembershipRef: watch.studentMembershipId }]) } as unknown as MonitoringVisitService;
+    const service = new MonitoringRevocationService(visits, new MonitoringMetricsService(), registry);
+    service.attach(servers[0]!);
+    await service.revokeClass(watch.classId, 'CLASS_ARCHIVED');
+    await received;
+    expect(socket.rooms.has(room)).toBe(false);
+    expect(await ownerRegistry.isCurrent(watch)).toBeNull();
+  });
 });

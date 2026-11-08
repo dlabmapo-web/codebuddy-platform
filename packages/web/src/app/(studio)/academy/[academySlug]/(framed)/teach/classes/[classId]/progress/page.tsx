@@ -1,3 +1,4 @@
+import { HistoryWorkspace } from "@/components/student-history/history-workspace";
 import { requireAcademyRoute } from '@/lib/academy-route';
 import type { TeacherStudentsResult } from '@cove/shared';
 import { notFound } from 'next/navigation';
@@ -70,10 +71,10 @@ export default async function ClassProgressPage({
         />
       }
       bleed
-      description={t('progress.description')}
-      title={students ? `${className} · ${t('progress.title')}` : className}
+      description={query.view === 'students' ? t('history.dashboard_description') : t('progress.description')}
+      title={students ? `${className} · ${t(query.view === 'students' ? 'history.title' : 'progress.title')}` : className}
     >
-      <ProgressWorkspace
+      {query.view === 'students' ? <div className="h-[calc(100dvh-180px)] min-h-[560px] overflow-hidden rounded-xl border border-border"><HistoryWorkspace academyId={academyId} classId={classId} standalone /></div> : <ProgressWorkspace
         academyId={academyId}
         classId={classId}
         className={className}
@@ -81,7 +82,7 @@ export default async function ClassProgressPage({
         // The exact state the server rendered for. Anything else refetches
         // rather than showing one query's rows under another query's filters.
         initialKey={serializeProgressQuery({ ...query, membershipId: null })}
-      />
+      />}
     </StudioPage>
   );
 }

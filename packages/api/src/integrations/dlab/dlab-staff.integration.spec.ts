@@ -194,7 +194,9 @@ describe.skipIf(!databaseUrl || !redisUrl)('automatic staff SSO, real isolated d
     const fresh = await f.login();
     expect(fresh.requiresStudentSession).toBe(false);
     expect(fresh.completed.authUserId).toBe(initial.completed.authUserId);
-  }, 20_000);
+  // Four separate tsx CLI processes are intentionally exercised, not mocked.
+  // Allow startup time on a developer machine running another worktree's E2E suite.
+  }, 60_000);
   it('selects only a safe eligible academy and never infers an explicitly excluded primary', async () => {
     const f = await fixture(); f.os.external_campus_ids = [f.secondary];
     const result = await f.login('/academy/not-my-academy');

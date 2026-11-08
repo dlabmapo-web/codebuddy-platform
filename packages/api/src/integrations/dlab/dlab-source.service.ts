@@ -5,10 +5,11 @@ import type { z } from 'zod';
 import { PrismaService } from '../../database/prisma.service.js';
 import type { DlabIdentity } from '../../generated/prisma/client.js';
 import { MonitoringRevocationService } from '../../monitoring/monitoring-revocation.service.js';
-import { DlabStateService, digest } from './dlab-state.service.js';
+import { DlabStateService, digest, dlabRecheckMessage } from './dlab-state.service.js';
 import { DlabReconcilerService } from './dlab-reconciler.service.js';
 import { dlabTransaction, sourceWrite } from './dlab-transaction.js';
 import { DlabError } from './dlab-error.js';
+import { DlabCampusProvisioner, reconcileDlabCampus } from './dlab-campus-provisioner.js';
 export { sourceLock, sourceWrite } from './dlab-transaction.js';
 
 export function sourceOrder(previous: Date | null, incoming: Date | null, oldHash: string, newHash: string): 'apply' | 'noop' {
@@ -26,9 +27,12 @@ function sourcePayload(record: Pick<DlabIdentity, 'name' | 'grade' | 'userRole' 
 }
 @Injectable()
 export class DlabSourceService {
-  constructor(private readonly prisma: PrismaService, private readonly state: DlabStateService, private readonly reconciler: DlabReconcilerService, @Optional() private readonly revocation?: MonitoringRevocationService) {}
-  async changed(membershipIds: string[] = []) {
-    await this.state.optionalRedis()?.publish('cove:dlab:changed', 'recheck').catch(() => undefined);
+  constructor(private readonly prisma: PrismaService, private readonly state: DlabStateService, private readonly reconciler: DlabReconcilerService, @Optional() private readonly revocation?: MonitoringRevocationService, @Optional() private readonly campusProvisioner?: DlabCampusProvisioner) {}
+  /** `recheck` names the accounts whose live sessions must re-verify; by
+   * default (campus changes) every session does. An empty list asks nobody. */
+  async changed(membershipIds: string[] = [], recheck: readonly string[] | 'everyone' = 'everyone') {
+    const message = recheck === 'everyone' ? 'recheck' : recheck.length ? dlabRecheckMessage(recheck) : null;
+    if (message) await this.state.optionalRedis()?.publish('cove:dlab:changed', message).catch(() => undefined);
     for (const id of new Set(membershipIds)) await this.revocation?.revokeMembership(id, 'ROLE_CHANGED');
   }
   async campus(id: string, input: z.infer<typeof dlabCampusSchema>, requestId?: string) {
@@ -37,19 +41,19 @@ export class DlabSourceService {
     const outcome = await dlabTransaction(this.prisma, async tx => {
       await sourceWrite(tx);
       const existing = await tx.dlabCampus.findUnique({ where: { externalCampusId: id } });
-      if (existing && sourceOrder(existing.sourceUpdatedAt, timestamp, existing.payloadHash, hash) === 'noop') return { record: existing, changed: [] as string[] };
+      if (existing && sourceOrder(existing.sourceUpdatedAt, timestamp, existing.payloadHash, hash) === 'noop') {
+        // Replaying current data can finish rollout of a previously staged row.
+        // A stale event cannot trigger provisioning or alter authoritative state.
+        if (existing.sourceUpdatedAt && timestamp && timestamp < existing.sourceUpdatedAt) return { record: existing, changed: [] as string[] };
+        const result = await this.campusProvisioner?.provision(tx, existing, requestId);
+        return { record: result?.campus ?? existing, changed: result?.created ? await reconcileDlabCampus(tx, this.reconciler, id) : [] };
+      }
       const accessChanged = existing && existing.status !== input.status;
       const record = await tx.dlabCampus.upsert({ where: { externalCampusId: id }, create: { externalCampusId: id, name: input.name, status: input.status, campusType: input.campus_type, payloadHash: hash, sourceUpdatedAt: timestamp }, update: { name: input.name, status: input.status, campusType: input.campus_type ?? null, payloadHash: hash, sourceUpdatedAt: timestamp ?? existing?.sourceUpdatedAt, receivedAt: new Date(), ...(accessChanged ? { accessRevision: { increment: 1 } } : {}) } });
-      const changed: string[] = [];
-      if (accessChanged) {
-        const identities = await tx.dlabIdentity.findMany({ where: { OR: [{ externalCampusId: id }, { externalCampusIds: { has: id } }, { bindings: { some: { externalCampusId: id } } }] }, orderBy: { externalUserId: 'asc' } });
-        for (const identity of identities) {
-          const updated = await tx.dlabIdentity.update({ where: { externalUserId: identity.externalUserId }, data: { generation: { increment: 1 }, revision: { increment: 1 } } });
-          changed.push(...await this.reconciler.reconcile(tx, updated));
-        }
-      }
+      const result = await this.campusProvisioner?.provision(tx, record, requestId);
+      const changed = accessChanged || result?.created ? await reconcileDlabCampus(tx, this.reconciler, id) : [];
       await tx.dlabIntegrationEvent.create({ data: { requestId, action: 'campus.updated', details: { externalCampusId: id, status: input.status } } });
-      return { record, changed };
+      return { record: result?.campus ?? record, changed };
     });
     await this.changed(outcome.changed);
     return outcome.record;
@@ -67,15 +71,16 @@ export class DlabSourceService {
       }
       // Recompute from canonical stored fields, including rows predating this migration.
       const previousHash = previous ? digest(JSON.stringify(sourcePayload(previous))) : '';
-      if (previous && loginStartedAt === undefined && sourceOrder(previous.sourceUpdatedAt, timestamp, previousHash, hash) === 'noop') return { record: previous, changed: [] as string[] };
+      if (previous && loginStartedAt === undefined && sourceOrder(previous.sourceUpdatedAt, timestamp, previousHash, hash) === 'noop') return { record: previous, changed: [] as string[], recheck: [] as string[] };
       const changesAccess = previous && (previous.accountStatus !== payload.accountStatus || previous.userRole !== payload.userRole || previous.externalCampusId !== payload.externalCampusId || JSON.stringify(canonicalDlabScope(previous.externalCampusId, previous.externalCampusIds)) !== JSON.stringify(payload.externalCampusIds));
       const record = await tx.dlabIdentity.upsert({ where: { externalUserId: id }, create: { ...payload, externalUserId: id, reservedUserId: randomUUID(), payloadHash: hash, sourceUpdatedAt: timestamp }, update: { ...payload, payloadHash: hash, ...(timestamp ? { sourceUpdatedAt: timestamp } : {}), revision: { increment: 1 }, ...(changesAccess ? { generation: { increment: 1 } } : {}), receivedAt: new Date() } });
-      if (record.userId) await tx.user.update({ where: { id: record.userId }, data: { displayName: record.name } });
+      const user = record.userId ? await tx.user.update({ where: { id: record.userId }, data: { displayName: record.name }, select: { authUserId: true } }) : null;
       const changed = await this.reconciler.reconcile(tx, record);
       await tx.dlabIntegrationEvent.create({ data: { externalUserId: id, requestId, action: loginStartedAt === undefined ? 'user.updated' : 'user.login', revision: record.revision, details: { beforeRole: previous?.userRole ?? null, role: record.userRole, scope: record.externalCampusIds, status: record.accountStatus } } });
-      return { record, changed };
+      // Only this account's facts changed; a no-op replay changed nobody's.
+      return { record, changed, recheck: user?.authUserId ? [user.authUserId] : [] };
     });
-    await this.changed(outcome.changed);
+    await this.changed(outcome.changed, outcome.recheck);
     return outcome.record;
   }
 }

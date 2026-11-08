@@ -78,6 +78,7 @@ function createService(options?: {
   compare?: (request: { actual: string; expected: string }) => ComparisonResult;
   engineVersion?: string;
   comparatorVersion?: string | null;
+  timeScale?: number;
 }) {
   const submission = {
     id: submissionId,
@@ -134,6 +135,7 @@ function createService(options?: {
   } as unknown as PrismaService;
   const engine = {
     version: options?.engineVersion ?? "pyodide-0.27.5",
+    timeScale: options?.timeScale,
     run: options?.run
       ? vi.fn((request: { stdin: string; timeLimitMs: number }) =>
           options.run!(request.stdin, request.timeLimitMs),
@@ -678,6 +680,41 @@ describe("GradingService.grade — the total deadline covers every wait", () => 
     expect(tx.submission.updateMany).toHaveBeenCalledWith(aborted);
     expect(tx.studentExerciseProgress.upsert).not.toHaveBeenCalled();
   }, 10_000);
+
+  // A scaled engine spends `timeScale` times the authored budget, so the wall
+  // clock it is held to grows with it. Only Date is faked: a "slow" run moves
+  // the clock exactly as far as it says, and nothing else has to wait.
+  it.each([
+    [1, "aborts it"],
+    [2.5, "still grades it"],
+  ] as const)("at scale %s, a run 6.1 s past a 1 s budget %s", async (timeScale, expected) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const { service, tx, engine } = createService({
+        timeScale,
+        profile: { ...eliceProfile, totalTimeLimitMs: 1_000 },
+        cases: weightedCases(),
+        run: async (stdin) => {
+          if (stdin === "case-1") vi.setSystemTime(Date.now() + 6_100);
+          return answers([1, 2, 3])(stdin);
+        },
+      });
+
+      await service.grade(submissionId, vi.fn().mockResolvedValue(undefined));
+
+      if (timeScale === 1) {
+        expect(tx.submission.updateMany).toHaveBeenCalledWith(aborted);
+        return;
+      }
+      expect(tx.submission.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ status: "PASSED" }),
+      }));
+      // 7.5 s of wall clock in all and 1.4 s of it left: 560 ms of authored time.
+      expect((engine.run as ReturnType<typeof vi.fn>).mock.calls[1]![0].timeLimitMs).toBe(560);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("GradingService.grade — recorded runtimes", () => {

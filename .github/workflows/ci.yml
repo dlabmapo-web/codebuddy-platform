@@ -91,6 +91,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate deployment configuration
         run: bash deploy/scripts/validate-local.sh
+      - name: Verify scanner install rejects corrupt downloads
+        run: python3 deploy/scripts/install-trivy.test.py
       - name: Test learning release and rollback selection
         run: python3 deploy/scripts/learning-rollout.test.py
       - name: Verify browser admission rollback ordering
@@ -154,9 +156,14 @@ jobs:
             NEXT_PUBLIC_SHORT_ANSWER_ENABLED=true
             NEXT_PUBLIC_MULTIPLE_CHOICE_ENABLED=true
             NEXT_PUBLIC_VIDEO_LESSONS_ENABLED=true
+      - name: Install verified Trivy release
+        run: bash deploy/scripts/install-trivy.sh
+
       - name: Scan runtime image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
+          version: v0.70.0
           image-ref: local/cove-${{ matrix.name }}:ci
           format: table
           severity: CRITICAL

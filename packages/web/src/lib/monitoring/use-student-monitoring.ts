@@ -3,6 +3,7 @@
 import {
   monitoringClientEvents,
   monitoringServerEvents,
+  watchStartedEventSchema,
   type StudentIndicatorState,
   type WatchEndedEvent,
   type WatchStartedEvent,
@@ -15,7 +16,6 @@ import type { TerminalTranscript } from '@/lib/workspace/terminal-transcript';
 import type { TerminalEvent } from '@/lib/workspace/use-python-runner';
 
 import { expiresWhenIdle } from './awareness/pointer-lifecycle';
-import { attachRemoteCursor, readCursor } from './awareness/remote-cursor';
 import { useAwareness } from './awareness/use-awareness';
 import { bindYTextToMonaco, type MonacoCodeEditor, type YjsMonacoBinding } from './yjs-monaco';
 import { useStudentPresence } from './student-presence';
@@ -74,7 +74,7 @@ export function useStudentMonitoring({
   onBeforeCollaborate,
   onAfterCollaborate,
   ready,
-  teacherLabel,
+  hasLocalEdits = true,
   terminal,
 }: {
   classId: string;
@@ -91,6 +91,8 @@ export function useStudentMonitoring({
    * would replace their work with an attempt they only looked at.
    */
   ready: boolean;
+  /** Only an unsaved student buffer may seed a fresh shared document. */
+  hasLocalEdits?: boolean;
   /**
    * Persists the local draft, so the server seeds the document from it.
    *
@@ -178,6 +180,9 @@ export function useStudentMonitoring({
    * in the meantime is undone.
    */
   const handedOffRef = React.useRef<Set<string>>(new Set());
+  const localEditsRef = React.useRef(hasLocalEdits);
+  const seedFromModelRef = React.useRef(hasLocalEdits);
+  React.useLayoutEffect(() => { localEditsRef.current = hasLocalEdits; }, [hasLocalEdits]);
 
   /* ------------------------------------------------------------- presence */
 
@@ -189,8 +194,7 @@ export function useStudentMonitoring({
    */
   React.useEffect(() => {
     if (!materialId || !courseId) return;
-    setOpenMaterial({ materialId, courseId, classId });
-    return () => setOpenMaterial(null);
+    return setOpenMaterial({ materialId, courseId, classId });
   }, [classId, courseId, materialId, setOpenMaterial]);
 
   /* -------------------------------------------------------- the lifecycle */
@@ -233,12 +237,13 @@ export function useStudentMonitoring({
   const identityRef = React.useRef(`${classId}:${materialId ?? ''}`);
   React.useLayoutEffect(() => {
     const identity = `${classId}:${materialId ?? ''}`;
-    if (identityRef.current === identity) return;
+    if (identityRef.current === identity && sessionRef.current.phase !== 'retired' && !docRef.current.isDestroyed) return;
+    const changedIdentity = identityRef.current !== identity;
     identityRef.current = identity;
     bindingRef.current?.destroy();
     bindingRef.current = null;
     syncedRef.current = false;
-    handedOffRef.current = new Set();
+    if (changedIdentity) handedOffRef.current = new Set();
     const replacement = new Y.Doc();
     const stale = docRef.current;
     docRef.current = replacement;
@@ -268,7 +273,7 @@ export function useStudentMonitoring({
     const editor = editorRef.current;
     if (
       bindingRef.current ||
-      !editor ||
+      !editor || !editor.getModel() ||
       !readyRef.current ||
       !syncedRef.current ||
       current.draftId === null ||
@@ -280,7 +285,7 @@ export function useStudentMonitoring({
     const firstHandoff = !handedOffRef.current.has(current.draftId);
     handedOffRef.current.add(current.draftId);
     bindingRef.current = bindYTextToMonaco(docRef.current.getText('code'), editor, {
-      seed: firstHandoff ? 'model' : 'text',
+      seed: firstHandoff && seedFromModelRef.current ? 'model' : 'text',
       pointerIdentity: { draftId: current.draftId, material: current.materialId },
     });
     publish({ ...current, phase: 'bound' });
@@ -297,7 +302,7 @@ export function useStudentMonitoring({
   React.useEffect(() => {
     if (!socket) return;
 
-    const onWatchStarted = (event: WatchStartedEvent) => {
+    const onWatchStarted = (event: WatchStartedEvent, resync = false) => {
       const current = sessionRef.current;
       // A watch is about one exercise in one class. An event naming anywhere
       // else describes a session this workspace is no longer in, and adopting
@@ -314,7 +319,7 @@ export function useStudentMonitoring({
       // Y.Doc the first teacher is actively editing, tear down the binding
       // under the student's cursor, and remount the statement they are
       // reading — all because somebody else opened a tab.
-      if (current.draftId === event.draftId && current.phase === 'bound') {
+      if (!resync && current.draftId === event.draftId && current.phase === 'bound') {
         // The summary that follows carries the authoritative indicator; this
         // is the optimistic half, so the student is not told "nobody" for the
         // width of a round trip.
@@ -325,6 +330,8 @@ export function useStudentMonitoring({
       }
 
       setIndicator(event.indicator);
+      if (current.draftId !== event.draftId || current.phase === 'local') seedFromModelRef.current = localEditsRef.current;
+      if (resync) { bindingRef.current?.destroy(); bindingRef.current = null; }
       // A different draft is a different document. Reusing this one would
       // merge two problems' histories and send the result to the server.
       if (current.draftId !== null && current.draftId !== event.draftId) {
@@ -474,7 +481,30 @@ export function useStudentMonitoring({
     socket.on(monitoringServerEvents.studentIndicator, onIndicator);
     socket.on(monitoringServerEvents.documentSynced, onSynced);
     socket.on(monitoringServerEvents.documentUpdated, onUpdated);
+    let active = true;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let bindingRequest = 0;
+    let bindingAttempts = 0;
+    const requestBinding = () => {
+      const current = sessionRef.current;
+      if (!active || !socket.connected || !academyId || !current.materialId || current.phase === 'retired') return;
+      clearTimeout(retry);
+      const request = ++bindingRequest;
+      const generation = current.generation;
+      socket.timeout(5000).emit(monitoringClientEvents.studentBindingFetch, { eventId: crypto.randomUUID(), academyId,
+        classId: current.classId, materialId: current.materialId }, (failure: Error | null, ack: { ok: boolean; data?: unknown; code?: string }) => {
+        if (!active || request !== bindingRequest || sessionRef.current.generation !== generation) return;
+        const parsed = watchStartedEventSchema.safeParse(ack?.data);
+        if (!failure && ack?.ok && parsed.success) { bindingAttempts = 0; onWatchStarted(parsed.data, true); }
+        else if ((failure || !ack?.ok) && !['MONITORING_DISABLED', 'MONITORING_ACCESS_DENIED'].includes(ack?.code ?? '') && bindingAttempts++ < 5) {
+          retry = setTimeout(requestBinding, Math.min(bindingAttempts, 5) * 1000);
+        }
+      });
+    };
+    socket.on('connect', requestBinding);
+    requestBinding();
     return () => {
+      active = false; clearTimeout(retry); socket.off('connect', requestBinding);
       socket.off(monitoringServerEvents.watchStarted, onWatchStarted);
       socket.off(monitoringServerEvents.watchEnded, onWatchEnded);
       socket.off(monitoringServerEvents.watchSummary, onWatchSummary);
@@ -482,7 +512,7 @@ export function useStudentMonitoring({
       socket.off(monitoringServerEvents.documentSynced, onSynced);
       socket.off(monitoringServerEvents.documentUpdated, onUpdated);
     };
-  }, [bindIfReady, onAfterCollaborate, onBeforeCollaborate, publish, socket]);
+  }, [academyId, classId, materialId, bindIfReady, onAfterCollaborate, onBeforeCollaborate, publish, socket]);
 
   /**
    * After a gap, ask rather than infer.
@@ -562,7 +592,7 @@ export function useStudentMonitoring({
   // is working, not supervising, and an arrow parked over their code says
   // somebody is following along when nobody may be.
   const draftId = session.draftId;
-  const { peers, remote, publishCursor } = useAwareness({
+  const { peers, remote } = useAwareness({
     draftId,
     peerOrigin: 'TEACHER',
     remoteCursor: expiresWhenIdle,
@@ -571,26 +601,6 @@ export function useStudentMonitoring({
   });
 
   const [editor, setEditor] = React.useState<MonacoCodeEditor | null>(null);
-  const remoteCursorRef = React.useRef<ReturnType<
-    typeof attachRemoteCursor
-  > | null>(null);
-
-  React.useEffect(() => {
-    // Nothing is drawn in the editor until a teacher is actually in the room;
-    // an unwatched student's editor is exactly the editor it always was.
-    if (!editor || !draftId) return;
-    const cursor = attachRemoteCursor(editor, teacherLabel, 'teacher');
-    remoteCursorRef.current = cursor;
-    return () => {
-      cursor.dispose();
-      remoteCursorRef.current = null;
-    };
-  }, [draftId, editor, teacherLabel]);
-
-  React.useEffect(() => {
-    remoteCursorRef.current?.update(remote.cursor);
-  }, [remote.cursor]);
-
   /**
    * Activity, whether or not anybody is watching.
    *
@@ -608,28 +618,6 @@ export function useStudentMonitoring({
       contentListener.dispose();
     };
   }, [editor, markActive]);
-
-  React.useEffect(() => {
-    if (!editor || !draftId) return;
-    const cursorListener = editor.onDidChangeCursorSelection((event) => {
-      publishCursor(readCursor(event.selection));
-    });
-    let frame = 0;
-    const contentListener = editor.onDidChangeModelContent(() => {
-      cancelAnimationFrame(frame);
-      // WebKit Monaco can apply text without a following cursor-selection
-      // event. Read after Monaco finishes the edit so the teacher receives
-      // the final column rather than the position before the keystroke.
-      frame = requestAnimationFrame(() => {
-        publishCursor(readCursor(editor.getSelection()));
-      });
-    });
-    return () => {
-      cancelAnimationFrame(frame);
-      cursorListener.dispose();
-      contentListener.dispose();
-    };
-  }, [draftId, editor, publishCursor]);
 
   /* ---------------------------------------------------------------- terminal */
 

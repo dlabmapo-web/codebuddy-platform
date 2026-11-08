@@ -52,9 +52,9 @@ export function CourseOutline({
   React.useEffect(() => {
     const classId = classContext.classId;
     if (!classId) return;
-    setOpenMaterial({ materialId: null, courseId, classId });
+    const release = setOpenMaterial({ materialId: null, courseId, classId });
     markActive();
-    return () => setOpenMaterial(null);
+    return release;
   }, [classContext.classId, courseId, markActive, setOpenMaterial]);
 
   // A deep-linked lecture is only in the DOM once its module is expanded, which

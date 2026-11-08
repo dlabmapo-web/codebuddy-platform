@@ -1,4 +1,5 @@
 import { StaffWorkspace } from "./_components/staff-workspace";
+import { ExerciseImageProvider } from '@/components/studio/lesson-image-providers';
 import { routes } from '@/lib/routes';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import type { LearnExerciseBootstrap } from '@cove/shared';
@@ -30,6 +31,18 @@ export default async function ExerciseWorkspacePage({
   const search = await searchParams;
   const submissionId = single(search.submission);
   const requestedClassId = single(search.classId);
+  // Started before the Turtle check rather than after it: the two reads are
+  // independent, and waiting for one before asking for the other doubled the
+  // time to first paint. A Turtle exercise still redirects below; its unused
+  // bootstrap answer (a refusal) is simply discarded.
+  const bootstrapRequest = createServerORPCClient().learn.getExerciseBootstrap({
+    academyId,
+    materialId,
+    ...(single(search.preview) === "true" ? { preview: true } : {}),
+    ...(single(search.mode) === "student" ? { mode: "student" as const } : {}),
+    ...(isUuid(requestedClassId) ? { classId: requestedClassId } : {}),
+    ...(isUuid(submissionId) ? { submissionId } : {}),
+  }).then((value): LearnExerciseBootstrap | null => value, () => null);
   if (!submissionId) {
     let destination: string | undefined;
     try {
@@ -50,22 +63,10 @@ export default async function ExerciseWorkspacePage({
   // One authorized read for the exercise and the course it sits in: the
   // navigator opens with the curriculum already in hand rather than showing a
   // loading panel on every entry. A requested attempt is loaded alongside it.
-  let bootstrap: LearnExerciseBootstrap | null = null;
-  try {
-    bootstrap = await createServerORPCClient().learn.getExerciseBootstrap({
-      academyId,
-      materialId,
-      ...(single(search.preview) === "true" ? { preview: true } : {}),
-      ...(single(search.mode) === "student" ? { mode: "student" as const } : {}),
-      ...(isUuid(requestedClassId) ? { classId: requestedClassId } : {}),
-      ...(isUuid(submissionId) ? { submissionId } : {}),
-    });
-  } catch {
-    // Unpublished, missing, and out-of-academy are all just "not here" to a
-    // student, and telling them apart would leak the existence of content they
-    // cannot see.
-    notFound();
-  }
+  // Unpublished, missing, and out-of-academy are all just "not here" to a
+  // student, and telling them apart would leak the existence of content they
+  // cannot see.
+  const bootstrap = await bootstrapRequest;
   if (!bootstrap) notFound();
 
   const staffPractice = bootstrap.access?.mode === "staff-practice";
@@ -103,14 +104,16 @@ export default async function ExerciseWorkspacePage({
       namespaces={exerciseNamespaces}
       resources={resources}
     >
-      {staffPractice ? <StaffWorkspace key={materialId} academyId={academyId} bootstrap={bootstrap} userId={user.id} /> : <Workspace
-        academyId={academyId}
-        bootstrap={bootstrap}
-        classId={bootstrap.classContext.classId!}
-        returnTo={returnTo}
-        submissionRequested={Boolean(submissionId)}
-        userId={user.id}
-      />}
+      <ExerciseImageProvider academyId={academyId} materialId={materialId} preview={staffPractice && (bootstrap.access?.preview ?? false)}>
+        {staffPractice ? <StaffWorkspace key={materialId} academyId={academyId} bootstrap={bootstrap} userId={user.id} /> : <Workspace
+          academyId={academyId}
+          bootstrap={bootstrap}
+          classId={bootstrap.classContext.classId!}
+          returnTo={returnTo}
+          submissionRequested={Boolean(submissionId)}
+          userId={user.id}
+        />}
+      </ExerciseImageProvider>
     </PageTranslationsProvider>
   );
 }

@@ -11,6 +11,7 @@ import {
 
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
+import { withCurriculum } from "./curriculum-read.js";
 
 /**
  * One course, shaped as an outline, for one person's progress.
@@ -38,11 +39,20 @@ export const visibleCurriculumInclude = {
           materials: {
             where: { isVisible: true },
             orderBy: [{ position: "asc" }, { id: "asc" }],
+            // Only what outlines, summaries and progress read. Exercise text,
+            // starter code, solutions and manual content are loaded by the
+            // workspace that shows them, not once per material of a course.
             include: {
-              programmingExercise: true,
-              manualMaterial: true,
-              videoLesson: { include: { asset: true } },
-              pdfDocument: { include: { asset: true } },
+              programmingExercise: { select: { difficulty: true, submissionPolicy: true, referencePdfMaterialId: true } },
+              manualMaterial: { select: { includeInScore: true, maximumHundredths: true } },
+              videoLesson: {
+                select: { assetId: true, revision: true, placement: true, includeInScore: true, maximumHundredths: true,
+                  asset: { select: { state: true, durationMs: true, filename: true, byteSize: true } } },
+              },
+              pdfDocument: {
+                select: { placement: true, revision: true,
+                  asset: { select: { state: true, originalFilename: true, byteSize: true, pageCount: true } } },
+              },
             },
           },
         },
@@ -82,9 +92,8 @@ export class CurriculumOutlineService {
   ): Promise<LearnCourseOutline | null> {
     const course = await this.prisma.course.findFirst({
       where: { id: courseId, academyId, isVisible: true },
-      include: visibleCurriculumInclude,
     });
-    return course ? this.outlineFor(course, userId) : null;
+    return course ? this.outlineFor(await withCurriculum(this.prisma, course), userId) : null;
   }
 
   /** The same fold, for a caller that already read the course graph. */

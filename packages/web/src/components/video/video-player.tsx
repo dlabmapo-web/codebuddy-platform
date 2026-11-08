@@ -1,4 +1,6 @@
 "use client";
+import { surfaceProps, anchorProps } from '@/lib/monitoring/awareness/surfaces';
+
 import Hls from "hls.js";
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
@@ -8,6 +10,7 @@ import type { VideoReadResult } from "@cove/shared";
 import { videoMediaBase } from "@/lib/video-api";
 import { useVideoProgress } from "./use-video-progress";
 import { VideoViewingProgress } from "./video-viewing-progress";
+import { useStudentPresence } from '@/lib/monitoring/student-presence';
 export function VideoPlayer({
   data,
   academyId,
@@ -16,6 +19,8 @@ export function VideoPlayer({
   resource = false,
   onEnd,
   onPlayback,
+  observing = false,
+  alignTo,
 }: {
   data: VideoReadResult;
   academyId: string;
@@ -24,8 +29,11 @@ export function VideoPlayer({
   resource?: boolean;
   onEnd?: () => void;
   onPlayback?: (playing: boolean) => void;
+  observing?: boolean;
+  alignTo?: { position: number; revision: number };
 }) {
   const { t } = useVideoTranslation();
+  const { publishObservation } = useStudentPresence();
   const element = useRef<HTMLVideoElement>(null),
     root = useRef<HTMLDivElement>(null),
     hls = useRef<Hls | null>(null),
@@ -54,7 +62,7 @@ export function VideoPlayer({
       assetId: data.asset.id,
       classId,
       enabled:
-        data.canTrack && !preview && Boolean(classId) && data.trackingAvailable,
+        data.canTrack && !preview && !observing && Boolean(classId) && data.trackingAvailable,
     },
     data.progress,
   );
@@ -76,6 +84,9 @@ export function VideoPlayer({
     seeking = false,
   ) => {
     const video = element.current;
+    if (video && !observing && !preview && data.canTrack) publishObservation(data.materialId, {
+      videoPosition: video.currentTime, videoState: video.ended ? 'ended' : isPlaying ? 'playing' : 'paused',
+    });
     if (video)
       watch.checkpoint({
         positionMs: Math.round(video.currentTime * 1000),
@@ -85,6 +96,7 @@ export function VideoPlayer({
       });
   };
   const sendRef = useRef(send);
+  useEffect(() => { if (alignTo && element.current) element.current.currentTime = alignTo.position; }, [alignTo]);
   useEffect(() => {
     sendRef.current = send;
   });
@@ -230,7 +242,7 @@ export function VideoPlayer({
                 : "relative aspect-video max-h-[max(8rem,calc(100dvh-16rem))] min-h-0 w-full"
           }
         >
-          <video
+          <video {...surfaceProps('video')} {...anchorProps('video:player')}
             ref={element}
             aria-label={data.title}
             playsInline
@@ -253,10 +265,10 @@ export function VideoPlayer({
                   resume,
                   Math.max(0, duration - 0.1),
                 );
-              if (ready && !preview && !resource)
+              if (ready && !preview && !resource && !observing)
                 void video.play().catch(() => undefined);
             }}
-            onTimeUpdate={() => setPosition(element.current?.currentTime ?? 0)}
+            onTimeUpdate={() => { setPosition(element.current?.currentTime ?? 0); if (!observing) send(); }}
             onVolumeChange={() => {
               if (element.current) {
                 setMuted(element.current.muted);

@@ -218,6 +218,8 @@ export class AcademyLibraryService {
     });
 
     const courseId = randomUUID();
+    // Prisma's default 5 s is too short for a large course's bulk inserts over
+    // the database link; the same budget the platform library import gives it.
     const created = await this.prisma.$transaction(async (tx) => {
       const course = await tx.course.create({
         data: {
@@ -254,7 +256,7 @@ export class AcademyLibraryService {
       });
 
       return course;
-    });
+    }, { maxWait: 5_000, timeout: 30_000 });
 
     const summary = await this.prisma.course.findUniqueOrThrow({
       where: { id: created.id },

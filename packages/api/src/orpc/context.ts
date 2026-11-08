@@ -1,3 +1,4 @@
+import type { StudentWorkHistoryService } from "../teach/student-work-history.service.js";
 import type { StaffPracticeService } from "../learn/staff-practice.service.js";
 import type { HelpRequestService } from "../monitoring/help-request.service.js";
 import { randomUUID, timingSafeEqual } from "node:crypto";
@@ -104,6 +105,7 @@ export type ORPCDeps = {
   profileService: ProfileService;
   academyProfileService: AcademyProfileService;
   teacherProgressService: TeacherProgressService;
+  studentWorkHistoryService: StudentWorkHistoryService;
   teacherOverviewService: TeacherOverviewService;
   teamLeadOverviewService: TeamLeadOverviewService;
   teacherRosterService: TeacherRosterService;

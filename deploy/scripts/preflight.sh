@@ -224,7 +224,7 @@ if feature_enabled GUI_ENABLED; then
 fi
 (( available_kb >= reserved_available_kb )) || fail "insufficient available memory for application headroom and enabled learning runtimes"
 cpu_count="$(getconf _NPROCESSORS_ONLN)"
-(( cpu_count >= 6 )) || fail "production requires at least 6 online CPU cores"
+(( cpu_count >= 4 )) || fail "production requires at least 4 online CPU cores"
 available_disk_kb="$(df -Pk "$deploy_root" | awk 'NR==2 {print $4}')"
 (( available_disk_kb >= 20 * 1024 * 1024 )) || fail "less than 20 GB disk is currently available"
 

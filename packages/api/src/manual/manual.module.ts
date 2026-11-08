@@ -1,3 +1,5 @@
+import { TeachModule } from "../teach/teach.module.js";
+import { ReviewExecutionService } from "./review-execution.service.js";
 import { ManualPracticeService } from "./manual-practice.service.js";
 import { MultipleChoiceService } from "./multiple-choice.service.js";
 import { ShortAnswerService } from "./short-answer.service.js";
@@ -11,12 +13,13 @@ import { ManualController } from "./manual.controller.js";
 import { ManualService } from "./manual.service.js";
 import { GuiClientService } from "./gui-client.service.js";
 @Module({
-  imports: [PointsModule, AcademiesModule, AuthModule, AuthorizationModule],
+  imports: [TeachModule, PointsModule, AcademiesModule, AuthModule, AuthorizationModule],
   controllers: [ManualController],
   providers: [
     ShortAnswerService,
     MultipleChoiceService,
     ManualService,
+    ReviewExecutionService,
     ManualPracticeService,
     GuiClientService,
     ManualAssetsService,

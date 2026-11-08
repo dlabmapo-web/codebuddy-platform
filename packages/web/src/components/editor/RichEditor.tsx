@@ -3,6 +3,7 @@
 import { ChoiceSelector } from '@/components/studio/choice-selector';
 import { useEditorTranslation } from './use-editor-translation';
 import { usePrivateImageResolver } from './private-image-context';
+import { LessonImageError, prepareLessonImage } from '@/lib/lesson-images';
 import { useEditor, EditorContent, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -23,7 +24,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import {
   Bold, Italic, UnderlineIcon, Strikethrough, AlignLeft, AlignCenter, AlignRight,
   List, ListOrdered, Table as TableIcon, ImageIcon, Link as LinkIcon,
-  Minus, Highlighter, Type, Undo, Redo, Paperclip,
+  Minus, Highlighter, Type, Undo, Redo,
   ArrowDownToLine, ArrowUpToLine, ArrowLeftToLine, ArrowRightToLine,
   Trash2, TableCellsMerge, TableCellsSplit,
 } from 'lucide-react';
@@ -190,7 +191,6 @@ const COLORS = ['#16181D', '#DC2626', '#D97706', '#16A34A', '#1B64DA', '#7C3AED'
 export function RichEditor({ value, onChange, onImageUpload, placeholder, minHeight = 280 }: Props) {
   const { t } = useEditorTranslation();
   const editorPlaceholder = placeholder ?? t('placeholder');
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [uploadError,setUploadError]=useState("");
   const [inTable, setInTable] = useState(false);
@@ -240,37 +240,27 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder, minHei
     }
   }, [value, editor]);
 
-  const uploadFile = useCallback(async (file: File, asImage: boolean) => {
-    if (!editor) return;
-    if (onImageUpload) {
-      if (asImage) editor.chain().focus().setImage({src:await onImageUpload(file),alt:file.name}).run();
-      return;
-    }
-    const fd = new FormData();
-    fd.append('file', file);
-    const res = await fetch('/api/uploads', { method: 'POST', body: fd });
-    const json = await res.json();
-    if (!json.url) return;
-    if (asImage) {
-      editor.chain().focus().setImage({ src: json.url, alt: file.name }).run();
-    } else {
-      editor.chain().focus().insertContent(
-        `<a href="${json.url}" target="_blank" rel="noopener noreferrer">${json.name}</a>`
-      ).run();
-    }
+  // Only an editor given an uploader can take pictures; v2 has no generic upload route.
+  const uploadImage = useCallback(async (file: File) => {
+    if (!editor || !onImageUpload) return;
+    // A laptop photo is shrunk and a non-ASCII name made safe before upload;
+    // the original name stays as the alt text.
+    const prepared = await prepareLessonImage(file);
+    editor.chain().focus().setImage({ src: await onImageUpload(prepared), alt: file.name }).run();
   }, [editor, onImageUpload]);
 
   const handleImageChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {try {setUploadError("");await uploadFile(file, true);}catch(e){setUploadError(e instanceof Error?e.message:t("image_upload_failed"));}}
+    if (file) {
+      try { setUploadError(""); await uploadImage(file); }
+      catch (error) {
+        setUploadError(error instanceof LessonImageError
+          ? t(error.reason === 'too-large' ? 'image_too_large' : 'image_too_large_unshrinkable')
+          : error instanceof Error ? error.message : t("image_upload_failed"));
+      }
+    }
     e.target.value = '';
-  }, [uploadFile, t]);
-
-  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) await uploadFile(file, false);
-    e.target.value = '';
-  }, [uploadFile]);
+  }, [uploadImage, t]);
 
   const setLink = useCallback(() => {
     const url = window.prompt(t('link_prompt'));
@@ -347,8 +337,7 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder, minHei
           <TableIcon size={14} />
         </ToolBtn>
         <ToolBtn onClick={setLink} active={editor.isActive('link')} title={t('insert_link')}><LinkIcon size={14} /></ToolBtn>
-        <ToolBtn onClick={() => imageInputRef.current?.click()} title={t('attach_image')}><ImageIcon size={14} /></ToolBtn>
-        {!onImageUpload && <ToolBtn onClick={() => fileInputRef.current?.click()} title={t('attach_file')}><Paperclip size={14} /></ToolBtn>}
+        {onImageUpload && <ToolBtn onClick={() => imageInputRef.current?.click()} title={t('attach_image')}><ImageIcon size={14} /></ToolBtn>}
       </div>
 
       {/* ── Table Context Toolbar ─────────────────────────────────────────── */}
@@ -411,8 +400,7 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder, minHei
       )}
 
       {uploadError?<p role="alert">{uploadError}</p>:null}
-      <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-      <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
+      {onImageUpload && <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp,image/svg+xml,.png,.jpg,.jpeg,.gif,.webp,.avif,.bmp,.svg" className="hidden" onChange={handleImageChange} />}
 
       <div className="bg-card">
         <EditorContent editor={editor} />

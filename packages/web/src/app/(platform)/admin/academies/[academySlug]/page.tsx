@@ -29,14 +29,10 @@ export default async function PlatformAcademyPage({
   const { t } = await getServerTranslation(['platform']);
   const { academyId } = await requirePlatformAcademyRoute(academySlug);
   const client = createServerORPCClient();
-  const academy = await client.platformAcademies
-    .get({ academyId })
-    .catch(() => null);
-  if (!academy) notFound();
-
   // The first page of each, for the panels. The full lists live in the
   // console's own directories, which these link to once there are more.
-  const [courses, classes, pointsEnabled] = await Promise.all([
+  // Requested beside the academy read; each already settles to a fallback.
+  const panels = Promise.all([
     client.platformContent
       .courses({ academyIds: [academyId], pageSize: 6 })
       .catch(() => null),
@@ -45,6 +41,12 @@ export default async function PlatformAcademyPage({
       .catch(() => null),
     academyPointsEnabled(academyId),
   ]);
+  const academy = await client.platformAcademies
+    .get({ academyId })
+    .catch(() => null);
+  if (!academy) notFound();
+
+  const [courses, classes, pointsEnabled] = await panels;
 
   return (
     <PlatformShell

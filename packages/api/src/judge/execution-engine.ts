@@ -39,6 +39,13 @@ export type ExecutionResult = {
 export interface ExecutionEngine {
   /** Recorded on every submission so a runtime upgrade stays auditable. */
   readonly version: string;
+  /**
+   * How much slower than native CPython this engine runs student code; 1 when
+   * absent. Limits are authored in native time, so a scaled engine takes
+   * `limit × timeScale` and reports runtimes ÷ timeScale (`time-scaled-engine.ts`),
+   * and callers convert wall-clock deadlines with the same factor.
+   */
+  readonly timeScale?: number;
   run(request: ExecutionRequest): Promise<ExecutionResult>;
   dispose(): Promise<void>;
 }

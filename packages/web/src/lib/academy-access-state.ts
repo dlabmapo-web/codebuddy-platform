@@ -6,6 +6,7 @@ import type {
 import { roleCanMonitor, rolesHavePermission } from '@cove/shared';
 
 import { routes } from '@/lib/routes';
+import { academyEntryPath } from '@/lib/academy-entry';
 
 type Membership = AuthUser['memberships'][number];
 type Application = AuthUser['applications'][number];
@@ -96,13 +97,8 @@ export function authDestination(account: AuthMeResponse): string {
   if (!account.user.username) return routes.welcome;
   const state = resolveAcademyAccessState(account);
   if (state.kind === 'active') {
-    const { academy } = state.membership;
-    // Every role lands on the academy root, which answers to each of them
-    // differently: a teaching overview, a control tower, or — since the
-    // student overview shipped — the work that student left open. Sending a
-    // student past it to the catalog would skip the one section that knows
-    // which problem they were in the middle of.
-    return routes.academy(academy.slug);
+    const { academy, role } = state.membership;
+    return academyEntryPath(academy.slug, role);
   }
   // A platform operator belongs to no academy — that is the design, not an
   // incomplete signup — so every screen below this line would tell them to ask

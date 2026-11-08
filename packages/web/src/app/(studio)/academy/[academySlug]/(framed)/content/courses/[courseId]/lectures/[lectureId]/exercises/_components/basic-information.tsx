@@ -30,11 +30,14 @@ export function BasicInformation({
   authoring,
   draft,
   editable,
+  onImageUpload,
   update,
 }: {
   authoring: ExerciseAuthoring;
   draft: ExerciseDraft;
   editable: boolean;
+  /** Stores a picture privately for this course and returns its `cove-asset:` source. */
+  onImageUpload?: (file: File) => Promise<string>;
   update: ExerciseDraftUpdate;
 }) {
   const { t } = useTranslation(['content', 'pdf-practice']);
@@ -56,6 +59,7 @@ export function BasicInformation({
           >
             <RichEditor
               onChange={(description) => update('description', description)}
+              onImageUpload={onImageUpload}
               placeholder={t('exercise.placeholder.description')}
               value={draft.description}
             />

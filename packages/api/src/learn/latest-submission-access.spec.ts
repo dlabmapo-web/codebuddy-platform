@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { LearnService } from './learn.service.js';
 
+vi.mock("./curriculum-read.js", () => ({
+  // Unit fixtures already carry each course's hierarchy, as the include did;
+  // the one-statement reader itself is proven against Prisma by
+  // curriculum-read.integration.spec.ts.
+  withCurriculum: async (_db: unknown, course: unknown) => course,
+  withCurricula: async (_db: unknown, courses: unknown) => courses,
+}));
+
 function fixture(role = 'STUDENT', via = 'membership') {
   const db = { material: { findFirst: vi.fn().mockResolvedValue({ id: 'material', type: 'PROGRAMMING_EXERCISE', programmingExercise: {}, lecture: { courseModule: { course: { id: 'course' } } } }) },
     submission: { findFirst: vi.fn().mockResolvedValue({ id: 'newest', createdAt: new Date('2026-10-23'), status: 'FAILED', score: 0 }) } };

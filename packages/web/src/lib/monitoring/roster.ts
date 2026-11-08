@@ -63,9 +63,8 @@ export function mergeRoster(
       active,
       // A suspended member is on the roster so the teacher can see why they
       // are unreachable, but they are never openable.
-      // The live code editor only supports the coding materials returned by
-      // the roster. Manual quizzes/answers still count as solving, but use
-      // their own Tutoring surface rather than a programming draft.
+      // Every observable material is named by the authorized class curriculum.
+      // Opening it starts a student watch; code editing is a separate grant.
       canOpenLive: active && materialId !== null && byMaterial.has(materialId) && canOpenLiveWorkspace({ state, materialId }),
     };
   });

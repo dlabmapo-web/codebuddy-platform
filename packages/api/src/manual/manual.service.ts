@@ -53,9 +53,9 @@ import {
   nextMaterialPosition,
   compactMaterialPositions,
 } from "../content/content-positions.js";
-import { visibleCurriculumInclude } from "../learn/curriculum-outline.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { GuiClientService } from "./gui-client.service.js";
+import { withCurricula, withCurriculum } from "../learn/curriculum-read.js";
 type Target = { academyId: string; materialId: string };
 @Injectable()
 export class ManualService {
@@ -420,8 +420,7 @@ export class ManualService {
     const [outline, draft, attempts, classes, tutoringClasses] = await Promise.all([
       this.db.course.findUnique({
         where: { id: row.lecture.courseModule.course.id },
-        include: visibleCurriculumInclude,
-      }),
+      }).then((found) => found && withCurriculum(this.db, found)),
       staffPractice || config.shortAnswer || config.multipleChoice
         ? Promise.resolve(null)
         : this.db.manualDraft.findUnique({
@@ -830,6 +829,7 @@ export class ManualService {
           where: { submissionId: existing.id, status: "ERROR" },
           data: { status: "PENDING" },
         });
+        this.shortAnswers.requestDrain();
       }
       return { submissionId: existing.id };
     }
@@ -952,6 +952,8 @@ export class ManualService {
         }
         throw error;
       });
+    // Grade now rather than at the worker's next recovery tick.
+    if (config.shortAnswer) this.shortAnswers.requestDrain();
     return { submissionId: submission.id };
   }
   capabilities() {
@@ -1011,30 +1013,41 @@ export class ManualService {
         },
         include: {
           multipleChoiceAssessment: true,
+          shortAnswerAssessment: true,
           reviews: { orderBy: { version: "desc" } },
         },
       });
-      if (!attempt?.multipleChoiceAssessment || !input.classId)
-        throw new NotFoundException();
+      if (!attempt || !input.classId) throw new NotFoundException();
       if (!input.preview)
         await this.explanation(identity, {
           ...input,
           classId: input.classId,
           submissionId: input.submissionId,
         });
-      const definition = multipleChoiceSchema.parse(
-        attempt.multipleChoiceAssessment.definition,
-      );
-      publicHtml = [
-        definition.problemDescription,
-        ...definition.options.map((o) => o.content),
-        (attempt.profile as { description?: string }).description ?? "",
-      ];
-      if (
-        effectiveManualResult(attempt)?.completed &&
-        definition.explanationEnabled
-      )
-        privateHtml = definition.explanation;
+      if (attempt.multipleChoiceAssessment) {
+        const definition = multipleChoiceSchema.parse(
+          attempt.multipleChoiceAssessment.definition,
+        );
+        publicHtml = [
+          definition.problemDescription,
+          ...definition.options.map((o) => o.content),
+          (attempt.profile as { description?: string }).description ?? "",
+        ];
+        if (
+          effectiveManualResult(attempt)?.completed &&
+          definition.explanationEnabled
+        )
+          privateHtml = definition.explanation;
+      } else {
+        // A short answer shows its frozen instructions, and its explanation
+        // only once the attempt is completed, as `explanation` does.
+        publicHtml = [(attempt.profile as { description?: string }).description ?? ""];
+        const definition = attempt.shortAnswerAssessment
+          ? shortAnswerSchema.parse(attempt.shortAnswerAssessment.definition)
+          : null;
+        if (definition?.explanationEnabled && effectiveManualResult(attempt)?.completed)
+          privateHtml = definition.explanation;
+      }
     } else if (config.multipleChoice) {
       const definition = multipleChoiceSchema.parse(config.multipleChoice);
       publicHtml = [
@@ -1043,6 +1056,12 @@ export class ManualService {
         ...definition.options.map((o) => o.content),
       ];
       if (input.preview) privateHtml = definition.explanation;
+    } else {
+      // Written, Turtle and short-answer instructions. A short answer's
+      // explanation is private until completion, so only a reviewer previews it.
+      publicHtml = [config.description];
+      if (input.preview && config.shortAnswer)
+        privateHtml = shortAnswerSchema.parse(config.shortAnswer).explanation;
     }
     if (
       ![...publicHtml, privateHtml].some((html) =>
@@ -1050,13 +1069,9 @@ export class ManualService {
       )
     )
       throw new NotFoundException();
-    const asset = await this.db.manualAsset.findUnique({
-      where: { id: input.assetId },
-    });
-    if (!asset?.mimeType.startsWith("image/")) throw new NotFoundException();
-    return {
-      url: `data:${asset.mimeType};base64,${await this.assets.bytes(input.assetId)}`,
-    };
+    const url = await this.assets.imageDataUrl(input.assetId);
+    if (!url) throw new NotFoundException();
+    return { url };
   }
   async matchingPreview(
     identity: SupabaseIdentity,
@@ -1135,6 +1150,7 @@ export class ManualService {
       where: { submissionId: input.submissionId, status: "ERROR" },
       data: { status: "PENDING" },
     });
+    this.shortAnswers.requestDrain();
     return { submissionId: input.submissionId };
   }
   private reviewScope(actor: AcademyAccess, academyId: string) {
@@ -1195,14 +1211,13 @@ export class ManualService {
     const where = this.reviewScope(actor, input.academyId);
     const row = await this.db.class.findFirst({
       where: { id: input.classId, ...where },
-      include: {
-        courseAssignments: {
-          include: { course: { include: visibleCurriculumInclude } },
-        },
-      },
+      include: { courseAssignments: { include: { course: true } } },
     });
     if (!row) throw new NotFoundException();
-    return row.courseAssignments.flatMap((a) =>
+    // Every assigned course's hierarchy in one statement.
+    const courses = await withCurricula(this.db, row.courseAssignments.map((a) => a.course));
+    const assignments = row.courseAssignments.map((a, index) => ({ ...a, course: courses[index]! }));
+    return assignments.flatMap((a) =>
       a.course.modules.flatMap((m) =>
         m.lectures.flatMap((l) =>
           l.materials

@@ -1,5 +1,6 @@
 'use client';
 
+import { surfaceProps, anchorProps } from '@/lib/monitoring/awareness/surfaces';
 import { CheckCheck, MessageSquareText, Send, PenLine, X, ListChecks, CircleCheck, CircleX, Clock3 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useId, type FormEvent, type ReactNode } from 'react';
@@ -34,16 +35,16 @@ export function AssessmentStatus({ label, completed }: { label: string; complete
   return <span role="status" className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${completed === true ? 'border-success/20 bg-success/10 text-success' : completed === false ? 'border-warning/20 bg-warning/10 text-warning' : 'border-brand/20 bg-brand-soft text-brand'}`}><Icon aria-hidden className="size-4 shrink-0" />{label}</span>;
 }
 
-export function WrittenAnswerCard({ question, hint, answer, disabled, onChange }: {
-  question?: string; hint?: string; answer: string; disabled?: boolean; onChange: (answer: string) => void;
+export function WrittenAnswerCard({ question, hint, answer, disabled, readOnly, answerLabel, onChange }: {
+  question?: string; hint?: string; answer: string; disabled?: boolean; readOnly?: boolean; answerLabel?: string; onChange: (answer: string) => void;
 }) {
   const { t } = useManualTranslation();
   const id = useId();
-  return <div className="p-5 sm:p-6">
+  return <div {...surfaceProps('answer')} className="p-5 sm:p-6">
     <h2 id={`${id}-question`} className="mb-6 flex items-start gap-3 text-base font-bold leading-7"><span aria-hidden className="text-lg font-extrabold text-brand">Q.</span>{question || t('your_answer')}</h2>
     <label htmlFor={id} className="mb-2 flex items-center gap-2 text-xs font-semibold text-sub"><PenLine aria-hidden className="size-3.5" />{t('ui.write_answer')}</label>
     {hint ? <p id={`${id}-hint`} className="mb-3 text-sm leading-relaxed text-sub">{hint}</p> : null}
-    <textarea id={id} aria-label={t('your_answer')} aria-describedby={hint ? `${id}-hint` : undefined}
+    <textarea {...anchorProps('answer:response')} id={id} readOnly={readOnly} aria-label={answerLabel ?? t('your_answer')} aria-describedby={hint ? `${id}-hint` : undefined}
       className="min-h-44 w-full resize-y rounded-md border border-border bg-canvas p-4 text-base leading-7 outline-none transition-shadow placeholder:text-sub/60 focus:border-brand focus:ring-2 focus:ring-brand/15 disabled:opacity-60 sm:min-h-48"
       placeholder={hint || t('ui.answer_placeholder')} maxLength={10000} disabled={disabled} value={answer} onChange={e => onChange(e.target.value)} />
     <p className="mt-2 text-right text-xs tabular-nums text-sub">{t('ui.characters', { count: answer.length, maximum: 10000 })}</p>

@@ -7,6 +7,7 @@ import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.
 import { privateSolutions, replaceExerciseSolutions, solutionOrder } from "./exercise-solutions.js";
 import type { ExerciseSolutionEntry } from "@cove/shared";
 import { validatePdfReference, assertPublishedPdfReferences, detachSubtreePdfReferences } from "../documents/pdf-reference.js";
+import { assertLessonImages } from "./lesson-images.js";
 import { lockLibraryTitles, assertLibraryTitleAvailable } from "./library/library-title-lock.js";
 import {videoMetadata} from "../videos/video-metadata.js";
 import { pdfMetadata } from "../documents/pdf-metadata.js";
@@ -1266,6 +1267,7 @@ export class CourseService {
     const record = await this.prisma.$transaction(async (tx) => {
       await lockCourse(tx, input.courseId);
       await validatePdfReference(tx, input, input.referencePdfMaterialId);
+      await assertLessonImages(tx, { academyId: input.academyId, courseId: input.courseId, html: input.description });
       const position = await nextMaterialPosition(tx, input.lectureId);
       const material = await tx.material.create({
         data: {
@@ -1360,6 +1362,7 @@ export class CourseService {
       await lockCourse(tx, input.courseId);
       const latest = await tx.programmingExercise.findUniqueOrThrow({ where: { materialId: current.id } });
       await validatePdfReference(tx, input, input.referencePdfMaterialId === undefined ? latest.referencePdfMaterialId : input.referencePdfMaterialId, input.isVisible);
+      await assertLessonImages(tx, { academyId: input.academyId, courseId: input.courseId, html: input.description, previousHtml: latest.description });
       const claimed = await tx.programmingExercise.updateMany({
         where: {
           materialId: current.id,

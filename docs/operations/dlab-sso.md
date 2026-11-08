@@ -2,6 +2,8 @@
 Design: [automatic student/staff SSO](../superpowers/specs/2026-10-21-dlab-os-automatic-student-staff-sso-design.md).
 Implementation branch: `feat/dlab-os-staff-sso`. Deployment and real HQ testing must be recorded separately from local test results.
 
+Multi-campus provisioning is described in [the multi-campus rollout guide](dlab-multicampus-sso.md). It adds a default-off API provisioning flag and a separate catch-up command; receiving campus metadata alone does not activate an academy. Follow that guide for explicit existing-academy links and automatic creation for new HQ campuses.
+
 ## What happens
 
 HQ creates the account in OS. The person signs into `https://os.dlabcampus.com/`, then opens the Cove card or staff shortcut. GET `https://cs.coveedu.com/sso/start` redirects to OS authorization. Cove's callback exchanges the one-use code on the API server using Basic client authentication and creates/reuses the managed Cove account, memberships and normal Supabase session. No Cove signup, application or password copying is required.

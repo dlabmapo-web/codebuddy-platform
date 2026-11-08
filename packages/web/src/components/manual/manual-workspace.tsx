@@ -1,7 +1,9 @@
 'use client';
 
+import { TerminalLines } from './terminal-lines';
+import { anchorProps, surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import { Send, Save, BookOpen, History, MessageSquareText, ListChecks, FileCode2, Play, Square, Terminal, Turtle, Expand } from 'lucide-react';
-import { useStudentPresence } from '@/lib/monitoring/student-presence';
+import { useMaterialObservation, StudentObservationIndicator } from '@/lib/monitoring/use-material-observation';
 import { LessonHeader, LessonFooter } from '@/components/workspace/lesson-chrome';
 import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-navigator';
 import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
@@ -24,10 +26,12 @@ import {
 import { useManualTranslation } from "./use-manual-translation";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { effectiveManualResult, type ManualSession } from "@cove/shared";
+import { effectiveManualResult, type ManualSession, type ManualWorkspace as ManualWorkspaceData } from "@cove/shared";
 import { manualApi } from "@/lib/manual-api";
+import { claimServerRead, SERVER_READ_FRESH_MS } from "@/lib/server-read";
 import { CodeEditor } from "@/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/code-editor";
 import { RichTextFrame } from "@/components/studio/rich-text-frame";
+import { ManualImageProvider } from "@/components/studio/lesson-image-providers";
 import { GuiViewer } from "./gui-viewer";
 import { AddSourceFile } from './add-source-file';
 import { Button } from '@/components/studio/button';
@@ -42,24 +46,34 @@ export function ManualWorkspace({
   userId,
   classId,
   preview = false,
+  initialWorkspace,
 }: {
   academyId: string;
   materialId: string;
   userId: string;
   classId?: string;
   preview?: boolean;
+  /** The server render's read of this activity, used once (see claimServerRead). */
+  initialWorkspace?: { workspace: ManualWorkspaceData; token: string } | null;
 }) {
   const { t: mt } = useManualTranslation();
   const { t: pt } = usePracticeTranslation();
   const router = useRouter();
   const { t: lt } = useLayoutTranslation('learn');
   const [deliveryClass, setDeliveryClass] = useState(classId);
+  const [serverRead] = useState(() =>
+    initialWorkspace && claimServerRead(initialWorkspace.token) ? initialWorkspace.workspace : undefined);
   const target = { academyId, materialId };
   const query = useQuery({
     queryKey: ["manual", userId, academyId, materialId, preview, deliveryClass],
     queryFn: () =>
       manualApi.read({ ...target, preview, classId: deliveryClass }),
-    retry: false, staleTime: 0, refetchOnWindowFocus: true,
+    // The server already read this activity for this render; repeating the
+    // read on mount only delayed everything that depends on it. Another class
+    // choice, a replayed payload or the next refetch reads as before.
+    initialData: () => (deliveryClass === classId ? serverRead : undefined),
+    staleTime: (current) => serverRead && current.state.dataUpdateCount === 0 ? SERVER_READ_FRESH_MS : 0,
+    retry: false, refetchOnWindowFocus: true,
   });
   const data = query.data;
   const short = data?.config.shortAnswer;
@@ -70,6 +84,8 @@ export function ManualWorkspace({
   const [loadedInstructions, setLoadedInstructions] = useState("");
   const [files, setFiles] = useState<Record<string, string>>({});
   const [answer, setAnswer] = useState("");
+  const [observedDrawing, setObservedDrawing] = useState<string | null>(null);
+  const onObservedFrame = useCallback((frame: string) => setObservedDrawing(frame.length <= 700000 ? frame : null), []);
   const [selected, setSelected] = useState("main.py");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -263,14 +279,13 @@ export function ManualWorkspace({
     }
     if (href) router.push(href); else if (id) navigation.navigate(id);
   }
-  const { setOpenMaterial } = useStudentPresence();
   const presenceCourseId = !preview && !data?.practice ? data?.course.id : undefined;
-  useEffect(() => {
-    if (!presenceCourseId || !selectedClass) return;
-    setOpenMaterial({ materialId, courseId: presenceCourseId, classId: selectedClass });
-    return () => setOpenMaterial(null);
-  }, [materialId, presenceCourseId, selectedClass, setOpenMaterial]);
+  const observation = useMaterialObservation({ materialId, courseId: presenceCourseId, classId: selectedClass, enabled: Boolean(presenceCourseId),
+    work: choice ? { choices: choiceSelected } : data?.type === 'TURTLE_EXERCISE'
+      ? { files, activeFile: selected, entryPoint: data.config.entryPoint, execution: preparing ? 'STARTING' : session?.state ?? 'READY', output: preparing ? '' : (session?.output ?? '').slice(-64000), drawing: observedDrawing }
+      : { answer } });
   async function run(solution = false) {
+    setObservedDrawing(null);
     setSolutionRun(solution);
     const current = ++generation.current;
     setBusy(true);
@@ -500,10 +515,12 @@ export function ManualWorkspace({
                   }}
                 />
               ) : (
-                <RichTextFrame
-                  content={explanation.data.explanation}
-                  title={mt("explanation")}
-                />
+                <ManualImageProvider scope={{ ...target, classId: selectedClass, submissionId: attempt?.id }}>
+                  <RichTextFrame
+                    content={explanation.data.explanation}
+                    title={mt("explanation")}
+                  />
+                </ManualImageProvider>
               )}
             </section>
           ) : null}</>;
@@ -513,6 +530,7 @@ export function ManualWorkspace({
         leaveHref={navigation.courseHref}
         curriculum={<CurriculumTrigger compact ref={triggerRef} open={panelOpen} panelId={panelId} onToggle={togglePanel} path={navigation.context?.path ?? null} />}>
         {data.practice ? <span className="hidden rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand sm:inline-flex">{pt('label')}</span> : null}
+        <StudentObservationIndicator materialId={materialId} classId={selectedClass} />
         <ManualStaffActions academyId={academyId} data={data} classId={selectedClass} onRunSolution={preview && drawing ? () => void run(true) : undefined} runDisabled={busy || Boolean(running)} />
       </LessonHeader>
       {preview ? <p role="note" className={`flex shrink-0 items-center gap-2 border-b border-brand/15 bg-brand-soft px-5 text-brand ${drawing ? "py-1.5 text-xs" : "py-3 text-sm"}`}><BookOpen aria-hidden className="size-4 shrink-0" />{mt(data.practice ? "ui.preview_practice_notice" : "ui.preview_notice")}</p> : null}
@@ -538,7 +556,7 @@ export function ManualWorkspace({
         <ListChecks aria-hidden className="size-4" />{mt(choice || (short && short.gradingMode !== 'MANUAL') ? 'automatic_graded' : 'teacher_graded').replace(/\s*·\s*$/, '')} · {mt(data.config.includeInScore ? 'included_in_score' : 'excluded_from_score')}
       </div>
       <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${drawing ? "md:flex-row" : "gap-4 overflow-y-auto p-4 sm:p-6 md:flex-row md:overflow-hidden md:p-8"}`}>
-        <aside
+        <aside {...surfaceProps('statement')}
           className={
             !showInstructions
               ? "hidden"
@@ -552,10 +570,10 @@ export function ManualWorkspace({
               scope={{ ...target, classId: selectedClass, preview }}
             />
           ) : (
-            <RichTextFrame
+            <div {...anchorProps('statement:instructions')}><ManualImageProvider scope={{ ...target, classId: selectedClass, preview }}><RichTextFrame
               content={data.config.description}
               title={mt("activity_instructions")}
-            />
+            /></ManualImageProvider></div>
           )}
           {preview && data.config.modelAnswer ? (
             <details className="mt-6 rounded-xl border border-border bg-canvas/60 p-4">
@@ -587,8 +605,8 @@ export function ManualWorkspace({
                   setDirty(true); setSaved(mt('unsaved_changes'));
                 }} /></div>
               </div>
-              <div className={styles.editor}>
-                <CodeEditor
+              <div className={styles.editor} {...surfaceProps('editor')}>
+                <CodeEditor onMount={observation.onEditorMount}
                   code={files[selected] ?? ""}
                   fontSize={14}
                   onChange={(value) => {
@@ -600,7 +618,7 @@ export function ManualWorkspace({
               </div>
             </>
           ) : loadedChoice ? (
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div {...surfaceProps('answer')} className="min-h-0 flex-1 overflow-y-auto">
               <ChoiceOptions
                 definition={loadedChoice}
                 selected={choiceSelected}
@@ -740,10 +758,10 @@ export function ManualWorkspace({
               <WorkspaceResizeHandle value={editorShare} onChange={setEditorShare} />
               <div className={styles.results}>
                 <div
-                  className={styles.drawing}
+                  className={styles.drawing} {...surfaceProps('drawing')}
                 >
                   {session ? (
-                    <GuiViewer key={session.id} session={session} onError={showError} onStop={() => void stop()} layout={drawingLayout} onLayoutChange={setDrawingLayout} />
+                    <GuiViewer key={session.id} session={session} onError={showError} onFrame={onObservedFrame} onStop={() => void stop()} layout={drawingLayout} onLayoutChange={setDrawingLayout} />
                   ) : (
                     <div className="flex min-h-0 flex-1 flex-col bg-white">
                       <div className="flex min-h-11 shrink-0 items-center gap-1 border-b border-border bg-card px-3 text-xs">
@@ -758,7 +776,7 @@ export function ManualWorkspace({
                   )}
                 </div>
                 <section
-                  className={`${styles.terminal} bg-editor-bg text-white`}
+                  className={`${styles.terminal} bg-editor-bg text-white`} {...surfaceProps('terminal')}
                   aria-label={mt("terminal")}
                 >
                   <div className="flex min-h-11 shrink-0 items-center gap-2 border-b border-white/10 px-3 text-xs font-semibold text-white/65"><Terminal aria-hidden className="size-3.5" />{mt("terminal")}</div>
@@ -766,7 +784,7 @@ export function ManualWorkspace({
                     className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap p-3 font-mono text-xs leading-relaxed"
                     data-testid="turtle-terminal"
                   >
-                    {session?.output || (!session ? mt("code_not_run") : "")}
+                    <TerminalLines output={session?.output || (!session ? mt("code_not_run") : "")} />
                   </pre>
                   <form
                     onSubmit={(e) => {

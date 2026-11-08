@@ -305,7 +305,17 @@ export class CollaborationDocumentService implements OnModuleInit, OnModuleDestr
         );
       }
       const plain = toSharedDocumentText(stored);
-      if (plain.length > 0) doc.getText(codeField).insert(0, plain);
+      if (plain.length > 0) {
+        // Before the first flush, two API processes can load the same plain
+        // draft. Seed identical CRDT history so their edits refer to the same
+        // characters rather than waiting forever for another process's seed.
+        // The live document keeps its own random identity for later repairs.
+        const seed = new Y.Doc();
+        seed.clientID = createHash("sha256").update(draftId).update("\0").update(plain).digest().readUInt32BE(0);
+        seed.getText(codeField).insert(0, plain);
+        Y.applyUpdate(doc, Y.encodeStateAsUpdate(seed));
+        seed.destroy();
+      }
     }
 
     await this.evictIdle();

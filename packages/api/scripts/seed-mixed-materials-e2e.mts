@@ -161,6 +161,14 @@ try {
               inputFormat: "",
               outputFormat: "",
               constraints: "",
+              testCases: {
+                create: [{
+                  position: 1,
+                  input: "",
+                  expectedOutput: "hello",
+                  visibility: "SAMPLE",
+                }],
+              },
             },
           });
         if (i === 1)

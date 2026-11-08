@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { DataTable } from '@/components/studio/data-table';
 import { Tooltip, TooltipProvider } from '@/components/studio/primitives';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
+import { MaterialIdentity } from '@/components/workspace/material-identity';
 import { useLocale } from '@/i18n';
 import {
   compareLiveState,
@@ -117,12 +118,7 @@ export function RosterTable({
           }
           return (
             <div className="flex min-w-0 max-w-[16rem] items-center gap-2">
-              <span className="shrink-0 rounded-md bg-accent px-1.5 py-0.5 text-[12px] font-bold tabular-nums text-sub">
-                {exercise.number}
-              </span>
-              <span className="truncate text-[13.5px] font-semibold text-ink" title={exercise.title}>
-                {exercise.title}
-              </span>
+              <MaterialIdentity compact number={exercise.number} title={exercise.title} type={exercise.type ?? 'PROGRAMMING_EXERCISE'} />
             </div>
           );
         },

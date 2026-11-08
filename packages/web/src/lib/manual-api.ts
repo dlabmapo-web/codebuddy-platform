@@ -48,6 +48,10 @@ async function request<T>(
   return body as T;
 }
 export const manualApi = {
+  startReview: (data: import('@cove/shared').HistoryReviewRun) => request<ManualSession>('/review-sessions', 'POST', data),
+  reviewStatus: (id: string) => request<ManualSession>(`/review-sessions/${id}`),
+  stopReview: (id: string) => request(`/review-sessions/${id}`, 'DELETE'),
+  reviewInput: (id: string, text: string) => request(`/review-sessions/${id}/input`, 'POST', {text}),
   latestSubmission: (target: { academyId: string; materialId: string; classId?: string; preview?: boolean }, signal?: AbortSignal) =>
     request<LatestSubmission | null>("/latest-submission?" + new URLSearchParams(Object.entries(target).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])), "GET", undefined, signal),
   capabilities: () => request<{ shortAnswer: boolean; multipleChoice: boolean }>("/capabilities"),

@@ -1,7 +1,8 @@
 import { turtleBrowserProfileId, turtleHelperVersion, turtleSourceBytes, type TurtleBrowserProfile, type TurtleBrowserRun, type TurtleBrowserStart, type TurtleStarterId } from '@cove/shared';
 import { TurtleRequestError, turtleRequest } from './client';
 
-export type BrowserState = { ready: boolean; pending: boolean; running: boolean; state: 'IDLE' | 'ADMITTING' | 'STARTING' | 'COMPUTING' | 'RENDERING' | 'DISPLAYING' | 'STOPPED' | 'ERROR' | 'UNSUPPORTED' | 'EXPIRED'; output: string; fullPython: boolean; firstStrokeMs?: number; admissionMs?: number; dispatchToStrokeMs?: number };
+/** `runtimeFailed`: the frame could not be (re)started; only an explicit retry tries again. */
+export type BrowserState = { ready: boolean; pending: boolean; running: boolean; state: 'IDLE' | 'ADMITTING' | 'STARTING' | 'COMPUTING' | 'RENDERING' | 'DISPLAYING' | 'STOPPED' | 'ERROR' | 'UNSUPPORTED' | 'EXPIRED'; output: string; fullPython: boolean; runtimeFailed: boolean; firstStrokeMs?: number; admissionMs?: number; dispatchToStrokeMs?: number };
 export type RuntimeEvent = { kind: string; generation?: string; text?: string; message?: string };
 export interface TurtleBrowserBridge {
   ready: boolean;
@@ -9,7 +10,7 @@ export interface TurtleBrowserBridge {
 }
 type Pending = { input: TurtleBrowserStart; source: string; generation: string; cancelled: boolean };
 type Active = { run: TurtleBrowserRun; generation: string };
-const initial = (): BrowserState => ({ ready: false, pending: false, running: false, state: 'IDLE', output: '', fullPython: false });
+const initial = (): BrowserState => ({ ready: false, pending: false, running: false, state: 'IDLE', output: '', fullPython: false, runtimeFailed: false });
 const terminal = new Set(['displaying', 'unsupported', 'failed', 'timed-out', 'lease-expired']);
 
 /** Parent-side admission authority. The isolated frame never receives a grant,
@@ -40,8 +41,8 @@ export class BrowserTurtleExecution {
     this.update({ ready: !!bridge?.ready });
   }
   event(event: RuntimeEvent) {
-    if (event.kind === 'ready') { if (this.bridge) this.bridge.ready = true; this.update({ ready: true, fullPython: this.state.state === 'UNSUPPORTED' && this.state.fullPython }); return; }
-    if (event.kind === 'prepare-failed') { this.update({ ready: false, fullPython: true }); return; }
+    if (event.kind === 'ready') { if (this.bridge) this.bridge.ready = true; this.update({ ready: true, runtimeFailed: false, fullPython: this.state.state === 'UNSUPPORTED' && this.state.fullPython }); return; }
+    if (event.kind === 'prepare-failed') { this.update({ ready: false, fullPython: true, runtimeFailed: true }); return; }
     if (!this.generation || event.generation !== this.generation) return;
     if (event.kind === 'painted') {
       // Fixed local performance entries only. No source, output or run identity.
@@ -67,11 +68,14 @@ export class BrowserTurtleExecution {
   }
   private timers() { clearTimeout(this.renewTimer); clearTimeout(this.leaseTimer); }
   private localStop(clear = false) {
+    // Bootstrap, recovery and re-attachment stop defensively while nothing has
+    // run; that is not a stopped program and must not read as one.
+    const stopping = clear || !!this.active || !!this.pending || this.state.running || this.state.pending;
     this.epoch++; this.timers();
     this.generation = '';
     if (this.pending) this.pending.cancelled = true;
     this.bridge?.send({ kind: 'stop', generation: this.active?.generation ?? this.pending?.generation, clear });
-    this.update({ running: false, state: 'STOPPED', ...(clear ? { output: '', fullPython: false } : {}) });
+    this.update({ running: false, ...(stopping ? { state: 'STOPPED' as const } : {}), ...(clear ? { output: '', fullPython: false } : {}) });
   }
   private async settle() {
     const active = this.active;

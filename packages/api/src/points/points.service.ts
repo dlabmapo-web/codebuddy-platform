@@ -95,7 +95,8 @@ export class PointsService {
             },
           )
         : Promise.resolve(null),
-      this.listLedger(identity, {
+      // The page's own scope; the class comes from it, so re-resolving adds nothing.
+      this.ledgerFor(scope, {
         academyId: scope.academyId,
         ...(input.membershipId ? { membershipId: input.membershipId } : {}),
         ...(selectedClass ? { classId: selectedClass.classId } : {}),
@@ -382,7 +383,13 @@ export class PointsService {
     identity: SupabaseIdentity,
     input: PointsLedgerInput,
   ): Promise<PointsLedgerPage> {
-    const scope = await this.access.resolve(identity, input);
+    return this.ledgerFor(await this.access.resolve(identity, input), input);
+  }
+
+  private async ledgerFor(
+    scope: PointsScope,
+    input: PointsLedgerInput,
+  ): Promise<PointsLedgerPage> {
     const pageSize = input.pageSize ?? POINTS_LEDGER_PAGE_SIZE;
     const page = Math.max(1, input.page ?? 1);
     const selectedClass =

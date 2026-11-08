@@ -397,8 +397,9 @@ export const defaultExerciseTimeLimitMs = 3_000;
 /**
  * Server-enforced ceilings on an enhanced profile.
  *
- * The total stays well under the judge's ten-minute stale sweep, or a long but
- * legitimate run would be reported lost while it was still grading.
+ * The total stays under the judge's stale sweep (ten minutes, longer under a
+ * `JUDGE_TIME_SCALE` above 1), or a long but legitimate run would be reported
+ * lost while it was still grading.
  */
 export const gradingProfileBounds = {
   totalTimeLimitMs: { min: 1_000, max: 300_000, default: 60_000 },

@@ -149,6 +149,31 @@ function clientDoc(text = ""): Y.Doc {
 }
 
 describe("loading", () => {
+  it("gives two instances the same history before a legacy draft's first flush", async () => {
+    const first = createService({ draftCode: "print(2 + 3)" });
+    const second = createService({ draftCode: "print(2 + 3)" });
+    const student = clientDoc(), teacher = clientDoc();
+    try {
+      Y.applyUpdate(student, Y.encodeStateAsUpdate(await first.service.load(draftId)));
+      Y.applyUpdate(teacher, Y.encodeStateAsUpdate(await second.service.load(draftId)));
+      const before = Y.encodeStateVector(teacher);
+      teacher.transact(() => {
+        teacher.getText("code").delete(0, teacher.getText("code").length);
+        teacher.getText("code").insert(0, 'print("staff live edit")');
+      });
+      const update = Y.encodeStateAsUpdate(teacher, before);
+      await first.service.applyUpdate(draftId, update);
+      await second.service.applyUpdate(draftId, update);
+      Y.applyUpdate(student, update);
+      expect(student.getText("code").toString()).toBe('print("staff live edit")');
+      await expect(first.service.readCode(draftId)).resolves.toBe('print("staff live edit")');
+      await expect(second.service.readCode(draftId)).resolves.toBe('print("staff live edit")');
+    } finally {
+      student.destroy(); teacher.destroy();
+      await first.service.onModuleDestroy(); await second.service.onModuleDestroy();
+    }
+  });
+
   it("seeds a first collaboration from the draft's saved code", async () => {
     const { service } = createService({ draftCode: "print(1)\n" });
     await expect(service.readCode(draftId)).resolves.toBe("print(1)\n");

@@ -1617,8 +1617,24 @@ describe("first watch draft creation", () => {
 });
 
 describe("direct live page watch", () => {
-  it("joins the teacher notification room without needing a roster subscription", async () => {
-    const { gateway, visits } = createGateway({
+  it('recovers only the authenticated student’s own active coding attachment', async () => {
+    const prisma = { exerciseDraft: { findFirst: vi.fn().mockResolvedValue({ id: draftId }) } };
+    const { gateway, presence, watchSessions } = createGateway({ prisma });
+    Object.assign(gateway, { access: { requireFeature: vi.fn(), requireStudentSelf: vi.fn().mockResolvedValue({ membershipId: studentMembershipId, userId: claim.studentUserId }) } });
+    Object.assign(presence, { currentSource: vi.fn().mockResolvedValue({ socketGeneration: 'generation-1', materialId }) });
+    watchSessions.list.mockResolvedValue([{ draftId }] as never);
+    watchSessions.summarize.mockResolvedValue({ watcherCount: 1, indicator: 'HELPING' } as never);
+    const socket = createSocket({ student: { academyId, membershipId: studentMembershipId, classId, materialId, classes: [{ classId }] } });
+    const result = await gateway.studentBindingFetch(socket, { eventId: crypto.randomUUID(), academyId, classId, materialId });
+    expect(result).toMatchObject({ ok: true, data: { draftId, materialId, classId, indicator: 'HELPING' } });
+    expect(prisma.exerciseDraft.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ userId: claim.studentUserId, materialId }) }));
+    prisma.exerciseDraft.findFirst.mockClear();
+    const denied = await gateway.studentBindingFetch(socket, { eventId: crypto.randomUUID(), academyId, classId, materialId: crypto.randomUUID() });
+    expect(denied).toMatchObject({ ok: false, code: 'MONITORING_STUDENT_UNAVAILABLE' });
+    expect(prisma.exerciseDraft.findFirst).not.toHaveBeenCalled();
+  });
+  it.each([false, true])("authorizes the watch and its requested automatic editing (%s)", async (autoEdit) => {
+    const { gateway, visits, watchSessions } = createGateway({
       snapshot: async () => ({ entries: [{ studentMembershipId, materialId }] }) as unknown as PresenceSnapshot,
     });
     Object.assign(gateway, {
@@ -1632,12 +1648,25 @@ describe("direct live page watch", () => {
     Object.assign(visits, { start: vi.fn().mockResolvedValue({ id: visitId, startedAt: new Date(), replaced: null }) });
     const socket = createSocket({});
     try {
-      const result = await gateway.watchStart(socket, { eventId: crypto.randomUUID(), academyId, classId, studentMembershipId, sessionId, protocolVersion: 3 });
+      const result = await gateway.watchStart(socket, { eventId: crypto.randomUUID(), academyId, classId, studentMembershipId, sessionId, protocolVersion: 3, autoEdit,
+        materialId: '80000000-0000-4000-8000-000000000099' });
       expect(result.ok).toBe(true);
+      if (result.ok) expect(result.data.mode).toBe(autoEdit ? 'HELPING' : 'MONITORING');
+      expect(watchSessions.register).toHaveBeenCalledWith(expect.objectContaining({ mode: autoEdit ? 'HELPING' : 'MONITORING', draftId }));
+      expect((gateway as unknown as { access: { requireMonitorableMaterial: unknown } }).access.requireMonitorableMaterial).toHaveBeenCalledWith(claim, materialId);
       expect(socket.join).toHaveBeenCalledWith(expect.arrayContaining([monitoringRooms.teacher(academyId, teacherMembershipId)]));
     } finally {
       gateway.onModuleDestroy();
     }
+  });
+
+  it('does not grant automatic editing without class authorization', async () => {
+    const { gateway, watchSessions } = createGateway();
+    Object.assign(gateway, { requireClassClaim: vi.fn().mockRejectedValue(new AppException('MONITORING_ACCESS_DENIED', 403)) });
+    const result = await gateway.watchStart(createSocket({}), { eventId: crypto.randomUUID(), academyId, classId,
+      studentMembershipId, sessionId, protocolVersion: 3, autoEdit: true });
+    expect(result).toMatchObject({ ok: false, code: 'MONITORING_ACCESS_DENIED' });
+    expect(watchSessions.register).not.toHaveBeenCalled();
   });
 });
 

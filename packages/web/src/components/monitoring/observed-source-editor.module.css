@@ -1,0 +1,2 @@
+.caret { border-left: 2px solid var(--color-peer); }
+.selection { background: color-mix(in srgb, var(--color-peer) 22%, transparent); }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BrowserState } from './browser-execution';
 import { turtleExecutionStatus } from './execution-status';
 
-const browser: BrowserState = { ready: true, pending: false, running: false, state: 'IDLE', output: '', fullPython: false };
+const browser: BrowserState = { ready: true, pending: false, running: false, state: 'IDLE', output: '', fullPython: false, runtimeFailed: false };
 const defaults = { browserMode: false, browser, browserUnavailable: false, busy: false, error: false, session: null };
 
 describe('Turtle execution feedback', () => {

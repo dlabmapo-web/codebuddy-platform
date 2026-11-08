@@ -24,6 +24,7 @@ import { SampleCheckStore } from "./sample-check.store.js";
 import type { ExecutionEngine } from "./execution-engine.js";
 import { PyodideExecutionEngine } from "./pyodide-engine.js";
 import { SandboxExecutionEngine } from "./sandbox-engine.js";
+import { TimeScaledEngine } from "./time-scaled-engine.js";
 
 /**
  * The judge is its own process, not a thread inside the API.
@@ -87,11 +88,15 @@ async function bootstrap(): Promise<void> {
       environment.JUDGE_CONCURRENCY,
     );
   }
+  // Pyodide is slower than the native CPython limits are authored for; grading
+  // runs in native-equivalent time (`time-scaled-engine.ts`).
+  const timeScale = environment.JUDGE_TIME_SCALE;
+  const execution = timeScale === 1 ? engine : new TimeScaledEngine(engine, timeScale);
   const telemetry = new ExecutionTelemetry();
   const comparator = new ComparatorPool(environment.JUDGE_COMPARATOR_POOL_SIZE, {}, telemetry);
   const grading = new GradingService(
     prisma,
-    engine,
+    execution,
     new PointAwardService(prisma),
     comparator,
     telemetry,
@@ -147,7 +152,7 @@ async function bootstrap(): Promise<void> {
   // short-lived records.
   const samples = new SampleCheckRunner(
     new SampleCheckStore(() => queue.redis()),
-    engine,
+    execution,
     comparator,
     capacity,
   );
@@ -167,7 +172,8 @@ async function bootstrap(): Promise<void> {
     queues: () => queue.diagnostics() });
   logger.log(JSON.stringify({ event: "judge.config", concurrency: environment.JUDGE_CONCURRENCY,
     comparatorPool: environment.JUDGE_COMPARATOR_POOL_SIZE, backgroundConcurrency: environment.REGRADE_CONCURRENCY,
-    sampleConcurrency: environment.SAMPLE_CHECK_CONCURRENCY, readinessGuard: environment.JUDGE_READINESS_GUARD, traceTimings: environment.JUDGE_TRACE_TIMINGS }));
+    sampleConcurrency: environment.SAMPLE_CHECK_CONCURRENCY, readinessGuard: environment.JUDGE_READINESS_GUARD, traceTimings: environment.JUDGE_TRACE_TIMINGS,
+    timeScale }));
 
   const recovery = new RuntimeRecovery(prisma, queue);
   let recovering = false;

@@ -30,7 +30,7 @@
     "filter_offline": "오프라인",
     "column_student": "학생",
     "column_state": "상태",
-    "column_exercise": "현재 문제",
+    "column_exercise": "현재 학습 자료",
     "column_activity": "마지막 활동",
     "column_run": "최근 실행",
     "empty": "조건에 맞는 학생이 없습니다.",
@@ -39,11 +39,11 @@
     "open_live": "실시간 보기",
     "open_live_new_tab": "새 탭에서 실시간 보기",
     "open_points": "포인트",
-    "no_exercise": "문제 풀이 중이 아님",
+    "no_exercise": "열어 둔 자료 없음",
     "never_seen": "없음",
     "membership_inactive": "비활성 멤버십",
-    "in_exercise": "문제 풀이 중",
-    "solution_status": "풀이 현황"
+    "in_exercise": "학습 자료 보는 중",
+    "solution_status": "학생 학습 기록"
   },
   "state": {
     "ONLINE": "접속",
@@ -75,6 +75,7 @@
     "revoked_body": "더 이상 이 반의 담당 강사가 아닙니다."
   },
   "workspace": {
+    "edit_problem": "문제 편집",
     "recovery_body": "실시간 모니터링을 일시적으로 사용할 수 없습니다. 자동으로 재연결을 시도하며, 계속 연결되지 않으면 다시 시도할 수 있습니다. 동기화가 완료될 때까지 편집이 중지됩니다.",
     "retry_connection": "연결 다시 시도",
     "title": "실시간 지도",
@@ -155,7 +156,11 @@
       "statement": "문제 설명을",
       "editor": "코드를",
       "terminal": "터미널을",
-      "feedback": "피드백을"
+      "feedback": "피드백을",
+      "answer": "답안",
+      "drawing": "그림",
+      "pdf": "PDF",
+      "video": "동영상"
     }
   },
   "indicator": {
@@ -263,5 +268,31 @@
     "minutes": "{{count}}분",
     "seconds": "{{count}}초",
     "rate_limited": "요청이 너무 많습니다. 1분 후 다시 시도해 주세요."
+  },
+  "observation": {
+    "choose_material": "선택한 자료가 없습니다. 강의 목차에서 자료를 선택하면 학생의 작업을 확인할 수 있습니다.",
+    "materials": "학습 자료",
+    "student_on": "학생의 현재 자료: {{title}}",
+    "no_material": "온라인 · 열어 둔 자료 없음",
+    "return_live": "실시간으로 돌아가기",
+    "student_answer": "학생 답안",
+    "live_response": "실시간 답안 · 읽기 전용",
+    "saved_response": "저장된 답안 · 읽기 전용",
+    "waiting_response": "실시간 답안을 기다리는 중",
+    "waiting_drawing": "학생의 그림을 기다리는 중",
+    "student_drawing": "학생의 실시간 터틀 그림",
+    "student_output": "학생 터미널 출력",
+    "turtle": "실시간 터틀 활동",
+    "pdf_page": "학생 PDF 페이지: {{page}}",
+    "video_state": "학생: {{position}}초 · {{state}}",
+    "playing": "재생 중",
+    "paused": "일시 정지",
+    "ended": "재생 완료",
+    "loading": "자료를 불러오는 중…",
+    "load_failed": "실시간 자료를 불러올 수 없습니다. 다시 시도해 주세요.",
+    "retry": "다시 시도",
+    "access_denied": "모니터링 권한이 종료되었습니다.",
+    "read_only": "읽기 전용",
+    "last_response": "마지막 관찰 답안 · 읽기 전용"
   }
 }

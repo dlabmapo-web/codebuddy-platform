@@ -3,6 +3,7 @@ import type { CaseComparator, CaseOutcome, InputPromptPolicy } from "@cove/share
 import type { ComparisonResult, OutputComparator } from "./comparator-pool.js";
 import type { ExecutionEngine, ExecutionResult } from "./execution-engine.js";
 import { eliceCaseDecisionFor, type GraderFault } from "./grading.js";
+import { timeScaleOf } from "./time-scaled-engine.js";
 
 /** Bounded scheduling, comparison, reporting and cleanup time, not student time. */
 export const GRADING_OVERHEAD_MS = 5_000;
@@ -78,9 +79,11 @@ export async function evaluateEnhancedCase(
   if (remaining <= 0) return { kind: "deadline" };
 
   // Case and cumulative execution limits produce student verdicts. Only a
-  // shorter infrastructure deadline makes a forced stop a judge failure.
+  // shorter infrastructure deadline makes a forced stop a judge failure. The
+  // deadline is wall clock and limits are authored time, so what is left of
+  // it is converted with the engine's scale.
   const studentLimit = Math.min(testCase.caseLimitMs, input.executionBudgetMs ?? testCase.caseLimitMs);
-  const limit = Math.min(studentLimit, remaining);
+  const limit = Math.min(studentLimit, Math.max(1, Math.floor(remaining / timeScaleOf(deps.engine))));
   const executionStartedAt = Date.now();
   const execution = deps.engine.run({
     inputPromptPolicy: input.inputPromptPolicy ?? "INCLUDE",

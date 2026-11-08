@@ -74,7 +74,6 @@ const master = {
 };
 
 function build(source: unknown = master) {
-  const remapped: unknown[] = [];
   const created: Record<string, unknown[]> = {
     courseModule: [],
     lecture: [],
@@ -90,9 +89,10 @@ function build(source: unknown = master) {
   let courseData: Record<string, unknown> = {};
 
   const tx = {
-    $queryRaw: vi.fn().mockResolvedValue([]),
-    pdfAsset: { findUnique: vi.fn().mockResolvedValue({ state: "READY" }) },
-    videoAsset: {findUnique: vi.fn().mockResolvedValue({state: "READY"})},
+    // The asset locks: every requested asset found READY under the lock.
+    $queryRaw: vi.fn((_sql: TemplateStringsArray, ids: string[]) =>
+      Promise.resolve(ids.map(() => ({ state: "READY" }))),
+    ),
     course: {
       create: vi.fn(({ data }) => {
         courseData = data;
@@ -103,10 +103,7 @@ function build(source: unknown = master) {
       Object.keys(created).map((model) => [
         model,
         {
-          update: vi.fn(({ where, data }) => {
-            if (model === "programmingExercise") remapped.push({ materialId: where.materialId, ...data });
-            return Promise.resolve({});
-          }),
+          update: vi.fn(() => Promise.resolve({})),
           deleteMany: vi.fn(),
           createMany: vi.fn(({ data }) => {
             created[model]!.push(...data);
@@ -165,7 +162,7 @@ function build(source: unknown = master) {
     { write: vi.fn().mockResolvedValue({}) } as never,
   );
 
-  return { service, created, remapped, courseValue: () => courseData };
+  return { service, created, tx, courseValue: () => courseData };
 }
 
 describe('AcademyLibraryService.adopt', () => {
@@ -344,12 +341,47 @@ it('remaps a reference even when the exercise precedes its PDF in the copied tre
       programmingExercise: null, pdfDocument: { assetId: 'immutable-asset', placement: 'BOTH' } },
   ];
   const input = { ...source, modules: [{ ...source.modules[0], lectures: [{ ...source.modules[0]!.lectures[0], materials }] }] };
-  const { service, created, remapped } = build(input);
+  const { service, created } = build(input);
   await service.adopt(identity, { academyId: branchId, libraryCourseId: masterId, title: 'Copy' });
   const copied = created.material as Array<{ id: string; type: string }>;
   const exercise = copied.find(m => m.type === 'PROGRAMMING_EXERCISE')!;
   const document = copied.find(m => m.type === 'PDF_DOCUMENT')!;
-  expect(remapped.filter((row: any) => row.referencePdfMaterialId)).toEqual([{ materialId: exercise.id, referencePdfMaterialId: document.id }]);
+  expect(created.programmingExercise).toEqual([expect.objectContaining({ materialId: exercise.id, referencePdfMaterialId: document.id })]);
   expect(document.id).not.toBe('source-pdf');
   expect(created.pdfDocument).toEqual([expect.objectContaining({ materialId: document.id, assetId: 'immutable-asset' })]);
+});
+
+// A 500-material course timed out when every asset cost two round trips and
+// every PDF reference one more: the copy must not grow per row.
+it('locks each asset kind in one read and writes PDF references in the bulk insert', async () => {
+  const original = master.modules[0]!.lectures[0]!.materials[0]!;
+  const pdf = (n: number, assetId = `pdf-asset-${n}`) => ({ id: `source-pdf-${n}`, type: 'PDF_DOCUMENT', title: `Theory ${n}`, position: 10 + n, isRequired: false, isVisible: true,
+    programmingExercise: null, pdfDocument: { assetId, placement: 'MAIN' } });
+  const video = (n: number) => ({ id: `source-video-${n}`, type: 'VIDEO_LESSON', title: `Video ${n}`, position: 20 + n, isRequired: true, isVisible: true,
+    videoLesson: { assetId: `video-asset-${n}`, description: '', placement: 'MAIN', includeInScore: false, maximumHundredths: 10000, thresholdBasisPoints: 9000, captions: [], assets: [] } });
+  const exercise = (n: number) => ({ ...original, id: `source-exercise-${n}`, position: n,
+    programmingExercise: { ...original.programmingExercise, externalKey: `p${n}`, referencePdfMaterialId: `source-pdf-${n % 3}` } });
+  const materials = [pdf(0), pdf(1), pdf(2), pdf(3, 'pdf-asset-0'), video(0), video(1), ...[1, 2, 3, 4].map(exercise)];
+  const input = { ...master, modules: [{ ...master.modules[0], lectures: [{ ...master.modules[0]!.lectures[0], materials }] }] };
+  const { service, created, tx } = build(input);
+  await service.adopt(identity, { academyId: branchId, libraryCourseId: masterId, title: 'Copy' });
+  expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
+  expect(tx.$queryRaw.mock.calls[0]![1]).toEqual(['pdf-asset-0', 'pdf-asset-1', 'pdf-asset-2']);
+  expect(tx.$queryRaw.mock.calls[1]![1]).toEqual(['video-asset-0', 'video-asset-1']);
+  expect((tx as any).programmingExercise.update).not.toHaveBeenCalled();
+  const copied = created.material as Array<{ id: string; title: string }>;
+  const idOf = (title: string) => copied.find(m => m.title === title)!.id;
+  expect((created.programmingExercise as Array<{ externalKey: string; referencePdfMaterialId: string }>).map(e => [e.externalKey, e.referencePdfMaterialId]))
+    .toEqual([['p1', idOf('Theory 1')], ['p2', idOf('Theory 2')], ['p3', idOf('Theory 0')], ['p4', idOf('Theory 1')]]);
+});
+
+it('refuses the copy when a video is not READY under the lock', async () => {
+  const videoLesson = { assetId: 'video-asset', description: '', placement: 'MAIN', includeInScore: false, maximumHundredths: 10000, thresholdBasisPoints: 9000, captions: [], assets: [] };
+  const source = { ...master, modules: [{ ...master.modules[0], lectures: [{ ...master.modules[0]!.lectures[0], materials: [{ title: 'Video', type: 'VIDEO_LESSON', position: 1, isRequired: true, isVisible: true, videoLesson }] }] }] };
+  for (const locked of [[{ state: 'PROCESSING' }], []]) {
+    const { service, created, tx } = build(source);
+    tx.$queryRaw.mockResolvedValueOnce(locked as never);
+    await expect(service.adopt(identity, { academyId: branchId, libraryCourseId: masterId, title: 'Copy' })).rejects.toThrow('Only ready video lessons can be adopted');
+    expect(created.videoLesson).toHaveLength(0);
+  }
 });

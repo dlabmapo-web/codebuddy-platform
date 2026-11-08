@@ -83,6 +83,14 @@ export const learnContract = {
     .input(learnMaterialInputSchema.extend({ preview: z.boolean().optional() }))
     .output(z.object({ type: materialTypeSchema })),
   /**
+   * One private image of a programming problem's description, as a data URL.
+   * Readable by whoever may open the problem, and only while its description
+   * shows the image.
+   */
+  getExerciseImage: oc
+    .input(learnMaterialInputSchema.extend({ assetId: z.uuid(), preview: z.boolean().optional() }))
+    .output(z.object({ url: z.string() })),
+  /**
    * The classes a student learns through, and one of them in full.
    *
    * Read-only by construction. The management mutations stay in

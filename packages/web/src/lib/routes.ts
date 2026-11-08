@@ -194,6 +194,8 @@ export const routes = {
     `${academyRoot(academySlug)}/teach/classes/${segment(classId)}`,
   academyTeachProgress: (academySlug: string, classId: string) =>
     `${academyRoot(academySlug)}/teach/classes/${segment(classId)}/progress`,
+  academyTeachStudentWork: (academySlug: string, classId: string, membershipId: string, materialId: string) =>
+    `${academyRoot(academySlug)}/teach/classes/${segment(classId)}/students/${segment(membershipId)}/work/${segment(materialId)}`,
   academyTeachStudentLive: (
     academySlug: string,
     classId: string,
@@ -216,6 +218,7 @@ export const routes = {
   academyTeachAnalytics: (academySlug: string) =>
     `${academyRoot(academySlug)}/teach/analytics`,
   /** The teacher's own students: who they teach, and where each one stands. */
+  academyTeachHistory: (academySlug: string) => `${academyRoot(academySlug)}/teach/history`,
   academyTeachStudents: (academySlug: string) =>
     `${academyRoot(academySlug)}/teach/students`,
   academyPeople: (academySlug: string) =>

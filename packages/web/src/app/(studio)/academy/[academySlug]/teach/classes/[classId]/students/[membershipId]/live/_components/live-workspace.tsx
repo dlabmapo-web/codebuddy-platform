@@ -7,11 +7,15 @@ import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import {
   navigatorPathFromBreadcrumb,
   type MonitoringStudentContext,
+  type ObservationSnapshot,
+  type ObservationAwarenessEvent,
+  type MaterialType,
 } from '@cove/shared';
 import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ObservationPresence } from '@/components/monitoring/observation-presence';
 import { RemotePointer } from '@/components/monitoring/remote-pointer';
 import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-navigator';
 import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
@@ -20,10 +24,12 @@ import { QuizFeedback } from '@/components/workspace/quiz-feedback';
 import { GradingNotice } from '@/components/pdf/grading-notice';
 import { ExerciseReferencePane } from '@/components/pdf/exercise-reference-pane';
 import { ProblemStatement } from '@/components/workspace/problem-statement';
+import { ExerciseImageProvider } from '@/components/studio/lesson-image-providers';
 import { useLayoutTranslation } from '@/i18n';
 import { orpc } from '@/lib/orpc';
 import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import { useLiveWorkspace } from '@/lib/monitoring/use-live-workspace';
+import { codingConnectionState } from '@/lib/monitoring/connection';
 import { navigatorRow } from '@/lib/workspace/navigator-geometry';
 import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
 import { useEditorPreferences } from '@/lib/workspace/use-editor-preferences';
@@ -40,16 +46,16 @@ import { LiveEditor } from './live-editor';
 import { feedbackScope } from '@/lib/monitoring/feedback-draft-store';
 import { useFeedbackDraft } from '@/lib/monitoring/feedback-draft-provider';
 import { LiveHelpQueue } from '@/components/monitoring/help-queue';
+import { MonitoringTutorOutlet, MonitoringLiveContent } from '@/components/student-history/monitor-history';
+import { HistoryPresentationContext } from '@/lib/monitoring/history-presentation';
 import { StudentSwitcher } from '@/components/monitoring/student-switcher';
 
 import { FeedbackDock } from './live-feedback';
 import { LiveHeader } from './live-header';
 import { LiveOutput, type LiveOutputTab } from './live-output';
 import { useLiveSubmissionResult } from '../_hooks/use-live-submission-result';
-import { PreviewBanner } from './preview-banner';
 import { PreviewEditor } from './preview-editor';
 import { AnswerCodeModal } from './answer-code-modal';
-import { HelpModeToggle } from './help-mode-toggle';
 
 /**
  * One student's exercise, opened beside them.
@@ -70,22 +76,44 @@ export function LiveWorkspace({
   membershipId,
   context,
   teacherMembershipRef,
+  onSelectMaterial,
+  onCodeSelected,
+  selectedMaterialId,
+  observation,
+  observationAwareness,
+  observationConnection,
+  onRegisterTransition,
+  onReturnToObserved,
+  canEditProblem,
 }: {
   academyId: string;
   classId: string;
   membershipId: string;
   context: MonitoringStudentContext;
   teacherMembershipRef: string | null;
+  onSelectMaterial?: (materialId: string, type?: MaterialType) => Promise<void>;
+  onCodeSelected?: (materialId: string) => void;
+  selectedMaterialId?: string;
+  observation?: ObservationSnapshot | null;
+  observationAwareness?: ObservationAwarenessEvent | null;
+  observationConnection?: React.ComponentProps<typeof LiveHeader>['connection'];
+  onRegisterTransition?: (prepare: (() => Promise<boolean>) | null) => void;
+  onReturnToObserved?: () => void;
+  canEditProblem?: boolean;
 }) {
   const academySlug = useAcademySlug();
   const { t } = useTranslation('monitoring');
   const { t: tl } = useLayoutTranslation('learn');
-  /** One request at a time; the server's answer is what changes the label. */
-  const [helpPending, setHelpPending] = React.useState(false);
+  const selectedCodeIsCurrent = observation?.type === 'PROGRAMMING_EXERCISE' &&
+    observation.materialId === (selectedMaterialId ?? observation.materialId);
   const live = useLiveWorkspace({
     academyId,
     classId,
     studentMembershipId: membershipId,
+    autoEdit: true,
+    availableCode: selectedCodeIsCurrent && observation.source && observation.materialId &&
+      observation.state !== 'OFFLINE' && observation.state !== 'RECONNECTING'
+      ? { materialId: observation.materialId, source: observation.source } : null,
   });
   const runner = usePythonRunner();
   // Local runs only: the teacher's copy never claims a server verdict.
@@ -112,9 +140,8 @@ export function LiveWorkspace({
     setOutputTab('student');
   }, [mirroredRunId]);
 
-  // The exercise is fetched once the watch says which one the student has
-  // open. A remembered material id in the URL would let a teacher name an
-  // exercise the student is not on; the server chooses it instead.
+  // Fetch the live statement after the server acknowledges the watched draft.
+  // Other selected coding materials use their saved preview in the same layout.
   const materialId = live.session?.materialId;
   const exerciseQuery = useQuery({
     queryKey: ['academy', academyId, 'live-exercise', membershipId, materialId],
@@ -129,6 +156,8 @@ export function LiveWorkspace({
     retry: false,
   });
   const liveExercise = exerciseQuery.data?.exercise ?? null;
+  const [lastExercise, setLastExercise] = React.useState<typeof liveExercise>(null);
+  if (liveExercise && lastExercise !== liveExercise) setLastExercise(liveExercise);
 
   const submissionResult = useLiveSubmissionResult({
     academyId,
@@ -204,6 +233,24 @@ export function LiveWorkspace({
     watchDenied: live.denied !== null,
     watchEnded: live.ended !== null,
   });
+  React.useEffect(() => {
+    onRegisterTransition?.(live.prepareStudentSwitch);
+    return () => onRegisterTransition?.(null);
+  }, [onRegisterTransition, live.prepareStudentSwitch]);
+  const requestedPreviewRef = React.useRef<string | null>(null);
+  const { displayedMaterialId: displayedForNavigation, select: selectForNavigation,
+    following: followingForNavigation, previewing: previewingForNavigation } = display;
+  React.useEffect(() => {
+    // The watch acknowledgement announces this material in the display hook.
+    // Do not race that announcement with a saved preview of the same problem.
+    if (!selectedMaterialId || followingForNavigation || previewingForNavigation) return;
+    if (!live.session && (!observation || observation.type === 'PROGRAMMING_EXERCISE')) return;
+    if (selectedMaterialId === live.session?.materialId || (selectedMaterialId === displayedForNavigation && display.display?.mode === 'preview')) return;
+    const request = `${selectedMaterialId}:${live.session?.visitId ?? 'saved'}`;
+    if (requestedPreviewRef.current === request) return;
+    requestedPreviewRef.current = request;
+    selectForNavigation(selectedMaterialId);
+  }, [selectedMaterialId, live.session, displayedForNavigation, selectForNavigation, followingForNavigation, previewingForNavigation, observation, display.display?.mode]);
   // Destructured rather than kept as an object: reading `.open` off a hook
   // result that also carries a ref is a ref access as far as the React
   // compiler is concerned, and it is right to flag it.
@@ -220,23 +267,27 @@ export function LiveWorkspace({
   // What the statement pane renders. Preview and live share the presentation
   // exactly; what differs is where the payload came from and what may be done
   // with it.
-  const shown = previewed ?? liveExercise;
+  const shown = previewed ?? liveExercise ?? (lastExercise?.exercise.materialId === selectedMaterialId ? lastExercise : null);
+  const setHistoryMaterial = React.useContext(HistoryPresentationContext)?.setMaterial;
+  React.useEffect(() => {setHistoryMaterial?.(selectedMaterialId ?? materialId ?? context.exercise?.exercise.materialId ?? null,
+    shown?.breadcrumb.course.id, 'PROGRAMMING_EXERCISE', shown?.exercise.title);},
+    [selectedMaterialId,materialId,context.exercise?.exercise.materialId,shown?.breadcrumb.course.id,shown?.exercise.title,setHistoryMaterial]);
   const sampleTestCases = React.useMemo(
     () => (previewed ? [] : (liveExercise?.exercise.sampleTestCases ?? [])),
     [liveExercise, previewed],
   );
 
   const feedbackQuery = useQuery({
-    queryKey: ['academy', academyId, 'live-feedback', membershipId, materialId],
+    queryKey: ['academy', academyId, 'live-feedback', membershipId, selectedMaterialId ?? materialId],
     queryFn: () =>
       orpc.monitoring.listFeedback({
         academyId,
         classId,
         membershipId,
-        materialId,
+        materialId: selectedMaterialId ?? materialId,
         limit: 50,
       }),
-    enabled: Boolean(materialId),
+    enabled: Boolean(selectedMaterialId ?? materialId),
     retry: false,
   });
 
@@ -272,26 +323,7 @@ export function LiveWorkspace({
     dividerProps: outputDividerProps,
   } = useSplitPane({ axis: 'vertical', initial: 240, min: 96, max: 1_200 });
 
-  /** The shared document as text, read at the moment a run starts. */
-  /**
-   * Asking the server to grant or withdraw edit permission.
-   *
-   * The hook locks the editor immediately when stepping back and waits for the
-   * acknowledgement before unlocking — so this only has to keep a second press
-   * from racing the first, and to stop showing a spinner once the answer is in
-   * regardless of which way it went.
-   */
-  const requestHelpMode = React.useCallback(
-    (next: boolean) => {
-      setHelpPending(true);
-      void live.setMode(next ? 'HELPING' : 'MONITORING').finally(() => {
-        setHelpPending(false);
-      });
-    },
-    [live],
-  );
-
-  const getCode = React.useCallback(() => live.text.toString(), [live.text]);
+  const getCode = React.useCallback(() => previewed ? previewed.studentCode ?? previewed.exercise.starterCode : live.text.toString(), [live.text, previewed]);
 
   /**
    * The teacher runs the document they are looking at, in their own browser.
@@ -300,15 +332,12 @@ export function LiveWorkspace({
    * appear on the student's screen, and a submission is theirs alone to make.
    */
   const handleRun = React.useCallback(() => {
-    // Guarded as well as hidden: the shared document holds the student's live
-    // exercise, and running it while reading a different one would report the
-    // wrong program's output under the wrong problem.
-    if (previewed) return;
+    // Execute the selected snapshot or live document in the monitor's own runtime.
     setOutputTab('you');
     void runner.run(getCode(), {
       banner: [{ text: '$ python solution.py\n', kind: 'meta' }],
     });
-  }, [getCode, previewed, runner]);
+  }, [getCode, runner]);
 
   const handleRunSample = React.useCallback(
     async (index: number) => {
@@ -339,19 +368,23 @@ export function LiveWorkspace({
   const student =
     context.student.displayName ?? context.student.email ?? membershipId;
 
-  const note = useFeedbackDraft(feedbackScope(teacherMembershipRef, academyId, classId, membershipId, materialId ?? null));
+  const note = useFeedbackDraft(feedbackScope(teacherMembershipRef, academyId, classId, membershipId, selectedMaterialId ?? materialId ?? null));
   return (
     <div className="flex h-dvh flex-col bg-canvas">
       {/* The student's mouse, drawn wherever this teacher's layout puts the
           pane it is over. */}
-      <RemotePointer name={student} pointer={live.remote.pointer} />
+      <ObservationPresence awareness={observationAwareness ?? null} materialId={selectedMaterialId ?? materialId ?? null} name={student} />
+      <RemotePointer name={student} pointer={observation && observation.type !== 'PROGRAMMING_EXERCISE' ? null : live.remote.pointer} />
 
       <div className="shrink-0" {...surfaceProps('header')}>
         <LiveHeader
+          canEditProblem={canEditProblem}
           helpQueue={<LiveHelpQueue academyId={academyId} classId={classId} currentMembershipId={membershipId} prepare={live.prepareStudentSwitch} cancel={live.cancelStudentSwitch} />}
           studentSwitcher={<StudentSwitcher academyId={academyId} classId={classId} membershipId={membershipId} name={context.student.displayName ?? context.student.email ?? membershipId} className={context.class.name} prepare={live.prepareStudentSwitch} cancel={live.cancelStudentSwitch} />}
-          answer={
-            display.isLive && live.session && liveExercise ? (
+          answer={<>
+            {observation?.materialId && observation.materialId !== (selectedMaterialId ?? materialId) && onReturnToObserved
+              ? <button type="button" className="inline-flex h-8 items-center rounded-lg border border-border bg-card px-3 text-[12.5px] font-bold text-ink" onClick={onReturnToObserved}>{t('preview.return')}</button> : null}
+            {display.isLive && live.session && liveExercise ? (
               <AnswerCodeModal
                 academyId={academyId}
                 classId={classId}
@@ -362,10 +395,12 @@ export function LiveWorkspace({
                 membershipId={membershipId}
                 visitId={live.session.visitId}
               />
-            ) : undefined
-          }
+            ) : <button disabled type="button" className="inline-flex h-8 items-center rounded-lg border border-border bg-card px-3 text-[12.5px] font-bold text-ink opacity-45">{t('answer.show')}</button>}
+          </>}
           classId={classId}
-          connection={live.state}
+          connection={selectedCodeIsCurrent
+            ? codingConnectionState(live.state, live.canEdit && live.session?.materialId === observation.materialId)
+            : previewed || observation?.type !== 'PROGRAMMING_EXERCISE' ? observationConnection ?? live.state : live.state}
           context={context}
           curriculum={
             <CurriculumTrigger
@@ -377,16 +412,10 @@ export function LiveWorkspace({
             />
           }
           exercise={shown}
-          helpMode={
-            <HelpModeToggle
-              busy={helpPending}
-              disabled={!live.canEdit || !display.isLive}
-              helping={live.helping}
-              onToggle={requestHelpMode}
-            />
-          }
           liveStatus={
-            display.live.available
+            observation?.state === 'RECONNECTING' ? t('indicator.reconnecting') : observation?.materialId
+              ? `${t('live.on_exercise', { title: observation.path?.exercise.title ?? '' })}`
+              : !observation && display.live.available
               ? t('live.on_exercise', {
                   title: display.live.path?.exercise.title ?? '',
                 })
@@ -395,7 +424,6 @@ export function LiveWorkspace({
           unsaved={live.unsaved}
         />
       </div>
-
       {live.pendingRecovery ? (
         <div role="status" className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-2 text-sm">
           <span>{t(live.pendingRecovery === 'recovering' ? 'workspace.pending_recovering' : 'workspace.pending_blocked')}</span>
@@ -414,7 +442,8 @@ export function LiveWorkspace({
         </div>
       ) : null}
 
-      {!live.pendingRecovery && live.denied === 'MONITORING_REALTIME_UNAVAILABLE' ? (
+      {!live.pendingRecovery && (live.denied === 'MONITORING_REALTIME_UNAVAILABLE' ||
+        (live.denied === 'MONITORING_STUDENT_UNAVAILABLE' && selectedCodeIsCurrent)) ? (
         <div className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-4 py-2 text-[13px] text-sub" role="status">
           <span>{t('workspace.recovery_body')}</span>
           <button className="rounded-md border border-border px-2 py-1 font-semibold" onClick={live.follow} type="button">
@@ -422,29 +451,15 @@ export function LiveWorkspace({
           </button>
         </div>
       ) : null}
-      {live.ended ? (
+      {live.ended && !(live.ended === 'STUDENT_LEFT' && observation?.materialId && observation.state !== 'OFFLINE' && observation.state !== 'RECONNECTING') ? (
         <p className="shrink-0 border-b border-danger/25 bg-danger/5 px-4 py-2 text-[13px] font-semibold text-danger">
           {t('workspace.ended_title')} · {t(`end_reason.${live.ended}`)}
         </p>
       ) : null}
-      {live.denied === 'MONITORING_STUDENT_UNAVAILABLE' ? (
+      {live.denied === 'MONITORING_STUDENT_UNAVAILABLE' && !observation?.materialId ? (
         <p className="shrink-0 border-b border-border bg-card px-4 py-2 text-[13px] text-sub">
           {t('workspace.not_solving_body')}
         </p>
-      ) : null}
-
-      {/* Reading ahead, said out loud for as long as it lasts. */}
-      {previewed ? (
-        <PreviewBanner
-          liveTitle={
-            display.live.available
-              ? (display.live.path?.exercise.title ?? null)
-              : null
-          }
-          onReturn={display.returnToLive}
-          previewTitle={previewed.exercise.title}
-          returning={display.following}
-        />
       ) : null}
 
       {display.previewFailed ? (
@@ -473,9 +488,10 @@ export function LiveWorkspace({
 
       {/* The panel and the panes share one row, so opening the course takes
           width from the workspace rather than covering it. */}
-      <div className={navigatorRow}>
+      <div className={`relative ${navigatorRow}`}>
+        <MonitoringLiveContent>
         <WorkspaceCurriculumNavigator
-          resourceHref={(id) => {
+          resourceHref={onSelectMaterial ? undefined : (id) => {
             for (const courseModule of display.navigator?.course.modules ?? []) for (const lecture of courseModule.lectures) {
               const type = lecture.documents?.some(item => item.materialId === id) ? 'PDF_DOCUMENT'
                 : lecture.videos?.some(item => item.materialId === id) ? 'VIDEO_LESSON'
@@ -499,11 +515,20 @@ export function LiveWorkspace({
           // The student's own exercise, marked even while the teacher reads
           // somewhere else.
           liveMaterialId={
-            display.live.available ? display.live.materialId : null
+            observation ? observation.materialId : display.live.available ? display.live.materialId : null
           }
           onClose={closePanel}
           onRetry={display.loadCurriculum}
-          onSelect={display.select}
+          onSelect={(id) => {
+            let type: MaterialType = 'PROGRAMMING_EXERCISE';
+            for (const courseModule of display.navigator?.course.modules ?? []) for (const lecture of courseModule.lectures) {
+              if (lecture.documents?.some(item => item.materialId === id)) type = 'PDF_DOCUMENT';
+              if (lecture.videos?.some(item => item.materialId === id)) type = 'VIDEO_LESSON';
+              const manual = lecture.manualMaterials?.find(item => item.materialId === id); if (manual) type = manual.type;
+            }
+            if (type !== 'PROGRAMMING_EXERCISE' && onSelectMaterial) { void onSelectMaterial(id, type); return; }
+            onCodeSelected?.(id); display.select(id);
+          }}
           open={panelOpen}
           panelId={panelId}
         />
@@ -524,11 +549,13 @@ export function LiveWorkspace({
               <>
               <GradingNotice exercise={shown.exercise} />
               <ExerciseReferencePane key={shown.exercise.materialId} academyId={academyId} exercise={shown.exercise} teacher>
+              <ExerciseImageProvider academyId={academyId} materialId={shown.exercise.materialId} staff>
               <ProblemStatement
                 collaborating={live.collaborating}
                 exercise={shown.exercise}
                 revealedHints={shown.exercise.hints.length}
               />
+              </ExerciseImageProvider>
               </ExerciseReferencePane>
               </>
             ) : (
@@ -594,10 +621,7 @@ export function LiveWorkspace({
                   <LiveEditor
                     pointerIdentity={live.session ? { draftId: live.session.draftId, material: live.session.materialId } : undefined}
                     fontSize={preferences.fontSize}
-                    onCursor={live.publishCursor}
-                    peerName={student}
                     readOnly={!live.canEditCode || !display.isLive}
-                    remoteCursor={live.remote.cursor}
                     text={live.text}
                   />
                 )}
@@ -619,7 +643,7 @@ export function LiveWorkspace({
               >
                 <LiveOutput
                   activeSample={activeSample}
-                  canRun={display.isLive}
+                  canRun={Boolean(shown)}
                   onRun={handleRun}
                   onRunSample={(index) => void handleRunSample(index)}
                   academySlug={academySlug}
@@ -641,13 +665,13 @@ export function LiveWorkspace({
               </div>
             </div>}
 
-            {!previewed ? (
               <div className="shrink-0" {...surfaceProps('feedback')}>
                 <FeedbackDock
+                  canDraft={Boolean(shown) && live.state !== 'revoked'}
                   canSend={live.canEdit && display.isLive}
                   draft={note.text}
                   feedback={feedback}
-                  materialId={materialId ?? null}
+                  materialId={selectedMaterialId ?? materialId ?? null}
                   onDraftChange={note.edit}
                   onHydrate={note.hydrate}
                   onSend={async (body) => {
@@ -658,9 +682,10 @@ export function LiveWorkspace({
                   teacherMembershipRef={teacherMembershipRef}
                 />
               </div>
-            ) : null}
           </section>
         </div>
+        </MonitoringLiveContent>
+        <MonitoringTutorOutlet />
       </div>
     </div>
   );

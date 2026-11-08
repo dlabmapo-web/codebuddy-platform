@@ -159,6 +159,8 @@ export type DataTableProps<TData, TValue> = {
    * except that one.
    */
   layout?: 'auto' | 'fixed';
+  /** Scoped table sizing/styles, for lists that need contained horizontal scroll. */
+  tableClassName?: string;
   className?: string;
 };
 
@@ -180,6 +182,7 @@ export function DataTable<TData, TValue>({
   loadingLabel,
   frameless = false,
   layout = 'auto',
+  tableClassName,
   className,
 }: DataTableProps<TData, TValue>) {
   const { t } = useLayoutTranslation('common');
@@ -443,6 +446,7 @@ export function DataTable<TData, TValue>({
           className={cn(
             'w-full border-collapse text-left',
             layout === 'fixed' && 'table-fixed',
+            tableClassName,
           )}
         >
           <thead>

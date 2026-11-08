@@ -1,5 +1,7 @@
 import type { PdfAsset, PdfDocument } from "../generated/prisma/client.js";
-export function pdfMetadata(doc: PdfDocument & { asset: PdfAsset }) {
+export function pdfMetadata(doc: Pick<PdfDocument, "placement" | "revision"> & {
+  asset: Pick<PdfAsset, "originalFilename" | "byteSize" | "pageCount">;
+}) {
   return {
     placement: doc.placement,
     revision: doc.revision,

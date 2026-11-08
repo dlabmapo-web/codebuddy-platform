@@ -28,7 +28,7 @@ setsid setpriv --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-
  bash "$native_artifact/tools/next-fixture-start.sh" "$native_work/next-source" "http://127.0.0.1:$COVE_NATIVE_AUTH_PORT" "http://127.0.0.1:$COVE_NATIVE_API_PORT" "$COVE_NATIVE_NEXT_ORIGIN" "$native_node" > "$native_work/evidence/next-server.log" 2>&1 & native_next=$!
 for native_try in {1..100}; do if curl -fsS "$COVE_NATIVE_NEXT_ORIGIN/login" >/dev/null; then break; fi; kill -0 "$native_next"; sleep .2; done
 # Strict growth stops after the first correctness/resource failure. Never run 200 here.
-for native_clients in 1 2 4; do
+for native_clients in 1 2 4 10; do
  for native_cases in 1 5 10; do
   setpriv --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs \
    "$native_node" --max-old-space-size=256 "$native_repo/packages/api/scripts/benchmark-native-classroom.mjs" \

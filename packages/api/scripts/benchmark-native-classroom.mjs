@@ -184,8 +184,12 @@ async function main() {
                         else {
                             const { page, student: prepared } = pages[i];
                             const acceptance = page.waitForResponse(r => r.request().method() === 'POST' && r.url().startsWith(fixture.next.apiOrigin + '/api/rpc') && r.url().includes('submit'), { timeout: Math.min(30000, remaining()) });
-                            await page.evaluate(() => { const initial = document.querySelector('[data-testid="result-hero"]')?.textContent ?? ''; window.__nativeObservedChange = false; window.__nativeResultObserver = new MutationObserver(() => { const next = document.querySelector('[data-testid="result-hero"]')?.textContent ?? ''; if (next !== initial)
-                                window.__nativeObservedChange = true; }); window.__nativeResultObserver.observe(document.body, { childList: true, subtree: true, characterData: true }); return performance.now(); });
+                            const expectedHeading = fixture.next.headings?.[student.workload.kind] ?? student.workload.heading;
+                            // Also stamps the DOM mutation that shows the expected verdict, so the report separates
+                            // the page's own display time from the driver's later observation of it.
+                            await page.evaluate(heading => { const initial = document.querySelector('[data-testid="result-hero"]')?.textContent ?? ''; window.__nativeObservedChange = false; window.__nativeRenderedAt = undefined; window.__nativeResultObserver = new MutationObserver(() => { const next = document.querySelector('[data-testid="result-hero"]')?.textContent ?? ''; if (next !== initial)
+                                window.__nativeObservedChange = true; if (window.__nativeObservedChange && window.__nativeClick && window.__nativeRenderedAt === undefined && [...document.querySelectorAll('h1,h2,h3,h4,h5,h6,[role="heading"]')].some(h => h.textContent?.trim() === heading))
+                                window.__nativeRenderedAt = performance.now(); }); window.__nativeResultObserver.observe(document.body, { childList: true, subtree: true, characterData: true }); return performance.now(); }, expectedHeading);
                             const submitButton = page.getByRole('button', { name: fixture.next.submitLabel ?? 'Submit', exact: true });
                             await submitButton.evaluate(button => button.addEventListener('click', event => { window.__nativeClick = { trusted: event.isTrusted, monotonic: performance.now(), epoch: performance.timeOrigin + performance.now(), alignmentMs: Date.now() - (performance.timeOrigin + performance.now()) }; }, { capture: true, once: true }));
                             await page.getByRole('button', { name: fixture.next.submitLabel ?? 'Submit', exact: true }).click({ timeout: Math.min(15000, remaining()) });
@@ -198,7 +202,7 @@ async function main() {
                             await page.getByRole('heading', { name: fixture.next.headings?.[student.workload.kind] ?? student.workload.heading, exact: true }).waitFor({ state: 'visible', timeout: Math.min(30000, remaining()) });
                             await page.waitForFunction(() => window.__nativeObservedChange, {}, { timeout: Math.min(15000, remaining()) });
                             // Browser-local monotonic clock includes actual click/Next/BFF/SSE/render path.
-                            const observed = await page.evaluate(() => ({ displayMs: performance.now() - window.__nativeClick.monotonic, ...window.__nativeClick }));
+                            const observed = await page.evaluate(() => ({ displayMs: performance.now() - window.__nativeClick.monotonic, renderedMs: window.__nativeRenderedAt === undefined ? null : window.__nativeRenderedAt - window.__nativeClick.monotonic, ...window.__nativeClick }));
                             if (!observed.trusted || Math.abs(observed.alignmentMs) > 5)
                                 throw Error('Untrusted or unaligned actual Submit click clock');
                             starts.push(observed.epoch);

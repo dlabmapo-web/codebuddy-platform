@@ -100,20 +100,24 @@ export const nativeMaterialEligibilitySchema = z
     { message: "Certified case timeout cannot be lower than the exercise default" },
   );
 /**
- * Every exercise of an academy, or of a whole organization when `academyId` is
- * absent, whose authored limits fit the node: memory within its certified
- * class and no case longer than `maxCaseTimeLimitMs`. Edits keep their
- * admission, and exercises outside these limits stay on compatibility grading.
+ * Every exercise of an academy, of a whole organization when `academyId` is
+ * absent, or of the whole platform when both are absent, whose authored limits
+ * fit the node: memory within its certified class and no case longer than
+ * `maxCaseTimeLimitMs`. Edits keep their admission, and exercises outside
+ * these limits stay on compatibility grading.
  */
 export const nativeScopeEligibilitySchema = z
   .object({
-    organizationId: z.string().uuid(),
+    organizationId: z.string().uuid().optional(),
     academyId: z.string().uuid().optional(),
     contexts: z.array(z.enum(["live", "preview"])).min(1).max(2),
     kinds: z.array(nativeAdmissionKindSchema).min(1).max(4),
     maxCaseTimeLimitMs: z.number().int().min(1).max(120_000),
   })
-  .strict();
+  .strict()
+  .refine((entry) => entry.academyId === undefined || entry.organizationId !== undefined, {
+    message: "An academy scope names its organization",
+  });
 export const nativeEligibilitySchema = z.union([
   nativeMaterialEligibilitySchema,
   nativeScopeEligibilitySchema,

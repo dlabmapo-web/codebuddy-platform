@@ -77,6 +77,23 @@ describe("native admission and immutable contracts", () => {
     expect(nativeReleaseManifestSchema.safeParse({ ...fixture, eligibility: [{ ...academyScope, contexts: [] }] }).success).toBe(false);
     expect(nativeReleaseManifestSchema.safeParse({ ...fixture, eligibility: [{ ...academyScope, materialId: id }] }).success).toBe(false);
   });
+  it("admits every academy of the platform, follows a replaced manifest and falls back while it is missing", async () => {
+    const livePath = join(directory, "live-manifest.json");
+    const platform = { contexts: ["live", "preview"], kinds: ["official", "staff-practice", "sample", "regrade"], maxCaseTimeLimitMs: 60_000 };
+    const live = admission({ NATIVE_GRADING_MANIFEST: livePath }).admission;
+    // Before the node has published its manifest, new work stays on compatibility grading.
+    expect(await live.select(context, exercise)).toBeNull();
+    await writeFile(livePath, JSON.stringify({ ...fixture, eligibility: [platform] }));
+    const elsewhere = { ...context, academyId: "20000000-0000-4000-8000-000000000001", materialId: "30000000-0000-4000-8000-000000000001" };
+    expect(await live.select(elsewhere, exercise)).toEqual(fixture.descriptor);
+    // A node release rewrites the manifest; admission follows its new runtime.
+    const next = { ...fixture.descriptor, pythonVersion: "3.12.13" };
+    await writeFile(livePath, JSON.stringify({ ...fixture, descriptor: next, eligibility: [platform] }));
+    expect(await live.select(elsewhere, exercise)).toEqual(next);
+    await rm(livePath);
+    expect(await live.select(elsewhere, exercise)).toBeNull();
+    expect(nativeReleaseManifestSchema.safeParse({ ...fixture, eligibility: [{ ...platform, academyId: id }] }).success).toBe(false);
+  });
   it("loads one immutable bounded manifest and refuses malformed explicit identities", async () => {
     const loaded = await loadNativeManifest(path); expect(Object.isFrozen(loaded.descriptor.comparator)).toBe(true);
     expect(frozenNativeDescriptor(null)).toBeNull(); expect(() => frozenNativeDescriptor({ engine: "pyodide" })).toThrow();

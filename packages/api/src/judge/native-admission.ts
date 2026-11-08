@@ -1,4 +1,5 @@
-import { open } from "node:fs/promises";
+import { open, stat } from "node:fs/promises";
+import { Logger } from "@nestjs/common";
 import { nativeReleaseManifestSchema, nativeRuntimeDescriptorSchema, type NativeReleaseManifest, type NativeRuntimeDescriptor } from "@cove/shared";
 import type { Prisma } from "../generated/prisma/client.js";
 import type { PrismaService } from "../database/prisma.service.js";
@@ -48,21 +49,47 @@ export type NativeAdmissionContext = {
   context: "live" | "preview"; kind: "official" | "staff-practice" | "sample" | "regrade";
 };
 export class NativeAdmission {
+  private readonly logger = new Logger(NativeAdmission.name);
   private manifest?: Promise<NativeReleaseManifest>;
+  /** The manifest file's identity when `manifest` was read; a new node release rewrites it. */
+  private loaded?: { path: string; mtimeMs: number; size: number; ino: number };
+  private lastFailureLog = 0;
   constructor(private readonly config: { get(key: string): unknown }, private readonly prisma: PrismaService, private readonly queue?: JudgeQueue) {}
   async select(context: NativeAdmissionContext, exercise: ExerciseGradingSource, reader: Pick<Prisma.TransactionClient, "academy"> = this.prisma): Promise<NativeRuntimeDescriptor | null> {
     if (this.config.get("NATIVE_GRADING_ENABLED") !== true || !this.queue) return null;
     if (this.config.get("NATIVE_GRADING_BRIDGE_ACK") !== "filtered-compatibility-workers-v1") throw new Error("Native admission requires completed filtered compatibility worker rollout");
     const path = this.config.get("NATIVE_GRADING_MANIFEST") as string | undefined;
     if (!path) throw new Error("Enabled native admission requires a manifest");
-    const manifest = await (this.manifest ??= loadNativeManifest(path));
+    // The node publishes its manifest when it starts. Until it has, or while it
+    // is unreadable, new work goes to compatibility grading rather than failing.
+    let manifest: NativeReleaseManifest;
+    try { manifest = await this.current(path); } catch (error) {
+      if (Date.now() - this.lastFailureLog > 60_000) {
+        this.lastFailureLog = Date.now();
+        this.logger.warn(`native manifest unavailable, using compatibility grading: ${String(error)}`);
+      }
+      return null;
+    }
     return this.certified(manifest, context, exercise, reader, true);
+  }
+  /** One stat per admission; the file is re-read only when a node release replaced it. */
+  private async current(path: string): Promise<NativeReleaseManifest> {
+    const info = await stat(path);
+    const loaded = this.loaded;
+    if (!this.manifest || !loaded || loaded.path !== path || loaded.mtimeMs !== info.mtimeMs || loaded.size !== info.size || loaded.ino !== info.ino) {
+      this.loaded = { path, mtimeMs: info.mtimeMs, size: info.size, ino: info.ino };
+      const reading = loadNativeManifest(path);
+      // A failed read is retried on the next admission, never cached.
+      reading.catch(() => { if (this.manifest === reading) { this.manifest = undefined; this.loaded = undefined; } });
+      this.manifest = reading;
+    }
+    return this.manifest;
   }
   /** Repairs retain their original family. A new native revision needs explicit certification. */
   async retain(descriptor: NativeRuntimeDescriptor, context: NativeAdmissionContext, exercise: ExerciseGradingSource, reader: Pick<Prisma.TransactionClient, "academy"> = this.prisma) {
     const path = this.config.get("NATIVE_GRADING_MANIFEST") as string | undefined;
     if (!path || !this.queue) throw new Error("Native repair requires retained certification");
-    const manifest = await (this.manifest ??= loadNativeManifest(path));
+    const manifest = await this.current(path);
     // Accepted repairs wait for their recorded capacity; Redis availability cannot change their durable intent.
     const selected = await this.certified(manifest, context, exercise, reader, false);
     if (!selected || runtimeQueueName("official", descriptor) !== runtimeQueueName("official", selected)) throw new Error("Native repair is not certified for its retained runtime");
@@ -76,13 +103,14 @@ export class NativeAdmission {
     const benchmarkSized = exercise.testCases.length <= 10 &&
       Buffer.byteLength(exercise.testCases.map(c => c.input).join(""), "utf8") <= 65536;
     const academy = await reader.academy.findUnique({ where: { id: context.academyId }, select: { organizationId: true } });
-    if (!academy || !manifest.eligibility.some(e => e.organizationId === academy.organizationId && e.kinds.includes(context.kind) &&
+    if (!academy || !manifest.eligibility.some(e => e.kinds.includes(context.kind) &&
       ("materialId" in e
-        ? benchmarkSized && e.academyId === context.academyId && e.materialId === context.materialId &&
+        ? benchmarkSized && e.organizationId === academy.organizationId && e.academyId === context.academyId && e.materialId === context.materialId &&
           e.gradingRevision === context.gradingRevision && e.context === context.context &&
           e.memoryLimitMb === exercise.memoryLimitMb && e.timeLimitMs === exercise.timeLimitMs &&
           longestCaseMs <= (e.maxCaseTimeLimitMs ?? e.timeLimitMs)
-        : (e.academyId === undefined || e.academyId === context.academyId) &&
+        : (e.organizationId === undefined || e.organizationId === academy.organizationId) &&
+          (e.academyId === undefined || e.academyId === context.academyId) &&
           e.contexts.includes(context.context) && longestCaseMs <= e.maxCaseTimeLimitMs))) return null;
     if (!requireReady) return manifest.descriptor;
     const redis = await this.queue!.redis();

@@ -21,6 +21,10 @@ import { ExecutionCapacity } from "./execution-capacity.js";
 import { practiceSnapshotSchema } from "./practice-snapshot.js";
 import { RuntimeRecovery } from "./runtime-recovery.js";
 import type { Worker } from "bullmq";
+import { setTimeout as delay } from "node:timers/promises";
+
+/** Within the production stop grace period; the node is already withdrawn from admission. */
+const NATIVE_DRAIN_MS = 5 * 60_000;
 
 /** Execution nodes need no API/Supabase/BFF credentials. Pool arithmetic is an explicit fleet budget. */
 export const nativeWorkerEnvironmentSchema = z.object({
@@ -75,12 +79,26 @@ export async function bootstrapNativeWorker(configuration: Record<string, unknow
     const redis = await queue.redis();
     await Promise.all(lanes.map(lane => redis.zrem(nativeReadinessKey(manifest.descriptor, lane), nodeId)));
   };
+  // Withdrawn readiness stops new admission here at once. Work already queued
+  // for this runtime is finished before the consumers close, so a release that
+  // replaces the node never strands accepted submissions on a queue nobody serves.
+  const drain = async () => {
+    const end = Date.now() + NATIVE_DRAIN_MS;
+    const queues = background ? [queue.queue, queue.practiceQueue, queue.regradeQueue, queue.sampleQueue] : [queue.queue];
+    while (Date.now() < end) {
+      const counts = await Promise.all(queues.map(q => q.getJobCounts("waiting", "prioritized", "delayed", "active")));
+      if (counts.every(c => !c.waiting && !c.prioritized && !c.delayed && !c.active)) return;
+      await delay(250);
+    }
+  };
   const close = async () => {
     if (stopped) return;
     stopped = true;
-    clearInterval(pulse); clearInterval(sweep); gate.stop();
+    clearInterval(pulse); clearInterval(sweep);
     await Promise.all([readinessWork, recoveryWork]);
     await withdraw().catch(() => undefined);
+    if (workers.length) await drain().catch(error => console.error("native drain failed", String(error)));
+    gate.stop();
     process.off("SIGTERM", onSignal); process.off("SIGINT", onSignal);
     await Promise.all(workers.map(w => w.close()));
     await monitor?.close();

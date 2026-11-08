@@ -53,6 +53,10 @@ for image_variable in HOME_IMAGE STUDIO_IMAGE API_IMAGE JUDGE_IMAGE MIGRATION_IM
   [[ "$image_value" =~ ^ghcr\.io/[a-z0-9_.-]+/[a-z0-9_.-]+:sha-[0-9a-f]{40}$ ]] \
     || fail "$image_variable must be a private GHCR image pinned to sha-<40 lowercase hex>"
 done
+if [[ -n "${NATIVE_IMAGE:-}" ]]; then
+  [[ "$NATIVE_IMAGE" =~ ^ghcr\.io/[a-z0-9_.-]+/[a-z0-9_.-]+:sha-[0-9a-f]{40}$ ]] \
+    || fail "NATIVE_IMAGE must be pinned to the approved release SHA"
+fi
 if feature_enabled VIDEO_LESSONS_ENABLED; then
   [[ "${VIDEO_WORKER_IMAGE:-}" =~ ^ghcr\.io/[a-z0-9_.-]+/[a-z0-9_.-]+:sha-[0-9a-f]{40}$ ]] \
     || fail "VIDEO_WORKER_IMAGE must be pinned to the approved release SHA"

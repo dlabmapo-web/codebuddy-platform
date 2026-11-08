@@ -43,6 +43,7 @@ rollback_on_error() {
     fi
     "$script_dir/publish-turtle-browser.sh" || { printf 'Previous runtime assets could not be restored.\n' >&2; exit "$status"; }
     compose up -d --remove-orphans || true
+    stop_native_without_image
   fi
   exit "$status"
 }
@@ -59,6 +60,9 @@ fi
 if feature_enabled GUI_ENABLED; then
   compose pull gui-service
   "$script_dir/pin-gui-runtime.sh"
+fi
+if native_enabled; then
+  compose pull native-grader
 fi
 "$script_dir/publish-turtle-browser.sh"
 compose --profile operations run --rm migrate

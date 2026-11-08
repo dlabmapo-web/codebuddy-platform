@@ -32,6 +32,7 @@ updates = {
     "STUDIO_IMAGE": f"{namespace}/cove-studio:{tag}",
     "API_IMAGE": f"{namespace}/cove-api:{tag}",
     "JUDGE_IMAGE": f"{namespace}/cove-judge:{tag}",
+    "NATIVE_IMAGE": f"{namespace}/cove-native:{tag}",
     "MIGRATION_IMAGE": f"{namespace}/cove-migration:{tag}",
     "VIDEO_WORKER_IMAGE": f"{namespace}/cove-video-worker:{tag}",
     "GUI_SERVICE_IMAGE": f"{namespace}/cove-gui-service:{tag}",
@@ -70,7 +71,8 @@ for line in path.read_text().splitlines():
         seen.add(key)
     else:
         lines.append(line)
-optional = {"VIDEO_WORKER_IMAGE", "GUI_SERVICE_IMAGE", "GUI_RUNTIME_IMAGE", "DLAB_OS_BASE_URL"}
+# NATIVE_IMAGE is appended on the first release that adds the native node.
+optional = {"VIDEO_WORKER_IMAGE", "GUI_SERVICE_IMAGE", "GUI_RUNTIME_IMAGE", "DLAB_OS_BASE_URL", "NATIVE_IMAGE"}
 optional.update(browser_keys)
 optional.update(key for key in updates if key.endswith("_ENABLED"))
 missing = (updates.keys() - optional) - seen

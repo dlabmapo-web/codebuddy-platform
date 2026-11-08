@@ -15,6 +15,9 @@ compose() {
   if feature_enabled GUI_ENABLED; then
     profiles+=(--profile gui)
   fi
+  if native_enabled; then
+    profiles+=(--profile native)
+  fi
   docker compose \
     --project-directory "$deploy_root" \
     --env-file "$deployment_env" \
@@ -36,6 +39,25 @@ for line in pathlib.Path(sys.argv[1]).read_text().splitlines():
         values[key.strip()] = value.strip().strip("\"'")
 sys.exit(0 if values.get(sys.argv[2]) == "true" else 1)
 PY
+}
+
+# The native grading node runs when the release pins its image.
+native_enabled() {
+  [[ -f "$deployment_env" ]] && grep -Eq '^NATIVE_IMAGE=ghcr\.io/' "$deployment_env"
+}
+
+# After restoring a release without the native node: its API no longer admits
+# native work, so stopping the node (which first finishes queued native work)
+# leaves nothing behind.
+stop_native_without_image() {
+  if ! native_enabled; then
+    docker compose \
+      --project-directory "$deploy_root" \
+      --env-file "$deployment_env" \
+      -f "$compose_file" \
+      --profile native \
+      stop --timeout 360 native-grader || true
+  fi
 }
 
 stop_learning_services() {

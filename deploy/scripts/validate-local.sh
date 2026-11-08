@@ -82,6 +82,29 @@ if any(volume.get("target") == "/var/run/docker.sock" for volume in services["vi
     raise SystemExit("Video worker must never have Docker access")
 print("Optional learning profiles: private GUI control network and isolated video worker")
 PY
+native_json="$(validation_compose --profile native config --format json)"
+python3 - "$native_json" <<'PY'
+import json, sys
+services = json.loads(sys.argv[1])["services"]
+node, api = services["native-grader"], services["api"]
+assert not node.get("ports") and not node.get("privileged") and node.get("network_mode") is None
+assert set(node["networks"]) == {"backend", "egress"}
+assert not any(v.get("target") == "/var/run/docker.sock" for v in node.get("volumes", []))
+assert node["cap_drop"] == ["ALL"]
+assert set(node["cap_add"]) == {"SYS_ADMIN", "SYS_PTRACE", "SETUID", "SETGID", "SYS_RESOURCE", "DAC_OVERRIDE", "CHOWN", "SETPCAP"}
+assert "no-new-privileges:true" in node["security_opt"] and node["read_only"] and node["cgroup"] == "private"
+# The launcher refuses an envelope that differs from its manifest sizing.
+sizing = json.loads(node["environment"]["NATIVE_NODE_RESOURCES"])
+assert float(node["cpus"]) == sizing["cpuSlots"]
+assert int(node["mem_limit"]) == int(node["memswap_limit"]) == sizing["envelopeMemoryMb"] * 1024**2
+assert int(node["pids_limit"]) == 256
+scope = json.loads(node["environment"]["NATIVE_ELIGIBILITY"])
+assert scope and all("materialId" not in entry for entry in scope)
+assert api["environment"]["NATIVE_GRADING_MANIFEST"] == "/run/cove-native-shared/manifest.json"
+assert any(v["target"] == "/run/cove-native-shared" and v.get("read_only") for v in api["volumes"])
+assert any(v["target"] == "/run/cove-native-shared" and not v.get("read_only") for v in node["volumes"])
+print("Native node: no ports or Docker access, minimal capabilities, envelope matches its manifest")
+PY
 
 # The shared-VPS pilot must use the rootless socket, no published ports, and
 # the same private control network as the API/Caddy, never course Docker.

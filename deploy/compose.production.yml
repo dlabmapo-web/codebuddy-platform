@@ -153,6 +153,11 @@ services:
       TURTLE_TRIAL_BROWSER_RUNTIME_ID: ${TURTLE_TRIAL_BROWSER_RUNTIME_ID:-}
       TURTLE_TRIAL_BROWSER_RETAINED_RUNTIME_IDS: ${TURTLE_TRIAL_BROWSER_RETAINED_RUNTIME_IDS:-}
       TURTLE_TRIAL_BROWSER_PILOT_ACADEMY_IDS: ${TURTLE_TRIAL_BROWSER_PILOT_ACADEMY_IDS:-}
+      # New work goes to native grading while the node reports ready, and to
+      # judge-worker otherwise. Set false in deployment.env to stop admitting it.
+      NATIVE_GRADING_ENABLED: ${NATIVE_GRADING_ENABLED:-true}
+      NATIVE_GRADING_BRIDGE_ACK: filtered-compatibility-workers-v1
+      NATIVE_GRADING_MANIFEST: /run/cove-native-shared/manifest.json
     networks:
       - edge
       - backend
@@ -160,6 +165,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    volumes:
+      - native_manifest:/run/cove-native-shared:ro
     tmpfs:
       # Two concurrent PDF uploads may each use 95 MB while validating.
       - /tmp:rw,noexec,nosuid,size=256m,uid=1001,gid=1001
@@ -333,6 +340,84 @@ services:
     mem_limit: 1280m
     cpus: 1.50
     pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
+
+  # Native CPython grading (packages/grading-runtime): every case runs in a
+  # fresh NsJail jail with its own user, mount, PID, IPC, network, UTS and
+  # cgroup namespaces, a read-only Python root, default-deny seccomp and its
+  # own memory, CPU, PID and output limits. The container's cgroup is the node
+  # envelope the launcher verifies before it reports ready: 3 CPU slots, their
+  # memory (512 MiB cases), no swap and 256 tasks. The API admits work here only
+  # while that readiness is current, so judge-worker grades everything else.
+  #
+  # No published ports and no Docker socket. The launcher needs the listed
+  # capabilities and unconfined AppArmor/seccomp to create each jail's
+  # namespaces and mounts; the worker holding database and Redis credentials
+  # drops every capability (deploy/native/start-node.sh), and learner code gets
+  # none of either. `docker compose run --rm native-grader qualify` runs the
+  # real-kernel containment checks on this host.
+  native-grader:
+    image: ${NATIVE_IMAGE:-ghcr.io/dlabmapo-web/cove-native:disabled}
+    # Enabled by NATIVE_IMAGE in deployment.env (scripts/common.sh), so a
+    # rollback to a release without the node still starts everything else.
+    profiles: [native]
+    restart: unless-stopped
+    init: true
+    user: "0:0"
+    entrypoint: ["/bin/sh", "/opt/cove/tools/container-node.sh"]
+    command: ["serve"]
+    read_only: true
+    cgroup: private
+    security_opt:
+      - no-new-privileges:true
+      - apparmor=unconfined
+      - seccomp=unconfined
+    cap_drop:
+      - ALL
+    cap_add:
+      - SYS_ADMIN
+      - SYS_PTRACE
+      - SETUID
+      - SETGID
+      - SYS_RESOURCE
+      - DAC_OVERRIDE
+      - CHOWN
+      - SETPCAP
+    env_file:
+      - ./secrets/api.env
+    environment:
+      # Must match cpus/mem_limit below: the launcher refuses a different envelope.
+      NATIVE_NODE_RESOURCES: '{"cpuSlots":3,"officialReservedSlots":1,"envelopeMemoryMb":3376,"serviceOverheadMb":1024,"officialReservedMemoryMb":656,"maxCaseMemoryMb":512,"caseOverheadMb":128,"scratchMb":16,"maxCasePids":8}'
+      # Every academy; exercises above 512 MiB or a 60 s case stay on judge-worker.
+      NATIVE_ELIGIBILITY: '[{"contexts":["live","preview"],"kinds":["official","staff-practice","sample","regrade"],"maxCaseTimeLimitMs":60000}]'
+      NATIVE_HEALTH_PORT: "4102"
+    networks:
+      - backend
+      - egress
+    volumes:
+      - native_manifest:/run/cove-native-shared
+    tmpfs:
+      - /run/cove-native:rw,nosuid,nodev,noexec,size=64m,mode=0700
+      - /tmp:rw,nosuid,nodev,noexec,size=64m
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/opt/cove/node", "-e", "fetch('http://127.0.0.1:4102/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+    # Withdrawn readiness, then queued native work finishes (native-worker.ts).
+    stop_grace_period: 6m
+    cpus: 3
+    mem_limit: 3376m
+    memswap_limit: 3376m
+    pids_limit: 256
     logging:
       driver: json-file
       options:
@@ -604,6 +689,8 @@ secrets:
 volumes:
   # The judge ↔ sandbox socket, and nothing else.
   judge_sandbox_socket:
+  # The native node's manifest for API admission: identity, sizing and scope.
+  native_manifest:
   caddy_data:
   caddy_config:
   caddy_logs:

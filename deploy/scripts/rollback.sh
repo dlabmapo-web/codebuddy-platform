@@ -21,8 +21,12 @@ if feature_enabled GUI_ENABLED; then
   compose pull gui-service
   "$script_dir/pin-gui-runtime.sh"
 fi
+if native_enabled; then
+  compose pull native-grader
+fi
 "$script_dir/publish-turtle-browser.sh"
 compose up -d --remove-orphans
+stop_native_without_image
 compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
 "$script_dir/wait-healthy.sh"
 "$script_dir/smoke.sh"

@@ -100,6 +100,22 @@ judge only; the sandbox enforces whatever limit it receives. Change it in
 earlier ones are raw Pyodide time. A native-CPython engine uses scale 1. See the
 [design](../superpowers/specs/2026-11-06-elice-equivalent-time-limits-design.md).
 
+## Native grading
+
+New submissions, staff practice, server sample checks and repairs are graded by
+native CPython in a fresh NsJail jail per case (`native-grader`), at authored
+(Elice) time with no `JUDGE_TIME_SCALE`. The API sends work there only while the
+node reports ready, so `judge-worker` keeps grading during node restarts and
+for exercises above 512 MiB or with a case over 60 s. Prewarmed jails start a
+case in a few milliseconds.
+
+Measured on a GitHub x86 runner with two CPU slots (production has three), a
+ten-case submission took 0.29 s from admission to its committed grade for one
+student, and the last of ten students submitting together waited 2.9 s. One
+student saw the result 0.87 s after clicking Submit (80 ms emulated latency).
+Operations, sizing and the containment check command are in
+[deploy/native/README.md](../../deploy/native/README.md#production-node-compose).
+
 ## Reproducible local checks
 
 Run from the repository root with Docker available:

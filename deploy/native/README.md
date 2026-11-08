@@ -116,6 +116,42 @@ identity/code/output. The native family is explicit; the ordinary worker's
 `JUDGE_RUNTIME_FAMILY=pyodide` retains compatibility queues. Keep descriptor-bound
 workers/images for every accepted native queue until its replay window expires.
 
+## Production node (Compose)
+
+Production runs one node per host as the `native-grader` Compose service
+(`deploy/compose.production.yml`, profile `native`, enabled when the release pins
+`NATIVE_IMAGE`). `container-node.sh` makes the container's private cgroup
+namespace the envelope: it remounts that cgroup2 writable inside the container,
+moves every process into `service`, delegates cpu/memory/pids, generates the
+manifest from `NATIVE_NODE_RESOURCES` and `NATIVE_ELIGIBILITY`, and starts
+`start-node.sh`. Compose's `cpus`, `mem_limit`, `memswap_limit` and `pids_limit`
+must equal that sizing; the launcher refuses any other envelope, and
+`scripts/validate-local.sh` checks them together.
+
+The container has no published ports or Docker socket. It holds the
+capabilities the launcher needs and runs with unconfined AppArmor/seccomp so
+NsJail can create each jail's namespaces and mounts; the worker drops every
+capability, and each jail applies its own default-deny seccomp policy. It
+publishes the manifest (identity, sizing, scope; not secret) to the
+`native_manifest` volume, which the API reads, re-reading it when a node release
+replaces it. Admission needs that node's current readiness, so new work goes to
+`judge-worker` while the node is starting, stopped or unhealthy.
+
+Production sizing on the 4 vCPU / 16 GB Lightsail host: 3 CPU slots, one
+reserved for official grading, 512 MiB cases, a 3,376 MiB envelope (1,024 MiB
+service, 3 x 656 MiB cases, 384 MiB for twelve standbys). The scope is every
+academy; exercises above 512 MiB or with a case over 60 s stay on `judge-worker`.
+
+- Stop admitting native work: `NATIVE_GRADING_ENABLED=false` in
+  `deployment.env`, then `docker compose up -d api`. Accepted native work still
+  finishes on the node.
+- Containment checks on the real host, beside the running node (a separate
+  envelope): `docker compose --profile native run --rm native-grader qualify`.
+- On stop (each release replaces the node), the worker withdraws readiness,
+  finishes queued native work for up to five minutes, then closes
+  (`stop_grace_period` 6 minutes). A rollback to a release without
+  `NATIVE_IMAGE` stops the node the same way.
+
 ## Bounded measurement
 
 `pnpm --filter @cove/api benchmark:native-classroom --fixture /private/authority.json

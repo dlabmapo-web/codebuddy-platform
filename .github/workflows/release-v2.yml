@@ -116,8 +116,76 @@ jobs:
           ignore-unfixed: true
           exit-code: "1"
 
+  # The native grading node: its pinned guest (CPython, NsJail, policy) first,
+  # then the node packaging FROM that exact guest digest.
+  publish-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify release tag
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v2\.[0-9]+\.[0-9]+$ ]]
+          test "$(git rev-list -n 1 "$GITHUB_REF_NAME")" = "$GITHUB_SHA"
+          git fetch --no-tags origin feat/cove-studio-v2
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/feat/cove-studio-v2
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish the native grading guest
+        id: guest
+        uses: docker/build-push-action@v6
+        with:
+          context: packages/grading-runtime/guest
+          file: packages/grading-runtime/guest/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY_NAMESPACE }}/cove-native-guest:${{ env.IMAGE_TAG }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+      - name: Build and publish cove-native
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/native-grading.Dockerfile
+          push: true
+          build-args: |
+            NATIVE_GUEST_IMAGE=${{ env.REGISTRY_NAMESPACE }}/cove-native-guest@${{ steps.guest.outputs.digest }}
+          tags: |
+            ${{ env.REGISTRY_NAMESPACE }}/cove-native:${{ env.IMAGE_TAG }}
+            ${{ env.REGISTRY_NAMESPACE }}/cove-native:${{ github.ref_name }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Install verified Trivy release
+        run: bash deploy/scripts/install-trivy.sh
+
+      - name: Scan published image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          skip-setup-trivy: true
+          version: v0.70.0
+          image-ref: ${{ env.REGISTRY_NAMESPACE }}/cove-native:${{ env.IMAGE_TAG }}
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
   deploy:
-    needs: publish
+    needs: [publish, publish-native]
     runs-on: ubuntu-latest
     environment: production
     steps:

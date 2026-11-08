@@ -177,10 +177,26 @@ test("large invalid UTF-8 and tiny appends retain fixed bounded storage", () => 
   assert.ok(Buffer.byteLength(text) <= limit);
   assert.equal(text, "�".repeat(Math.floor(limit / 3)));
   assert.equal(capture.truncated, true);
-  // One fixed payload allocation; no per-write Buffer/array metadata growth.
+  // One contiguous buffer capped at the limit; no per-write Buffer/array metadata growth.
   const storage = capture as unknown as { buffer: Buffer; chunks?: unknown };
   assert.equal(storage.buffer.length, limit);
   assert.equal(storage.chunks, undefined);
+});
+test("output capture grows from a small buffer and keeps every byte up to the limit", () => {
+  const capture = new ByteCapture(8 * 1024 * 1024);
+  const storage = () => (capture as unknown as { buffer: Buffer }).buffer.length;
+  capture.append(Buffer.from("42\n"));
+  assert.equal(storage(), 16 * 1024);
+  const line = Buffer.from("한글 line\n");
+  let expected = "42\n";
+  for (let i = 0; i < 5000; i++) { capture.append(line); expected += line.toString(); }
+  assert.equal(capture.text(), expected);
+  assert.equal(capture.truncated, false);
+  assert.ok(storage() >= Buffer.byteLength(expected) && storage() <= 2 * Buffer.byteLength(expected));
+  const small = new ByteCapture(10);
+  small.append(Buffer.from("0123456789abc"));
+  assert.equal(small.text(), "0123456789");
+  assert.equal(small.truncated, true);
 });
 
 test("native result validation rejects multibyte output beyond byte allowance", async () => {

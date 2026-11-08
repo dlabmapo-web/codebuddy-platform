@@ -1,12 +1,19 @@
-import { readFile, writeFile, readdir, rmdir } from "node:fs/promises";
+import { readFileSync, writeFileSync, readdirSync, rmdirSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { NativeInfrastructureError } from "./contract.js";
 import { CleanupUncertainError } from "./service.js";
+/*
+ * Cgroup and /proc control files are kernel pseudo-files answered from memory,
+ * never a disk. Each case touches about forty; accessing them synchronously
+ * avoids a thread-pool round trip and a promise for every one.
+ */
 export const readControl = async (path: string) =>
-  (await readFile(path, "utf8")).trim();
+  readFileSync(path, "utf8").trim();
+export const writeControl = (path: string, value: string) =>
+  writeFileSync(path, value);
 export async function childGroups(path: string): Promise<string[]> {
-  return (await readdir(path, { withFileTypes: true }))
+  return readdirSync(path, { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .map((e) => join(path, e.name));
 }
@@ -25,7 +32,7 @@ export async function oomKills(path: string): Promise<number> {
   return Number(match[1]);
 }
 export async function killCgroup(path: string) {
-  await writeFile(join(path, "cgroup.kill"), "1");
+  writeControl(join(path, "cgroup.kill"), "1");
 }
 export async function cleanupCgroup(path: string, timeoutMs = 5000) {
   const end = performance.now() + timeoutMs;
@@ -39,7 +46,7 @@ export async function cleanupCgroup(path: string, timeoutMs = 5000) {
     }
     const remove = async (p: string) => {
       for (const child of await childGroups(p)) await remove(child);
-      await rmdir(p);
+      rmdirSync(p);
     };
     await remove(path);
   } catch (cause) {

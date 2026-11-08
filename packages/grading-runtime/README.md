@@ -98,14 +98,19 @@ no-new-privileges and a default-deny architecture-specific Kafel policy. Fork,
 clone, ptrace, sockets/connect, namespace and mount operations are denied.  Process/thread creation
 is deliberately unsupported and additionally bounded by the kernel PID limit.
 
-The immutable bootstrap reads source and stdin as JSON data. Before compiling or
-running source, it writes exactly one readiness byte on FD3 and waits. The host
-verifies child cgroup memory/swap/PID/CPU controls, UID/GID/capabilities,
-no-new-privileges, an additional seccomp filter, namespace separation, read-only
-root and bounded tmpfs through host `/proc`. Only then does it start a monotonic
-wall budget, sample kernel CPU consumption and send GO. The bootstrap closes FD3
-before learner compilation. It does not send trusted outcomes or timing. Source
-cannot choose argv, executable, mounts, environment, cgroups, policy or socket.
+The immutable bootstrap writes one readiness byte (`R`) on FD3 before any request
+exists, so jails can wait verified ahead of demand. The host verifies child cgroup
+memory/swap/PID/CPU controls, UID/GID/capabilities, no-new-privileges, an
+additional seccomp filter, namespace separation, read-only root and bounded tmpfs
+through host `/proc`. A claim applies the case's memory limits, then sends the
+request as data: one `cove-request-1` header line counting the source and stdin
+bytes that follow (not JSON, whose import cost every case about 7 ms). The
+bootstrap lowers its CPU-time rlimit to the case and acknowledges (`A`); the host
+reads the limit back from `/proc`, starts a monotonic wall budget, samples kernel
+CPU consumption no sooner than the case could reach its limit, and sends GO. The
+bootstrap closes FD3 before learner compilation. It does not send trusted outcomes
+or timing. Source cannot choose argv, executable, mounts, environment, cgroups,
+policy or socket.
 Top-level await remains a SyntaxError, matching the current Pyodide script runner; prompt INCLUDE/IGNORE, Unicode,
 `sys.stdin.buffer`, and SystemExit semantics are preserved for qualification.
 

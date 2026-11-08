@@ -50,17 +50,32 @@ export function encodeFrame(value: unknown, limit = FRAME_LIMIT): Buffer {
   return Buffer.concat([header, payload]);
 }
 /** Drop partial trailing codepoints: replacement characters may exceed byte budget. */
+/**
+ * Most programs print a few lines; allocating the whole allowance (8 MiB) for
+ * every case made allocation and garbage collection the launcher's largest
+ * cost. Storage starts here and doubles up to the limit.
+ */
+const INITIAL_CAPTURE_BYTES = 16 * 1024;
+/** One contiguous buffer bounded by `limit`; never a list of appended chunks. */
 export class ByteCapture {
-  private readonly buffer: Buffer;
+  private buffer: Buffer;
   private size = 0;
   truncated = false;
   constructor(readonly limit: number) {
     if (!Number.isSafeInteger(limit) || limit < 1)
       throw new Error("Invalid capture bound");
-    this.buffer = Buffer.allocUnsafe(limit);
+    this.buffer = Buffer.allocUnsafe(Math.min(limit, INITIAL_CAPTURE_BYTES));
   }
   append(chunk: Buffer) {
     const take = Math.min(chunk.length, this.limit - this.size);
+    if (this.size + take > this.buffer.length) {
+      let capacity = this.buffer.length;
+      while (capacity < this.size + take)
+        capacity = Math.min(this.limit, capacity * 2);
+      const grown = Buffer.allocUnsafe(capacity);
+      this.buffer.copy(grown, 0, 0, this.size);
+      this.buffer = grown;
+    }
     chunk.copy(this.buffer, this.size, 0, take);
     this.size += take;
     if (take < chunk.length) this.truncated = true;

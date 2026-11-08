@@ -5,11 +5,12 @@ import type { Duplex } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { mkdtemp, rm, writeFile, symlink, chmod } from "node:fs/promises";
 import { rootfsDigest } from "../src/identity.js";
+import { guestRequest } from "../src/launcher.js";
 const bootstrap = fileURLToPath(
   new URL("../guest/bootstrap.py", import.meta.url),
 );
 /** Trusted synthetic semantic test only: never used for learner execution/containment. */
-async function guest(code: string, stdin = "", inputPromptPolicy = "INCLUDE", timeLimitMs = 1000) {
+async function guest(code: string, stdin = "", inputPromptPolicy: "INCLUDE" | "IGNORE" = "INCLUDE", timeLimitMs = 1000) {
   const child = spawn("python3", ["-I", "-B", "-u", bootstrap], {
     stdio: ["pipe", "pipe", "pipe", "pipe"],
   });
@@ -23,7 +24,7 @@ async function guest(code: string, stdin = "", inputPromptPolicy = "INCLUDE", ti
   gate.on("data", (b) => {
     control += b;
     if (control === "R")
-      child.stdin.end(JSON.stringify({ code, stdin, inputPromptPolicy, timeLimitMs }));
+      child.stdin.end(guestRequest({ code, stdin, inputPromptPolicy, timeLimitMs, memoryLimitMb: 128 }));
     else if (control === "RA") gate.end("G");
   });
   const exit = await new Promise<number | null>((resolve, reject) => {
@@ -126,6 +127,24 @@ test("bootstrap lowers the CPU-time rlimit to the case before acknowledging", as
     "import resource\ntry:\n resource.setrlimit(resource.RLIMIT_CPU, (100, 100))\nexcept ValueError:\n print('refused')",
   );
   assert.equal(raised.stdout, "refused\n");
+});
+test("bootstrap refuses a malformed request before any source runs", async () => {
+  for (const request of [
+    Buffer.from('{"code":"print(1)","stdin":""}'),
+    Buffer.from("cove-request-1 8 0 INCLUDE 1000\nprint(1)extra"),
+    Buffer.from("cove-request-1 8 0 SOMETIMES 1000\nprint(1)"),
+  ]) {
+    const child = spawn("python3", ["-I", "-B", "-u", bootstrap], { stdio: ["pipe", "pipe", "pipe", "pipe"] });
+    let stdout = "";
+    child.stdout.on("data", (b) => (stdout += b));
+    (child.stdio[3] as Duplex).once("data", () => child.stdin.end(request));
+    const exit = await new Promise<number | null>((resolve) => child.once("close", resolve));
+    assert.equal(exit, 125);
+    assert.equal(stdout, "");
+  }
+});
+test("bootstrap no longer imports json or types for every case", async () => {
+  assert.equal((await guest("import sys; print('json' in sys.modules, 're' in sys.modules)")).stdout, "False False\n");
 });
 test("learner globals belong to the registered __main__ without bootstrap state", async () => {
   const result = await guest(

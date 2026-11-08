@@ -1,14 +1,13 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import {
-  readFile,
-  writeFile,
-  mkdir,
-  mkdtemp,
-  rm,
-  readlink,
-  lstat,
-  statfs,
-} from "node:fs/promises";
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { readFile, mkdir, readlink, lstat, statfs } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { arch, availableParallelism, totalmem } from "node:os";
@@ -43,6 +42,7 @@ import {
   oomKills,
   killCgroup,
   cleanupCgroup,
+  writeControl,
 } from "./cgroups.js";
 export type NsJailOptions = {
   manifest: NativeReleaseManifest;
@@ -73,6 +73,8 @@ export const standbyBackstopMs = (startupTimeoutMs = 10000, cleanupTimeoutMs = 5
  * budget in `ResourceBank` caps the total below this on a small node.
  */
 const STANDBY_PER_SLOT = 4;
+/** Shortest wait between CPU-time samples once a case nears its limit. */
+const CPU_SAMPLE_MIN_MS = 5;
 const NAMESPACES = ["mnt", "pid", "ipc", "net", "uts", "user", "cgroup"] as const;
 export class NsJailBackend implements NativeBackend {
   private prepared = false;
@@ -280,7 +282,7 @@ export class NsJailBackend implements NativeBackend {
     jail.inner = child;
     jail.pid = pids[0];
     const proc = `/proc/${pids[0]}`;
-    const status = await readFile(`${proc}/status`, "utf8");
+    const status = readFileSync(`${proc}/status`, "utf8");
     if (
       !/^Uid:\s+65534\s+65534\s+65534\s+65534$/m.test(status) ||
       !/^Gid:\s+65534\s+65534\s+65534\s+65534$/m.test(status) ||
@@ -303,9 +305,9 @@ export class NsJailBackend implements NativeBackend {
         "Guest seccomp filter was not installed",
       );
     for (const ns of NAMESPACES)
-      if ((await readlink(`${proc}/ns/${ns}`)) === own.namespaces.get(ns))
+      if (readlinkSync(`${proc}/ns/${ns}`) === own.namespaces.get(ns))
         throw new NativeInfrastructureError(`Missing private ${ns} namespace`);
-    const mounts = await readFile(`${proc}/mountinfo`, "utf8");
+    const mounts = readFileSync(`${proc}/mountinfo`, "utf8");
     const root = mounts.split("\n").find((x) => x.split(" ")[4] === "/");
     const tmp = mounts.split("\n").find((x) => x.split(" ")[4] === "/tmp");
     if (
@@ -363,25 +365,25 @@ export class NsJailBackend implements NativeBackend {
     signal?.addEventListener("abort", onAbort, { once: true });
     try {
       // Mark created before setting controls, so a partial setup still gets cleaned.
-      await mkdir(jail.cgroup, { mode: 0o700 });
+      mkdirSync(jail.cgroup, { mode: 0o700 });
       jail.created = true;
       // An unclaimed jail is kernel-capped well below any authored limit; claim raises it.
-      await writeFile(
+      writeControl(
         join(jail.cgroup, "memory.max"),
         String(STANDBY_MEMORY_MB * 1024 * 1024),
       );
-      await writeFile(join(jail.cgroup, "memory.swap.max"), "0");
-      await writeFile(join(jail.cgroup, "memory.oom.group"), "1");
-      await writeFile(join(jail.cgroup, "pids.max"), String(r.maxCasePids));
-      await writeFile(join(jail.cgroup, "cpu.max"), "100000 100000");
+      writeControl(join(jail.cgroup, "memory.swap.max"), "0");
+      writeControl(join(jail.cgroup, "memory.oom.group"), "1");
+      writeControl(join(jail.cgroup, "pids.max"), String(r.maxCasePids));
+      writeControl(join(jail.cgroup, "cpu.max"), "100000 100000");
       // A waiting standby yields CPU to running cases; claim restores the default.
-      if (standby) await writeFile(join(jail.cgroup, "cpu.weight"), "1");
-      await writeFile(
+      if (standby) writeControl(join(jail.cgroup, "cpu.weight"), "1");
+      writeControl(
         join(jail.cgroup, "cgroup.subtree_control"),
         "+cpu +memory +pids",
       );
-      jail.directory = await mkdtemp(join(o.workRoot, "case-"));
-      await writeFile(
+      jail.directory = mkdtempSync(join(o.workRoot, "case-"));
+      writeFileSync(
         join(jail.directory, "jail.cfg"),
         jailConfig(
           {
@@ -528,7 +530,7 @@ export class NsJailBackend implements NativeBackend {
     }
     if (jail.directory)
       try {
-        await rm(jail.directory, { recursive: true, force: true });
+        rmSync(jail.directory, { recursive: true, force: true });
       } catch (cause) {
         cleanupError = new CleanupUncertainError(
           "Native scratch cleanup uncertain",
@@ -641,9 +643,9 @@ export class NsJailBackend implements NativeBackend {
     const r = this.manifest.resources;
     const inner = String(request.memoryLimitMb * 1024 * 1024);
     const outer = String((request.memoryLimitMb + r.scratchMb) * 1024 * 1024);
-    await writeFile(join(jail.inner!, "memory.max"), inner);
-    await writeFile(join(jail.cgroup, "memory.max"), outer);
-    await writeFile(join(jail.cgroup, "cpu.weight"), "100");
+    writeControl(join(jail.inner!, "memory.max"), inner);
+    writeControl(join(jail.cgroup, "memory.max"), outer);
+    writeControl(join(jail.cgroup, "cpu.weight"), "100");
     if (
       (await readControl(join(jail.inner!, "memory.max"))) !== inner ||
       (await readControl(join(jail.cgroup, "memory.max"))) !== outer ||
@@ -678,10 +680,10 @@ export class NsJailBackend implements NativeBackend {
       gate.once("end", onEnd);
       signal.addEventListener("abort", onCancel, { once: true });
       if (signal.aborted) onCancel();
-      jail.child!.stdin!.end(JSON.stringify(request));
+      jail.child!.stdin!.end(guestRequest(request));
     });
     const seconds = String(cpuRlimitSeconds(request.timeLimitMs));
-    const limits = await readFile(`/proc/${jail.pid}/limits`, "utf8");
+    const limits = readFileSync(`/proc/${jail.pid}/limits`, "utf8");
     const cpu = /^Max cpu time\s+(\S+)\s+(\S+)\s+seconds\s*$/m.exec(limits);
     if (!cpu || cpu[1] !== seconds || cpu[2] !== seconds)
       throw new NativeInfrastructureError("Jail CPU rlimit mismatch");
@@ -713,7 +715,9 @@ export class NsJailBackend implements NativeBackend {
     let timedOut = false,
       started: number | undefined,
       cpuStart = 0,
-      monitor: ReturnType<typeof setInterval> | undefined,
+      monitor: ReturnType<typeof setTimeout> | undefined,
+      // A sample still in flight when the case ends must not schedule another.
+      watching = true,
       wall: ReturnType<typeof setTimeout> | undefined;
     let sample: Promise<void> | undefined;
     let fault: unknown;
@@ -762,28 +766,37 @@ export class NsJailBackend implements NativeBackend {
         abort();
       }, request.timeLimitMs);
       const cgroup = jail.cgroup;
-      monitor = setInterval(() => {
-        if (sample) return;
-        sample = cpuUsec(cgroup)
-          .then(
-            (usage) => {
-              if (usage - cpuStart >= request.timeLimitMs * 1000) {
-                timedOut = true;
+      // The case group runs on at most one CPU (its verified `cpu.max`), so its
+      // CPU time can reach the limit no sooner than the remaining allowance from
+      // now. Sample then rather than every 10 ms: a short case is never sampled.
+      const watch = (afterMs: number) => {
+        if (!watching) return;
+        monitor = setTimeout(() => {
+          sample = cpuUsec(cgroup)
+            .then(
+              (usage) => {
+                const remainingMs =
+                  request.timeLimitMs - (usage - cpuStart) / 1000;
+                if (remainingMs <= 0) {
+                  timedOut = true;
+                  abort();
+                } else watch(Math.max(CPU_SAMPLE_MIN_MS, remainingMs));
+              },
+              (error) => {
+                fault = error;
                 abort();
-              }
-            },
-            (error) => {
-              fault = error;
-              abort();
-            },
-          )
-          .finally(() => {
-            sample = undefined;
-          });
-      }, 10);
+              },
+            )
+            .finally(() => {
+              sample = undefined;
+            });
+        }, afterMs);
+      };
+      watch(request.timeLimitMs);
       const exit = await jail.processClosed!;
       clearTimeout(wall);
-      clearInterval(monitor);
+      watching = false;
+      clearTimeout(monitor);
       await sample;
       const runtimeMs = Math.max(0, performance.now() - started);
       cleanupStarted = performance.now();
@@ -818,7 +831,8 @@ export class NsJailBackend implements NativeBackend {
       draining();
       signal.removeEventListener("abort", abort);
       clearTimeout(wall);
-      clearInterval(monitor);
+      watching = false;
+      clearTimeout(monitor);
       if (completedResult) {
         // The supervisor has exited and every output pipe has closed, and policy
         // forbids process creation: nothing further can change this verdict.
@@ -852,6 +866,20 @@ export class NsJailBackend implements NativeBackend {
       if (!this.probing) this.replenish();
     }
   }
+}
+/**
+ * The request as the guest bootstrap reads it: one header line, then the
+ * source and stdin bytes it counts. Plain bytes keep `json` out of every case.
+ */
+export function guestRequest(request: NativeExecutionRequest): Buffer {
+  const code = Buffer.from(request.code, "utf8");
+  const stdin = Buffer.from(request.stdin, "utf8");
+  const policy = request.inputPromptPolicy ?? "INCLUDE";
+  return Buffer.concat([
+    Buffer.from(`cove-request-1 ${code.length} ${stdin.length} ${policy} ${request.timeLimitMs}\n`),
+    code,
+    stdin,
+  ]);
 }
 type Jail = {
   cgroup: string;

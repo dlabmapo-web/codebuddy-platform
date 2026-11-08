@@ -48,10 +48,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # @cove/shared and @cove/i18n are consumed as built packages, so they
-      # compile before anything type-checks against them.
+      # @cove/shared, @cove/i18n and @cove/grading-runtime are consumed as built
+      # packages, so they compile before anything type-checks against them.
       - name: Build shared packages
-        run: pnpm --filter @cove/shared --filter @cove/i18n build
+        run: pnpm --filter @cove/shared --filter @cove/i18n --filter @cove/grading-runtime build
 
       - name: Generate Prisma client
         run: pnpm --filter @cove/api db:generate

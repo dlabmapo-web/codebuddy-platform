@@ -85,7 +85,7 @@ jobs:
 
       - name: Build shared packages
         if: steps.preflight.outputs.configured == 'true'
-        run: pnpm --filter @cove/shared --filter @cove/i18n build
+        run: pnpm --filter @cove/shared --filter @cove/i18n --filter @cove/grading-runtime build
 
       - name: Generate Prisma client
         if: steps.preflight.outputs.configured == 'true'

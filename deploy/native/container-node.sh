@@ -43,7 +43,7 @@ fi
 # clean environment and learner jails never inherit one.
 umask 077
 "$node" -e '
-const { readFileSync, writeFileSync, renameSync } = require("node:fs");
+const { readFileSync, writeFileSync, renameSync, chmodSync } = require("node:fs");
 const [state, shared] = process.argv.slice(1);
 const config = JSON.parse(readFileSync(state + "/config.json", "utf8"));
 writeFileSync(state + "/manifest.json", JSON.stringify(config.manifest), { mode: 0o600 });
@@ -62,9 +62,13 @@ const env = process.env, worker = {
 };
 writeFileSync(state + "/worker.json", JSON.stringify(worker), { mode: 0o600 });
 // The API admits work by this manifest. Not secret: runtime identity, sizing and
-// scope. Replaced atomically so a reader never sees half of it.
-writeFileSync(shared + "/manifest.json.next", JSON.stringify(config.manifest), { mode: 0o644 });
+// scope. Replaced atomically so a reader never sees half of it. The umask above
+// would make it owner-only; the API reads it as another user, so set the mode.
+writeFileSync(shared + "/manifest.json.next", JSON.stringify(config.manifest));
+chmodSync(shared + "/manifest.json.next", 0o644);
 renameSync(shared + "/manifest.json.next", shared + "/manifest.json");
 ' "$state" "$shared"
 umask 022
+# An unreadable manifest silently sends every submission to judge-worker.
+[ "$(stat -c %a "$shared/manifest.json")" = 644 ] || { echo 'shared manifest must be world-readable' >&2; exit 78; }
 exec env -i PATH=/usr/bin:/bin /bin/bash "$artifact/tools/start-node.sh" "$artifact" "$state/config.json" "$state/worker.json"

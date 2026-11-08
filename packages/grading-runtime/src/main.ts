@@ -13,6 +13,7 @@ const schema = z
     policyPath: z.string(),
     cgroupRoot: z.string(),
     workRoot: z.string(),
+    standbyPerSlot: z.number().int().min(0).max(16).optional(),
   })
   .strict();
 const path = process.argv[2];

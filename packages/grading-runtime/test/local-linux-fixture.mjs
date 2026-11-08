@@ -74,7 +74,6 @@ const cfg = jailConfig(
     cgroup: "/sys/fs/cgroup",
     log: "/tmp/nsjail.log",
   },
-  { code: "print(1)", stdin: "", timeLimitMs: 1000, memoryLimitMb: 128 },
   resources,
 );
 await writeFile("/tmp/nsjail.cfg", cfg);

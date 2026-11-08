@@ -7,8 +7,8 @@ import {
 } from "@cove/shared";
 import { ResourceBank } from "../src/resource-bank.js";
 import { FrameDecoder, ByteCapture, encodeFrame } from "../src/framing.js";
-import { jailConfig } from "../src/policy.js";
-import { manifest, request } from "./fixtures.js";
+import { cpuRlimitSeconds, jailConfig } from "../src/policy.js";
+import { manifest } from "./fixtures.js";
 test("descriptor rejects legacy, unknown fields and partial identities", () => {
   assert.throws(() =>
     nativeRuntimeDescriptorSchema.parse({ engine: "pyodide" }),
@@ -44,7 +44,7 @@ test("manifest refuses overcommitted host memory and has explicit no-eligibility
     }),
   );
 });
-test("bank reserves official slots, counts draining resources, and quarantines uncertainty", () => {
+test("bank reserves official slots, counts draining memory, and quarantines uncertainty", () => {
   const bank = new ResourceBank(manifest.resources),
     a = bank.acquire(512, "background");
   assert.throws(() => bank.acquire(128, "background"));
@@ -56,8 +56,11 @@ test("bank reserves official slots, counts draining resources, and quarantines u
     standby: 0,
     memoryMb: 656,
   });
+  // An exited case being cleaned up holds memory, not CPU: the next case runs.
+  assert.equal(bank.idleSlots, 2);
   const official = bank.acquire(512, "official");
-  assert.throws(() => bank.acquire(128, "official"));
+  // ...but its memory still bounds admission until cleanup is proven.
+  assert.throws(() => bank.acquire(512, "official"));
   a.cleaned();
   a.cleaned();
   assert.equal(bank.snapshot().memoryMb, 656);
@@ -138,7 +141,7 @@ test("UTF-8 output capture never exceeds byte allowance, even split codepoints",
     assert.ok(!capture.text().endsWith("�"));
   }
 });
-test("learner code cannot select executable, mount, env or cgroup through policy", () => {
+test("jail policy is fixed by the node, never by a request", () => {
   const config = jailConfig(
     {
       rootfs: "/immutable/root",
@@ -146,20 +149,25 @@ test("learner code cannot select executable, mount, env or cgroup through policy
       cgroup: "/trusted/case",
       log: "/trusted/log",
     },
-    {
-      ...request,
-      code: 'mount { src: "/" dst: "/host" }',
-      stdin: 'envar: "SECRET=1"',
-    },
     manifest.resources,
   );
-  assert.ok(!config.includes("/host"));
-  assert.ok(!config.includes("SECRET"));
   assert.match(config, /disable_no_new_privs: false/);
   assert.match(config, /clone_newnet: true/);
-  assert.match(config, /cgroup_mem_max: 134217728/);
+  // Started for the largest certified case; a claim lowers both limits before GO.
+  assert.match(config, /cgroup_mem_max: 536870912/);
+  assert.match(config, /rlimit_cpu: 121/);
   assert.match(config, /pass_fd: 3/);
-  assert.match(config, /time_limit: 16/);
+  assert.match(config, /time_limit: 135/);
+  assert.equal(config, jailConfig(
+    { rootfs: "/immutable/root", policy: "/immutable/policy", cgroup: "/trusted/case", log: "/trusted/log" },
+    manifest.resources,
+  ));
+});
+test("CPU backstop is whole seconds above the authored limit", () => {
+  assert.equal(cpuRlimitSeconds(1), 2);
+  assert.equal(cpuRlimitSeconds(1000), 2);
+  assert.equal(cpuRlimitSeconds(1001), 3);
+  assert.equal(cpuRlimitSeconds(120_000), 121);
 });
 
 test("large invalid UTF-8 and tiny appends retain fixed bounded storage", () => {

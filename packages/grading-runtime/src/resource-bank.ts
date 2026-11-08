@@ -34,9 +34,20 @@ export class ResourceBank {
     }
     return { active, draining, quarantined, standby: this.standby, memoryMb };
   }
-  /** CPU slots not held by any allocation; prewarming may only use spare CPU. */
+  /**
+   * A CPU slot is held while learner code can run. A draining allocation has
+   * exited and holds only memory until its cleanup is proven; a quarantined one
+   * keeps its slot, and the bank is unready anyway.
+   */
+  private get busySlots() {
+    let busy = 0;
+    for (const allocation of this.allocations.values())
+      if (allocation.state !== "draining") busy++;
+    return busy;
+  }
+  /** CPU slots no running case holds; prewarming prefers spare CPU. */
   get idleSlots() {
-    return Math.max(0, this.resources.cpuSlots - this.allocations.size);
+    return Math.max(0, this.resources.cpuSlots - this.busySlots);
   }
   /**
    * Idle prewarmed jails hold no CPU slot and are kernel-capped at `memoryMb`.
@@ -89,7 +100,7 @@ export class ResourceBank {
       (lane === "background" ? r.officialReservedMemoryMb : 0);
     if (
       !this.ready ||
-      this.allocations.size >= slots ||
+      this.busySlots >= slots ||
       used.memoryMb + memory > available
     )
       throw new NativeInfrastructureError("Native capacity unavailable");

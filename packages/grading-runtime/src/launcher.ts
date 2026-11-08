@@ -27,7 +27,7 @@ import {
 import { CleanupUncertainError, type NativeBackend } from "./service.js";
 import type { ResourceBank } from "./resource-bank.js";
 import { ByteCapture } from "./framing.js";
-import { jailConfig, NSJAIL_REVISION } from "./policy.js";
+import { cpuRlimitSeconds, jailConfig, NSJAIL_REVISION } from "./policy.js";
 import { fileDigest, rootfsDigest } from "./identity.js";
 import { verifyCgroupLimits } from "./cgroup-limits.js";
 import { readStartupLog } from "./startup-log.js";
@@ -48,27 +48,28 @@ export type NsJailOptions = {
   workRoot: string;
   startupTimeoutMs?: number;
   cleanupTimeoutMs?: number;
+  /** Idle verified jails per CPU slot; 0 starts every case cold. */
+  standbyPerSlot?: number;
 };
 /** Idle interpreter peaks near 10 MiB; claim raises this to the authored limit. */
 const STANDBY_MEMORY_MB = 32;
 const STANDBY_TTL_MS = 30_000;
 /**
- * Jail startup outlasts a short case several times over, so one replacement per
- * claim cannot keep up with sequential cases; keep a shallow pipeline per certificate.
+ * Verified idle jails kept per CPU slot. A short case finishes in a few
+ * milliseconds and a jail takes tens to start, so sequential cases from every
+ * slot need a pool rather than one replacement per claim. The standby memory
+ * budget in `ResourceBank` caps the total below this on a small node.
  */
-const STANDBY_DEPTH = 4;
-/** Aged standbys are replaced only while their certificate saw recent demand. */
-const STANDBY_DEMAND_WINDOW_MS = 60_000;
+const STANDBY_PER_SLOT = 4;
 const NAMESPACES = ["mnt", "pid", "ipc", "net", "uts", "user", "cgroup"] as const;
 export class NsJailBackend implements NativeBackend {
   private prepared = false;
   private closing = false;
   private bank?: ResourceBank;
   private own?: { filters: number; namespaces: Map<string, string> };
-  private readonly standby = new Map<string, Jail[]>();
-  private readonly warming = new Map<string, number>();
-  private warmingTotal = 0;
-  private readonly lastDemand = new Map<string, number>();
+  /** One pool for every exercise: jails no longer carry a case's limits until claimed. */
+  private readonly standby: Jail[] = [];
+  private warming = 0;
   private readonly background = new Set<Promise<void>>();
   private probing = false;
   private manifest: NativeReleaseManifest;
@@ -236,9 +237,17 @@ export class NsJailBackend implements NativeBackend {
         "Native CPython readiness probe failed",
       );
     this.prepared = true;
+    // Fill the pool before the first case asks for it.
+    this.replenish();
   }
-  private async verifyGatedChild(cgroup: string, memoryMb: number) {
-    const children = await childGroups(cgroup);
+  private get standbyTarget() {
+    return (
+      this.manifest.resources.cpuSlots *
+      (this.options.standbyPerSlot ?? STANDBY_PER_SLOT)
+    );
+  }
+  private async verifyGatedChild(jail: Jail) {
+    const children = await childGroups(jail.cgroup);
     if (children.length !== 1)
       throw new NativeInfrastructureError(
         "Expected exactly one gated jail cgroup",
@@ -247,7 +256,7 @@ export class NsJailBackend implements NativeBackend {
       r = this.manifest.resources;
     if (
       (await readControl(join(child, "memory.max"))) !==
-        String(memoryMb * 1024 * 1024) ||
+        String(r.maxCaseMemoryMb * 1024 * 1024) ||
       (await readControl(join(child, "memory.swap.max"))) !== "0" ||
       (await readControl(join(child, "pids.max"))) !== String(r.maxCasePids) ||
       (await readControl(join(child, "cpu.max"))) !== "1000000 1000000"
@@ -256,6 +265,8 @@ export class NsJailBackend implements NativeBackend {
     const pids = (await readControl(join(child, "cgroup.procs"))).split(/\s+/);
     if (pids.length !== 1 || !/^\d+$/.test(pids[0]))
       throw new NativeInfrastructureError("Expected one gated Python process");
+    jail.inner = child;
+    jail.pid = pids[0];
     const proc = `/proc/${pids[0]}`;
     const status = await readFile(`${proc}/status`, "utf8");
     if (
@@ -310,18 +321,15 @@ export class NsJailBackend implements NativeBackend {
     )
       throw new NativeInfrastructureError("Guest scratch is not bounded");
   }
-  /** Spawns and fully verifies a jail gated before its request; never runs learner code. */
-  private async startJail(
-    request: NativeExecutionRequest,
-    standby: boolean,
-    signal?: AbortSignal,
-  ): Promise<Jail> {
+  /**
+   * Spawns and fully verifies a jail gated before its request; never runs
+   * learner code. A standby waits at the lowest CPU weight; a jail started for a
+   * waiting case does not.
+   */
+  private async startJail(standby: boolean, signal?: AbortSignal): Promise<Jail> {
     const o = this.options,
       r = this.manifest.resources;
     const jail: Jail = {
-      key: jailKey(request),
-      memoryLimitMb: request.memoryLimitMb,
-      timeLimitMs: request.timeLimitMs,
       cgroup: join(o.cgroupRoot, `case-${randomUUID()}`),
       created: false,
       stderr: new ByteCapture(gradingDataLimits.stderrBytes),
@@ -340,16 +348,10 @@ export class NsJailBackend implements NativeBackend {
       // Mark created before setting controls, so a partial setup still gets cleaned.
       await mkdir(jail.cgroup, { mode: 0o700 });
       jail.created = true;
-      // An idle standby is kernel-capped well below the authored limit; claim raises it.
+      // An unclaimed jail is kernel-capped well below any authored limit; claim raises it.
       await writeFile(
         join(jail.cgroup, "memory.max"),
-        String(
-          (standby
-            ? STANDBY_MEMORY_MB
-            : request.memoryLimitMb + r.scratchMb) *
-            1024 *
-            1024,
-        ),
+        String(STANDBY_MEMORY_MB * 1024 * 1024),
       );
       await writeFile(join(jail.cgroup, "memory.swap.max"), "0");
       await writeFile(join(jail.cgroup, "memory.oom.group"), "1");
@@ -371,10 +373,9 @@ export class NsJailBackend implements NativeBackend {
             cgroup: jail.cgroup,
             log: join(jail.directory, "nsjail.log"),
           },
-          request,
           r,
           // The supervisor's own backstop also covers the longest standby wait.
-          (o.startupTimeoutMs ?? 10000) + (standby ? STANDBY_TTL_MS : 0),
+          (o.startupTimeoutMs ?? 10000) + STANDBY_TTL_MS,
           o.cleanupTimeoutMs ?? 5000,
         ),
         { mode: 0o600 },
@@ -439,7 +440,7 @@ export class NsJailBackend implements NativeBackend {
         if (signal?.aborted) onCancel();
         void jail.processClosed!.then(() => onEnd(), finish);
       });
-      await this.verifyGatedChild(jail.cgroup, request.memoryLimitMb);
+      await this.verifyGatedChild(jail);
       if (signal?.aborted) throw cancelled();
       return jail;
     } catch (cause) {
@@ -518,11 +519,10 @@ export class NsJailBackend implements NativeBackend {
       }
     if (cleanupError) throw cleanupError;
   }
-  /** Claims a verified idle jail for exactly this memory/time certificate, if one is ready. */
-  private claimStandby(key: string): Jail | undefined {
-    const idle = this.standby.get(key);
-    while (idle?.length) {
-      const jail = idle.shift()!;
+  /** Claims a verified idle jail, if one is ready. */
+  private claimStandby(): Jail | undefined {
+    while (this.standby.length) {
+      const jail = this.standby.shift()!;
       clearTimeout(jail.expiry);
       if (!jail.exited && !jail.earlyOutput) {
         // The claiming request's own allocation now covers this jail's memory.
@@ -548,33 +548,36 @@ export class NsJailBackend implements NativeBackend {
     this.background.add(disposal);
     void disposal.finally(() => this.background.delete(disposal));
   }
-  /** Tops up verified jails ahead of the next cases with the same certificate. */
-  private replenish(request: NativeExecutionRequest) {
-    const key = jailKey(request);
+  /**
+   * Startup burns CPU that running cases would otherwise get, and their wall
+   * time counts against their limit. Warm on slots no running case holds; when
+   * every slot is busy, start one jail only while the pool holds fewer than one
+   * per slot, so a sustained burst never leaves every case waiting for its own.
+   */
+  private get warmingAllowance() {
+    const idle = this.bank?.idleSlots ?? 0;
+    if (idle > 0) return idle;
+    return this.standby.length + this.warming < this.manifest.resources.cpuSlots
+      ? 1
+      : 0;
+  }
+  /** Keeps the pool full ahead of demand, within the warming allowance. */
+  private replenish() {
     while (
+      this.prepared &&
       !this.closing &&
       this.bank &&
-      (this.standby.get(key)?.length ?? 0) + (this.warming.get(key) ?? 0) <
-        STANDBY_DEPTH &&
-      // Startup burns CPU: warm only on slots no admitted work holds.
-      this.warmingTotal < this.bank.idleSlots
+      this.standby.length + this.warming < this.standbyTarget &&
+      this.warming < this.warmingAllowance
     ) {
       const release = this.bank.reserveStandby(
         STANDBY_MEMORY_MB,
-        this.manifest.resources.cpuSlots * STANDBY_DEPTH,
+        this.standbyTarget,
       );
       if (!release) return;
-      this.warming.set(key, (this.warming.get(key) ?? 0) + 1);
-      this.warmingTotal++;
-      const warming = this.startJail(
-        {
-          code: "",
-          stdin: "",
-          timeLimitMs: request.timeLimitMs,
-          memoryLimitMb: request.memoryLimitMb,
-        },
-        true,
-      )
+      this.warming++;
+      let started = false;
+      const warming = this.startJail(true)
         .then(
           (jail) => {
             jail.release = release;
@@ -584,56 +587,100 @@ export class NsJailBackend implements NativeBackend {
             }
             jail.expiry = setTimeout(() => this.expire(jail), STANDBY_TTL_MS);
             jail.expiry.unref();
-            const idle = this.standby.get(key) ?? [];
-            idle.push(jail);
-            this.standby.set(key, idle);
+            this.standby.push(jail);
+            started = true;
           },
           (error) => {
             // startJail has already attempted disposal; uncertainty stays charged.
             if (error instanceof CleanupUncertainError) this.bank?.quarantine();
             else release();
-            // Never retry in a loop; the next real case cold-starts and reports failure.
           },
         )
         .finally(() => {
-          this.warming.set(key, this.warming.get(key)! - 1);
-          this.warmingTotal--;
+          this.warming--;
+          // Continue filling after a success only. A failed start is never retried
+          // in a loop; the next real case cold-starts and reports the failure.
+          if (started) this.replenish();
         });
       this.background.add(warming);
       void warming.finally(() => this.background.delete(warming));
     }
   }
-  /** Recycles an aged standby; only real requests count as demand for a replacement. */
+  /** Recycles an aged standby and starts its replacement. */
   private expire(jail: Jail) {
-    const idle = this.standby.get(jail.key);
-    const index = idle?.indexOf(jail) ?? -1;
+    const index = this.standby.indexOf(jail);
     if (index < 0) return;
-    idle!.splice(index, 1);
+    this.standby.splice(index, 1);
     this.discard(jail);
+    this.replenish();
+  }
+  /**
+   * Applies one case's limits to a gated jail and reads every one back from
+   * the kernel before GO: memory on both case cgroups, normal CPU weight, and
+   * the CPU-time rlimit the bootstrap lowers once it holds the request.
+   */
+  private async arm(jail: Jail, request: NativeExecutionRequest, signal: AbortSignal) {
+    const r = this.manifest.resources;
+    const inner = String(request.memoryLimitMb * 1024 * 1024);
+    const outer = String((request.memoryLimitMb + r.scratchMb) * 1024 * 1024);
+    await writeFile(join(jail.inner!, "memory.max"), inner);
+    await writeFile(join(jail.cgroup, "memory.max"), outer);
+    await writeFile(join(jail.cgroup, "cpu.weight"), "100");
     if (
-      performance.now() - (this.lastDemand.get(jail.key) ?? -Infinity) <
-      STANDBY_DEMAND_WINDOW_MS
+      (await readControl(join(jail.inner!, "memory.max"))) !== inner ||
+      (await readControl(join(jail.cgroup, "memory.max"))) !== outer ||
+      (await readControl(join(jail.cgroup, "cpu.weight"))) !== "100"
     )
-      this.replenish({
-        code: "",
-        stdin: "",
-        timeLimitMs: jail.timeLimitMs,
-        memoryLimitMb: jail.memoryLimitMb,
-      });
+      throw new NativeInfrastructureError("Jail kernel controls mismatch");
+    const gate = jail.gate!;
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => finish(new NativeInfrastructureError("Native limit deadline")),
+        this.options.startupTimeoutMs ?? 10000,
+      );
+      const finish = (error?: unknown) => {
+        clearTimeout(timer);
+        gate.off("data", onData);
+        gate.off("end", onEnd);
+        signal.removeEventListener("abort", onCancel);
+        if (error) reject(error);
+        else resolve();
+      };
+      const onData = (bytes: Buffer) =>
+        finish(
+          bytes.length === 1 && bytes[0] === 65
+            ? undefined
+            : new NativeInfrastructureError("Invalid bootstrap limit acknowledgement"),
+        );
+      const onEnd = () =>
+        finish(new NativeInfrastructureError("Jail failed before learner start"));
+      const onCancel = () =>
+        finish(new NativeInfrastructureError("Native execution cancelled"));
+      gate.once("data", onData);
+      gate.once("end", onEnd);
+      signal.addEventListener("abort", onCancel, { once: true });
+      if (signal.aborted) onCancel();
+      jail.child!.stdin!.end(JSON.stringify(request));
+    });
+    const seconds = String(cpuRlimitSeconds(request.timeLimitMs));
+    const limits = await readFile(`/proc/${jail.pid}/limits`, "utf8");
+    const cpu = /^Max cpu time\s+(\S+)\s+(\S+)\s+seconds\s*$/m.exec(limits);
+    if (!cpu || cpu[1] !== seconds || cpu[2] !== seconds)
+      throw new NativeInfrastructureError("Jail CPU rlimit mismatch");
   }
   async close() {
     this.closing = true;
-    for (const idle of this.standby.values())
-      for (const jail of idle.splice(0)) {
-        clearTimeout(jail.expiry);
-        this.discard(jail);
-      }
+    for (const jail of this.standby.splice(0)) {
+      clearTimeout(jail.expiry);
+      this.discard(jail);
+    }
     while (this.background.size) await Promise.allSettled([...this.background]);
   }
   async execute(
     raw: NativeExecutionRequest,
     signal: AbortSignal,
     draining: () => void,
+    deliver?: (result: NativeExecutionResult) => void,
   ): Promise<NativeExecutionResult> {
     if (!this.prepared && !this.probing)
       throw new NativeInfrastructureError("Native backend is not prepared");
@@ -671,25 +718,10 @@ export class NsJailBackend implements NativeBackend {
     try {
       if (signal.aborted)
         throw new NativeInfrastructureError("Cancelled before launch");
-      jail = this.probing ? undefined : this.claimStandby(jailKey(request));
+      jail = this.probing ? undefined : this.claimStandby();
       prewarmed = Boolean(jail);
-      if (jail) {
-        // Raise the idle caps to the authored certificate and prove them before GO.
-        const limit = String(
-          (request.memoryLimitMb + r.scratchMb) * 1024 * 1024,
-        );
-        await writeFile(join(jail.cgroup, "memory.max"), limit);
-        await writeFile(join(jail.cgroup, "cpu.weight"), "100");
-        if (
-          (await readControl(join(jail.cgroup, "memory.max"))) !== limit ||
-          (await readControl(join(jail.cgroup, "cpu.weight"))) !== "100"
-        )
-          throw new NativeInfrastructureError("Jail kernel controls mismatch");
-      } else jail = await this.startJail(request, false, signal);
-      if (!this.probing) {
-        this.lastDemand.set(jailKey(request), performance.now());
-        this.replenish(request);
-      }
+      if (!jail) jail = await this.startJail(false, signal);
+      if (!this.probing) this.replenish();
       const { child, gate, stderr } = jail;
       const stdout = new ByteCapture(
         request.outputLimitBytes ?? gradingDataLimits.stdoutBytes,
@@ -700,7 +732,7 @@ export class NsJailBackend implements NativeBackend {
       signal.addEventListener("abort", abort, { once: true });
       if (signal.aborted)
         throw new NativeInfrastructureError("Native execution cancelled");
-      child!.stdin!.end(JSON.stringify(request));
+      await this.arm(jail, request, signal);
       cpuStart = await cpuUsec(jail.cgroup);
       started = performance.now();
       gate!.end("G");
@@ -766,6 +798,18 @@ export class NsJailBackend implements NativeBackend {
       signal.removeEventListener("abort", abort);
       clearTimeout(wall);
       clearInterval(monitor);
+      if (completedResult) {
+        // The supervisor has exited and every output pipe has closed, and policy
+        // forbids process creation: nothing further can change this verdict.
+        // Deliver it now; capacity stays charged until cleanup is proven below.
+        completedResult.timings = {
+          startupMs: Math.max(0, started! - executionCallStarted),
+          executionMs: completedResult.runtimeMs,
+          cleanupMs: Math.max(0, performance.now() - cleanupStarted),
+          prewarmed,
+        };
+        deliver?.(completedResult);
+      }
       let cleanupError: unknown;
       try {
         await sample;
@@ -783,21 +827,16 @@ export class NsJailBackend implements NativeBackend {
           cleanupError = cause;
         }
       if (cleanupError) throw cleanupError;
-      if (completedResult)
-        completedResult.timings = {
-          startupMs: Math.max(0, started! - executionCallStarted),
-          executionMs: completedResult.runtimeMs,
-          cleanupMs: Math.max(0, performance.now() - cleanupStarted),
-          prewarmed,
-        };
+      // A slot may be idle now; refill after a burst instead of at the next claim.
+      if (!this.probing) this.replenish();
     }
   }
 }
 type Jail = {
-  key: string;
-  memoryLimitMb: number;
-  timeLimitMs: number;
   cgroup: string;
+  /** NsJail's own child group, holding the one gated Python process. */
+  inner?: string;
+  pid?: string;
   created: boolean;
   directory?: string;
   child?: ChildProcess;
@@ -810,6 +849,3 @@ type Jail = {
   release?: () => void;
   expiry?: ReturnType<typeof setTimeout>;
 };
-/** Everything baked into a jail's supervisor config before its request exists. */
-const jailKey = (request: Pick<NativeExecutionRequest, "memoryLimitMb" | "timeLimitMs">) =>
-  `${request.memoryLimitMb}:${request.timeLimitMs}`;

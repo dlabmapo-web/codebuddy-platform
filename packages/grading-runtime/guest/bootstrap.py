@@ -3,6 +3,7 @@ import builtins
 import io
 import json
 import os
+import resource
 import sys
 import types
 
@@ -40,6 +41,12 @@ payload = json.load(sys.stdin)
 source = payload["code"]
 stdin = payload["stdin"]
 ignore_prompt = payload.get("inputPromptPolicy", "INCLUDE") == "IGNORE"
+# Every jail starts with the node's largest CPU backstop. Lower both limits to
+# this case's (an unprivileged process cannot raise them again) and acknowledge;
+# the launcher reads the result back from /proc before it sends GO.
+cpu_seconds = -(-payload["timeLimitMs"] // 1000) + 1
+resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds))
+os.write(3, b"A")
 sys.stdin = io.TextIOWrapper(io.BytesIO(stdin.encode("utf-8")), encoding="utf-8")
 sys.argv = ["main.py"]
 if ignore_prompt:

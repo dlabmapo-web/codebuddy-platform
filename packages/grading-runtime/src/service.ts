@@ -24,11 +24,16 @@ export interface NativeBackend {
   attach?(bank: ResourceBank): void;
   /** Releases idle prewarmed work; called after every request has settled. */
   close?(): Promise<void>;
-  /** Resolves/rejects only after cleanup; uncertainty MUST throw CleanupUncertainError. */
+  /**
+   * Resolves/rejects only after cleanup; uncertainty MUST throw CleanupUncertainError.
+   * A backend may hand over a final result earlier through `deliver`, once
+   * nothing can change it; the caller still holds capacity until this settles.
+   */
   execute(
     request: NativeExecutionRequest,
     signal: AbortSignal,
     draining: () => void,
+    deliver?: (result: NativeExecutionResult) => void,
   ): Promise<NativeExecutionResult>;
 }
 export class NativeExecutionService {
@@ -81,7 +86,11 @@ export class NativeExecutionService {
       );
     // Never unlink an unknown/live socket on startup.
     this.server = createServer((socket) => this.accept(socket));
-    this.server.maxConnections = this.manifest.resources.cpuSlots + 2;
+    // Admission is the bank's decision, answered UNAVAILABLE so the client
+    // retries. This cap only bounds descriptors: past it the kernel connection
+    // is reset, which a worker sees as a judge failure. Leave room for one run
+    // and one closing socket per slot plus health probes and busy retries.
+    this.server.maxConnections = this.manifest.resources.cpuSlots * 4 + 8;
     await new Promise<void>((resolve, reject) => {
       this.server!.once("error", reject);
       this.server!.listen(this.options.socketPath, () => {
@@ -218,25 +227,35 @@ export class NativeExecutionService {
         (this.options.startupAllowanceMs ?? 10000) +
         (this.options.cleanupAllowanceMs ?? 5000),
     );
-    try {
-      const result = await this.options.backend.execute(
-        request.request!,
-        controller.signal,
-        allocation.draining,
-      );
+    // The worker waits on this reply for its next case; cleanup of the finished
+    // one continues behind it while the allocation stays charged.
+    let replied: Promise<void> | undefined;
+    const deliver = (result: NativeExecutionResult) => {
       allocation.draining();
-      await respond(
+      replied ??= respond(
         controller.signal.aborted ? { error: "CANCELLED" } : { result },
       );
+    };
+    try {
+      deliver(
+        await this.options.backend.execute(
+          request.request!,
+          controller.signal,
+          allocation.draining,
+          deliver,
+        ),
+      );
+      await replied;
       allocation.cleaned();
     } catch (error) {
       if (error instanceof CleanupUncertainError) allocation.quarantine();
       else allocation.cleaned();
       // Setup failures remove the generation from admission; capacity contention above doesn't.
       if (!controller.signal.aborted) this.bank.quarantine();
-      await respond({
-        error: controller.signal.aborted ? "CANCELLED" : "INFRASTRUCTURE",
-      });
+      await (replied ??
+        respond({
+          error: controller.signal.aborted ? "CANCELLED" : "INFRASTRUCTURE",
+        }));
     } finally {
       clearTimeout(timeout);
     }

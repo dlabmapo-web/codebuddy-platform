@@ -167,6 +167,9 @@ export class NativeExecutionClient {
     const acquisitionStarted = performance.now();
     const acquisitionEnd =
       performance.now() + (this.options.acquisitionTimeoutMs ?? 30_000);
+    // A slot frees when a case exits, typically within milliseconds; back off
+    // from a short first retry instead of adding a fixed 100 ms to every case.
+    let retryMs = 5;
     for (;;) {
       const attemptStarted = performance.now();
       const response = await this.exchange("run", parsed, signal);
@@ -186,7 +189,7 @@ export class NativeExecutionClient {
           `Native execution ${response.error ?? "invalid response"}`,
         );
       await delay(
-        Math.min(100, Math.max(1, acquisitionEnd - performance.now())),
+        Math.min(retryMs, Math.max(1, acquisitionEnd - performance.now())),
         undefined,
         {
           signal: signal
@@ -194,6 +197,7 @@ export class NativeExecutionClient {
             : this.shutdown.signal,
         },
       );
+      retryMs = Math.min(100, retryMs * 2);
     }
   }
   async dispose() {

@@ -72,23 +72,33 @@ must also fit that headroom on the approved host. Source/rootfs are read-only.
 Only the owned work/socket and delegated cgroup paths are writable. Production
 needs separately measured API/DB/Redis/OS budgets; this fixture is not sizing proof.
 
-The launcher prewarms jails: after a case with a given memory/time certificate it
-keeps up to four fully verified jails gated before GO for the next cases (a case
-then starts in milliseconds instead of paying NsJail and CPython startup). Each
-idle standby is kernel-capped at 32 MiB, raised to the authored limit only when
-claimed, recycled after 30 seconds and not replaced once its certificate sees no
-real demand for a minute (recycling is not demand). Standbys hold no CPU slot and
-draw on a fixed memory budget: what remains when every slot of either lane holds a
-maximum-size case (224 MiB, seven standbys, on the qualification node; none when
-slots fill the envelope). A standby stays charged until its cleanup is proven.
-Warming starts only on CPU slots no admitted work holds, and a waiting standby runs
-at cpu.weight 1 until claimed. NsJail's own namespace setup runs in the service
-leaf and is not weighted, so warming still costs some CPU next to running cases;
-measure wall-limit outcomes under load. Each result reports `timings.prewarmed`.
-They hold `case-*` groups until the service closes; if the launcher dies
-their request pipe closes and they exit without running learner code. The guest
-rootfs ships unchecked-hash stdlib bytecode, since `-B` on the read-only root would
-otherwise recompile the stdlib in every case.
+The launcher prewarms jails: from readiness on it keeps up to four fully verified
+jails per CPU slot gated before GO, one pool for every exercise, so a case starts
+in milliseconds instead of paying NsJail and CPython startup. Every jail starts
+for the node's largest certified case. A claim then applies that case's limits
+and reads each back from the kernel before GO: memory on both case groups (an
+idle standby is capped at 32 MiB), normal CPU weight, and the CPU-time rlimit the
+bootstrap lowers to the case and acknowledges (`A`) once it holds the request.
+Standbys are recycled after 30 seconds and replaced at once. They hold no CPU slot
+and draw on a fixed memory budget: what remains when every slot of either lane
+holds a maximum-size case (224 MiB, seven standbys, on the qualification node;
+none when slots fill the envelope). A standby stays charged until its cleanup is
+proven. Warming uses CPU slots no running case holds; with every slot busy it
+starts one jail only while the pool holds fewer than one per slot. A waiting
+standby runs at cpu.weight 1 until claimed. NsJail's own namespace setup runs in
+the service leaf and is not weighted, so warming still costs some CPU next to
+running cases; measure wall-limit outcomes under load. Each result reports
+`timings.prewarmed`. Standbys hold `case-*` groups until the service closes; if
+the launcher dies their request pipe closes and they exit without running learner
+code. The guest rootfs ships unchecked-hash stdlib bytecode, since `-B` on the
+read-only root would otherwise recompile the stdlib in every case.
+
+A result is returned as soon as the jail's supervisor has exited and every output
+pipe has closed (policy forbids process creation, so nothing can change it then).
+Cleanup continues behind it: the case keeps its memory charged, though no CPU
+slot, until the cgroup is proven empty and removed, and an uncertain cleanup
+still quarantines the node. The socket's connection cap only bounds descriptors;
+admission is the resource bank's busy answer, which clients retry from 5 ms.
 
 `manifest.mjs` produces measured descriptor/config plus deployment intent with
 **empty eligibility**. `validate-deployment.mjs` rejects mismatched family/identity,

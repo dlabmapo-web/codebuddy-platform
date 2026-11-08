@@ -69,14 +69,21 @@ export class NativeAdmission {
     return selected;
   }
   private async certified(manifest: NativeReleaseManifest, context: NativeAdmissionContext, exercise: ExerciseGradingSource, reader: Pick<Prisma.TransactionClient, "academy">, requireReady: boolean) {
-    if (exercise.memoryLimitMb > 512 || exercise.testCases.length > 10 || !exercise.testCases.length ||
-      Buffer.byteLength(exercise.testCases.map(c => c.input).join(""), "utf8") > 65536) return null;
+    // The node's certified class bounds every entry; the job gate refuses larger work.
+    if (exercise.memoryLimitMb > Math.min(512, manifest.resources.maxCaseMemoryMb) || !exercise.testCases.length) return null;
+    const longestCaseMs = Math.max(...exercise.testCases.map(c => c.timeLimitMsOverride ?? exercise.timeLimitMs));
+    // A classroom certificate was qualified within these benchmark bounds; a scope is not.
+    const benchmarkSized = exercise.testCases.length <= 10 &&
+      Buffer.byteLength(exercise.testCases.map(c => c.input).join(""), "utf8") <= 65536;
     const academy = await reader.academy.findUnique({ where: { id: context.academyId }, select: { organizationId: true } });
-    if (!academy || !manifest.eligibility.some(e => e.organizationId === academy.organizationId &&
-      e.academyId === context.academyId && e.materialId === context.materialId && e.gradingRevision === context.gradingRevision &&
-      e.context === context.context && e.kinds.includes(context.kind) && e.memoryLimitMb === exercise.memoryLimitMb &&
-      e.timeLimitMs === exercise.timeLimitMs && exercise.testCases.every(c =>
-        (c.timeLimitMsOverride ?? exercise.timeLimitMs) <= (e.maxCaseTimeLimitMs ?? e.timeLimitMs)))) return null;
+    if (!academy || !manifest.eligibility.some(e => e.organizationId === academy.organizationId && e.kinds.includes(context.kind) &&
+      ("materialId" in e
+        ? benchmarkSized && e.academyId === context.academyId && e.materialId === context.materialId &&
+          e.gradingRevision === context.gradingRevision && e.context === context.context &&
+          e.memoryLimitMb === exercise.memoryLimitMb && e.timeLimitMs === exercise.timeLimitMs &&
+          longestCaseMs <= (e.maxCaseTimeLimitMs ?? e.timeLimitMs)
+        : (e.academyId === undefined || e.academyId === context.academyId) &&
+          e.contexts.includes(context.context) && longestCaseMs <= e.maxCaseTimeLimitMs))) return null;
     if (!requireReady) return manifest.descriptor;
     const redis = await this.queue!.redis();
     const count = Number(await redis.eval(READ_READY, 1, nativeReadinessKey(manifest.descriptor, context.kind === "official" ? "official" : "background")));

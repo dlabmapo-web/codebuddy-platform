@@ -1,16 +1,30 @@
 import { type NativeNodeResources } from "@cove/shared";
-import type { NativeExecutionRequest } from "./contract.js";
 export const NSJAIL_REVISION = "d8415bc8eea43cdd413daba25af63127019a1189";
+/** The protocol's longest case; bounds the supervisor backstops of every jail. */
+export const MAX_CASE_TIME_LIMIT_MS = 120_000;
 export type JailPaths = {
   rootfs: string;
   policy: string;
   cgroup: string;
   log: string;
 };
-/** Protobuf-text strings are escaped by JSON, never interpolated as shell syntax. */
+/**
+ * The kernel CPU-time backstop for one case: whole seconds above the authored
+ * limit, which the launcher's own cgroup sampling enforces first. The guest
+ * bootstrap lowers its rlimit to this before GO; the launcher verifies it.
+ */
+export const cpuRlimitSeconds = (timeLimitMs: number) =>
+  Math.ceil(timeLimitMs / 1000) + 1;
+/**
+ * Protobuf-text strings are escaped by JSON, never interpolated as shell syntax.
+ *
+ * Nothing here depends on a request: every jail is started for the node's
+ * largest certified case, so any verified standby can serve any exercise. A
+ * case's own memory and CPU limits are applied, and read back from the kernel,
+ * when it claims a jail and before its source runs.
+ */
 export function jailConfig(
   paths: JailPaths,
-  request: NativeExecutionRequest,
   resources: NativeNodeResources,
   startupTimeoutMs = 10000,
   cleanupTimeoutMs = 5000,
@@ -46,19 +60,19 @@ seccomp_policy_file: ${q(paths.policy)}
 pass_fd: 3
 use_cgroupv2: true
 cgroupv2_mount: ${q(paths.cgroup)}
-cgroup_mem_max: ${request.memoryLimitMb * 1024 * 1024}
+cgroup_mem_max: ${resources.maxCaseMemoryMb * 1024 * 1024}
 cgroup_mem_swap_max: 0
 cgroup_pids_max: ${resources.maxCasePids}
 cgroup_cpu_ms_per_sec: 1000
 rlimit_as_type: INF
-rlimit_cpu: ${Math.ceil(request.timeLimitMs / 1000) + 1}
+rlimit_cpu: ${cpuRlimitSeconds(MAX_CASE_TIME_LIMIT_MS)}
 rlimit_core: 0
 rlimit_fsize: ${resources.scratchMb}
 rlimit_nofile: 32
 rlimit_nproc_type: HARD
 rlimit_stack: 8
 rlimit_stack_type: VALUE
-time_limit: ${Math.ceil((startupTimeoutMs + request.timeLimitMs + cleanupTimeoutMs) / 1000)}
+time_limit: ${Math.ceil((startupTimeoutMs + MAX_CASE_TIME_LIMIT_MS + cleanupTimeoutMs) / 1000)}
 exec_bin { path: "/usr/local/bin/python3.12" arg: "-I" arg: "-B" arg: "-u" arg: "/opt/cove/bootstrap.py" }
 `;
 }

@@ -40,9 +40,12 @@ for native_clients in 1 2 4; do
 # Chromium's crash reporter requires writable profile/config directories. Keep
 # them inside the owned fixture rather than the intentionally nonexistent unit home.
 mkdir -m 700 "$native_work/browser-home" "$native_work/browser-home/config" "$native_work/browser-home/cache"
+# One student first: the plain Submit-to-visible-score path, before two arrive together.
+for native_clients in 1 2; do
 setpriv --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs \
  env HOME="$native_work/browser-home" XDG_CONFIG_HOME="$native_work/browser-home/config" XDG_CACHE_HOME="$native_work/browser-home/cache" \
- xvfb-run -a "$native_node" --max-old-space-size=512 "$native_repo/packages/api/scripts/benchmark-native-classroom.mjs" --mode next-browser --fixture "$native_work/authority.json" --output "$native_work/evidence/next-browser-2-10.json" --clients 2 --cases 10 --max-seconds 120
+ xvfb-run -a "$native_node" --max-old-space-size=512 "$native_repo/packages/api/scripts/benchmark-native-classroom.mjs" --mode next-browser --fixture "$native_work/authority.json" --output "$native_work/evidence/next-browser-$native_clients-10.json" --clients "$native_clients" --cases 10 --max-seconds 120
+done
 kill -- -"$native_next"; wait "$native_next" || true; native_next=''
 kill "$native_fixture"; wait "$native_fixture" || true; native_fixture=''
 kill "$native_launcher"; wait "$native_launcher"; native_launcher=''

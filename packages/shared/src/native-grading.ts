@@ -79,39 +79,53 @@ export const nativeNodeResourcesSchema = z
       fail("Certified case cannot fit in envelope");
   });
 export type NativeNodeResources = z.infer<typeof nativeNodeResourcesSchema>;
+const nativeAdmissionKindSchema = z.enum(["official", "staff-practice", "sample", "regrade"]);
+/** One certified exercise revision, exactly as authored when it was qualified. */
+export const nativeMaterialEligibilitySchema = z
+  .object({
+    organizationId: z.string().uuid(),
+    academyId: z.string().uuid(),
+    materialId: z.string().uuid(),
+    gradingRevision: z.number().int().nonnegative(),
+    context: z.enum(["live", "preview"]),
+    kinds: z.array(nativeAdmissionKindSchema).min(1).max(4),
+    memoryLimitMb: z.number().int().min(16).max(4096),
+    timeLimitMs: z.number().int().min(1).max(120_000),
+    /** Absent retains the original default-only certification. */
+    maxCaseTimeLimitMs: z.number().int().min(1).max(120_000).optional(),
+  })
+  .strict()
+  .refine(
+    entry => (entry.maxCaseTimeLimitMs ?? entry.timeLimitMs) >= entry.timeLimitMs,
+    { message: "Certified case timeout cannot be lower than the exercise default" },
+  );
+/**
+ * Every exercise of an academy, or of a whole organization when `academyId` is
+ * absent, whose authored limits fit the node: memory within its certified
+ * class and no case longer than `maxCaseTimeLimitMs`. Edits keep their
+ * admission, and exercises outside these limits stay on compatibility grading.
+ */
+export const nativeScopeEligibilitySchema = z
+  .object({
+    organizationId: z.string().uuid(),
+    academyId: z.string().uuid().optional(),
+    contexts: z.array(z.enum(["live", "preview"])).min(1).max(2),
+    kinds: z.array(nativeAdmissionKindSchema).min(1).max(4),
+    maxCaseTimeLimitMs: z.number().int().min(1).max(120_000),
+  })
+  .strict();
+export const nativeEligibilitySchema = z.union([
+  nativeMaterialEligibilitySchema,
+  nativeScopeEligibilitySchema,
+]);
+export type NativeEligibility = z.infer<typeof nativeEligibilitySchema>;
 export const nativeReleaseManifestSchema = z
   .object({
     schemaVersion: z.literal(1),
     descriptor: nativeRuntimeDescriptorSchema,
     resources: nativeNodeResourcesSchema,
     /** Explicit scope only. Empty means no admission, useful for qualification. */
-    eligibility: z
-      .array(
-        z
-          .object({
-            organizationId: z.string().uuid(),
-            academyId: z.string().uuid(),
-            materialId: z.string().uuid(),
-            gradingRevision: z.number().int().nonnegative(),
-            context: z.enum(["live", "preview"]),
-            kinds: z
-              .array(
-                z.enum(["official", "staff-practice", "sample", "regrade"]),
-              )
-              .min(1)
-              .max(4),
-            memoryLimitMb: z.number().int().min(16).max(4096),
-            timeLimitMs: z.number().int().min(1).max(120_000),
-            /** Absent retains the original default-only certification. */
-            maxCaseTimeLimitMs: z.number().int().min(1).max(120_000).optional(),
-          })
-          .strict()
-          .refine(
-            entry => (entry.maxCaseTimeLimitMs ?? entry.timeLimitMs) >= entry.timeLimitMs,
-            { message: "Certified case timeout cannot be lower than the exercise default" },
-          ),
-      )
-      .max(10000),
+    eligibility: z.array(nativeEligibilitySchema).max(10000),
   })
   .strict();
 export type NativeReleaseManifest = z.infer<typeof nativeReleaseManifestSchema>;

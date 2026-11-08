@@ -76,23 +76,28 @@ try {
     else {
         service = new NativeExecutionService({ ...config, backend: new NsJailBackend(config) });
         await service.listen();
-        // First, before other certificates hold standby budget: a repeated certificate
-        // must claim a prewarmed jail, whose 32 MiB idle cap is raised to the authored
-        // limit before GO. The launcher reports the hit; timing alone proves nothing.
-        const cold = await run('print(1)', { memoryLimitMb: 256, timeLimitMs: 1500 });
-        assert.equal(cold.timings.prewarmed, false);
+        // The pool fills right after readiness: the first case claims a verified
+        // standby whose 32 MiB idle cap is raised to the authored limit before GO.
+        // The launcher reports the hit; timing alone proves nothing.
         let warm;
         for (let attempt = 1; ; attempt++) {
-            await delay(1500);
             warm = await run('x = bytearray(200 * 1024 * 1024); print(len(x))', { memoryLimitMb: 256, timeLimitMs: 1500 });
             if (warm.timings.prewarmed) break;
-            if (attempt === 2) throw Error('Repeated certificate never claimed a prewarmed jail');
+            if (attempt === 3) throw Error('Ready pool never supplied a prewarmed jail');
+            await delay(1000);
         }
         assert.equal(warm.outcome, 'PASSED');
         assert.equal(warm.stdout, '209715200\n');
         passed++;
-        // Cancellation before readiness (an unused certificate cold-starts) is prompt
-        // and releases capacity, rather than waiting out the startup deadline.
+        // One pool serves every exercise, so each claim applies its own limits:
+        // a smaller memory allowance and a CPU rlimit the learner cannot raise.
+        const small = await run('x = bytearray(200 * 1024 * 1024)', { memoryLimitMb: 64, timeLimitMs: 1000 });
+        assert.equal(small.outcome, 'MEMORY_LIMIT');
+        const limit = await run('import resource\nprint(resource.getrlimit(resource.RLIMIT_CPU))\ntry:\n resource.setrlimit(resource.RLIMIT_CPU, (100, 100))\nexcept ValueError:\n print("refused")', { timeLimitMs: 2500 });
+        assert.equal(limit.stdout, '(4, 4)\nrefused\n');
+        passed++;
+        // Cancellation right after the request is prompt and releases capacity,
+        // rather than waiting out the startup deadline.
         const early = new AbortController(), cancelStarted = performance.now();
         const cancelling = run('print(1)', { signal: early.signal, memoryLimitMb: 96, timeLimitMs: 1100 });
         setTimeout(() => early.abort(), 5);
@@ -105,7 +110,7 @@ try {
         }
         assert.equal((await client.health()).ready, true);
         passed++;
-        // Mixed memory/time certificates compete for one standby budget; every result stays correct.
+        // Mixed memory/time certificates share one pool; every result stays correct.
         const profiles = [[32, 1000], [64, 1200], [128, 1500], [256, 1000]];
         let mixedHits = 0;
         for (let round = 0; round < 3; round++)
@@ -113,6 +118,7 @@ try {
                 const results = await Promise.all([0, 1].map(i => run(`print(${memoryLimitMb}+${i})`, { memoryLimitMb, timeLimitMs })));
                 results.forEach((r, i) => { assert.equal(r.outcome, 'PASSED'); assert.equal(r.stdout, `${memoryLimitMb + i}\n`); if (r.timings.prewarmed) mixedHits++; });
             }
+        assert.ok(mixedHits >= 12, `mixed certificates claimed only ${mixedHits}/24 prewarmed jails`);
         passed++;
         // CPU-bound cases running beside warm-up must not lose their wall allowance:
         // 300 ms of CPU inside a 1000 ms limit, two at once, repeatedly.
@@ -124,7 +130,7 @@ try {
                 contentionWallMs.push(r.runtimeMs);
             }
         passed++;
-        console.log(JSON.stringify({ gate: 'standby-behaviour', status: 'PASS', coldStartupMs: cold.timings.startupMs, warmStartupMs: warm.timings.startupMs, cancelMs, mixedHits, mixedRuns: 24, contentionWallMs }));
+        console.log(JSON.stringify({ gate: 'standby-behaviour', status: 'PASS', warmStartupMs: warm.timings.startupMs, cancelMs, mixedHits, mixedRuns: 24, contentionWallMs }));
         const check = async (code, expected, extra = {}) => { const result = await run(code, extra); for (const [key, value] of Object.entries(expected))
             assert.equal(result[key], value, code); assert.ok(result.timings && result.timings.cleanupMs >= 0); passed++; };
         await check('print(input("이름: "))', { stdout: '이름: 학생\n', outcome: 'PASSED' }, { stdin: '학생\n' });
@@ -162,6 +168,18 @@ try {
         service = undefined;
         assert.equal((await readdir(config.cgroupRoot)).filter(n => n.startsWith('case-')).length, 0);
         passed++;
+        // Without a pool every case starts its own jail; the same limits apply before GO.
+        service = new NativeExecutionService({ ...config, backend: new NsJailBackend({ ...config, standbyPerSlot: 0 }) });
+        await service.listen();
+        const cold = await run('x = bytearray(200 * 1024 * 1024); print(len(x))', { memoryLimitMb: 256, timeLimitMs: 1500 });
+        assert.equal(cold.timings.prewarmed, false);
+        assert.equal(cold.stdout, '209715200\n');
+        assert.equal((await run('x = bytearray(200 * 1024 * 1024)', { memoryLimitMb: 64 })).outcome, 'MEMORY_LIMIT');
+        await service.close();
+        service = undefined;
+        assert.equal((await readdir(config.cgroupRoot)).filter(n => n.startsWith('case-')).length, 0);
+        passed++;
+        console.log(JSON.stringify({ gate: 'cold-start', status: 'PASS', coldStartupMs: cold.timings.startupMs }));
         console.log(JSON.stringify({ gate: 'actual-linux-containment', status: 'PASS', passed, descriptor: config.manifest.descriptor }));
     }
 }

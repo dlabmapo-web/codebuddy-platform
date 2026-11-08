@@ -9,7 +9,7 @@ const bootstrap = fileURLToPath(
   new URL("../guest/bootstrap.py", import.meta.url),
 );
 /** Trusted synthetic semantic test only: never used for learner execution/containment. */
-async function guest(code: string, stdin = "", inputPromptPolicy = "INCLUDE") {
+async function guest(code: string, stdin = "", inputPromptPolicy = "INCLUDE", timeLimitMs = 1000) {
   const child = spawn("python3", ["-I", "-B", "-u", bootstrap], {
     stdio: ["pipe", "pipe", "pipe", "pipe"],
   });
@@ -18,11 +18,14 @@ async function guest(code: string, stdin = "", inputPromptPolicy = "INCLUDE") {
   child.stdout.on("data", (b) => (stdout += b));
   child.stderr.on("data", (b) => (stderr += b));
   const gate = child.stdio[3] as Duplex;
-  gate.once("data", (b) => {
-    assert.deepEqual(b, Buffer.from("R"));
-    gate.end("G");
+  // The launcher's order: ready, then the request, the limit acknowledgement, GO.
+  let control = "";
+  gate.on("data", (b) => {
+    control += b;
+    if (control === "R")
+      child.stdin.end(JSON.stringify({ code, stdin, inputPromptPolicy, timeLimitMs }));
+    else if (control === "RA") gate.end("G");
   });
-  child.stdin.end(JSON.stringify({ code, stdin, inputPromptPolicy }));
   const exit = await new Promise<number | null>((resolve, reject) => {
     child.once("error", reject);
     child.once("close", (code) => resolve(code));
@@ -111,6 +114,19 @@ test("SystemExit integer wrapping and monkeypatched builtins preserve failure", 
   assert.notEqual(mutated.exit, 0);
 });
 
+test("bootstrap lowers the CPU-time rlimit to the case before acknowledging", async () => {
+  const result = await guest(
+    "import resource; print(resource.getrlimit(resource.RLIMIT_CPU))",
+    "",
+    "INCLUDE",
+    2500,
+  );
+  assert.deepEqual(result, { stdout: "(4, 4)\n", stderr: "", exit: 0 });
+  const raised = await guest(
+    "import resource\ntry:\n resource.setrlimit(resource.RLIMIT_CPU, (100, 100))\nexcept ValueError:\n print('refused')",
+  );
+  assert.equal(raised.stdout, "refused\n");
+});
 test("learner globals belong to the registered __main__ without bootstrap state", async () => {
   const result = await guest(
     "x = 7\nimport __main__\nprint(__main__.x)\nprint(__main__.__dict__ is globals())\nprint(hasattr(__main__, 'run_script'), hasattr(__main__, 'payload'))",

@@ -50,6 +50,33 @@ describe("native admission and immutable contracts", () => {
   ])("keeps uncertified %s on compatibility admission", async (_, candidate, authored) => {
     expect(await admission().admission.select(candidate, authored)).toBeNull();
   });
+  it("admits every exercise of a scope within the node's limits, across edits and large tests", async () => {
+    const scopePath = join(directory, "scope-manifest.json");
+    const academyScope = { organizationId: id, academyId: id, contexts: ["live"], kinds: ["official", "sample"], maxCaseTimeLimitMs: 5000 };
+    await writeFile(scopePath, JSON.stringify({ ...fixture, eligibility: [academyScope] }));
+    const scoped = admission({ NATIVE_GRADING_MANIFEST: scopePath }).admission;
+    const large = { ...exercise, memoryLimitMb: 512, timeLimitMs: 3000,
+      testCases: Array.from({ length: 40 }, () => ({ ...exercise.testCases[0]!, input: "1 ".repeat(50_000) })) };
+    const anotherMaterial = { ...context, materialId: "30000000-0000-4000-8000-000000000001", gradingRevision: 7 };
+    expect(await scoped.select(anotherMaterial, large)).toEqual(fixture.descriptor);
+    expect(await scoped.select({ ...anotherMaterial, kind: "sample" }, exercise)).toEqual(fixture.descriptor);
+    expect(await scoped.retain(fixture.descriptor, anotherMaterial, large)).toEqual(fixture.descriptor);
+    for (const [candidate, authored] of [
+      [{ ...anotherMaterial, academyId: "20000000-0000-4000-8000-000000000001" }, exercise],
+      [{ ...anotherMaterial, context: "preview" as const }, exercise],
+      [{ ...anotherMaterial, kind: "regrade" as const }, exercise],
+      [anotherMaterial, { ...exercise, memoryLimitMb: 1024 }],
+      [anotherMaterial, { ...exercise, testCases: [{ ...exercise.testCases[0]!, timeLimitMsOverride: 5001 }] }],
+      [anotherMaterial, { ...exercise, testCases: [] }],
+    ] as const) expect(await scoped.select(candidate, authored)).toBeNull();
+    // Without an academy the scope is the organization: any of its academies qualifies.
+    const { academyId: _, ...organizationScope } = academyScope;
+    await writeFile(scopePath, JSON.stringify({ ...fixture, eligibility: [organizationScope] }));
+    const organization = admission({ NATIVE_GRADING_MANIFEST: scopePath }).admission;
+    expect(await organization.select({ ...anotherMaterial, academyId: "20000000-0000-4000-8000-000000000001" }, exercise)).toEqual(fixture.descriptor);
+    expect(nativeReleaseManifestSchema.safeParse({ ...fixture, eligibility: [{ ...academyScope, contexts: [] }] }).success).toBe(false);
+    expect(nativeReleaseManifestSchema.safeParse({ ...fixture, eligibility: [{ ...academyScope, materialId: id }] }).success).toBe(false);
+  });
   it("loads one immutable bounded manifest and refuses malformed explicit identities", async () => {
     const loaded = await loadNativeManifest(path); expect(Object.isFrozen(loaded.descriptor.comparator)).toBe(true);
     expect(frozenNativeDescriptor(null)).toBeNull(); expect(() => frozenNativeDescriptor({ engine: "pyodide" })).toThrow();

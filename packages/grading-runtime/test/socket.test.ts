@@ -282,3 +282,77 @@ test("client exposes trusted stage timings and separate busy acquisition", async
     await f.close();
   }
 });
+
+test("a result is delivered before cleanup, which keeps memory charged until it ends", async () => {
+  let clean!: () => void;
+  const cleanup = new Promise<void>((r) => (clean = r));
+  const f = await fixture({
+    ...backend,
+    execute: async (_request, _signal, draining, deliver) => {
+      draining();
+      deliver?.(result);
+      await cleanup;
+      return result;
+    },
+  });
+  try {
+    assert.deepEqual(await f.client.run(request), result);
+    // Exited work holds no CPU slot, only its memory, until cleanup is proven.
+    assert.deepEqual(
+      { ...f.service.bank.snapshot(), idle: f.service.bank.idleSlots },
+      { active: 0, draining: 1, quarantined: 0, standby: 0, memoryMb: 272, idle: 2 },
+    );
+    clean();
+    await delay(20);
+    assert.equal(f.service.bank.snapshot().draining, 0);
+    assert.equal(f.service.bank.ready, true);
+  } finally {
+    clean();
+    await f.close();
+  }
+});
+test("cleanup uncertainty after an early result still quarantines the node", async () => {
+  const f = await fixture({
+    ...backend,
+    execute: async (_request, _signal, draining, deliver) => {
+      draining();
+      deliver?.(result);
+      await delay(10);
+      throw new CleanupUncertainError("lost child");
+    },
+  });
+  try {
+    assert.deepEqual(await f.client.run(request), result);
+    await delay(30);
+    const health = await f.client.health();
+    assert.equal(health.ready, false);
+    assert.equal(health.quarantined, 1);
+  } finally {
+    await f.close();
+  }
+});
+test("more workers than slots are answered busy and retried, never reset", async () => {
+  const f = await fixture({
+    ...backend,
+    execute: async (_request, _signal, draining, deliver) => {
+      await delay(2);
+      draining();
+      deliver?.(result);
+      await delay(3);
+      return result;
+    },
+  });
+  const clients = Array.from({ length: 8 }, () => new NativeExecutionClient({
+    socketPath: f.socketPath, descriptor: manifest.descriptor, lane: "official", acquisitionTimeoutMs: 5000,
+  }));
+  try {
+    const results = await Promise.all(clients.map(async (client) => {
+      for (let i = 0; i < 25; i++) assert.deepEqual(await client.run(request), result);
+      return true;
+    }));
+    assert.equal(results.length, 8);
+  } finally {
+    await Promise.all(clients.map((client) => client.dispose()));
+    await f.close();
+  }
+});

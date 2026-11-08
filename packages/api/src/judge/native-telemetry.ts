@@ -12,7 +12,10 @@ export function measuredNativeClient(client: NativeExecutionClient, telemetry: E
         telemetry.observe("cleanup", result.timings.cleanupMs);
         if (result.timings.acquisitionMs !== undefined) telemetry.observe("acquire", result.timings.acquisitionMs);
       }
-      return result;
+      // The launcher measures sub-millisecond time. Every engine result is whole
+      // milliseconds: stored and published case results, and the cumulative
+      // budget that sets the next case's limit, are integers.
+      return { ...result, runtimeMs: Math.round(result.runtimeMs) };
     },
     dispose: () => client.dispose(),
   };

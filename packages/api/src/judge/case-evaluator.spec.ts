@@ -103,6 +103,14 @@ describe("enhanced case execution on a scaled engine", () => {
     expect(engine.run).toHaveBeenCalledWith(expect.objectContaining({ timeLimitMs: 400 }));
   });
 
+  it("gives the engine whole milliseconds when the remaining budget is fractional", async () => {
+    const { engine, comparator, input } = fixture(100);
+    const evaluation = evaluateEnhancedCase({ engine, comparator }, { ...input, executionBudgetMs: 2_995.63 });
+    await vi.advanceTimersByTimeAsync(100);
+    await evaluation;
+    expect(engine.run).toHaveBeenCalledWith(expect.objectContaining({ timeLimitMs: 2_995 }));
+  });
+
   it("keeps the case limit when the deadline is not the tighter bound", async () => {
     const { engine, comparator, input } = fixture(100);
     const evaluation = evaluateEnhancedCase({ engine: { ...engine, timeScale: 2.5 }, comparator }, input);

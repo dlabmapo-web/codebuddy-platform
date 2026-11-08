@@ -83,7 +83,8 @@ export async function evaluateEnhancedCase(
   // deadline is wall clock and limits are authored time, so what is left of
   // it is converted with the engine's scale.
   const studentLimit = Math.min(testCase.caseLimitMs, input.executionBudgetMs ?? testCase.caseLimitMs);
-  const limit = Math.min(studentLimit, Math.max(1, Math.floor(remaining / timeScaleOf(deps.engine))));
+  // Engines take whole milliseconds; a fractional budget must never reach them.
+  const limit = Math.max(1, Math.floor(Math.min(studentLimit, remaining / timeScaleOf(deps.engine))));
   const executionStartedAt = Date.now();
   const execution = deps.engine.run({
     inputPromptPolicy: input.inputPromptPolicy ?? "INCLUDE",

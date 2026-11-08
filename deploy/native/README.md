@@ -74,12 +74,15 @@ needs separately measured API/DB/Redis/OS budgets; this fixture is not sizing pr
 
 The launcher prewarms jails: from readiness on it keeps up to four fully verified
 jails per CPU slot gated before GO, one pool for every exercise, so a case starts
-in milliseconds instead of paying NsJail and CPython startup. Every jail starts
-for the node's largest certified case. A claim then applies that case's limits
-and reads each back from the kernel before GO: memory on both case groups (an
-idle standby is capped at 32 MiB), normal CPU weight, and the CPU-time rlimit the
-bootstrap lowers to the case and acknowledges (`A`) once it holds the request.
-Standbys are recycled after 30 seconds and replaced at once. They hold no CPU slot
+in milliseconds instead of paying NsJail and CPython startup. Every standby starts
+for the node's largest memory class and any case up to 10 seconds; a longer case
+starts its own jail. A claim then applies that case's limits and reads each back
+from the kernel before GO: memory on both case groups (an idle standby is capped
+at 32 MiB), normal CPU weight, and the CPU-time rlimit the bootstrap lowers to the
+case and acknowledges (`A`) once it holds the request. Standbys are recycled after
+15 seconds and replaced at once. A standby's supervisor time limit (startup, wait,
+the 10-second case class and cleanup: 40 s) is what ends learner code that
+outlives a crashed launcher while its unit keeps running. They hold no CPU slot
 and draw on a fixed memory budget: what remains when every slot of either lane
 holds a maximum-size case (224 MiB, seven standbys, on the qualification node;
 none when slots fill the envelope). A standby stays charged until its cleanup is

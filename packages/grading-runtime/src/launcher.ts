@@ -27,7 +27,12 @@ import {
 import { CleanupUncertainError, type NativeBackend } from "./service.js";
 import type { ResourceBank } from "./resource-bank.js";
 import { ByteCapture } from "./framing.js";
-import { cpuRlimitSeconds, jailConfig, NSJAIL_REVISION } from "./policy.js";
+import {
+  cpuRlimitSeconds,
+  jailConfig,
+  NSJAIL_REVISION,
+  POOL_CASE_TIME_LIMIT_MS,
+} from "./policy.js";
 import { fileDigest, rootfsDigest } from "./identity.js";
 import { verifyCgroupLimits } from "./cgroup-limits.js";
 import { readStartupLog } from "./startup-log.js";
@@ -53,7 +58,14 @@ export type NsJailOptions = {
 };
 /** Idle interpreter peaks near 10 MiB; claim raises this to the authored limit. */
 const STANDBY_MEMORY_MB = 32;
-const STANDBY_TTL_MS = 30_000;
+/** Part of every standby's backstop (`standbyBackstopMs`), so kept short. */
+const STANDBY_TTL_MS = 15_000;
+/**
+ * The longest a standby's learner code can run if the launcher dies mid-case
+ * and nothing else stops the unit: the supervisor's own time limit.
+ */
+export const standbyBackstopMs = (startupTimeoutMs = 10000, cleanupTimeoutMs = 5000) =>
+  Math.ceil((startupTimeoutMs + STANDBY_TTL_MS + POOL_CASE_TIME_LIMIT_MS + cleanupTimeoutMs) / 1000) * 1000;
 /**
  * Verified idle jails kept per CPU slot. A short case finishes in a few
  * milliseconds and a jail takes tens to start, so sequential cases from every
@@ -323,10 +335,15 @@ export class NsJailBackend implements NativeBackend {
   }
   /**
    * Spawns and fully verifies a jail gated before its request; never runs
-   * learner code. A standby waits at the lowest CPU weight; a jail started for a
-   * waiting case does not.
+   * learner code. A standby waits at the lowest CPU weight and serves any case
+   * within the pool's limit; a jail started for a waiting case serves that
+   * case's limit, with no standby wait in its backstop.
    */
-  private async startJail(standby: boolean, signal?: AbortSignal): Promise<Jail> {
+  private async startJail(
+    standby: boolean,
+    caseTimeLimitMs: number,
+    signal?: AbortSignal,
+  ): Promise<Jail> {
     const o = this.options,
       r = this.manifest.resources;
     const jail: Jail = {
@@ -374,8 +391,9 @@ export class NsJailBackend implements NativeBackend {
             log: join(jail.directory, "nsjail.log"),
           },
           r,
+          caseTimeLimitMs,
           // The supervisor's own backstop also covers the longest standby wait.
-          (o.startupTimeoutMs ?? 10000) + STANDBY_TTL_MS,
+          (o.startupTimeoutMs ?? 10000) + (standby ? STANDBY_TTL_MS : 0),
           o.cleanupTimeoutMs ?? 5000,
         ),
         { mode: 0o600 },
@@ -577,7 +595,7 @@ export class NsJailBackend implements NativeBackend {
       if (!release) return;
       this.warming++;
       let started = false;
-      const warming = this.startJail(true)
+      const warming = this.startJail(true, POOL_CASE_TIME_LIMIT_MS)
         .then(
           (jail) => {
             jail.release = release;
@@ -718,9 +736,12 @@ export class NsJailBackend implements NativeBackend {
     try {
       if (signal.aborted)
         throw new NativeInfrastructureError("Cancelled before launch");
-      jail = this.probing ? undefined : this.claimStandby();
+      jail =
+        this.probing || request.timeLimitMs > POOL_CASE_TIME_LIMIT_MS
+          ? undefined
+          : this.claimStandby();
       prewarmed = Boolean(jail);
-      if (!jail) jail = await this.startJail(false, signal);
+      if (!jail) jail = await this.startJail(false, request.timeLimitMs, signal);
       if (!this.probing) this.replenish();
       const { child, gate, stderr } = jail;
       const stdout = new ByteCapture(

@@ -1,7 +1,12 @@
 import { type NativeNodeResources } from "@cove/shared";
 export const NSJAIL_REVISION = "d8415bc8eea43cdd413daba25af63127019a1189";
-/** The protocol's longest case; bounds the supervisor backstops of every jail. */
-export const MAX_CASE_TIME_LIMIT_MS = 120_000;
+/**
+ * Longest case a prewarmed jail serves. A standby's supervisor backstop must
+ * outlast its wait plus any case it may be given, so this bounds how long
+ * learner code can outlive a crashed launcher. Longer cases start their own
+ * jail, whose backstop is sized for that case alone.
+ */
+export const POOL_CASE_TIME_LIMIT_MS = 10_000;
 export type JailPaths = {
   rootfs: string;
   policy: string;
@@ -18,14 +23,16 @@ export const cpuRlimitSeconds = (timeLimitMs: number) =>
 /**
  * Protobuf-text strings are escaped by JSON, never interpolated as shell syntax.
  *
- * Nothing here depends on a request: every jail is started for the node's
- * largest certified case, so any verified standby can serve any exercise. A
- * case's own memory and CPU limits are applied, and read back from the kernel,
- * when it claims a jail and before its source runs.
+ * Nothing here comes from a request: a jail is started for the node's largest
+ * memory class and any case up to `caseTimeLimitMs`, so a verified standby can
+ * serve any exercise within it. A case's own memory and CPU limits are applied,
+ * and read back from the kernel, when it claims a jail and before its source runs.
+ * `startupTimeoutMs` includes any time the jail may wait as a standby.
  */
 export function jailConfig(
   paths: JailPaths,
   resources: NativeNodeResources,
+  caseTimeLimitMs: number,
   startupTimeoutMs = 10000,
   cleanupTimeoutMs = 5000,
 ): string {
@@ -65,14 +72,14 @@ cgroup_mem_swap_max: 0
 cgroup_pids_max: ${resources.maxCasePids}
 cgroup_cpu_ms_per_sec: 1000
 rlimit_as_type: INF
-rlimit_cpu: ${cpuRlimitSeconds(MAX_CASE_TIME_LIMIT_MS)}
+rlimit_cpu: ${cpuRlimitSeconds(caseTimeLimitMs)}
 rlimit_core: 0
 rlimit_fsize: ${resources.scratchMb}
 rlimit_nofile: 32
 rlimit_nproc_type: HARD
 rlimit_stack: 8
 rlimit_stack_type: VALUE
-time_limit: ${Math.ceil((startupTimeoutMs + MAX_CASE_TIME_LIMIT_MS + cleanupTimeoutMs) / 1000)}
+time_limit: ${Math.ceil((startupTimeoutMs + caseTimeLimitMs + cleanupTimeoutMs) / 1000)}
 exec_bin { path: "/usr/local/bin/python3.12" arg: "-I" arg: "-B" arg: "-u" arg: "/opt/cove/bootstrap.py" }
 `;
 }

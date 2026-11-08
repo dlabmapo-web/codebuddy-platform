@@ -75,6 +75,7 @@ const cfg = jailConfig(
     log: "/tmp/nsjail.log",
   },
   resources,
+  1000,
 );
 await writeFile("/tmp/nsjail.cfg", cfg);
 const child = spawn(nsjailPath, ["--config", "/tmp/nsjail.cfg"], {

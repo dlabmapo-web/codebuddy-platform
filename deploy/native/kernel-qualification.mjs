@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 const [artifact, path, mode] = process.argv.slice(2), config = JSON.parse(await readFile(path, 'utf8'));
 const runtime = await import(pathToFileURL(artifact + '/worker/node_modules/@cove/grading-runtime/dist/index.js'));
-const { NativeExecutionService, NativeExecutionClient, NsJailBackend } = runtime;
+const { NativeExecutionService, NativeExecutionClient, NsJailBackend, standbyBackstopMs } = runtime;
 const client = new NativeExecutionClient({ socketPath: config.socketPath, descriptor: config.manifest.descriptor, lane: 'official' });
 const run = (code, extra = {}) => client.run({ code, stdin: '', memoryLimitMb: 128, timeLimitMs: 1000, outputLimitBytes: 1024, ...extra });
 let service, child, passed = 0;
@@ -61,7 +61,9 @@ try {
         console.log(JSON.stringify({ gate: 'crash-execution-marker', status: 'PASS', sourceReachedExecution: true }));
         child.kill('SIGKILL');
         await assert.rejects(running);
-        const end = performance.now() + 19000;
+        // The running case claimed a standby: with the unit still up, its supervisor's
+        // own time limit is what ends learner code that outlives the launcher.
+        const end = performance.now() + standbyBackstopMs() + 5000;
         while (true) {
             if ((await Promise.all((await groups()).map(g => readFile(config.cgroupRoot + '/' + g + '/cgroup.events', 'utf8')))).every(s => /^populated 0$/m.test(s)))
                 break;
@@ -95,6 +97,10 @@ try {
         assert.equal(small.outcome, 'MEMORY_LIMIT');
         const limit = await run('import resource\nprint(resource.getrlimit(resource.RLIMIT_CPU))\ntry:\n resource.setrlimit(resource.RLIMIT_CPU, (100, 100))\nexcept ValueError:\n print("refused")', { timeLimitMs: 2500 });
         assert.equal(limit.stdout, '(4, 4)\nrefused\n');
+        // A case longer than the pool serves gets its own jail and its own backstop.
+        const long = await run('import resource\nprint(resource.getrlimit(resource.RLIMIT_CPU))', { timeLimitMs: 10001 });
+        assert.equal(long.timings.prewarmed, false);
+        assert.equal(long.stdout, '(12, 12)\n');
         passed++;
         // Cancellation right after the request is prompt and releases capacity,
         // rather than waiting out the startup deadline.

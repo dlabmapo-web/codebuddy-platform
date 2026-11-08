@@ -8,6 +8,7 @@ import {
 import { ResourceBank } from "../src/resource-bank.js";
 import { FrameDecoder, ByteCapture, encodeFrame } from "../src/framing.js";
 import { cpuRlimitSeconds, jailConfig } from "../src/policy.js";
+import { standbyBackstopMs } from "../src/launcher.js";
 import { manifest } from "./fixtures.js";
 test("descriptor rejects legacy, unknown fields and partial identities", () => {
   assert.throws(() =>
@@ -141,27 +142,24 @@ test("UTF-8 output capture never exceeds byte allowance, even split codepoints",
     assert.ok(!capture.text().endsWith("�"));
   }
 });
-test("jail policy is fixed by the node, never by a request", () => {
-  const config = jailConfig(
-    {
-      rootfs: "/immutable/root",
-      policy: "/immutable/policy",
-      cgroup: "/trusted/case",
-      log: "/trusted/log",
-    },
-    manifest.resources,
-  );
+test("jail policy is fixed by the node and its time class, never by a request", () => {
+  const paths = { rootfs: "/immutable/root", policy: "/immutable/policy", cgroup: "/trusted/case", log: "/trusted/log" };
+  const config = jailConfig(paths, manifest.resources, 10_000);
   assert.match(config, /disable_no_new_privs: false/);
   assert.match(config, /clone_newnet: true/);
-  // Started for the largest certified case; a claim lowers both limits before GO.
+  // Started for the largest memory class; a claim lowers memory and CPU before GO.
   assert.match(config, /cgroup_mem_max: 536870912/);
-  assert.match(config, /rlimit_cpu: 121/);
+  assert.match(config, /rlimit_cpu: 11/);
   assert.match(config, /pass_fd: 3/);
-  assert.match(config, /time_limit: 135/);
-  assert.equal(config, jailConfig(
-    { rootfs: "/immutable/root", policy: "/immutable/policy", cgroup: "/trusted/case", log: "/trusted/log" },
-    manifest.resources,
-  ));
+  assert.match(config, /time_limit: 25/);
+  assert.equal(config, jailConfig(paths, manifest.resources, 10_000));
+  // A long case's own jail carries a backstop for that case and no standby wait.
+  const long = jailConfig(paths, manifest.resources, 60_000);
+  assert.match(long, /rlimit_cpu: 61/);
+  assert.match(long, /time_limit: 75/);
+});
+test("a crashed launcher leaves standby learner code at most 40 seconds", () => {
+  assert.equal(standbyBackstopMs(), 40_000);
 });
 test("CPU backstop is whole seconds above the authored limit", () => {
   assert.equal(cpuRlimitSeconds(1), 2);

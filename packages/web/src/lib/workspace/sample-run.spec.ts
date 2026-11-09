@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   answerStdinRequest,
+  nextStdinAction,
   createRunId,
   comparesSampleLocally,
   createSampleInputQueue,
@@ -248,5 +249,33 @@ describe('stopping a server check', () => {
 
   it('has nothing to stop when no check is in flight', () => {
     expect(stopActionFor(null)).toEqual({ kind: 'none' });
+  });
+});
+
+describe('nextStdinAction', () => {
+  it('answers a sample run from its own input only, ending in EOF', () => {
+    const sampleQueue = createSampleInputQueue('3\n');
+    const typeAhead = ['typed'];
+    expect(nextStdinAction({ sampleQueue, typeAhead, eofPending: false })).toEqual({ kind: 'line', line: '3' });
+    expect(nextStdinAction({ sampleQueue, typeAhead, eofPending: false })).toEqual({ kind: 'eof' });
+    expect(typeAhead).toEqual(['typed']);
+  });
+
+  it('serves pasted lines in order before asking the person', () => {
+    const typeAhead = ['101111', '101010'];
+    const next = () => nextStdinAction({ sampleQueue: null, typeAhead, eofPending: false });
+    expect(next()).toEqual({ kind: 'line', line: '101111' });
+    expect(next()).toEqual({ kind: 'line', line: '101010' });
+    expect(next()).toEqual({ kind: 'prompt' });
+  });
+
+  it('ends input only after the pasted lines', () => {
+    const typeAhead = ['last line'];
+    expect(nextStdinAction({ sampleQueue: null, typeAhead, eofPending: true })).toEqual({ kind: 'line', line: 'last line' });
+    expect(nextStdinAction({ sampleQueue: null, typeAhead, eofPending: true })).toEqual({ kind: 'eof' });
+  });
+
+  it('prompts a plain run with nothing typed ahead, as before', () => {
+    expect(nextStdinAction({ sampleQueue: null, typeAhead: [], eofPending: false })).toEqual({ kind: 'prompt' });
   });
 });

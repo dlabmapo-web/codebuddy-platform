@@ -42,3 +42,28 @@ export function isEndOfInputKey(event: KeyEventLike): boolean {
     !isImeComposing(event)
   );
 }
+
+/**
+ * A paste into the one-line terminal field, taken the way Elice's terminal
+ * takes a copied example.
+ *
+ * The field cannot hold a line break, so the browser would join a pasted block
+ * into one line and send it to the program's first `input()`. Instead every
+ * break ends a line that is sent at once, and the last line always stays in the
+ * field for Enter — even when the copy ends with a break, as an example's Copy
+ * button does, so the program runs when the person presses Enter, not on paste.
+ * Null when the paste has no break at all, so the browser's own paste runs.
+ */
+export function splitPastedInput(input: {
+  value: string;
+  selectionStart: number;
+  selectionEnd: number;
+  pasted: string;
+}): { lines: string[]; remainder: string } | null {
+  const pasted = input.pasted.replace(/\r\n?/g, '\n');
+  if (!pasted.includes('\n')) return null;
+  const body = pasted.endsWith('\n') ? pasted.slice(0, -1) : pasted;
+  const lines = (input.value.slice(0, input.selectionStart) + body + input.value.slice(input.selectionEnd)).split('\n');
+  const remainder = lines.pop()!;
+  return { lines, remainder };
+}

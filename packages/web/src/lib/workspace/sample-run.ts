@@ -135,6 +135,25 @@ export function answerStdinRequest(queue: string[] | null): StdinAnswer {
 }
 
 /**
+ * Answers one stdin request of any run, consuming whichever queue answers it.
+ *
+ * A sample run is answered from its own input alone, ending in EOF. A plain
+ * Run is answered first from lines the person sent before the program asked —
+ * the later lines of a multi-line paste — in the order they were sent, then
+ * by a Ctrl+D pressed meanwhile, and only then by asking them.
+ */
+export function nextStdinAction(input: {
+  sampleQueue: string[] | null;
+  typeAhead: string[];
+  eofPending: boolean;
+}): StdinAnswer {
+  if (input.sampleQueue !== null) return answerStdinRequest(input.sampleQueue);
+  const line = input.typeAhead.shift();
+  if (line !== undefined) return { kind: 'line', line };
+  return input.eofPending ? { kind: 'eof' } : { kind: 'prompt' };
+}
+
+/**
  * An identifier for a run, including where `crypto.randomUUID` is missing.
  *
  * It exists only in secure contexts; a page opened over plain http on a LAN

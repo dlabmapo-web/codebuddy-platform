@@ -1,13 +1,22 @@
 'use client';
 
+import { terminalByteLength } from '@cove/shared';
 import { AlertTriangle, ChevronRight, LoaderCircle } from 'lucide-react';
 import * as React from 'react';
 
 import { useLayoutTranslation } from '@/i18n';
 import { anchorProps } from '@/lib/monitoring/awareness/surfaces';
 
-import { isEndOfInputKey, isSubmitLineKey } from '@/lib/workspace/terminal-keys';
+import { isEndOfInputKey, isSubmitLineKey, splitPastedInput } from '@/lib/workspace/terminal-keys';
 import type { TerminalKind, TerminalLine } from '@/lib/workspace/use-python-runner';
+
+/**
+ * The largest paste the terminal takes. Pasted lines are echoed into a
+ * transcript that holds 512 KiB, and filling it ends the run as runaway output
+ * would; half of it leaves the program room to answer. Test run and Submit
+ * take inputs of any size.
+ */
+const PASTE_LIMIT_BYTES = 256 * 1024;
 
 const kindClass: Record<TerminalKind, string> = {
   out: 'text-[#D4D4D4]',
@@ -57,6 +66,7 @@ export function TerminalPanel({
 }) {
   const { t } = useLayoutTranslation('learn');
   const [value, setValue] = React.useState('');
+  const [pasteRefused, setPasteRefused] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const mirrored = mode === 'mirror';
@@ -77,6 +87,30 @@ export function TerminalPanel({
   const submit = () => {
     onSubmitInput?.(value);
     setValue('');
+    setPasteRefused(false);
+  };
+
+  // A copied example arrives as the lines it was written in: each complete
+  // line is sent at once, and the rest waits in the field for Enter.
+  const paste = (event: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = event.clipboardData.getData('text');
+    if (terminalByteLength(pasted) > PASTE_LIMIT_BYTES) {
+      event.preventDefault();
+      setPasteRefused(true);
+      return;
+    }
+    setPasteRefused(false);
+    const field = event.currentTarget;
+    const split = splitPastedInput({
+      value,
+      selectionStart: field.selectionStart ?? value.length,
+      selectionEnd: field.selectionEnd ?? value.length,
+      pasted,
+    });
+    if (!split) return;
+    event.preventDefault();
+    for (const line of split.lines) onSubmitInput?.(line);
+    setValue(split.remainder);
   };
 
   // Whatever is still in the field is sent first, as a terminal sends a
@@ -135,12 +169,14 @@ export function TerminalPanel({
         ) : null}
 
         {awaitingInput && !mirrored ? (
+          // No prompt sign: like Elice's terminal, the caret on the next line
+          // is the only cue, so pasted and typed lines read as plain terminal text.
           <div className="mt-1 flex items-center gap-1.5">
-            <ChevronRight className="size-3.5 shrink-0 text-[#9CDCFE]" />
             <input
               aria-label={t('workspace.stdin_prompt')}
               className="min-w-0 flex-1 bg-transparent font-mono text-[12.5px] text-[#9CDCFE] outline-none"
               onChange={(event) => setValue(event.target.value)}
+              onPaste={paste}
               onKeyDown={(event) => {
                 if (isSubmitLineKey(event.nativeEvent)) {
                   event.preventDefault();
@@ -164,6 +200,12 @@ export function TerminalPanel({
               </button>
             ) : null}
           </div>
+        ) : null}
+
+        {awaitingInput && !mirrored && pasteRefused ? (
+          <p className="mt-1 text-[#F87171]" role="status">
+            {t('workspace.paste_too_large')}
+          </p>
         ) : null}
 
         {synchronizing && synchronizingLabel ? (

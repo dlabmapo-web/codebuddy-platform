@@ -9,7 +9,7 @@ import {
 import type { PythonExecutionError } from '@/lib/pyodide/pythonError';
 
 import {
-  answerStdinRequest,
+  nextStdinAction,
   createRunId,
   createSampleInputQueue,
 } from './sample-run';
@@ -112,6 +112,12 @@ export function usePythonRunner(options?: {
    * written before the worker asks is overwritten by the ask itself.
    */
   const eofPendingRef = React.useRef(false);
+  /**
+   * Lines a person sent before the program asked for them — the later lines
+   * of a multi-line paste. Each is already echoed; each later read takes the
+   * next one without prompting, as a terminal's type-ahead does.
+   */
+  const typeAheadRef = React.useRef<string[]>([]);
   const bufferRef = React.useRef<TerminalLine[]>([]);
   const flushTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   // The transcript as the last commit left it. Socket handlers and worker
@@ -240,18 +246,20 @@ export function usePythonRunner(options?: {
         }
         case 'stdin': {
           // A queued sample answers automatically and ends in EOF, as the
-          // judge's stdin does; a plain run prompts the student, exactly as a
-          // terminal would.
-          if (eofPendingRef.current) {
-            eofPendingRef.current = false;
-            runner.sendEOF();
-            break;
-          }
-          const answer = answerStdinRequest(queueRef.current);
+          // judge's stdin does; a plain run takes what was typed ahead, then
+          // a pending Ctrl+D, then prompts the student, exactly as a terminal
+          // would.
+          const answer = nextStdinAction({
+            sampleQueue: queueRef.current,
+            typeAhead: typeAheadRef.current,
+            eofPending: eofPendingRef.current,
+          });
           if (answer.kind === 'line') {
-            append(`${answer.line}\n`, 'in');
+            // A typed-ahead line was echoed when it was sent.
+            if (queueRef.current !== null) append(`${answer.line}\n`, 'in');
             runner.provideInput(answer.line);
           } else if (answer.kind === 'eof') {
+            eofPendingRef.current = false;
             runner.sendEOF();
           } else {
             setWaiting(true);
@@ -331,6 +339,7 @@ export function usePythonRunner(options?: {
       // Supplied stdin — an empty sample input included — is all the program
       // gets; only a run without any is interactive.
       eofPendingRef.current = false;
+      typeAheadRef.current = [];
       queueRef.current =
         options?.stdin === undefined
           ? null
@@ -372,6 +381,7 @@ export function usePythonRunner(options?: {
     const runner = runnerRef.current;
     if (!runner) return;
     runner.stop();
+    typeAheadRef.current = [];
     flush();
     setRunning(false);
     setAwaitingInput(false);
@@ -397,10 +407,16 @@ export function usePythonRunner(options?: {
 
   const submitInput = React.useCallback(
     (value: string) => {
-      setAwaitingInput(false);
       // Only after the student presses Enter. A draft in the field is theirs
       // alone, and there is no event that could carry one.
       append(`${value}\n`, 'in');
+      // A line sent while the program is busy — a paste's second line onward —
+      // waits for its next read.
+      if (!transcriptRef.current.awaitingInput) {
+        typeAheadRef.current.push(value);
+        return;
+      }
+      setAwaitingInput(false);
       commit({ ...transcriptRef.current, awaitingInput: false });
       publish({ type: 'waiting', awaitingInput: false });
       runnerRef.current?.provideInput(value);

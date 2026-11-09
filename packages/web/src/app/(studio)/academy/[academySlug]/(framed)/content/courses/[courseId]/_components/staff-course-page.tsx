@@ -1,3 +1,4 @@
+import type { SolutionCheckSummary } from '@cove/shared';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import Link from 'next/link';
 import { PageTranslationsProvider } from '@/i18n';
@@ -33,6 +34,7 @@ export async function StaffCoursePage({
   const { academyId, roles } = await requireAcademyRoute(academySlug);
   const { t } = await getServerTranslation(['content']);
   let initialTree = null;
+  let initialSolutionChecks: SolutionCheckSummary[] | undefined;
   let canEditCurriculum = false;
   let canEditExercises = false;
   let canImport = false;
@@ -40,9 +42,15 @@ export async function StaffCoursePage({
 
   try {
     const client = createServerORPCClient();
-    initialTree = await client.academyCourses.getOutline({ academyId, courseId });
-    canEditCurriculum = canManageContent(roles);
     canEditExercises = canManageExercises(roles);
+    // Warnings are read beside the tree, and a failed read only hides them.
+    [initialTree, initialSolutionChecks] = await Promise.all([
+      client.academyCourses.getOutline({ academyId, courseId }),
+      canEditExercises
+        ? client.academyCourses.listSolutionChecks({ academyId, courseId }).catch(() => undefined)
+        : undefined,
+    ]);
+    canEditCurriculum = canManageContent(roles);
     canImport = canImportContent(roles);
   } catch (error) {
     // Only access denial gets the not-found state; anything else is a real
@@ -74,6 +82,7 @@ export async function StaffCoursePage({
           canEditExercises={canEditExercises}
           canImport={canImport}
           courseId={courseId}
+          initialSolutionChecks={initialSolutionChecks}
           initialTree={initialTree}
         />
       ) : (

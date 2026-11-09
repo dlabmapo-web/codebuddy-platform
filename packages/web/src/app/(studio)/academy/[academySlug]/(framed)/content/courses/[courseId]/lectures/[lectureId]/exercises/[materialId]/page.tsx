@@ -1,5 +1,5 @@
 
-import type { ExerciseSolutionEntry } from "@cove/shared";
+import type { ExerciseSolutionEntry, SolutionCheck } from "@cove/shared";
 import { requireAcademyRoute } from '@/lib/academy-route';
 import { notFound } from 'next/navigation';
 
@@ -39,6 +39,10 @@ export default async function ExercisePage({
         (error: unknown) => ({ error }),
       )
     : null;
+  // Its warning box only; a failed read lets the box read it after mount.
+  const checkRequest = canEdit
+    ? client.academyCourses.getSolutionCheck({ academyId, courseId, materialId }).catch(() => undefined)
+    : Promise.resolve(undefined);
   let context;
   let solutions: ExerciseSolutionEntry[] = [];
   try {
@@ -67,6 +71,7 @@ export default async function ExercisePage({
     if ('error' in read) throw read.error;
     solutions = read.solutions;
   }
+  const solutionCheck: SolutionCheck | null | undefined = await checkRequest;
 
   return (
     <StudioPage bleed title={context.course.title}>
@@ -76,6 +81,7 @@ export default async function ExercisePage({
         courseId={courseId}
         initialContext={context}
         initialSolutions={solutions}
+        initialSolutionCheck={solutionCheck}
         lectureId={lectureId}
       />
     </StudioPage>

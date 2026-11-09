@@ -104,7 +104,8 @@
       "CREATE": "New",
       "UPDATE": "Updated",
       "UNCHANGED": "No change"
-    }
+    },
+    "solution_checks": "Imported problems are being checked with their official solutions. Any failures appear as warnings in the course."
   },
   "unavailable": {
     "denied_title": "Import is not available to you",

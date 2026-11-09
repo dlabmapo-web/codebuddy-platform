@@ -3,7 +3,8 @@ import { publicConfig } from '@/lib/config';
 import { ManualAuthorDialog } from '@/components/manual/manual-author-dialog';
 import { PdfAuthorDialog } from '@/components/pdf/pdf-author-dialog';
 import * as Collapsible from '@radix-ui/react-collapsible';
-import { BookOpen, Braces, ChevronRight, FileCode2, FileText, ListChecks, PenLine, Sparkles, Turtle, Video } from 'lucide-react';
+import { AlertTriangle, BookOpen, Braces, ChevronRight, FileCode2, FileText, ListChecks, LoaderCircle, PenLine, Sparkles, Turtle, Video } from 'lucide-react';
+import { isSolutionCheckPending } from '@cove/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -76,6 +77,19 @@ export function useRevealAfterMove<T extends HTMLElement>(
 }
 
 /** Difficulty reads as a scale, so the tokens climb green → amber → red. */
+/** A failed official-solution check, or one still running, on a problem row. */
+function SolutionCheckFlag({ check }: { check: ReturnType<CourseBuilderState['solutionCheck']> }) {
+  const { t } = useTranslation('solution-check');
+  if (!check) return null;
+  if (isSolutionCheckPending(check.status)) {
+    const label = t('list_checking');
+    return <span role="img" aria-label={label} title={label} className="grid size-7 place-items-center text-sub"><LoaderCircle aria-hidden className="size-4 animate-spin" /></span>;
+  }
+  if (check.status !== 'FAILED') return null;
+  const label = t('list_failed', { cases: check.failedPositions.join(', ') });
+  return <span role="img" aria-label={label} title={label} className="grid size-7 place-items-center rounded-md text-danger"><AlertTriangle aria-hidden className="size-4" /></span>;
+}
+
 const difficultyStyles = {
   EASY: 'bg-success/10 text-success',
   MEDIUM: 'bg-warning/10 text-warning',
@@ -237,6 +251,7 @@ function ExerciseRow({
             title={material.title}
           />
         ) : null}
+        {exercise ? <SolutionCheckFlag check={builder.solutionCheck(material.id)} /> : null}
         {exercise?.aiFeedbackEnabled ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-[11.5px] font-bold text-brand">
             <Sparkles className="size-2.5" />

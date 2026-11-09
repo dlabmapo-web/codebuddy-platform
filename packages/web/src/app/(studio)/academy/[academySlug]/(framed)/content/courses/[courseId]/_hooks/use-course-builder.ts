@@ -4,8 +4,9 @@ import {videoApi} from "@/lib/video-api";
 import { manualApi } from '@/lib/manual-api';
 import { pdfApi } from '@/lib/pdf-api';
 
+import { isSolutionCheckPending, type SolutionCheckSummary } from '@cove/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { toApiError } from '@/lib/api-errors';
 import { orpc } from '@/lib/orpc';
@@ -62,12 +63,15 @@ export function useCourseBuilder({
   treeStaleTime = 30_000,
   canEditCurriculum,
   canEditExercises,
+  initialSolutionChecks,
 }: {
   target: BuilderTarget;
   initialTree: CourseTree;
   treeStaleTime?: number;
   canEditCurriculum: boolean;
   canEditExercises: boolean;
+  /** Read with the tree on the server; absent means read after mount. */
+  initialSolutionChecks?: SolutionCheckSummary[];
 }) {
   const { academyId, courseId } = target;
   const queryClient = useQueryClient();
@@ -84,6 +88,22 @@ export function useCourseBuilder({
     retry: false,
   });
   const tree = treeQuery.data;
+  // Official-solution warnings for the problem rows. Refreshed only while a
+  // check is still running — usually seconds after a save — and never in a
+  // hidden tab; otherwise read once with the page.
+  const solutionChecksQuery = useQuery({
+    queryKey: ['solution-checks', academyId, courseId],
+    queryFn: () => orpc.academyCourses.listSolutionChecks(target),
+    initialData: initialSolutionChecks,
+    staleTime: 30_000,
+    enabled: canEditExercises,
+    retry: false,
+    refetchInterval: (query) => query.state.data?.some((check) => isSolutionCheckPending(check.status)) ? 5_000 : false,
+  });
+  const solutionChecks = useMemo(
+    () => new Map((solutionChecksQuery.data ?? []).map((check) => [check.materialId, check])),
+    [solutionChecksQuery.data],
+  );
   const editable = canEditCurriculum;
   const exerciseEditable = canEditExercises;
 
@@ -519,6 +539,7 @@ export function useCourseBuilder({
     },
     revealId,
     clearReveal: () => setRevealId(null),
+    solutionCheck: (materialId: string) => solutionChecks.get(materialId),
     setExerciseVisible: (
       lectureId: string,
       materialId: string,

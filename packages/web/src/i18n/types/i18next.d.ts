@@ -6,6 +6,7 @@ import type video from "@cove/i18n/locales/en/video.json";
 import type manual from '@cove/i18n/locales/en/manual.json';
 import type grading from "@cove/i18n/locales/en/grading.json";
 import type sampleCheck from "@cove/i18n/locales/en/sample-check.json";
+import type solutionCheck from "@cove/i18n/locales/en/solution-check.json";
 /**
  * Makes `t()` key-checked. English is the source of truth for the key shape,
  * so `t('nav.link.membrs')` fails `pnpm typecheck` instead of rendering the
@@ -70,6 +71,7 @@ declare module 'i18next' {
       quiz: typeof import("@cove/i18n/locales/en/quiz.json");
       grading: typeof grading;
       "sample-check": typeof sampleCheck;
+      "solution-check": typeof solutionCheck;
       academy: typeof academy;
       applications: typeof applications;
       audit: typeof audit;

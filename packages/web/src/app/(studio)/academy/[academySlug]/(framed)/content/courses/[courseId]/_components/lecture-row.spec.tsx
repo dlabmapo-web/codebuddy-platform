@@ -24,7 +24,8 @@ vi.mock('../../../_components/visibility-confirm-modal', () => ({ VisibilityConf
 vi.mock('./move-anywhere-modal', () => ({ MoveAnywhereModal: (props: unknown) => { moveDialogs(props); return null; } }));
 vi.mock('./rename-modal', () => ({ RenameModal: () => null }));
 const roots: Array<ReturnType<typeof createRoot>> = [];
-afterEach(async () => { for (const root of roots.splice(0)) await act(() => root.unmount()); document.body.innerHTML = ''; vi.clearAllMocks(); });
+let solutionChecks: Record<string, unknown> = {};
+afterEach(async () => { for (const root of roots.splice(0)) await act(() => root.unmount()); document.body.innerHTML = ''; solutionChecks = {}; vi.clearAllMocks(); });
 async function render(editable: boolean, coding = false, visible = true, type?: string, linked = false) {
   const lecture = { id: 'lecture', title: 'Lesson', position: 1, isVisible: true, materials: [{ id: 'pdf', title: 'Reference document', type: 'PDF_DOCUMENT', position: 1, isVisible: true, programmingExercise: null, pdfDocument: { placement: 'BOTH', originalFilename: 'lesson.pdf', byteSize: 880 } }] } as unknown as CourseLecture;
   if (coding) lecture.materials = [{ id: 'problem', title: 'Coding exercise', type: 'PROGRAMMING_EXERCISE', position: 1, isVisible: visible, programmingExercise: { difficulty: 'EASY' } }] as unknown as CourseLecture['materials'];
@@ -33,7 +34,7 @@ async function render(editable: boolean, coding = false, visible = true, type?: 
     programmingExercise: type === 'PROGRAMMING_EXERCISE' ? { difficulty: 'EASY', referencePdfMaterialId: linked ? 'pdf' : null } : null,
   }] as unknown as CourseLecture['materials'];
   const destination = { id: 'destination', title: 'Destination', materials: [] };
-  const builder = { editable, exerciseEditable: editable, isCollapsed: () => false, visibilityPending: () => false, tree: { modules: [{ id: 'module', lectures: [lecture, destination] }] }, clearReveal: vi.fn(), target: { academyId: 'academy', courseId: 'course' }, refresh: vi.fn(), movePending: false } as unknown as CourseBuilderState;
+  const builder = { editable, exerciseEditable: editable, isCollapsed: () => false, visibilityPending: () => false, tree: { modules: [{ id: 'module', lectures: [lecture, destination] }] }, clearReveal: vi.fn(), target: { academyId: 'academy', courseId: 'course' }, refresh: vi.fn(), movePending: false, solutionCheck: (id: string) => solutionChecks[id] } as unknown as CourseBuilderState;
   const host = document.createElement('div'); document.body.append(host);
   const root = createRoot(host); roots.push(root);
   await act(() => root.render(<ul><LectureRow builder={builder} exercisePath={() => '/exercise'} lecture={lecture} moduleId="module" moduleNumber={1} parentEffectivelyVisible /></ul>));
@@ -81,4 +82,18 @@ it.each([
   expect(action).not.toBeNull();
   await act(() => action!.click());
   expect(moveDialogs).toHaveBeenCalledWith(expect.objectContaining({ kind: 'exercise', itemId: 'material' }));
+});
+it.each([
+  ['FAILED', 'list_failed'],
+  ['RUNNING', 'list_checking'],
+  ['QUEUED', 'list_checking'],
+] as const)('flags a problem whose official solution check is %s', async (status, label) => {
+  solutionChecks = { problem: { materialId: 'problem', status, failedPositions: status === 'FAILED' ? [8, 9] : [] } };
+  const host = await render(true, true);
+  expect(host.querySelector(`[role="img"][aria-label="${label}"]`)).not.toBeNull();
+});
+it.each(['PASSED', 'NO_SOLUTION', 'ERRORED', undefined] as const)('shows no flag for a %s check', async (status) => {
+  if (status) solutionChecks = { problem: { materialId: 'problem', status, failedPositions: [] } };
+  const host = await render(true, true);
+  expect(host.querySelector('[role="img"][aria-label^="list_"]')).toBeNull();
 });

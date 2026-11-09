@@ -704,6 +704,11 @@ function ResultStage({
             <p className="mt-1 text-[14px] leading-[1.6] text-sub">
               {t('result.description')}
             </p>
+            {problems.length ? (
+              <p className="mt-1 text-[14px] leading-[1.6] text-sub">
+                {t('result.solution_checks')}
+              </p>
+            ) : null}
           </div>
         </div>
 

@@ -98,7 +98,8 @@
       "CREATE": "생성",
       "UPDATE": "수정",
       "UNCHANGED": "변경 없음"
-    }
+    },
+    "solution_checks": "가져온 문제를 모범 답안으로 검사하고 있습니다. 실패한 문제는 과정 화면에 경고로 표시됩니다."
   },
   "unavailable": {
     "denied_title": "가져오기를 사용할 수 없습니다",

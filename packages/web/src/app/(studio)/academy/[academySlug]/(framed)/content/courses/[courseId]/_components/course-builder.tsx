@@ -2,7 +2,7 @@
 
 import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
-import type { CourseOutline as CourseTree } from '@cove/shared';
+import type { CourseOutline as CourseTree, SolutionCheckSummary } from '@cove/shared';
 import { Plus } from 'lucide-react';
 
 import { useTranslation } from 'react-i18next';
@@ -23,6 +23,7 @@ export function CourseBuilder({
   canImport,
   courseId,
   initialTree,
+  initialSolutionChecks,
   treeStaleTime = 30_000,
 }: {
   academyId: string;
@@ -31,6 +32,7 @@ export function CourseBuilder({
   canImport: boolean;
   courseId: string;
   initialTree: CourseTree;
+  initialSolutionChecks?: SolutionCheckSummary[];
   treeStaleTime?: number;
 }) {
   const contentPaths = useContentBasePath();
@@ -42,6 +44,7 @@ export function CourseBuilder({
     treeStaleTime,
     canEditCurriculum,
     canEditExercises,
+    initialSolutionChecks,
   });
   const exercisePath = (lectureId: string, materialId: string) =>
     contentPaths.exercise(courseId, lectureId, materialId);

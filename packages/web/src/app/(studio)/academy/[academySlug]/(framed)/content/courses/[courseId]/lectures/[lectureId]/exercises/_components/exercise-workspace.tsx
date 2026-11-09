@@ -1,6 +1,6 @@
 'use client';
 
-import type { ExerciseSolutionEntry } from "@cove/shared";
+import type { ExerciseSolutionEntry, SolutionCheck } from "@cove/shared";
 
 import { Code2, ListChecks } from 'lucide-react';
 import * as React from 'react';
@@ -23,6 +23,7 @@ import { HintsEditor } from './hints-editor';
 import { PreviewModal } from './preview-modal';
 import { StarterCodeEditor } from './starter-code-editor';
 import { SolutionCodeEditor } from './solution-code-editor';
+import { SolutionCheckCard } from './solution-check-card';
 
 export function ExerciseWorkspace({
   academyId,
@@ -31,6 +32,7 @@ export function ExerciseWorkspace({
   initialContext,
   canEdit,
   initialSolutions,
+  initialSolutionCheck,
 }: {
   academyId: string;
   courseId: string;
@@ -38,6 +40,8 @@ export function ExerciseWorkspace({
   initialContext: ExerciseAuthoringContext;
   canEdit: boolean;
   initialSolutions: ExerciseSolutionEntry[];
+  /** `undefined` when not read on the server; null before a first check. */
+  initialSolutionCheck?: SolutionCheck | null;
 }) {
   const { t: tq } = useTranslation('quiz');
   const { t } = useTranslation(['content', 'pdf-practice']);
@@ -123,6 +127,15 @@ export function ExerciseWorkspace({
           }}
         />
 </div> : null}
+        {canEdit && initialContext.material ? (
+          <SolutionCheckCard
+            academyId={academyId}
+            courseId={courseId}
+            initialCheck={initialSolutionCheck}
+            materialId={initialContext.material.id}
+            testCases={draft.testCases}
+          />
+        ) : null}
         <details className="rounded-xl border border-border bg-card p-5">
           <summary className="cursor-pointer text-sm font-semibold text-sub">{t('pdf-practice:solutions_hints')}</summary>
           <div className="mt-4 space-y-5">{assessmentEditors}</div>

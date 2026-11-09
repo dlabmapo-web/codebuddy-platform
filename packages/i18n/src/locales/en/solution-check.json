@@ -1,0 +1,44 @@
+{
+  "title": "Official solution check",
+  "help": "After each save, Cove runs the saved official solutions on every test case, the same way a student's submission is graded. This is a warning only; saving and publishing are never blocked.",
+  "status": {
+    "QUEUED": "Checking with the official solution…",
+    "RUNNING": "Checking with the official solution…",
+    "PASSED_one": "All {{cases}} cases passed with the official solution.",
+    "PASSED_other": "All {{cases}} cases passed with {{count}} official solutions.",
+    "FAILED": "The official solution fails some test cases. Check the test data.",
+    "NO_SOLUTION": "No official solution is saved, so this problem can't be checked.",
+    "NOT_CHECKABLE": "This problem can't be checked automatically (no test cases, or not a Python problem).",
+    "ERRORED": "The check couldn't run. Run it again in a moment.",
+    "NONE": "Not checked yet. Run a check to test the saved test cases."
+  },
+  "stale": "The test cases changed after this check. Save or run the check again.",
+  "slowest": "Slowest case: {{runtime}} ms of {{limit}} ms",
+  "solution_label": "Solution {{number}}",
+  "case_label": "Case {{position}}",
+  "sample": "Sample",
+  "hidden": "Hidden",
+  "line": "line {{line}}",
+  "outcome": {
+    "PASSED": "Passed",
+    "PASSED_WITH_WARNING": "Passed (slow)",
+    "WRONG_OUTPUT": "Wrong output",
+    "RUNTIME_ERROR": "Runtime error",
+    "TIME_LIMIT": "Time limit exceeded",
+    "MEMORY_LIMIT": "Memory limit exceeded",
+    "SKIPPED": "Not run"
+  },
+  "hint": {
+    "cut": "This test data is exactly {{length}} characters long. A spreadsheet probably cut it (Excel keeps 32,767 characters, Google Sheets 50,000). Paste the full data here in Edit.",
+    "WRONG_OUTPUT": "The expected output may be wrong, or the official solution is.",
+    "RUNTIME_ERROR": "The input may be cut short or in a different format than the problem statement says.",
+    "TIME_LIMIT": "The official solution is slower than this case's time limit.",
+    "MEMORY_LIMIT": "The official solution uses more memory than this problem allows."
+  },
+  "stopped": "Grading stopped early: {{reason}}",
+  "run_again": "Run check again",
+  "running": "Checking…",
+  "run_failed": "The check couldn't be started. Try again.",
+  "list_failed": "Official solution fails case {{cases}}",
+  "list_checking": "Checking with the official solution"
+}

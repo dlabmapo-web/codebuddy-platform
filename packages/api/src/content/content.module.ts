@@ -7,6 +7,8 @@ import { AcademyLibraryService } from "./library/academy-library.service.js";
 import { CourseService } from "./course.service.js";
 import { ContentImportController } from "./import/content-import.controller.js";
 import { ContentImportService } from "./import/content-import.service.js";
+import { SolutionCheckService } from "./solution-check.service.js";
+import { LearnModule } from "../learn/learn.module.js";
 import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.module.js";
 
 /**
@@ -27,9 +29,11 @@ import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.
     AuthModule,
     AuthorizationModule,
     MonitoringRevocationModule,
+    // The judge queue producer, for solution checks.
+    LearnModule,
   ],
   controllers: [ContentImportController],
-  providers: [AcademyLibraryService, CourseService, ContentImportService],
-  exports: [AcademyLibraryService, CourseService, ContentImportService],
+  providers: [AcademyLibraryService, CourseService, ContentImportService, SolutionCheckService],
+  exports: [AcademyLibraryService, CourseService, ContentImportService, SolutionCheckService],
 })
 export class ContentModule {}

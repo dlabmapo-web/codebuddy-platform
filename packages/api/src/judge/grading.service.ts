@@ -60,6 +60,11 @@ export type GradeSink = {
     earnedWeight?: number; possibleWeight?: number; appliedScoreHundredths?: number | null;
   }) => Promise<void>;
   fail: (reason: string, cases?: CaseRow[]) => Promise<void>;
+  /**
+   * Each executed case's error text, beside its row rather than in it: rows are
+   * persisted as they are, and a submission never stores stderr.
+   */
+  observe?: (position: number, run: { stderr: string }) => void;
 };
 
 type EliceProfile = Extract<ResolvedGradingProfile, { kind: "elice" }>;
@@ -282,6 +287,7 @@ export class GradingService {
           outputTruncated: run.outputTruncated,
         });
 
+        sink?.observe?.(position, run);
         results.push({
           position,
           isSample,
@@ -393,6 +399,7 @@ export class GradingService {
           testCase.effectiveTimeLimitMs ?? submission.timeLimitMs,
           Math.max(0, run.runtimeMs),
         );
+        sink?.observe?.(position, run);
         results.push({
           position,
           isSample,

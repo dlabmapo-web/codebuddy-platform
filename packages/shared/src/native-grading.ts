@@ -79,7 +79,7 @@ export const nativeNodeResourcesSchema = z
       fail("Certified case cannot fit in envelope");
   });
 export type NativeNodeResources = z.infer<typeof nativeNodeResourcesSchema>;
-const nativeAdmissionKindSchema = z.enum(["official", "staff-practice", "sample", "regrade"]);
+const nativeAdmissionKindSchema = z.enum(["official", "staff-practice", "sample", "regrade", "solution-check"]);
 /** One certified exercise revision, exactly as authored when it was qualified. */
 export const nativeMaterialEligibilitySchema = z
   .object({
@@ -88,7 +88,7 @@ export const nativeMaterialEligibilitySchema = z
     materialId: z.string().uuid(),
     gradingRevision: z.number().int().nonnegative(),
     context: z.enum(["live", "preview"]),
-    kinds: z.array(nativeAdmissionKindSchema).min(1).max(4),
+    kinds: z.array(nativeAdmissionKindSchema).min(1).max(5),
     memoryLimitMb: z.number().int().min(16).max(4096),
     timeLimitMs: z.number().int().min(1).max(120_000),
     /** Absent retains the original default-only certification. */
@@ -111,7 +111,7 @@ export const nativeScopeEligibilitySchema = z
     organizationId: z.string().uuid().optional(),
     academyId: z.string().uuid().optional(),
     contexts: z.array(z.enum(["live", "preview"])).min(1).max(2),
-    kinds: z.array(nativeAdmissionKindSchema).min(1).max(4),
+    kinds: z.array(nativeAdmissionKindSchema).min(1).max(5),
     maxCaseTimeLimitMs: z.number().int().min(1).max(120_000),
   })
   .strict()

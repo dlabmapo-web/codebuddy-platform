@@ -46,7 +46,7 @@ return redis.call('ZCARD', KEYS[1])
 `;
 export type NativeAdmissionContext = {
   academyId: string; materialId: string; gradingRevision: number;
-  context: "live" | "preview"; kind: "official" | "staff-practice" | "sample" | "regrade";
+  context: "live" | "preview"; kind: "official" | "staff-practice" | "sample" | "regrade" | "solution-check";
 };
 export class NativeAdmission {
   private readonly logger = new Logger(NativeAdmission.name);

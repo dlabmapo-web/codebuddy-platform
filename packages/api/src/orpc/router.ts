@@ -28,6 +28,7 @@ import { createAuthRouter } from "../auth/auth.router.js";
 import { ClassesService } from "../classes/classes.service.js";
 import { createClassesRouters } from "../classes/classes.router.js";
 import { CourseService } from "../content/course.service.js";
+import { SolutionCheckService } from "../content/solution-check.service.js";
 import { createContentRouters } from "../content/content.router.js";
 import { ContentImportService } from "../content/import/content-import.service.js";
 import { AnswerRecordsService } from "../learn/answer-records.service.js";
@@ -131,6 +132,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     }),
     rateLimitService: app.get(RateLimitService, { strict: false }),
     courseService: app.get(CourseService, { strict: false }),
+    solutionCheckService: app.get(SolutionCheckService, { strict: false }),
     contentImportService: app.get(ContentImportService, { strict: false }),
     classesService: app.get(ClassesService, { strict: false }),
     answerRecordsService: app.get(AnswerRecordsService, { strict: false }),

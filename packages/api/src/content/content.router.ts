@@ -133,6 +133,21 @@ export function createContentRouters(os: ORPCImplementer, deps: ORPCDeps) {
         .handler(({ context, input }) =>
           deps.courseService.getExerciseSolution(context.identity, input)
         ),
+      getSolutionCheck: os.academyCourses.getSolutionCheck
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.solutionCheckService.get(context.identity, input)
+        ),
+      runSolutionCheck: os.academyCourses.runSolutionCheck
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.solutionCheckService.run(context.identity, input)
+        ),
+      listSolutionChecks: os.academyCourses.listSolutionChecks
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.solutionCheckService.list(context.identity, input)
+        ),
       createExercise: os.academyCourses.createExercise
         .use(access.authenticated)
         .handler(({ context, input }) =>

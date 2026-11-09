@@ -4,6 +4,7 @@ import type { AuditService } from "../../academies/audit.service.js";
 import type { SupabaseIdentity } from "../../auth/auth.types.js";
 import type { AcademyAccessService } from "../../authorization/academy-access.service.js";
 import type { PrismaService } from "../../database/prisma.service.js";
+import type { SolutionCheckService } from "../solution-check.service.js";
 import { ContentImportService } from "./content-import.service.js";
 
 const identity: SupabaseIdentity = {
@@ -38,6 +39,67 @@ function audit() {
   } as unknown as AuditService;
 }
 
+function committing(entities: unknown[] = [], solutionChecks?: SolutionCheckService) {
+  const plan = {
+    modules: [],
+    issues: [],
+    counts: {
+      create: 0,
+      update: 1,
+      unchanged: 0,
+      warnings: 0,
+      conflicts: 0,
+      errors: 0,
+    },
+  };
+  const session = {
+    id: sessionId,
+    academyId,
+    courseId,
+    actorUserId,
+    status: "PREVIEW_READY",
+    result: null,
+    plan,
+    capturedContentRevision: 7,
+    expiresAt: new Date(Date.now() + 60_000),
+    checksumSha256: "a".repeat(64),
+    templateVersion: 3,
+  };
+  const transaction = {
+    $queryRaw: vi.fn().mockResolvedValue([{ id: courseId }]),
+    course: {
+      findFirst: vi.fn().mockResolvedValue({
+        id: courseId,
+        academyId,
+        contentRevision: 7,
+        modules: [],
+      }),
+      update: vi.fn().mockResolvedValue({ contentRevision: 8 }),
+    },
+    contentImportSession: {
+      update: vi.fn().mockResolvedValue({}),
+    },
+  };
+  const rootSessionUpdate = vi.fn();
+  const prisma = {
+    contentImportSession: {
+      findFirst: vi.fn().mockResolvedValue(session),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      update: rootSessionUpdate,
+    },
+    $transaction: vi.fn(
+      async (callback: (tx: typeof transaction) => Promise<unknown>) =>
+        callback(transaction),
+    ),
+  } as unknown as PrismaService;
+  const service = new ContentImportService(prisma, access(), audit(), solutionChecks);
+  Object.defineProperty(service, "applyPlan", {
+    value: vi.fn().mockResolvedValue(entities),
+  });
+
+  return { service, transaction, rootSessionUpdate };
+}
+
 describe("ContentImportService session safety", () => {
   it("scopes a stored preview to the Team Lead who created it", async () => {
     const findFirst = vi.fn().mockResolvedValue(null);
@@ -62,62 +124,7 @@ describe("ContentImportService session safety", () => {
   });
 
   it("stores the completed receipt inside the curriculum transaction", async () => {
-    const plan = {
-      modules: [],
-      issues: [],
-      counts: {
-        create: 0,
-        update: 1,
-        unchanged: 0,
-        warnings: 0,
-        conflicts: 0,
-        errors: 0,
-      },
-    };
-    const session = {
-      id: sessionId,
-      academyId,
-      courseId,
-      actorUserId,
-      status: "PREVIEW_READY",
-      result: null,
-      plan,
-      capturedContentRevision: 7,
-      expiresAt: new Date(Date.now() + 60_000),
-      checksumSha256: "a".repeat(64),
-      templateVersion: 3,
-    };
-    const transaction = {
-      $queryRaw: vi.fn().mockResolvedValue([{ id: courseId }]),
-      course: {
-        findFirst: vi.fn().mockResolvedValue({
-          id: courseId,
-          academyId,
-          contentRevision: 7,
-          modules: [],
-        }),
-        update: vi.fn().mockResolvedValue({ contentRevision: 8 }),
-      },
-      contentImportSession: {
-        update: vi.fn().mockResolvedValue({}),
-      },
-    };
-    const rootSessionUpdate = vi.fn();
-    const prisma = {
-      contentImportSession: {
-        findFirst: vi.fn().mockResolvedValue(session),
-        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
-        update: rootSessionUpdate,
-      },
-      $transaction: vi.fn(
-        async (callback: (tx: typeof transaction) => Promise<unknown>) =>
-          callback(transaction),
-      ),
-    } as unknown as PrismaService;
-    const service = new ContentImportService(prisma, access(), audit());
-    Object.defineProperty(service, "applyPlan", {
-      value: vi.fn().mockResolvedValue([]),
-    });
+    const { service, transaction, rootSessionUpdate } = committing();
 
     const receipt = await service.commit(identity, {
       academyId,
@@ -135,5 +142,27 @@ describe("ContentImportService session safety", () => {
       }),
     );
     expect(rootSessionUpdate).not.toHaveBeenCalled();
+  });
+
+  it("checks every created or changed problem once the import has committed", async () => {
+    const queued = [{ job: { materialId: "a", checkId: "c", memoryLimitMb: 256 }, descriptor: null }];
+    const order: string[] = [];
+    const solutionChecks = {
+      prepare: vi.fn(async () => { order.push("prepare"); return queued; }),
+      dispatch: vi.fn(async () => { order.push("dispatch"); }),
+    } as unknown as SolutionCheckService;
+    const { service, transaction } = committing([
+      { kind: "LECTURE", key: "l", title: "L", action: "CREATE", id: "lecture", lectureId: null },
+      { kind: "PROBLEM", key: "p1", title: "P1", action: "CREATE", id: "created", lectureId: "lecture" },
+      { kind: "PROBLEM", key: "p2", title: "P2", action: "UPDATE", id: "updated", lectureId: "lecture" },
+      { kind: "PROBLEM", key: "p3", title: "P3", action: "UNCHANGED", id: "unchanged", lectureId: "lecture" },
+    ], solutionChecks);
+    transaction.contentImportSession.update.mockImplementation(async () => { order.push("receipt"); return {}; });
+
+    await service.commit(identity, { academyId, courseId, sessionId, contentRevision: 7, acknowledgeWarnings: false });
+
+    expect(solutionChecks.prepare).toHaveBeenCalledWith(transaction, academyId, ["created", "updated"]);
+    expect(solutionChecks.dispatch).toHaveBeenCalledWith(queued);
+    expect(order).toEqual(["prepare", "receipt", "dispatch"]);
   });
 });

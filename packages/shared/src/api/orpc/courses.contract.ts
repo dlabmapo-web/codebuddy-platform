@@ -30,6 +30,11 @@ import {
   updateLectureSchema,
   updateProgrammingExerciseSchema,
 } from "../../content/course.js";
+import {
+  solutionCheckInputSchema,
+  solutionCheckSchema,
+  solutionCheckSummarySchema,
+} from "../../content/solution-check.js";
 
 export const academyCoursesContract = {
   list: oc
@@ -90,6 +95,18 @@ export const academyCoursesContract = {
   getExerciseSolution: oc
     .input(exerciseMaterialInputSchema)
     .output(exerciseSolutionSchema),
+  /** The latest run of the official solutions against the test cases; null before the first. */
+  getSolutionCheck: oc
+    .input(solutionCheckInputSchema)
+    .output(solutionCheckSchema.nullable()),
+  /** Queues a fresh check of the saved problem as it stands now. */
+  runSolutionCheck: oc
+    .input(solutionCheckInputSchema)
+    .output(solutionCheckSchema),
+  /** Every checked problem of a course, for the content list's warnings. */
+  listSolutionChecks: oc
+    .input(courseIdInputSchema)
+    .output(z.array(solutionCheckSummarySchema)),
   createExercise: oc
     .input(createProgrammingExerciseSchema)
     .output(exerciseAuthoringContextSchema),

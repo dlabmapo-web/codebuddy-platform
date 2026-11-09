@@ -393,7 +393,7 @@ services:
       # Must match cpus/mem_limit below: the launcher refuses a different envelope.
       NATIVE_NODE_RESOURCES: '{"cpuSlots":3,"officialReservedSlots":1,"envelopeMemoryMb":3376,"serviceOverheadMb":1024,"officialReservedMemoryMb":656,"maxCaseMemoryMb":512,"caseOverheadMb":128,"scratchMb":16,"maxCasePids":8}'
       # Every academy; exercises above 512 MiB or a 60 s case stay on judge-worker.
-      NATIVE_ELIGIBILITY: '[{"contexts":["live","preview"],"kinds":["official","staff-practice","sample","regrade"],"maxCaseTimeLimitMs":60000}]'
+      NATIVE_ELIGIBILITY: '[{"contexts":["live","preview"],"kinds":["official","staff-practice","sample","regrade","solution-check"],"maxCaseTimeLimitMs":60000}]'
       NATIVE_HEALTH_PORT: "4102"
     networks:
       - backend

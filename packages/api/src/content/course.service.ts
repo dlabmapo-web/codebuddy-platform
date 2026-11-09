@@ -17,7 +17,7 @@ import {
   type QuizDefinition,
 } from "@cove/shared";
 import { Prisma as PrismaValues } from "../generated/prisma/client.js";
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import {
   gradingProfileIssues,
@@ -37,6 +37,7 @@ import { atRevision } from "../common/optimistic-lock.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { AuditService } from "../academies/audit.service.js";
+import { SolutionCheckService } from "./solution-check.service.js";
 import {
   bumpContentRevision,
   compactLecturePositions,
@@ -220,6 +221,7 @@ export class CourseService {
     private readonly access: AcademyAccessService,
     private readonly audit: AuditService,
     private readonly revocation: MonitoringRevocationService,
+    @Optional() private readonly solutionChecks?: SolutionCheckService,
   ) {}
 
   async list(identity: SupabaseIdentity, academyId: string) {
@@ -1310,6 +1312,7 @@ export class CourseService {
         include: exerciseAuthoringInclude,
       });
       await replaceExerciseSolutions(tx, material.id, input.solutions);
+      const checks = await this.solutionChecks?.prepare(tx, input.academyId, [material.id]) ?? [];
       await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
@@ -1322,9 +1325,10 @@ export class CourseService {
       // §9.2 — the course's content moved, so any import preview taken
       // against the old revision is now stale and will be refused.
       await bumpContentRevision(tx, input.courseId);
-      return material;
+      return { material, checks };
     });
-    return toExerciseAuthoringContext(record);
+    await this.solutionChecks?.dispatch(record.checks);
+    return toExerciseAuthoringContext(record.material);
   }
 
   async updateExercise(
@@ -1422,6 +1426,7 @@ export class CourseService {
           })),
         });
       }
+      const checks = await this.solutionChecks?.prepare(tx, input.academyId, [current.id]) ?? [];
       let progressResetCount = 0;
       if (gradingChanged && !definitionChanged) {
         await tx.studentExerciseProgress.updateMany({ where: { materialId: current.id, gradingRevision: exercise.gradingRevision }, data: { gradingRevision: nextRevision } });
@@ -1462,9 +1467,10 @@ export class CourseService {
       // §9.2 — the course's content moved, so any import preview taken
       // against the old revision is now stale and will be refused.
       await bumpContentRevision(tx, input.courseId);
-      return updated;
+      return { updated, checks };
     });
-    return toExerciseAuthoringContext(record);
+    await this.solutionChecks?.dispatch(record.checks);
+    return toExerciseAuthoringContext(record.updated);
   }
 
   async setExerciseVisibility(

@@ -17,6 +17,7 @@ import { PracticeRunner } from "./practice.runner.js";
 import { RegradeRunner } from "./regrade.runner.js";
 import { SampleCheckRunner } from "./sample-check.runner.js";
 import { SampleCheckStore } from "./sample-check.store.js";
+import { SolutionCheckRunner } from "./solution-check.runner.js";
 import { ExecutionCapacity } from "./execution-capacity.js";
 import { practiceSnapshotSchema } from "./practice-snapshot.js";
 import { RuntimeRecovery } from "./runtime-recovery.js";
@@ -167,6 +168,12 @@ export async function bootstrapNativeWorker(configuration: Record<string, unknow
           await withExecutionKind("sample", () => telemetry.time("service", () => new SampleCheckRunner(store, measuredNativeClient(client, telemetry), comparator, new ExecutionCapacity(2)).run(job.data.checkId)), job.data.checkId);
         });
       }, 1, id => { void new SampleCheckRunner(store, probe, comparator, new ExecutionCapacity(2)).markFailed(id); }));
+      workers.push(queue.createSolutionCheckWorker(async job => {
+        const row = await prisma.exerciseSolutionCheck.findUnique({ where: { materialId: job.materialId }, select: { checkId: true, executionRuntimeSnapshot: true } });
+        // Superseded by a later save before it ran: that save queued its own.
+        if (!row || row.checkId !== job.checkId) return;
+        await execute(job.memoryLimitMb, row.executionRuntimeSnapshot, "background", g => withExecutionKind("check", () => telemetry.time("service", () => new SolutionCheckRunner(prisma, g).run(job)), job.checkId));
+      }, 1));
     }
     await Promise.all(workers.map(w => w.waitUntilReady()));
     await ready();

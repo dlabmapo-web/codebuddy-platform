@@ -65,5 +65,25 @@ export class RuntimeRecovery {
           data: { status: "ERRORED", gradedAt: new Date() } });
       }
     }
+    // Solution checks are recovered the way practice attempts are: a lost
+    // dispatch is queued again, a lost worker settles the check as errored.
+    const checks = await this.prisma.exerciseSolutionCheck.findMany({
+      where: { executionQueue: runtimeQueueName("check", descriptor), status: { in: ["QUEUED", "RUNNING"] }, queuedAt: { lt: new Date(Date.now() - 30_000) } },
+      take: 100, orderBy: { queuedAt: "asc" },
+      select: { materialId: true, checkId: true, status: true, startedAt: true, exercise: { select: { memoryLimitMb: true } } },
+    });
+    for (const row of checks) {
+      const job = await this.queue.solutionCheckQueue.getJob(row.checkId);
+      const state = await job?.getState();
+      if (row.status === "QUEUED") {
+        if (state === "failed") await job!.retry();
+        else if (!job) await this.queue.enqueueSolutionChecks([{ materialId: row.materialId, checkId: row.checkId, memoryLimitMb: row.exercise.memoryLimitMb }]);
+      } else if (state !== "active" && row.startedAt && Date.now() - row.startedAt.getTime() >= 60_000) {
+        await this.prisma.exerciseSolutionCheck.updateMany({
+          where: { materialId: row.materialId, checkId: row.checkId, status: "RUNNING", startedAt: row.startedAt },
+          data: { status: "ERRORED", result: { version: 1, solutions: [], failureReason: "WORKER_LOST" }, finishedAt: new Date() },
+        });
+      }
+    }
   }
 }

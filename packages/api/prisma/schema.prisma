@@ -1673,6 +1673,7 @@ model ProgrammingExercise {
   material  Material           @relation(fields: [materialId], references: [id], onDelete: Cascade)
   testCases ExerciseTestCase[]
   hints     ExerciseHint[]
+  solutionCheck ExerciseSolutionCheck?
 
   @@index([externalKey])
   @@index([legacyProblemNo])
@@ -2669,6 +2670,42 @@ model VideoWatchProgress {
   @@unique([materialId, assetId, userId, classId])
   @@index([userId, classId, materialId])
   @@map("video_watch_progress")
+}
+
+enum SolutionCheckStatus {
+  QUEUED
+  RUNNING
+  PASSED
+  FAILED
+  NO_SOLUTION
+  NOT_CHECKABLE
+  ERRORED
+}
+
+/// The latest run of a problem's official solutions against its own test
+/// cases, one row per problem. Staff only and advisory: nothing reads it to
+/// grade or to gate publishing. `checkId` changes every time a check is
+/// queued, so a job for an older definition finds itself superseded and
+/// exits. `result` holds outcomes and error lines, never test data or output.
+model ExerciseSolutionCheck {
+  materialId               String              @id @map("material_id") @db.Uuid
+  checkId                  String              @map("check_id") @db.Uuid
+  gradingRevision          Int                 @map("grading_revision")
+  solutionsDigest          String              @map("solutions_digest")
+  status                   SolutionCheckStatus
+  /// Runtime identity frozen when queued, as a submission's snapshot is.
+  engineVersion            String              @map("engine_version")
+  executionQueue           String?             @map("execution_queue")
+  executionRuntimeSnapshot Json?               @map("execution_runtime_snapshot")
+  result                   Json?
+  queuedAt                 DateTime            @default(now()) @map("queued_at") @db.Timestamptz(6)
+  startedAt                DateTime?           @map("started_at") @db.Timestamptz(6)
+  finishedAt               DateTime?           @map("finished_at") @db.Timestamptz(6)
+
+  exercise ProgrammingExercise @relation(fields: [materialId], references: [materialId], onDelete: Cascade)
+
+  @@index([executionQueue, status, queuedAt])
+  @@map("exercise_solution_checks")
 }
 
 model ProgrammingExerciseSolution {

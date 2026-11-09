@@ -7,7 +7,7 @@ import { ExecutionTelemetry, renderExecutionTimings } from "./execution-telemetr
 import { JudgeReadiness } from "./judge-readiness.js";
 
 type Worker = { pause(doNotWaitActive?: boolean): Promise<void>; resume(): void; client: Promise<{ status: string }> };
-type QueueSnapshot = { kind: "official" | "practice" | "sample" | "regrade"; waiting: number; active: number; delayed: number; failed: number; oldestWaitMs: number };
+type QueueSnapshot = { kind: "official" | "practice" | "sample" | "regrade" | "check"; waiting: number; active: number; delayed: number; failed: number; oldestWaitMs: number };
 function resourceMetrics(r: ExecutionDiagnostics["resources"], component: "worker" | "sandbox") {
   const values = { cpu_quota: r.cpuQuota, cpu_periods_total: r.periods, cpu_throttled_periods_total: r.throttledPeriods,
     cpu_throttled_seconds_total: r.throttledSeconds, cpu_pressure_pct: r.cpuPressure,

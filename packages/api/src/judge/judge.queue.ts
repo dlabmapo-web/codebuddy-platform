@@ -32,13 +32,22 @@ export const REGRADE_QUEUE = "cove-regrade";
  */
 export const SAMPLE_QUEUE = "cove-sample-checks";
 
-export type WorkKind = "official" | "practice" | "sample" | "regrade";
+/**
+ * Official-solution checks of saved problems. Background work like a regrade:
+ * nobody is waiting at a submit button, so it never delays a student.
+ */
+export const SOLUTION_CHECK_QUEUE = "cove-solution-checks";
+
+export type WorkKind = "official" | "practice" | "sample" | "regrade" | "check";
 export function runtimeQueueName(kind: WorkKind, descriptor?: NativeRuntimeDescriptor | null): string {
-  const base = { official: GRADING_QUEUE, practice: PRACTICE_QUEUE, sample: SAMPLE_QUEUE, regrade: REGRADE_QUEUE }[kind];
+  const base = { official: GRADING_QUEUE, practice: PRACTICE_QUEUE, sample: SAMPLE_QUEUE, regrade: REGRADE_QUEUE, check: SOLUTION_CHECK_QUEUE }[kind];
   return descriptor ? `${base}-native-v1-${nativeRuntimeVersion(descriptor).slice("native-cpython-".length)}` : base;
 }
 
 export type SampleCheckJob = { checkId: string };
+
+/** `checkId` is the row's when queued; a newer check replaces it and this job exits. */
+export type SolutionCheckJob = { materialId: string; checkId: string; memoryLimitMb: number };
 
 export type GradingJob = { submissionId: string };
 export type PracticeJob = { attemptId: string };
@@ -116,6 +125,7 @@ export class JudgeQueue implements OnModuleDestroy {
   private practiceInstance: Queue<PracticeJob> | null = null;
   private regradeInstance: Queue<RegradeJob> | null = null;
   private sampleInstance: Queue<SampleCheckJob> | null = null;
+  private solutionCheckInstance: Queue<SolutionCheckJob> | null = null;
   private eventsInstance: QueueEvents | null = null;
   private practiceEventsInstance: QueueEvents | null = null;
   private rateLimitClient: Redis | null = null;
@@ -194,10 +204,19 @@ export class JudgeQueue implements OnModuleDestroy {
     return this.sampleInstance;
   }
 
+  get solutionCheckQueue(): Queue<SolutionCheckJob> {
+    this.solutionCheckInstance ??= new Queue<SolutionCheckJob>(runtimeQueueName("check", this.descriptor), {
+      connection: redisConnection(this.redisUrl),
+      defaultJobOptions: { attempts: 2, backoff: { type: "exponential", delay: 5_000 },
+        removeOnComplete: { age: 3_600, count: 1_000 }, removeOnFail: { age: 86_400 } },
+    });
+    return this.solutionCheckInstance;
+  }
+
   /** Bounded operational counts only; job bodies/identifiers never leave here. */
   async diagnostics() {
-    const queues = [this.queue, this.practiceQueue, this.sampleQueue, this.regradeQueue] as const;
-    const kinds = ["official", "practice", "sample", "regrade"] as const;
+    const queues = [this.queue, this.practiceQueue, this.sampleQueue, this.regradeQueue, this.solutionCheckQueue] as const;
+    const kinds = ["official", "practice", "sample", "regrade", "check"] as const;
     const results = await Promise.allSettled(queues.map(async (queue, index) => {
       const [countsResult, oldestResult] = await Promise.allSettled([queue.getJobCounts("waiting", "active", "delayed", "failed"), queue.getWaiting(0, 0)]);
       if (countsResult.status === "rejected" || oldestResult.status === "rejected") throw new Error("Queue diagnostics unavailable");
@@ -249,6 +268,14 @@ export class JudgeQueue implements OnModuleDestroy {
 
   async enqueuePractice(attemptId: string, descriptor?: NativeRuntimeDescriptor | null): Promise<void> {
     await (descriptor ? this.forRuntime(descriptor) : this).practiceQueue.add("practice", { attemptId }, { jobId: attemptId });
+  }
+
+  /** `jobId` is the check id, so a dispatch retried by recovery cannot run one check twice. */
+  async enqueueSolutionChecks(jobs: readonly SolutionCheckJob[], descriptor?: NativeRuntimeDescriptor | null): Promise<void> {
+    if (!jobs.length) return;
+    await (descriptor ? this.forRuntime(descriptor) : this).solutionCheckQueue.addBulk(
+      jobs.map(job => ({ name: "check", data: job, opts: { jobId: job.checkId } })),
+    );
   }
 
   /**
@@ -379,6 +406,14 @@ export class JudgeQueue implements OnModuleDestroy {
     return worker;
   }
 
+  createSolutionCheckWorker(handler: (job: SolutionCheckJob, queuedAtMs?: number) => Promise<void>, concurrency: number): Worker<SolutionCheckJob> {
+    const worker = new Worker<SolutionCheckJob>(runtimeQueueName("check", this.descriptor), (job) => handler(job.data, job.timestamp), {
+      connection: redisConnection(this.redisUrl), concurrency,
+    });
+    worker.on("failed", (job, error) => this.logger.error(`solution check ${job?.id ?? "unknown"} failed: ${error.message}`));
+    return worker;
+  }
+
   async close(): Promise<void> {
     await Promise.all([...this.families.values()].map(family => family.close()));
     this.families.clear();
@@ -386,6 +421,7 @@ export class JudgeQueue implements OnModuleDestroy {
     await this.practiceInstance?.close();
     await this.regradeInstance?.close();
     await this.sampleInstance?.close();
+    await this.solutionCheckInstance?.close();
     await this.eventsInstance?.close();
     await this.practiceEventsInstance?.close();
     await this.rateLimitClient?.quit().catch(() => undefined);
@@ -393,6 +429,7 @@ export class JudgeQueue implements OnModuleDestroy {
     this.practiceInstance = null;
     this.regradeInstance = null;
     this.sampleInstance = null;
+    this.solutionCheckInstance = null;
     this.eventsInstance = null;
     this.practiceEventsInstance = null;
     this.rateLimitClient = null;

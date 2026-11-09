@@ -21,3 +21,4 @@ export * from "./quiz.js";
 export * from "./pdf.js";
 
 export * from "./solutions.js";
+export * from "./solution-check.js";

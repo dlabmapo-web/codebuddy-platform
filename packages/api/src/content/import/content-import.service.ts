@@ -1,5 +1,5 @@
 import { privateSolutions, replaceExerciseSolutions, solutionOrder } from "../exercise-solutions.js";
-import { HttpStatus, Injectable, Logger } from "@nestjs/common";
+import { HttpStatus, Injectable, Logger, Optional } from "@nestjs/common";
 import { createHash, randomUUID } from "node:crypto";
 import {
   CONTENT_IMPORT_MAX_PROBLEMS,
@@ -27,6 +27,7 @@ import {
 } from "@cove/shared";
 
 import { AuditService } from "../../academies/audit.service.js";
+import { SolutionCheckService, type QueuedSolutionChecks } from "../solution-check.service.js";
 import type { SupabaseIdentity } from "../../auth/auth.types.js";
 import { AcademyAccessService } from "../../authorization/academy-access.service.js";
 import { AppException } from "../../common/app-exception.js";
@@ -109,6 +110,7 @@ export class ContentImportService {
     private readonly prisma: PrismaService,
     private readonly access: AcademyAccessService,
     private readonly audit: AuditService,
+    @Optional() private readonly solutionChecks?: SolutionCheckService,
   ) {}
 
   /* ------------------------------------------------------------ downloads */
@@ -423,6 +425,7 @@ export class ContentImportService {
     }
 
     const started = Date.now();
+    let checks: QueuedSolutionChecks = [];
     try {
       const receipt = await this.prisma.$transaction(async (tx) => {
         // Step 10 — the course row, locked. Two imports for the same course
@@ -452,6 +455,11 @@ export class ContentImportService {
           actorUserId: actor.userId,
           requestId: context.requestId,
         });
+
+        // Every created or changed problem is checked against its official
+        // solutions once the import has committed.
+        checks = await this.solutionChecks?.prepare(tx, input.academyId,
+          entities.filter((entity) => entity.kind === "PROBLEM" && entity.action !== "UNCHANGED").map((entity) => entity.id)) ?? [];
 
         // Step 18 — one increment for the whole import, not one per entity. The
         // course moved once, and a preview taken before it should be refused
@@ -508,6 +516,7 @@ export class ContentImportService {
         return receipt;
       });
 
+      await this.solutionChecks?.dispatch(checks);
       this.logger.log({
         message: "content import committed",
         requestId: context.requestId,

@@ -21,6 +21,7 @@ import { ComparatorPool } from "./comparator-pool.js";
 import { ExecutionCapacity } from "./execution-capacity.js";
 import { SampleCheckRunner } from "./sample-check.runner.js";
 import { SampleCheckStore } from "./sample-check.store.js";
+import { SolutionCheckRunner } from "./solution-check.runner.js";
 import type { ExecutionEngine } from "./execution-engine.js";
 import { PyodideExecutionEngine } from "./pyodide-engine.js";
 import { SandboxExecutionEngine } from "./sandbox-engine.js";
@@ -164,10 +165,20 @@ async function bootstrap(): Promise<void> {
     environment.SAMPLE_CHECK_CONCURRENCY,
     (checkId) => void samples.markFailed(checkId),
   );
+  // Official-solution checks of saved problems: background work, behind every
+  // student, sized like a regrade.
+  const solutionChecks = new SolutionCheckRunner(prisma, grading);
+  const solutionCheckWorker = queue.createSolutionCheckWorker(
+    (job, queuedAtMs) => {
+      if (queuedAtMs !== undefined) telemetry.observe("queue", Math.max(0, Date.now() - queuedAtMs), "check");
+      return measured("check", () => capacity.runBackground(() => solutionChecks.run(job)), job.checkId);
+    },
+    environment.REGRADE_CONCURRENCY,
+  );
   const healthPort = Number(process.env.JUDGE_HEALTH_PORT ?? 0);
   const monitor = startJudgeMonitor({ port: healthPort, bind: environment.JUDGE_HEALTH_BIND,
     secret: environment.JUDGE_METRICS_SECRET, guard: environment.JUDGE_READINESS_GUARD,
-    telemetry: grading.telemetry, workers: [worker, practiceWorker, regradeWorker, sampleWorker],
+    telemetry: grading.telemetry, workers: [worker, practiceWorker, regradeWorker, sampleWorker, solutionCheckWorker],
     diagnostics: () => engine instanceof SandboxExecutionEngine ? engine.readDiagnostics() : Promise.resolve(undefined),
     queues: () => queue.diagnostics() });
   logger.log(JSON.stringify({ event: "judge.config", concurrency: environment.JUDGE_CONCURRENCY,

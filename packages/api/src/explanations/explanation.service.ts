@@ -1,6 +1,6 @@
 import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
 import { Injectable } from "@nestjs/common";
-import type { ExplanationRead, ExplanationReadResult, SaveExplanation } from "@cove/shared";
+import type { ExplanationDocument, ExplanationRead, ExplanationReadResult, SaveExplanation } from "@cove/shared";
 import { PrismaService } from "../database/prisma.service.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AuditService } from "../academies/audit.service.js";
@@ -16,12 +16,41 @@ import { bumpContentRevision, nextMaterialPosition, compactMaterialPositions } f
 import { sanitizeExplanation } from "./explanation-html.js";
 
 type Target = { academyId: string; courseId: string; lectureId: string; materialId: string };
+type DocumentRow = { materialId: string; title: string; isVisible: boolean; body: string; revision: number; courseId: string; courseTitle: string; lectureId: string; lectureTitle: string };
 @Injectable()
 export class ExplanationService {
   constructor(private readonly db: PrismaService, private readonly access: AcademyAccessService,
     private readonly images: ManualAssetsService, private readonly audit: AuditService,
     private readonly outlines: CurriculumOutlineService, private readonly revocation: MonitoringRevocationService) {}
 
+  async context(identity: SupabaseIdentity, input: { academyId: string; courseId: string; lectureId: string }) {
+    await this.access.requirePermission(identity.authUserId, input.academyId, "curriculum.manage");
+    const [row] = await this.db.$queryRaw<Array<{ courseId: string; courseTitle: string; lectureId: string; lectureTitle: string }>>`
+      SELECT c.id AS "courseId", c.title AS "courseTitle", l.id AS "lectureId", l.title AS "lectureTitle"
+      FROM lectures l JOIN course_modules cm ON cm.id = l.course_module_id JOIN courses c ON c.id = cm.course_id
+      WHERE l.id = ${input.lectureId}::uuid AND c.id = ${input.courseId}::uuid AND c.academy_id = ${input.academyId}::uuid`;
+    if (!row) throw new AppException("CONTENT_PARENT_MISMATCH", 404);
+    return { course: { id: row.courseId, title: row.courseTitle }, lecture: { id: row.lectureId, title: row.lectureTitle } };
+  }
+  private async readDocumentRow(academyId: string, materialId: string): Promise<DocumentRow> {
+    const [row] = await this.db.$queryRaw<DocumentRow[]>`
+      SELECT m.id AS "materialId", m.title, m.is_visible AS "isVisible", e.body, e.revision,
+        c.id AS "courseId", c.title AS "courseTitle", l.id AS "lectureId", l.title AS "lectureTitle"
+      FROM materials m JOIN explanation_materials e ON e.material_id = m.id
+      JOIN lectures l ON l.id = m.lecture_id JOIN course_modules cm ON cm.id = l.course_module_id
+      JOIN courses c ON c.id = cm.course_id
+      WHERE m.id = ${materialId}::uuid AND m.type = 'EXPLANATION' AND c.academy_id = ${academyId}::uuid`;
+    if (!row) throw new AppException("EXERCISE_NOT_AVAILABLE", 404);
+    return row;
+  }
+  /** Authoring needs a document, not a student curriculum/progress tree. */
+  async authorDocument(identity: SupabaseIdentity, input: { academyId: string; materialId: string }): Promise<ExplanationDocument> {
+    await this.access.requirePermission(identity.authUserId, input.academyId, "curriculum.review");
+    const row = await this.readDocumentRow(input.academyId, input.materialId);
+    const images = await this.images.imageDataUrls(lessonImageIds(row.body));
+    return { materialId: row.materialId, title: row.title, body: row.body, revision: row.revision, isVisible: row.isVisible,
+      course: { id: row.courseId, title: row.courseTitle }, lecture: { id: row.lectureId, title: row.lectureTitle }, images };
+  }
   async read(identity: SupabaseIdentity, input: ExplanationRead): Promise<ExplanationReadResult> {
     const actor = await this.access.requirePermission(identity.authUserId, input.academyId, input.preview ? "curriculum.review" : "curriculum.read");
     const scope = learningScopeFor(input.academyId, actor);
@@ -40,13 +69,7 @@ export class ExplanationService {
         : { AND: [effectivelyVisibleActivityWhere(input.academyId), scope.material, classScope] },
     ] }, select: { id: true } });
     if (!allowed) throw new AppException("EXERCISE_NOT_AVAILABLE", 404);
-    const [row] = await this.db.$queryRaw<Array<{ materialId: string; title: string; isVisible: boolean; body: string; revision: number; courseId: string; courseTitle: string; lectureId: string; lectureTitle: string }>>`
-      SELECT m.id AS "materialId", m.title, m.is_visible AS "isVisible", e.body, e.revision,
-        c.id AS "courseId", c.title AS "courseTitle", l.id AS "lectureId", l.title AS "lectureTitle"
-      FROM materials m JOIN explanation_materials e ON e.material_id = m.id
-      JOIN lectures l ON l.id = m.lecture_id JOIN course_modules cm ON cm.id = l.course_module_id
-      JOIN courses c ON c.id = cm.course_id WHERE m.id = ${allowed.id}::uuid`;
-    if (!row) throw new AppException("EXERCISE_NOT_AVAILABLE", 404);
+    const row = await this.readDocumentRow(input.academyId, allowed.id);
     const [images, outline] = await Promise.all([
       this.images.imageDataUrls(lessonImageIds(row.body)),
       this.readOutline(row.courseId, actor.userId, input.classId, Boolean(input.preview), !roles.includes("STUDENT")),

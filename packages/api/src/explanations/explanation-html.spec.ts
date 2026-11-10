@@ -21,3 +21,16 @@ describe("explanation document validation", () => {
     expect(saveExplanationSchema.safeParse({ ...target, materialId: id }).success).toBe(false);
   });
 });
+
+it('preserves code languages, indentation and literal markup without active elements', () => {
+  const code = 'for i in range(3):\n    print(&quot;&lt;script&gt;&quot;)\n';
+  const body = sanitizeExplanation(`<pre data-language="python" onclick="steal()"><code class="language-python">${code}</code></pre>`);
+  expect(body).toContain('data-language="python"'); expect(body).toContain('class="language-python"');
+  expect(body).toContain('    print('); expect(body).toContain('&lt;script&gt;'); expect(body).not.toMatch(/onclick|<script>/);
+  expect(sanitizeExplanation('<pre data-language="untrusted"><code class="evil">x</code></pre>')).toContain('data-language="plaintext"');
+});
+
+it('keeps legacy code-only language metadata readable', () => {
+  const body = sanitizeExplanation('<pre><code class="language-cpp">int x = 10;</code></pre>');
+  expect(body).toBe('<pre><code class="language-cpp">int x = 10;</code></pre>');
+});

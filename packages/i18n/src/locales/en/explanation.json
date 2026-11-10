@@ -36,5 +36,12 @@
   "conflict": "Someone updated this explanation. Your draft is still here. Copy your changes before reopening the latest version.",
   "too_long": "This explanation is too long. Shorten the content before saving.",
   "back": "Back to writing",
-  "refresh_failed": "Your explanation was saved, but the course could not refresh. Close and reopen the course."
+  "refresh_failed": "Your explanation was saved, but the course could not refresh. Close and reopen the course.",
+  "back_to_course": "Back to course",
+  "code_help": "Use Code example to add a formatted example. Press Ctrl/⌘ + Enter to continue writing below it.",
+  "copy_code": "Copy code",
+  "copied": "Copied",
+  "copy_failed": "Could not copy. Select the code and copy it manually.",
+  "plain_text": "Plain text",
+  "ready": "Ready to write"
 }

@@ -7,6 +7,7 @@ export type ContentPaths = {
   course: (courseId: string) => string;
   classes: () => string;
   class: (classId: string) => string;
+  explanation: (courseId: string, lectureId: string, materialId: string) => string;
   exercise: (
     courseId: string,
     lectureId: string,
@@ -36,6 +37,7 @@ export function createContentPaths(
       course: (courseId) => routes.adminLibraryCourse(courseId),
       classes: noClasses,
       class: noClasses,
+      explanation: (courseId, lectureId, materialId) => `${routes.adminLibraryCourse(courseId)}/lectures/${encodeURIComponent(lectureId)}/explanations/${encodeURIComponent(materialId)}`,
       exercise: (courseId, lectureId, materialId) =>
         routes.adminLibraryExercise(courseId, lectureId, materialId),
     };
@@ -47,6 +49,7 @@ export function createContentPaths(
         course: (courseId) => routes.academyLearnCourse(academySlug, courseId),
         classes: () => routes.academyClasses(academySlug),
         class: (classId) => routes.academyClass(academySlug, classId),
+        explanation: (courseId, lectureId, materialId) => `${routes.academyCourse(academySlug, courseId)}/lectures/${encodeURIComponent(lectureId)}/explanations/${encodeURIComponent(materialId)}`,
         exercise: (courseId, lectureId, materialId) =>
           `${routes.academyCourse(academySlug, courseId)}/lectures/${encodeURIComponent(lectureId)}/exercises/${encodeURIComponent(materialId)}`,
       }
@@ -59,6 +62,7 @@ export function createContentPaths(
         course: (courseId) => routes.adminAcademyCourse(academySlug, courseId),
         classes: () => routes.adminAcademyClasses(academySlug),
         class: (classId) => routes.adminAcademyClass(academySlug, classId),
+        explanation: (courseId, lectureId, materialId) => `${routes.adminAcademyCourse(academySlug, courseId)}/lectures/${encodeURIComponent(lectureId)}/explanations/${encodeURIComponent(materialId)}`,
         exercise: (courseId, lectureId, materialId) =>
           routes.adminAcademyExercise(
             academySlug,

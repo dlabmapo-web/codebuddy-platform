@@ -1,5 +1,6 @@
 'use client';
 
+import { CodeExample } from './code-example';
 import { ChoiceSelector } from '@/components/studio/choice-selector';
 import { useEditorTranslation } from './use-editor-translation';
 import { usePrivateImageResolver } from './private-image-context';
@@ -22,7 +23,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { mergeAttributes } from '@tiptap/react';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import {
-  Bold, Italic, UnderlineIcon, Strikethrough, AlignLeft, AlignCenter, AlignRight,
+  Code2, Bold, Italic, UnderlineIcon, Strikethrough, AlignLeft, AlignCenter, AlignRight,
   List, ListOrdered, Table as TableIcon, ImageIcon, Link as LinkIcon,
   Minus, Highlighter, Type, Undo, Redo,
   ArrowDownToLine, ArrowUpToLine, ArrowLeftToLine, ArrowRightToLine,
@@ -183,6 +184,7 @@ type Props = {
   onImageUpload?: (file: File) => Promise<string>;
   onImageUploadStateChange?: (state: { pending: boolean; error: boolean }) => void;
   editable?: boolean;
+  codeExamples?: boolean;
 };
 
 const FONT_SIZES = ['12', '14', '16', '18', '20', '24', '28', '32'];
@@ -190,7 +192,7 @@ const COLORS = ['#16181D', '#DC2626', '#D97706', '#16A34A', '#1B64DA', '#7C3AED'
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function RichEditor({ value, onChange, onImageUpload, onImageUploadStateChange, editable = true, placeholder, minHeight = 280 }: Props) {
+export function RichEditor({ value, onChange, onImageUpload, onImageUploadStateChange, editable = true, codeExamples = false, placeholder, minHeight = 280 }: Props) {
   const { t } = useEditorTranslation();
   const editorPlaceholder = placeholder ?? t('placeholder');
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -201,7 +203,8 @@ export function RichEditor({ value, onChange, onImageUpload, onImageUploadStateC
 
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ link: false, underline: false }),
+      StarterKit.configure({ link: false, underline: false, ...(codeExamples ? { codeBlock: false } : {}) }),
+      ...(codeExamples ? [CodeExample] : []),
       Underline,
       TextStyle,
       Color,
@@ -307,6 +310,13 @@ export function RichEditor({ value, onChange, onImageUpload, onImageUploadStateC
 
   if (!editor) return null;
 
+  function toggleCodeExample() {
+    if (!editor) return;
+    editor.chain().toggleCodeBlock({ language: 'python' }).run();
+    // Resolve the caret after the React code view mounts, even if the editor already has focus.
+    editor.commands.focus(editor.state.selection.from);
+  }
+
   return (
     <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
 
@@ -360,6 +370,7 @@ export function RichEditor({ value, onChange, onImageUpload, onImageUploadStateC
 
         <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title={t('bullet_list')}><List size={14} /></ToolBtn>
         <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title={t('numbered_list')}><ListOrdered size={14} /></ToolBtn>
+        {codeExamples ? <ToolBtn onClick={toggleCodeExample} active={editor.isActive('codeBlock')} title={t('code_example')}><Code2 size={16} /></ToolBtn> : null}
         <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title={t('divider')}><Minus size={14} /></ToolBtn>
         <Divider />
 

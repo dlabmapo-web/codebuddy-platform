@@ -1,5 +1,3 @@
-import dynamic from 'next/dynamic';
-const ExplanationAuthorDialog = dynamic(() => import('@/components/explanation/explanation-author-dialog').then(module => module.ExplanationAuthorDialog));
 import {VideoAuthorDialog} from "@/components/video/video-author-dialog";
 import { publicConfig } from '@/lib/config';
 import { ManualAuthorDialog } from '@/components/manual/manual-author-dialog';
@@ -11,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { routes } from '@/lib/routes';
-import { useContentAcademySlug, useContentSurface } from '@/components/studio/content-base-path-provider';
+import { useContentBasePath, useContentAcademySlug, useContentSurface } from '@/components/studio/content-base-path-provider';
 import { useTranslation } from 'react-i18next';
 import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-modal';
 
@@ -132,7 +130,7 @@ function ExerciseRow({
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [pdfMode, setPdfMode] = useState<'preview' | 'edit' | null>(null);
-  const [explanationMode, setExplanationMode] = useState<'edit' | 'preview' | null>(null);
+  const contentPaths = useContentBasePath();
   const [manualOpen,setManualOpen]=useState(false);
   const [videoOpen,setVideoOpen]=useState(false);
   const isManual=material.type==='TURTLE_EXERCISE'||material.type==='WRITTEN_RESPONSE'||material.type==='MULTIPLE_CHOICE';
@@ -208,7 +206,7 @@ function ExerciseRow({
       <div className="min-w-0 flex-1">
         {surface === 'academy' && material.type !== 'PDF_DOCUMENT' ? (
           <Link className={titleClass} href={viewHref}>{material.title}</Link>
-        ) : material.type === 'EXPLANATION' ? <button type="button" className={titleClass} onClick={() => setExplanationMode('preview')}>{material.title}</button> : material.type==='VIDEO_LESSON' ? <button type="button" className={titleClass} onClick={()=>setVideoOpen(true)}>{material.title}</button> : isManual ? <button type="button" className={titleClass} onClick={()=>setManualOpen(true)}>{material.title}</button> : material.type === 'PDF_DOCUMENT' ? (
+        ) : material.type === 'EXPLANATION' ? <button type="button" className={titleClass} onClick={() => router.push(contentPaths.explanation(builder.target.courseId, lectureId, material.id))}>{material.title}</button> : material.type==='VIDEO_LESSON' ? <button type="button" className={titleClass} onClick={()=>setVideoOpen(true)}>{material.title}</button> : isManual ? <button type="button" className={titleClass} onClick={()=>setManualOpen(true)}>{material.title}</button> : material.type === 'PDF_DOCUMENT' ? (
           <button
             type="button"
             className={`${titleClass} text-brand hover:underline`}
@@ -289,7 +287,7 @@ function ExerciseRow({
           // A problem's title lives with the rest of its content, so renaming
           // opens the problem instead of editing the row in place.
           onRename={() =>
-            material.type === 'EXPLANATION' ? setExplanationMode('edit') : isManual ? setManualOpen(true) : material.type === 'VIDEO_LESSON' ? setVideoOpen(true) : material.type === 'PDF_DOCUMENT'
+            material.type === 'EXPLANATION' ? router.push(contentPaths.explanation(builder.target.courseId, lectureId, material.id)) : isManual ? setManualOpen(true) : material.type === 'VIDEO_LESSON' ? setVideoOpen(true) : material.type === 'PDF_DOCUMENT'
               ? setPdfMode('edit')
               : router.push(href)
           }
@@ -315,7 +313,6 @@ function ExerciseRow({
         }}
         open={deleting}
       />
-      {explanationMode ? <ExplanationAuthorDialog target={{ ...builder.target, lectureId }} material={material} editable={rowEditable} initialPreview={explanationMode === 'preview'} onClose={() => setExplanationMode(null)} onSaved={builder.refresh} /> : null}
       {manualOpen ? <ManualAuthorDialog target={{...builder.target,lectureId}} material={material} onClose={()=>setManualOpen(false)} onSaved={builder.refresh}/> : null}
       {videoOpen?<VideoAuthorDialog target={{...builder.target,lectureId}} material={material} editable={rowEditable} onClose={()=>setVideoOpen(false)} onSaved={builder.refresh}/>:null}
       {pdfMode ? (
@@ -352,13 +349,13 @@ export function LectureRow({
 }) {
   const { t } = useTranslation(['content', 'courses', 'pdf-practice', 'material-picker']);
   const visibilityIsReal = useContentSurface() !== 'library';
-  const [explanationAdding, setExplanationAdding] = useState(false);
+  const contentPaths = useContentBasePath();
   const [pdfAdding, setPdfAdding] = useState(false);
   const router = useRouter();
   const materialKinds = availableMaterialKinds({ ...publicConfig, editable: builder.editable, exerciseEditable: builder.exerciseEditable });
   function chooseMaterial(kind: MaterialCreationKind) {
     switch (kind) {
-      case 'explanation': setExplanationAdding(true); break;
+      case 'explanation': router.push(contentPaths.explanation(builder.target.courseId, lecture.id, 'new')); break;
       case 'python': router.push(exercisePath(lecture.id, 'new')); break;
       case 'pdfPractice': router.push(`${exercisePath(lecture.id, 'new')}?referencePdf=required`); break;
       case 'pdf': setPdfAdding(true); break;
@@ -512,7 +509,6 @@ export function LectureRow({
           ) : null}
         </Collapsible.Content>
 
-        {explanationAdding ? <ExplanationAuthorDialog target={{ ...builder.target, lectureId: lecture.id }} onClose={() => setExplanationAdding(false)} onSaved={builder.refresh} /> : null}
         {videoAdding?<VideoAuthorDialog target={{...builder.target,lectureId:lecture.id}} onClose={()=>setVideoAdding(false)} onSaved={builder.refresh}/>:null}
         {choiceAdding ? <ManualAuthorDialog type="MULTIPLE_CHOICE" target={{...builder.target,lectureId:lecture.id}} onClose={()=>setChoiceAdding(false)} onSaved={builder.refresh}/> : null}
         {shortAdding ? <ManualAuthorDialog shortAnswer type="WRITTEN_RESPONSE" target={{...builder.target,lectureId:lecture.id}} onClose={()=>setShortAdding(false)} onSaved={builder.refresh}/> : null}

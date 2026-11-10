@@ -57,6 +57,28 @@ describe.skipIf(!databaseUrl)("explanation materials against disposable PostgreS
     if (process.env.COVE_EXPLANATION_EVIDENCE_PATH) await writeFile(process.env.COVE_EXPLANATION_EVIDENCE_PATH, JSON.stringify(evidence, null, 2) + "\n");
     await client.$disconnect();
   });
+  it("reads new-author context in two scoped statements and denies unauthorized targets", async () => {
+    const context = await measured(() => service.context(identity, { academyId, courseId, lectureId }));
+    expect(context.data).toMatchObject({ course: { id: courseId }, lecture: { id: lectureId } });
+    expect(context.statements).toBe(2); evidence.authorContext = context.statements;
+    console.info(`EXPLANATION_SQL authorContext=${context.statements}`);
+    await expect(service.context(student, { academyId, courseId, lectureId })).rejects.toMatchObject({ status: 403 });
+    await expect(service.context(identity, { academyId, courseId: foreignCourseId, lectureId })).rejects.toMatchObject({ status: 404 });
+  });
+  it("restricts the author document projection to curriculum reviewers and its academy", async () => {
+    const doc = await service.authorDocument(identity, { academyId, materialId });
+    expect(doc.title).toBe('Loops'); expect(doc).not.toHaveProperty('outline');
+    await expect(service.authorDocument(student, { academyId, materialId })).rejects.toMatchObject({ status: 403 });
+    await expect(service.authorDocument(identity, { academyId, materialId: randomUUID() })).rejects.toMatchObject({ status: 404 });
+    await expect(service.authorDocument(identity, { academyId: foreignAcademyId, materialId })).rejects.toMatchObject({ status: 403 });
+  });
+  it("round-trips multi-line teaching code through the real save and read paths", async () => {
+    const source = '<pre data-language="python"><code class="language-python">for i in range(3):\n    print(i)\n</code></pre>';
+    const saved = await service.save(identity, { academyId, courseId, lectureId, title: 'Code example', body: source, isVisible: false });
+    const read = await service.read(identity, { academyId, materialId: saved.materialId, preview: true });
+    expect(read.body).toBe(source);
+    await client.material.delete({ where: { id: saved.materialId } });
+  });
   it("creates hidden ungraded reading content and guards preview and coding inputs", async () => {
     const material = await client.material.findUniqueOrThrow({ where: { id: materialId }, include: { programmingExercise: true, manualMaterial: true } });
     expect(material).toMatchObject({ type: 'EXPLANATION', isVisible: false, isRequired: false, programmingExercise: null, manualMaterial: null });
@@ -70,12 +92,15 @@ describe.skipIf(!databaseUrl)("explanation materials against disposable PostgreS
   it("keeps full learner/author read statement counts constant with 1 versus 20 images and materials", async () => {
     const first = await measured(() => service.read(student, { academyId, materialId, classId }));
     const firstSource = await measured(() => client.course.findUniqueOrThrow({ where: { id: courseId }, include: courseCopyInclude }));
+    const firstDocument = await measured(() => service.authorDocument(identity, { academyId, materialId }));
     const firstAuthor = await measured(() => service.read(identity, { academyId, materialId, preview: true }));
     await client.explanationMaterial.update({ where: { materialId }, data: { body: imageBody(20) } });
     await client.material.createMany({ data: Array.from({ length: 19 }, (_, index) => ({ id: randomUUID(), lectureId, type: 'EXPLANATION' as const, title: `Concept ${index}`, position: index + 2, isVisible: true, isRequired: false })) });
     const extra = await client.material.findMany({ where: { lectureId, id: { not: materialId } }, select: { id: true } });
     await client.explanationMaterial.createMany({ data: extra.map(row => ({ materialId: row.id, body: '<p>Another concept</p>' })) });
     const many = await measured(() => service.read(student, { academyId, materialId, classId }));
+    const manyDocument = await measured(() => service.authorDocument(identity, { academyId, materialId }));
+    expect(firstDocument.statements).toBe(3); expect(manyDocument.statements).toBe(3); expect(manyDocument.data).not.toHaveProperty('outline');
     const manyAuthor = await measured(() => service.read(identity, { academyId, materialId, preview: true }));
     const manySource = await measured(() => client.course.findUniqueOrThrow({ where: { id: courseId }, include: courseCopyInclude }));
     expect(manySource.statements).toBe(firstSource.statements);
@@ -87,7 +112,7 @@ describe.skipIf(!databaseUrl)("explanation materials against disposable PostgreS
     expect(counts.statements).toBe(1); expect(counts.data.get(courseId)).toMatchObject({ explanations: 20, visibleExplanations: 20, exercises: 0 });
     const curriculum = await measured(() => readCurricula(db, [courseId]));
     expect(curriculum.statements).toBe(1); expect(JSON.stringify(curriculum.data.get(courseId))).not.toContain('Understanding loops');
-    Object.assign(evidence, { learner: [first.statements, many.statements], author: [firstAuthor.statements, manyAuthor.statements], counts: counts.statements, curriculum: curriculum.statements, copySource: [firstSource.statements, manySource.statements], repeated: repeated.statements });
+    Object.assign(evidence, { authorDocument: [firstDocument.statements, manyDocument.statements], learner: [first.statements, many.statements], author: [firstAuthor.statements, manyAuthor.statements], counts: counts.statements, curriculum: curriculum.statements, copySource: [firstSource.statements, manySource.statements], repeated: repeated.statements });
     console.info(`EXPLANATION_SQL learner=${first.statements}/${many.statements} author=${firstAuthor.statements}/${manyAuthor.statements} counts=${counts.statements} curriculum=${curriculum.statements} copySource=${firstSource.statements}/${manySource.statements} repeated=${repeated.statements}`);
   });
   it("rejects foreign references, stale edits, wrong class and hidden ancestors", async () => {

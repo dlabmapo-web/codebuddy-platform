@@ -164,3 +164,26 @@ Use `COVE_INTEGRATION_DATABASE_URL` and the `Prisma log: [{ emit: "event", level
 Keep the work focused across shared contracts, Prisma migration, explanation API, existing image helpers, authoring UI, reading page, and material integration points. Avoid expanding the programming-exercise draft schema or adding explanation branches to the grader. Extract a small shared image helper only where needed to remove a coding/manual dependency or a per-image SQL lookup; unrelated refactoring is outside scope.
 
 Before writing application code, read the installed relevant Next.js guides in `packages/web/node_modules/next/dist/docs/` as required by `AGENTS.md`. The [implementation plan](../plans/2026-11-10-explanation-materials-implementation.md) records the implementation boundaries. Actual application/test results and SQL counts belong to the verification report linked above; the migration has only been applied to disposable local PostgreSQL during verification.
+
+## 14. Dedicated authoring page and code examples (2026-11-10 follow-up)
+
+The user requested a full page instead of the initial authoring dialog, a wider reading document, and code examples matching the supplied dark code-window references. This supersedes the initial modal presentation; the Explanation material's storage, permissions, visibility, and ungraded behavior stay as specified above.
+
+### Authoring and navigation
+
+- The material picker navigates to `.../courses/{courseId}/lectures/{lectureId}/explanations/new`. Existing explanations use the same route ending in their material ID. Academy, academy console, and platform library each keep their own route surface.
+- The page provides course/lecture context, Back to course, visibility status, Save explanation, Write and Student preview tabs, and unsaved-change feedback. Back and ordinary link navigation confirm before discarding a changed draft; browser unload uses the native unsaved-change guard.
+- Creation reads the course and lecture names on the server using one scoped context endpoint. Editing receives the complete saved document, revision, and private image metadata from the server. Saving a new document replaces `/new` with its saved material route; subsequent saves refresh that document. Conflict and upload errors preserve the draft.
+- The writing sheet and reading article use the available width, up to 1,440 px. Narrow screens reduce padding and keep long code horizontally scrollable inside the code window.
+
+### Code examples
+
+The Explanation editor adds a **Code example** toolbar control. It inserts a dark code window with a language selector, a line-number gutter, and Copy code. Authors can mix multiple code examples, prose, images, tables, and other existing rich-text content in one document. Ctrl/⌘ + Enter exits a code block and continues the document below it.
+
+The selector labels the example only: Python 3, C, C++, JavaScript, TypeScript, Java, HTML, CSS, SQL, Shell, JSON, or Plain text. It does not select a runtime or introduce exercise configuration. Store escaped code as ordinary `pre[data-language] > code.language-*` HTML; never store the copy controls, language selector, or gutter in the authored body. Sanitization restricts language metadata to the known list and preserves indentation, line breaks, and literal markup.
+
+Students and the author's Student preview see the same dark window, static language label, line numbers, and Copy code control. The code is read-only. Copy writes the exact source, excluding the label and line numbers, and reports success or failure. The existing iframe remains script-disabled; its parent attaches trusted controls using DOM APIs. Existing rich-text consumers opt out by default. No Monaco editor, terminal, runtime allocation, Run, Test, Submit, grading fields, or test cases are added.
+
+### Read budget and acceptance checks
+
+The new-author context reader uses two SQL statements: academy access and one scoped course/lecture join. The dedicated author-document projection uses three with images: academy access, one scoped document/context join, and batched image metadata; it does not read student navigation or progress. Verify this through Prisma query events on disposable Docker PostgreSQL. Existing author/learner reads must remain constant as image/material counts grow. Browser verification must cover routed creation, save/reopen, images and code together, exact clipboard contents, full-width desktop reading, mobile overflow, and no runtime requests.

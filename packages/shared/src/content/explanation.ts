@@ -22,3 +22,16 @@ export type ExplanationDocument = {
   images: Record<string, string | null>;
 };
 export type ExplanationReadResult = ExplanationDocument & { outline: LearnCourseOutline };
+
+export type ExplanationAuthorContext = Pick<ExplanationDocument, "course" | "lecture">;
+/** Display-only examples; this is independent of the executable course language. */
+export const explanationCodeLanguages = [
+  { id: "plaintext", label: "Plain text" }, { id: "python", label: "Python 3" },
+  { id: "c", label: "C" }, { id: "cpp", label: "C++" },
+  { id: "javascript", label: "JavaScript" }, { id: "typescript", label: "TypeScript" },
+  { id: "java", label: "Java" }, { id: "html", label: "HTML" }, { id: "css", label: "CSS" },
+  { id: "sql", label: "SQL" }, { id: "bash", label: "Shell" }, { id: "json", label: "JSON" },
+] as const;
+export function explanationCodeLanguage(value: unknown): string {
+  return explanationCodeLanguages.find(item => item.id === value)?.id ?? "plaintext";
+}

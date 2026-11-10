@@ -31,6 +31,14 @@ export class ExplanationController {
     this.limits.assert(`explanation:${identity.authUserId}`, 120, 60_000);
     return identity;
   }
+  @Get("document") @Header("Cache-Control", "private, no-store")
+  async document(@Query() query: unknown, @Headers("authorization") header?: string) {
+    return this.service.authorDocument(await this.identify(header), parse(z.object({ academyId: z.uuid(), materialId: z.uuid() }).strict(), query));
+  }
+  @Get("context") @Header("Cache-Control", "private, no-store")
+  async context(@Query() query: unknown, @Headers("authorization") header?: string) {
+    return this.service.context(await this.identify(header), parse(explanationTargetSchema, query));
+  }
   @Get() @Header("Cache-Control", "private, no-store")
   async read(@Query() query: unknown, @Headers("authorization") header?: string) {
     return this.service.read(await this.identify(header), parse(explanationReadSchema, query));

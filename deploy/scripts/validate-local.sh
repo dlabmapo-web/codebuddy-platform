@@ -109,6 +109,9 @@ assert {"noexec", "nosuid", "nodev", "mode=0700", f"size={sizing['cpuSlots'] * 6
 assert sizing.get("artifactStoreMb", 256) < sizing["serviceOverheadMb"]
 scope = json.loads(node["environment"]["NATIVE_ELIGIBILITY"])
 assert scope and all("materialId" not in entry for entry in scope)
+# Every academy offers Python, C and C++; a course picks its language.
+assert any(set(entry.get("languages", ["PYTHON"])) == {"PYTHON", "C", "CPP"} and "run" in entry["kinds"]
+           and "organizationId" not in entry and "academyId" not in entry for entry in scope)
 assert api["environment"]["NATIVE_GRADING_MANIFEST"] == "/run/cove-native-shared/manifest.json"
 assert any(v["target"] == "/run/cove-native-shared" and v.get("read_only") for v in api["volumes"])
 assert any(v["target"] == "/run/cove-native-shared" and not v.get("read_only") for v in node["volumes"])

@@ -393,9 +393,10 @@ services:
       # Must match cpus/mem_limit below: the launcher refuses a different envelope.
       NATIVE_NODE_RESOURCES: '{"cpuSlots":3,"officialReservedSlots":1,"envelopeMemoryMb":3376,"serviceOverheadMb":1024,"officialReservedMemoryMb":656,"maxCaseMemoryMb":512,"caseOverheadMb":128,"scratchMb":16,"maxCasePids":8,"maxCompilePids":16,"artifactStoreMb":256}'
       # Every academy; exercises above 512 MiB or a 60 s case stay on judge-worker.
-      # No `languages` means Python only: C/C++ are admitted once an entry lists
-      # them (docs/operations/c-cpp-exercises.md).
-      NATIVE_ELIGIBILITY: '[{"contexts":["live","preview"],"kinds":["official","staff-practice","sample","regrade"],"maxCaseTimeLimitMs":60000}]'
+      # Every academy runs Python, C and C++: a course chooses its language.
+      # Removing C and CPP here turns them off everywhere at the next deploy
+      # (docs/operations/c-cpp-exercises.md).
+      NATIVE_ELIGIBILITY: '[{"contexts":["live","preview"],"kinds":["official","staff-practice","sample","regrade","run"],"maxCaseTimeLimitMs":60000,"languages":["PYTHON","C","CPP"]}]'
       NATIVE_HEALTH_PORT: "4102"
     networks:
       - backend

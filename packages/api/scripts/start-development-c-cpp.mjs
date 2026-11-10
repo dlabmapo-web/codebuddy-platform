@@ -43,7 +43,15 @@ const organizationId = '10000000-0000-4000-8000-000000000001';
 const managerId = '30000000-0000-4000-8000-000000000002';
 const teacherMembershipId = '40000000-0000-4000-8000-000000000004';
 const studentMembershipId = '40000000-0000-4000-8000-000000000005';
-const ids = { course: 'c1000000-0000-4000-8000-000000000001', module: 'c1000000-0000-4000-8000-000000000010', lecture: 'c1000000-0000-4000-8000-000000000020', C: 'c1000000-0000-4000-8000-000000000030', CPP: 'c1000000-0000-4000-8000-000000000031', CPP10: 'c1000000-0000-4000-8000-000000000032', class: 'c1000000-0000-4000-8000-000000000040' };
+// One course per language: a course's language is every coding problem's.
+// (Earlier runs seeded c1000000-…-0001 mixing both; delete it from the course list.)
+const ids = { class: 'c1000000-0000-4000-8000-000000000040' };
+const courses = [
+  { language: 'C', title: 'C Practice', course: 'c1000000-0000-4000-8000-000000000101', module: 'c1000000-0000-4000-8000-000000000110', lecture: 'c1000000-0000-4000-8000-000000000120',
+    problems: [['c1000000-0000-4000-8000-000000000130', 4, 'C — Add two numbers']] },
+  { language: 'CPP', title: 'C++ Practice', course: 'c1000000-0000-4000-8000-000000000201', module: 'c1000000-0000-4000-8000-000000000210', lecture: 'c1000000-0000-4000-8000-000000000220',
+    problems: [['c1000000-0000-4000-8000-000000000230', 4, 'C++ — Add two numbers'], ['c1000000-0000-4000-8000-000000000231', 10, 'C++ — Ten test cases']] },
+];
 const sources = {
   C: '#include <stdio.h>\n\nint main(void) {\n    int a, b;\n    if (scanf("%d %d", &a, &b) != 2) return 1;\n    printf("%d\\n", a + b);\n    return 0;\n}\n',
   CPP: '#include <iostream>\nusing namespace std;\n\nint main() {\n    int a, b;\n    if (!(cin >> a >> b)) return 1;\n    cout << a + b << "\\n";\n    return 0;\n}\n',
@@ -51,25 +59,25 @@ const sources = {
 const examples = [[2, 3], [40, 2], [-7, 2], [0, 0], [9, -9], [100, 200], [-100, -200], [1000000000, 1000000000], [1, 0], [123, 456]];
 const db = new PrismaService(new ConfigService({ DATABASE_URL: env.DATABASE_URL, DATABASE_POOL_MAX: 2 }));
 try {
-  const [academy, members, course, klass] = await Promise.all([
+  const [academy, members, existing, klass] = await Promise.all([
     db.academy.findUnique({ where: { id: academyId }, select: { slug: true, organizationId: true } }),
     db.academyMembership.findMany({ where: { academyId, status: 'ACTIVE', id: { in: ['40000000-0000-4000-8000-000000000002', teacherMembershipId, studentMembershipId] } }, select: { id: true } }),
-    db.course.findUnique({ where: { id: ids.course }, select: { academyId: true } }),
+    db.course.findMany({ where: { id: { in: courses.map((entry) => entry.course) } }, select: { id: true, academyId: true } }),
     db.class.findUnique({ where: { id: ids.class }, select: { academyId: true } }),
   ]);
   if (academy?.slug !== 'development-academy' || academy.organizationId !== organizationId || members.length !== 3) throw Error('Expected the existing development academy and seeded manager/teacher/student');
-  if (course && course.academyId !== academyId) throw Error('Practice course ID belongs to another academy');
+  if (existing.some((course) => course.academyId !== academyId)) throw Error('Practice course ID belongs to another academy');
   if (klass && klass.academyId !== academyId) throw Error('Practice class ID belongs to another academy');
-  if (!course) await db.course.create({ data: {
-    id: ids.course, academyId, createdByUserId: managerId, title: 'C and C++ Practice', description: 'Try native C and C++: Run with input, Test, and Submit.', isVisible: true,
-    modules: { create: { id: ids.module, externalKey: 'local-c-cpp', title: 'C and C++ Basics', position: 1, isVisible: true,
-      lectures: { create: { id: ids.lecture, externalKey: 'local-c-cpp-addition', title: 'Add two numbers', position: 1, isVisible: true,
-        materials: { create: [['C', 'C', 4, 'C — Add two numbers'], ['CPP', 'CPP', 4, 'C++ — Add two numbers'], ['CPP10', 'CPP', 10, 'C++ — Ten test cases']].map(([key, language, count, title], index) => ({
-          id: ids[key], title, type: 'PROGRAMMING_EXERCISE', position: index + 1, isVisible: true,
+  for (const entry of courses) if (!existing.some((course) => course.id === entry.course)) await db.course.create({ data: {
+    id: entry.course, academyId, createdByUserId: managerId, title: entry.title, language: entry.language, description: 'Try native ' + entry.title.split(' ')[0] + ': Run with input, Test, and Submit.', isVisible: true,
+    modules: { create: { id: entry.module, externalKey: 'local-' + entry.language.toLowerCase(), title: entry.title.split(' ')[0] + ' Basics', position: 1, isVisible: true,
+      lectures: { create: { id: entry.lecture, externalKey: 'local-' + entry.language.toLowerCase() + '-addition', title: 'Add two numbers', position: 1, isVisible: true,
+        materials: { create: entry.problems.map(([id, count, title], index) => ({
+          id, title, type: 'PROGRAMMING_EXERCISE', position: index + 1, isVisible: true,
           programmingExercise: { create: {
-            externalKey: 'local-c-cpp-' + key, language, difficulty: 'EASY', description: '<p>Read two integers and print their sum.</p><p>The starter code is ready to run. Enter <code>40 2</code> in Program input and press Run to print <code>42</code>. Test run checks the examples; Submit checks every case.</p>',
+            externalKey: 'local-' + entry.language.toLowerCase() + '-' + (index + 1), language: entry.language, difficulty: 'EASY', description: '<p>Read two integers and print their sum.</p><p>The starter code is ready to run. Enter <code>40 2</code> in Program input and press Run to print <code>42</code>. Test run checks the examples; Submit checks every case.</p>',
             inputFormat: 'Two integers separated by a space.', outputFormat: 'Their sum on one line.', constraints: '-1,000,000,000 ≤ a, b ≤ 1,000,000,000',
-            starterCode: sources[language], solutionCode: sources[language], solutions: { create: { position: 1, code: sources[language] } },
+            starterCode: sources[entry.language], solutionCode: sources[entry.language], solutions: { create: { position: 1, code: sources[entry.language] } },
             timeLimitMs: 1000, memoryLimitMb: 128, gradingMode: 'ELICE_STDIO', gradingSemanticVersion: 'elice-v1', continuationPolicy: 'CONTINUE_WITHIN_BUDGET', exitStatusPolicy: 'FAIL_ON_RUNTIME_ERROR', totalTimeLimitMs: 60000, comparatorTimeLimitMs: 100, materialMaximumHundredths: 10000, materialScorePolicy: 'PROPORTIONAL',
             testCases: { create: examples.slice(0, count).map(([a, b], i) => ({ position: i + 1, input: `${a} ${b}\n`, expectedOutput: String(a + b), visibility: i < 2 ? 'SAMPLE' : 'HIDDEN', weight: 1 })) },
           } },
@@ -78,9 +86,8 @@ try {
     } },
   } });
   await db.class.upsert({ where: { id: ids.class }, create: { id: ids.class, academyId, createdByUserId: managerId, teacherMembershipId, name: 'C/C++ Practice Class' }, update: {} });
-  await db.classCourse.createMany({ data: [{ classId: ids.class, courseId: ids.course, assignedByUserId: managerId }], skipDuplicates: true });
+  await db.classCourse.createMany({ data: courses.map((entry) => ({ classId: ids.class, courseId: entry.course, assignedByUserId: managerId })), skipDuplicates: true });
   await db.classEnrollment.createMany({ data: [{ classId: ids.class, membershipId: studentMembershipId, enrolledByUserId: managerId }], skipDuplicates: true });
-  await db.academyFeatureFlag.upsert({ where: { academyId_feature: { academyId, feature: 'C_CPP_EXERCISES' } }, create: { academyId, feature: 'C_CPP_EXERCISES', isEnabled: true }, update: { isEnabled: true } });
 } finally { await db.$disconnect(); }
 await mkdir(shared, { recursive: true, mode: 0o700 });
 const manifest = resolve(shared, 'manifest.json');
@@ -113,7 +120,8 @@ if (!ready) throw Error('Development grader readiness timed out');
 const settings = { NATIVE_GRADING_ENABLED: 'true', NATIVE_GRADING_BRIDGE_ACK: 'filtered-compatibility-workers-v1', NATIVE_GRADING_MANIFEST: manifest };
 local = local.split('\n').filter(line => line !== '# Native C/C++ for the regular development app (local Docker only).' && !Object.keys(settings).some(key => line.trimStart().startsWith(key + '='))).join('\n').trimEnd();
 await writeFile(localPath, `${local}\n\n# Native C/C++ for the regular development app (local Docker only).\n${Object.entries(settings).map(([key, value]) => `${key}=${value}`).join('\n')}\n`, { mode: 0o600 });
-await writeFile(resolve(state, 'course.json'), JSON.stringify({ ids, courseUrl: `http://localhost:3000/academy/development-academy/learn/courses/${ids.course}`, manifest, container }, null, 2));
-console.log('C and C++ Practice is ready in Cove Development Academy.');
-console.log(`http://localhost:3000/academy/development-academy/learn/courses/${ids.course}`);
+const courseUrls = courses.map((entry) => `http://localhost:3000/academy/development-academy/learn/courses/${entry.course}`);
+await writeFile(resolve(state, 'course.json'), JSON.stringify({ ids, courses, courseUrls, manifest, container }, null, 2));
+console.log('C Practice and C++ Practice are ready in Cove Development Academy.');
+for (const url of courseUrls) console.log(url);
 console.log('Native grader: cove-native-development. Restart the regular API to load its new local settings.');

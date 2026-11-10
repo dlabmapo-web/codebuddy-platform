@@ -150,17 +150,27 @@ test('repeated C++ checks keep every polling response valid', async ({ request }
   expect(invalidResponses).toEqual([]);
 });
 
-test('authoring offers C and C++ in the enabled academy', async ({ browser }) => {
+test('a course chooses its language, and its new problems are written in it', async ({ browser }) => {
   const f = fixture();
   const context = await browser.newContext({ storageState: f.auth.manager });
   const page = await context.newPage();
-  await page.goto(`/academy/${f.slug}/content/courses/${f.ids.course}/lectures/${f.ids.lecture}/exercises/new`);
-  const picker = page.locator('select').filter({ has: page.locator('option[value="CPP"]') });
-  await expect(picker).toBeVisible();
-  await picker.selectOption('C');
-  await expect(picker).toHaveValue('C');
-  await picker.selectOption('CPP');
-  await expect(picker).toHaveValue('CPP');
+  // A new problem in the C++ course: no language picker, the C++ template.
+  await page.goto(`/academy/${f.slug}/content/courses/${f.ids.courseCpp}/lectures/${f.ids.lectureCpp}/exercises/new`);
+  await expect.poll(() => language(page)).toBe('cpp');
+  await expect(page.locator('select').filter({ has: page.locator('option[value="CPP"]') })).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('cpp-authoring.png'), fullPage: true });
+
+  // Creating a course offers Python, C and C++, with no academy switch.
+  await page.goto(`/academy/${f.slug}/content/courses`);
+  await page.getByRole('button', { name: 'New course' }).click();
+  await page.getByLabel('Course title').fill('Pointers in C');
+  const field = page.getByLabel('Programming language');
+  await expect(field.locator('option')).toHaveText(['Python', 'C', 'C++']);
+  await field.selectOption('C');
+  await page.screenshot({ path: test.info().outputPath('course-language.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Create and open' }).click();
+  await expect.poll(async () =>
+    (await db.query('SELECT language FROM courses WHERE academy_id=$1 AND title=$2', [f.ids.academy, 'Pointers in C'])).rows[0]?.language,
+  ).toBe('C');
   await context.close();
 });

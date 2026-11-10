@@ -30,7 +30,7 @@ const db = new PrismaService(new ConfigService({ DATABASE_URL: database.href }))
 const ownership = await db.$queryRawUnsafe('SELECT fixture_id FROM native_qualification_fixture');
 if (ownership.length !== 1 || ownership[0].fixture_id !== process.env.COVE_NATIVE_FIXTURE_ID)
   throw Error('Disposable database ownership mismatch');
-const ids = Object.fromEntries(['organization', 'academy', 'manager', 'teacher', 'student', 'course', 'module', 'lecture', 'class', 'C', 'CPP', 'CPP10'].map(k => [k, randomUUID()]));
+const ids = Object.fromEntries(['organization', 'academy', 'manager', 'teacher', 'student', 'course', 'module', 'lecture', 'courseCpp', 'moduleCpp', 'lectureCpp', 'class', 'C', 'CPP', 'CPP10'].map(k => [k, randomUUID()]));
 const identities = Object.fromEntries(['manager', 'teacher', 'student'].map(role => [role, { id: ids[role], authId: randomUUID() }]));
 const slug = 'cpp-local-' + ids.academy.slice(0, 8);
 await db.organization.create({ data: { id: ids.organization, name: 'Disposable C/C++ acceptance', slug } });
@@ -40,19 +40,25 @@ for (const [role, user] of Object.entries(identities)) {
   const membership = await db.academyMembership.create({ data: { academyId: ids.academy, userId: user.id, role: role.toUpperCase(), status: 'ACTIVE', joinedAt: new Date() } });
   ids[role + 'Membership'] = membership.id;
 }
-await db.academyFeatureFlag.createMany({ data: ['C_CPP_EXERCISES', 'TEACHER_LIVE_MONITORING'].map(feature => ({ academyId: ids.academy, feature, isEnabled: true })) });
-await db.course.create({ data: { id: ids.course, academyId: ids.academy, createdByUserId: ids.manager, title: playground ? 'C and C++ Practice' : 'C/C++ browser acceptance', isVisible: true } });
-await db.courseModule.create({ data: { id: ids.module, courseId: ids.course, externalKey: randomUUID(), title: 'Native languages', position: 1, isVisible: true } });
-await db.lecture.create({ data: { id: ids.lecture, courseModuleId: ids.module, externalKey: randomUUID(), title: 'Addition', position: 1, isVisible: true } });
+await db.academyFeatureFlag.createMany({ data: [{ academyId: ids.academy, feature: 'TEACHER_LIVE_MONITORING', isEnabled: true }] });
+// One course per language: a course's language is every coding problem's.
+for (const [course, module, lecture, language, title] of [
+  [ids.course, ids.module, ids.lecture, 'C', playground ? 'C Practice' : 'C browser acceptance'],
+  [ids.courseCpp, ids.moduleCpp, ids.lectureCpp, 'CPP', playground ? 'C++ Practice' : 'C++ browser acceptance'],
+]) {
+  await db.course.create({ data: { id: course, academyId: ids.academy, createdByUserId: ids.manager, title, language, isVisible: true } });
+  await db.courseModule.create({ data: { id: module, courseId: course, externalKey: randomUUID(), title: 'Native languages', position: 1, isVisible: true } });
+  await db.lecture.create({ data: { id: lecture, courseModuleId: module, externalKey: randomUUID(), title: 'Addition', position: 1, isVisible: true } });
+}
 await db.class.create({ data: { id: ids.class, academyId: ids.academy, createdByUserId: ids.manager, teacherMembershipId: ids.teacherMembership, name: 'Local C/C++ class' } });
-await db.classCourse.create({ data: { classId: ids.class, courseId: ids.course, assignedByUserId: ids.manager } });
+await db.classCourse.createMany({ data: [ids.course, ids.courseCpp].map(courseId => ({ classId: ids.class, courseId, assignedByUserId: ids.manager })) });
 await db.classEnrollment.create({ data: { classId: ids.class, membershipId: ids.studentMembership, enrolledByUserId: ids.manager } });
 const sources = {
   C: '#include <stdio.h>\nint main(void) { int a, b; if (scanf("%d %d", &a, &b) != 2) return 1; printf("%d\\n", a+b); return 0; }\n',
   CPP: '#include <bits/stdc++.h>\nusing namespace std;\nint main() { int a,b; if (!(cin >> a >> b)) return 1; cout << a+b << "\\n"; return 0; }\n',
 };
 for (const [index, [key, language, count]] of [['C', 'C', 2], ['CPP', 'CPP', 2], ['CPP10', 'CPP', 10]].entries()) {
-  await db.material.create({ data: { id: ids[key], lectureId: ids.lecture, title: key + ' addition', type: 'PROGRAMMING_EXERCISE', position: index + 1, isVisible: true,
+  await db.material.create({ data: { id: ids[key], lectureId: language === 'C' ? ids.lecture : ids.lectureCpp, title: key + ' addition', type: 'PROGRAMMING_EXERCISE', position: index + 1, isVisible: true,
     programmingExercise: { create: { externalKey: randomUUID(), language, difficulty: 'EASY', description: '<p>Read two integers and print their sum.</p>', starterCode: sources[language], solutionCode: sources[language],
       timeLimitMs: 1000, memoryLimitMb: 512, gradingMode: 'ELICE_STDIO', gradingSemanticVersion: 'elice-v1', continuationPolicy: 'CONTINUE_WITHIN_BUDGET', exitStatusPolicy: 'FAIL_ON_RUNTIME_ERROR', totalTimeLimitMs: 60000, comparatorTimeLimitMs: 100,
       materialMaximumHundredths: 10000, materialScorePolicy: 'PROPORTIONAL', solutions: { create: { position: 1, code: sources[language] } },

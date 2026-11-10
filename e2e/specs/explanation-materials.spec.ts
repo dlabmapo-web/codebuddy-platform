@@ -1,4 +1,5 @@
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
+import { routes } from '../../packages/web/src/lib/routes';
 const provider = 'http://127.0.0.1:4320', api = 'http://127.0.0.1:4319/api';
 type Fixture = { id: string; academy: { id: string; slug: string } };
 async function fixture(request: APIRequestContext, role: string, parentFixtureId?: string): Promise<Fixture> {
@@ -24,7 +25,7 @@ test('author creates an illustrated explanation; student reads without coding to
   const seeded = await request.post(`${provider}/fixtures/${author.id}/classroom`, { data: { studentFixtureId: learner.id, emptyWork: true } });
   expect(seeded.ok(), await seeded.text()).toBe(true);
   const room = await seeded.json(); const academyId = author.academy.id;
-  await page.goto(`/academy/${author.academy.slug}/content/courses/${room.courseId}`);
+  await page.goto(routes.academyCourse(author.academy.slug, room.courseId));
   await page.getByRole('button', { name: /^New material$|^새 자료$/ }).first().click();
   await page.getByRole('dialog').getByText(/^Explanation$|^설명 자료$/).click();
   await page.getByRole('button', { name: /^Next$|^다음$/ }).click();
@@ -88,7 +89,7 @@ test('author creates an illustrated explanation; student reads without coding to
   // Publish through the real API, then verify the author can reopen the complete body.
   const published = await request.post(api + '/explanations/visibility', { data: { ...target, isVisible: true }, headers });
   expect(published.ok(), await published.text()).toBe(true);
-  await page.goto(`/academy/${author.academy.slug}/learn/explanations/${materialId}?preview=true`);
+  await page.goto(routes.academyLearnMaterial(author.academy.slug, materialId, 'EXPLANATION', { preview: true }));
   await page.getByRole('link', { name: /^Edit explanation$|^설명 자료 수정$/ }).click();
   await expect(page.locator('.tiptap')).toContainText('A loop repeats');
   await expect(page.locator('.tiptap img')).toHaveCount(2);
@@ -98,7 +99,7 @@ test('author creates an illustrated explanation; student reads without coding to
   const contentReads: string[] = [];
   student.on('request', req => { if (req.url().includes('/api/explanations')) contentReads.push(req.url()); });
   student.on('request', req => { if (/gui-sessions|practice-submissions|submissions|grading|judge|runtime/.test(req.url())) runtimeRequests.push(req.url()); });
-  await student.goto(`/academy/${author.academy.slug}/learn/explanations/${materialId}?classId=${room.classes[0].id}`);
+  await student.goto(routes.academyLearnMaterial(author.academy.slug, materialId, 'EXPLANATION', { classId: room.classes[0].id }));
   await expect(student.locator('article h1')).toHaveText('Understanding loops');
   const frame = student.frameLocator('article iframe');
   await expect(frame.locator('body')).toContainText('A loop repeats');

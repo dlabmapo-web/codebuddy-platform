@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
+import { routes } from '../../packages/web/src/lib/routes';
 
 const requireApi = createRequire(resolve('packages/api/package.json'));
 const { Pool } = requireApi('pg');
@@ -49,7 +50,7 @@ for (const name of ['C', 'CPP'] as const) {
     page.on('pageerror', error => errors.push(error.message));
     const pyodide: string[] = [];
     page.on('request', request => { if (/pyodide.*\.(wasm|js)/.test(request.url())) pyodide.push(request.url()); });
-    await page.goto(`/academy/${f.slug}/learn/exercises/${materialId}?classId=${f.ids.class}`);
+    await page.goto(routes.academyLearnExercise(f.slug, materialId, { classId: f.ids.class }));
     await expect.poll(() => language(page)).toBe(name === 'C' ? 'c' : 'cpp');
     // Batch input is prefilled; Run must use the value the learner changes it to.
     const input = page.getByRole('textbox', { name: 'Program input', exact: true });
@@ -88,20 +89,20 @@ for (const name of ['C', 'CPP'] as const) {
 
     const teacherContext = await browser.newContext({ storageState: f.auth.teacher });
     const teacher = await teacherContext.newPage();
-    const review = (id: string) => `/academy/${f.slug}/teach/classes/${f.ids.class}/students/${f.ids.studentMembership}/submissions/${id}`;
+    const review = (id: string) => routes.academyTeachSubmission(f.slug, f.ids.class, f.ids.studentMembership, id);
     await teacher.goto(review(failure.id));
     await expect(teacher.getByRole('heading', { name: 'Compile error', exact: true })).toBeVisible();
     await expect(teacher.locator('main')).toContainText('error:');
     await expect.poll(() => language(teacher)).toBe(name === 'C' ? 'c' : 'cpp');
     await teacher.goto(review(crash.id));
     await expect(teacher.locator('main')).toContainText('exit code 3');
-    await teacher.goto(`/academy/${f.slug}/teach/classes/${f.ids.class}/progress?view=students&student=${f.ids.studentMembership}&reviewMaterial=${materialId}&attempt=${failure.id}`);
+    await teacher.goto(`${routes.academyTeachProgress(f.slug, f.ids.class)}?view=students&student=${f.ids.studentMembership}&reviewMaterial=${materialId}&attempt=${failure.id}`);
     await expect(teacher.getByTestId('student-history-workspace')).toBeVisible();
     await teacher.getByRole('tab', { name: 'Saved submission result', exact: true }).click();
     await expect(teacher.locator('pre:visible').filter({ hasText: 'Compile error' })).toContainText('error:');
     await expect.poll(() => language(teacher)).toBe(name === 'C' ? 'c' : 'cpp');
     await teacher.screenshot({ path: test.info().outputPath(name + '-compile-history.png'), fullPage: true });
-    await teacher.goto(`/academy/${f.slug}/teach/classes/${f.ids.class}/students/${f.ids.studentMembership}/live`);
+    await teacher.goto(routes.academyTeachStudentLive(f.slug, f.ids.class, f.ids.studentMembership));
     await expect(teacher.locator('body')).toContainText('Local student');
     await expect(teacher.getByRole('button', { name: 'Run', exact: true })).toHaveCount(0);
     expect(pyodide).toEqual([]);
@@ -115,7 +116,7 @@ test('C++ submits all ten cases through the native worker', async ({ browser }) 
   const f = fixture();
   const context = await browser.newContext({ storageState: f.auth.student });
   const page = await context.newPage();
-  await page.goto(`/academy/${f.slug}/learn/exercises/${f.ids.CPP10}?classId=${f.ids.class}`);
+  await page.goto(routes.academyLearnExercise(f.slug, f.ids.CPP10, { classId: f.ids.class }));
   const result = await submit(page, f.ids.CPP10, f.sources.CPP);
   expect(result.score).toBe(100);
   await expect(page.getByTestId('result-passed')).toContainText('10 / 10');
@@ -155,13 +156,13 @@ test('a course chooses its language, and its new problems are written in it', as
   const context = await browser.newContext({ storageState: f.auth.manager });
   const page = await context.newPage();
   // A new problem in the C++ course: no language picker, the C++ template.
-  await page.goto(`/academy/${f.slug}/content/courses/${f.ids.courseCpp}/lectures/${f.ids.lectureCpp}/exercises/new`);
+  await page.goto(`${routes.academyCourse(f.slug, f.ids.courseCpp)}/lectures/${f.ids.lectureCpp}/exercises/new`);
   await expect.poll(() => language(page)).toBe('cpp');
   await expect(page.locator('select').filter({ has: page.locator('option[value="CPP"]') })).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('cpp-authoring.png'), fullPage: true });
 
   // Creating a course offers Python, C and C++, with no academy switch.
-  await page.goto(`/academy/${f.slug}/content/courses`);
+  await page.goto(routes.academyCourses(f.slug));
   await page.getByRole('button', { name: 'New course' }).click();
   await page.getByLabel('Course title').fill('Pointers in C');
   const field = page.getByLabel('Programming language');

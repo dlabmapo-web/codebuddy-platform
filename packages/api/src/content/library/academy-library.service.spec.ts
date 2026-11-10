@@ -257,6 +257,20 @@ describe('AcademyLibraryService.adopt', () => {
     expect(created.material[0]).toMatchObject({ isVisible: true });
   });
 
+  it('keeps the master course language, and each problem keeps its own', async () => {
+    const cpp = structuredClone(master) as typeof master & { language: string };
+    cpp.language = 'CPP';
+    cpp.modules[0]!.lectures[0]!.materials[0]!.programmingExercise!.language = 'CPP';
+    const { service, courseValue, created } = build(cpp);
+    await service.adopt(identity, {
+      academyId: branchId,
+      libraryCourseId: masterId,
+      title: 'Gangnam C++ 1',
+    });
+    expect(courseValue()).toMatchObject({ language: 'CPP' });
+    expect(created.programmingExercise).toEqual([expect.objectContaining({ language: 'CPP' })]);
+  });
+
   it('lands hidden, stamped with the revision it was taken at', async () => {
     const { service, courseValue } = build();
     await service.adopt(identity, {

@@ -6,6 +6,7 @@ import { pdfMetadataSchema } from "./pdf.js";
 import { gradingDataLimits } from "../grading-limits.js";
 
 import { libraryImportOriginSchema, courseProvenanceSchema } from "../platform/library.js";
+import { exerciseLanguageSchema } from "./language.js";
 
 export const materialTypes = ["PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE", "VIDEO_LESSON"] as const;
 export const materialTypeSchema = z.enum(materialTypes);
@@ -15,19 +16,13 @@ export const exerciseDifficulties = ["EASY", "MEDIUM", "HARD"] as const;
 export const exerciseDifficultySchema = z.enum(exerciseDifficulties);
 export type ExerciseDifficulty = z.infer<typeof exerciseDifficultySchema>;
 
-export const exerciseLanguages = ["PYTHON", "C", "CPP"] as const;
-export const exerciseLanguageSchema = z.enum(exerciseLanguages);
-export type ExerciseLanguage = z.infer<typeof exerciseLanguageSchema>;
-/**
- * Languages compiled by the native GCC runtime. They run only on the server:
- * Run, Test and Submit all go to the native node, with no browser runtime and
- * no compatibility fallback.
- */
-export function isCompiledLanguage(
-  language: ExerciseLanguage,
-): language is "C" | "CPP" {
-  return language === "C" || language === "CPP";
-}
+export {
+  compiledStarterTemplates,
+  exerciseLanguages,
+  exerciseLanguageSchema,
+  isCompiledLanguage,
+  type ExerciseLanguage,
+} from "./language.js";
 
 export const testCaseVisibilities = ["SAMPLE", "HIDDEN"] as const;
 export const testCaseVisibilitySchema = z.enum(testCaseVisibilities);
@@ -135,6 +130,11 @@ export const courseContentCountsSchema = z.object({
   lectures: z.number().int().nonnegative(),
   exercises: z.number().int().nonnegative(),
   /**
+   * Problems, quiz-style included: programming-exercise materials. Once there
+   * is one, the course's language is fixed.
+   */
+  problems: z.number().int().nonnegative().default(0),
+  /**
    * Problems a student could actually reach, were the course visible.
    *
    * A problem counts only when it, its lecture and its module are all visible,
@@ -155,6 +155,8 @@ export const courseSummarySchema = z.object({
   title: titleSchema,
   description: descriptionSchema,
   isVisible: z.boolean(),
+  /** Every coding exercise in the course is written in this language. */
+  language: exerciseLanguageSchema.default("PYTHON"),
   content: courseContentCountsSchema,
   /**
    * Where this course came from, when it came from the content library.
@@ -288,6 +290,8 @@ export const createCourseSchema = z.object({
   academyId: z.uuid(),
   title: titleSchema,
   description: descriptionSchema.default(""),
+  /** Chosen once, for every coding exercise the course will hold. */
+  language: exerciseLanguageSchema.default("PYTHON"),
 });
 
 export const updateCourseSchema = z.object({
@@ -295,6 +299,8 @@ export const updateCourseSchema = z.object({
   courseId: z.uuid(),
   title: titleSchema.optional(),
   description: descriptionSchema.optional(),
+  /** Accepted only while the course has no problems. */
+  language: exerciseLanguageSchema.optional(),
 });
 
 export const setCourseVisibilitySchema = z.object({
@@ -701,11 +707,6 @@ export const exerciseDraftFieldsSchema = z.object({
   outputFormat: z.string().max(10_000),
   constraints: z.string().max(10_000),
   starterCode: z.string().max(100_000),
-  /**
-   * Absent keeps what is stored, and a new exercise is Python, so a client
-   * that predates C and C++ can never turn a C exercise back into Python.
-   */
-  language: exerciseLanguageSchema.optional(),
   solutions: exerciseSolutionsSchema,
   aiFeedbackEnabled: z.boolean(),
   isVisible: z.boolean(),
@@ -758,14 +759,6 @@ function refineGrading(value: ExerciseDraftFields, context: z.RefinementCtx) {
     if ((test.comparator === "STDOUT" || test.comparator === "STDOUT_MATCH") && !test.expectedOutput.trim()) context.addIssue({ code: "custom", path: ["testCases", index, "expectedOutput"], message: "Enter expected output for this test case." });
   });
   if (!value.quiz && value.submissionPolicy === "AUTOMATIC" && !value.testCases.length) context.addIssue({ code: "custom", path: ["testCases"], message: "Add at least one test case for automatic grading." });
-  if (value.language && isCompiledLanguage(value.language)) {
-    if (value.quiz)
-      context.addIssue({ code: "custom", path: ["language"], message: "A quiz is not a C or C++ exercise." });
-    if (value.grading.mode !== "ELICE_STDIO")
-      context.addIssue({ code: "custom", path: ["grading", "mode"], message: "C and C++ exercises use weighted grading." });
-    if (value.grading.inputPromptPolicy !== "INCLUDE")
-      context.addIssue({ code: "custom", path: ["grading", "inputPromptPolicy"], message: "Input prompts can be ignored only in Python." });
-  }
   if (value.quiz && value.referencePdfMaterialId) {
     context.addIssue({ code: "custom", path: ["referencePdfMaterialId"], message: "PDF references require a Python exercise." });
   }
@@ -863,7 +856,7 @@ export const moveExerciseSchema = courseIdInputSchema.extend({
 });
 
 export const exerciseAuthoringContextSchema = z.object({
-  course: z.object({ id: z.uuid(), title: titleSchema }),
+  course: z.object({ id: z.uuid(), title: titleSchema, language: exerciseLanguageSchema.default("PYTHON") }),
   module: z.object({ id: z.uuid(), title: titleSchema }),
   lecture: z.object({ id: z.uuid(), title: titleSchema }),
   material: materialSchema.nullable(),

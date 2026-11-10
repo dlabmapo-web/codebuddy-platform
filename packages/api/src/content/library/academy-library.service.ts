@@ -64,6 +64,7 @@ export class AcademyLibraryService {
         id: true,
         title: true,
         description: true,
+        language: true,
         contentRevision: true,
         updatedAt: true,
         _count: { select: { modules: true } },
@@ -89,6 +90,7 @@ export class AcademyLibraryService {
         id: record.id,
         title: record.title,
         description: record.description,
+        language: record.language,
         contentRevision: record.contentRevision,
         moduleCount: record._count.modules,
         lectureCount: record.modules.reduce(
@@ -227,6 +229,9 @@ export class AcademyLibraryService {
           academyId: input.academyId,
           title,
           description: source.description,
+          // The copy is written in the master's language, and so are its
+          // exercises (each keeps its own, copied by `copyCourseTree`).
+          language: source.language,
           // The one gate, and the only one the branch needs: while this is
           // false no descendant flag can reach a student, whatever it says. The
           // branch publishes deliberately, from the editor it is already in,

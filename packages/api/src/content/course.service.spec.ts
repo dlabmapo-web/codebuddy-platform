@@ -30,6 +30,7 @@ function courseRecord() {
     title: "Python Foundations",
     description: "Learn Python",
     isVisible: false,
+    language: "PYTHON" as const,
     createdAt: now,
     updatedAt: now,
     modules: [
@@ -132,6 +133,18 @@ describe("CourseService", () => {
       }),
     );
     expect(result).toMatchObject({ isVisible: false });
+  });
+
+  it("creates a course in its chosen language, Python when none is chosen", async () => {
+    const { service, transaction } = createService();
+    await service.create(identity, { academyId, title: "C Basics", description: "", language: "C" });
+    expect(transaction.course.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ language: "C" }) }),
+    );
+    await service.create(identity, { academyId, title: "Python Basics", description: "" });
+    expect(transaction.course.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ language: "PYTHON" }) }),
+    );
   });
 
   it("rejects a case-insensitive title conflict", async () => {

@@ -1343,6 +1343,10 @@ model Course {
   title           String
   description     String  @default("")
   isVisible       Boolean @default(false) @map("is_visible")
+  /// The language of every coding exercise in this course. Chosen when the
+  /// course is created; fixed once it holds a coding exercise. Each exercise
+  /// keeps its own copy, which admission and grading read.
+  language        ExerciseLanguage @default(PYTHON)
   /// Bumped by every mutation anywhere in this course's content, in the same
   /// transaction as the mutation itself.
   ///

@@ -3,7 +3,7 @@ import { Prisma } from "../generated/prisma/client.js";
 import type { PrismaService } from "../database/prisma.service.js";
 
 export const emptyCourseCounts = (): CourseContentCounts => ({
-  modules: 0, lectures: 0, exercises: 0, visibleExercises: 0,
+  modules: 0, lectures: 0, exercises: 0, problems: 0, visibleExercises: 0,
   documents: 0, visibleDocuments: 0,
 });
 
@@ -24,6 +24,7 @@ export async function courseCounts(
       count(DISTINCT cm.id)::integer AS modules,
       count(DISTINCT l.id)::integer AS lectures,
       count(m.id) FILTER (WHERE m.type <> 'PDF_DOCUMENT')::integer AS exercises,
+      count(m.id) FILTER (WHERE m.type = 'PROGRAMMING_EXERCISE')::integer AS problems,
       count(m.id) FILTER (WHERE m.type <> 'PDF_DOCUMENT'
         AND cm.is_visible AND l.is_visible AND m.is_visible)::integer AS "visibleExercises",
       count(m.id) FILTER (WHERE m.type = 'PDF_DOCUMENT')::integer AS documents,

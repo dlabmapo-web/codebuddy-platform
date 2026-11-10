@@ -9,6 +9,7 @@ import { nativeRuntimeVersion } from "@cove/grading-runtime";
 import {
   createProgrammingExerciseSchema,
   defaultEliceGradingProfile,
+  legacyGradingProfile,
   type NativeGccDescriptor,
   type NativeRuntimeDescriptor,
 } from "@cove/shared";
@@ -75,6 +76,7 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
   let counted: ReturnType<typeof countingClient>;
   let statements = 0;
   let courses: CourseService;
+  let countedCourses: CourseService;
   let submissions: SubmissionService;
   let checks: SampleCheckService;
   let countedChecks: SampleCheckService;
@@ -98,14 +100,23 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
     timeLimitMsOverride: null, softTimeLimitMs: null, softPenalty: null, label: null,
   });
   const doubling = '#include <stdio.h>\nint main(void) { int n; scanf("%d", &n); printf("%d\\n", 2 * n); return 0; }\n';
-  const exerciseInput = (language?: "C" | "CPP") => createProgrammingExerciseSchema.parse({
-    academyId: ids.academy, courseId, lectureId, title: "Double in C", difficulty: "EASY",
-    description: "<p>Print twice the input.</p>", inputFormat: "", outputFormat: "", constraints: "",
-    starterCode: "", solutions: [{ title: null, code: doubling }], aiFeedbackEnabled: false, isVisible: true,
-    testCases: [answer("2\n", "4", 20, "SAMPLE"), answer("7\n", "14", 40, "HIDDEN"), answer("8\n", "16", 40, "HIDDEN")],
-    grading: defaultEliceGradingProfile, hints: [],
-    ...(language ? { language } : {}),
-  });
+  const exerciseInput = (target: { courseId: string; lectureId: string } = { courseId, lectureId }, grading = defaultEliceGradingProfile) =>
+    createProgrammingExerciseSchema.parse({
+      academyId: ids.academy, ...target, title: "Double in C", difficulty: "EASY",
+      description: "<p>Print twice the input.</p>", inputFormat: "", outputFormat: "", constraints: "",
+      starterCode: "", solutions: [{ title: null, code: doubling }], aiFeedbackEnabled: false, isVisible: true,
+      testCases: [answer("2\n", "4", 20, "SAMPLE"), answer("7\n", "14", 40, "HIDDEN"), answer("8\n", "16", 40, "HIDDEN")],
+      grading, hints: [],
+    });
+  /** A course with one module and one lecture, in the given language. */
+  const courseWithLecture = async (title: string, language: "PYTHON" | "C" | "CPP") => {
+    const course = await courses.create(manager, { academyId: ids.academy, title, description: "", language });
+    await courses.createModule(manager, { academyId: ids.academy, courseId: course.id, title: "M", description: "" });
+    const courseModule = await prisma.courseModule.findFirstOrThrow({ where: { courseId: course.id } });
+    await courses.createLecture(manager, { academyId: ids.academy, courseId: course.id, moduleId: courseModule.id, title: "L", description: "" });
+    const lecture = await prisma.lecture.findFirstOrThrow({ where: { courseModuleId: courseModule.id } });
+    return { course, courseId: course.id, lectureId: lecture.id };
+  };
 
   /** A scripted GCC engine: the native node's contract without its kernel. */
   const gccEngine = (script: {
@@ -180,6 +191,10 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
     submissions = new SubmissionService(prisma, access, config as never, classContext, queue);
     checks = new SampleCheckService(prisma, access, config as never, classContext, queue);
     const countedPrisma = counted as unknown as PrismaService;
+    countedCourses = new CourseService(
+      countedPrisma, new AcademyAccessService(countedPrisma, new SupportGrantResolver(countedPrisma)),
+      new AuditService(), { revokeClass: async () => undefined } as unknown as MonitoringRevocationService,
+    );
     countedChecks = new SampleCheckService(
       countedPrisma, new AcademyAccessService(countedPrisma, new SupportGrantResolver(countedPrisma)),
       config as never, new LearningClassContextService(countedPrisma), queue,
@@ -191,12 +206,9 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
       await prisma.user.create({ data: { id, authUserId, status: "ACTIVE", email: `${authUserId}@it.test`, username: `${name}${id.slice(0, 6)}` } });
     await prisma.academyMembership.create({ data: { academyId: ids.academy, userId: ids.manager, role: "MANAGER", status: "ACTIVE" } });
     await prisma.academyMembership.create({ data: { id: ids.studentMembership, academyId: ids.academy, userId: ids.student, role: "STUDENT", status: "ACTIVE" } });
-    const course = await courses.create(manager, { academyId: ids.academy, title: "C track", description: "" });
-    courseId = course.id;
-    await courses.createModule(manager, { academyId: ids.academy, courseId, title: "M", description: "" });
-    const courseModule = await prisma.courseModule.findFirstOrThrow({ where: { courseId } });
-    await courses.createLecture(manager, { academyId: ids.academy, courseId, moduleId: courseModule.id, title: "L", description: "" });
-    lectureId = (await prisma.lecture.findFirstOrThrow({ where: { courseModuleId: courseModule.id } })).id;
+    // A C course, in an academy with no feature switched on: every academy
+    // offers Python, C and C++.
+    ({ courseId, lectureId } = await courseWithLecture("C track", "C"));
     await prisma.class.create({ data: { id: ids.klass, academyId: ids.academy, name: "Cohort", createdByUserId: ids.manager } });
     await prisma.classCourse.create({ data: { classId: ids.klass, courseId, assignedByUserId: ids.manager } });
     await prisma.classEnrollment.create({ data: { classId: ids.klass, membershipId: ids.studentMembership, enrolledByUserId: ids.manager } });
@@ -210,13 +222,17 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
     if (manifestDirectory) rmSync(manifestDirectory, { recursive: true, force: true });
   });
 
-  it("lets an academy author C only with C_CPP_EXERCISES on, and stores it compiled-ready", async () => {
-    await expect(courses.createExercise(manager, exerciseInput("C"))).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
+  it("writes every coding exercise in its course's language, with weighted grading", async () => {
+    expect(await prisma.academyFeatureFlag.count({ where: { academyId: ids.academy } })).toBe(0);
+    expect((await prisma.course.findUniqueOrThrow({ where: { id: courseId } })).language).toBe("C");
+    // C keeps every printed byte and grades by weight: a legacy profile is refused.
+    await expect(courses.createExercise(manager, exerciseInput(undefined, { ...defaultEliceGradingProfile, inputPromptPolicy: "IGNORE" })))
+      .rejects.toMatchObject({ code: "EXERCISE_VALIDATION_FAILED" });
     expect(await prisma.programmingExercise.count({ where: { material: { lecture: { id: lectureId } } } })).toBe(0);
 
-    await prisma.academyFeatureFlag.create({ data: { academyId: ids.academy, feature: "C_CPP_EXERCISES", isEnabled: true } });
-    const created = await courses.createExercise(manager, exerciseInput("C"));
+    const created = await courses.createExercise(manager, exerciseInput());
     materialId = created.material!.id;
+    expect(created.course.language).toBe("C");
     revision = created.material!.programmingExercise!.gradingRevision;
     const stored = await prisma.programmingExercise.findUniqueOrThrow({ where: { materialId } });
     expect(stored).toMatchObject({ language: "C", gradingMode: "ELICE_STDIO", inputPromptPolicy: "INCLUDE" });
@@ -224,6 +240,50 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
     await prisma.courseModule.updateMany({ where: { courseId }, data: { isVisible: true } });
     await prisma.lecture.updateMany({ where: { id: lectureId }, data: { isVisible: true } });
     await courses.setVisibility(manager, { academyId: ids.academy, courseId, isVisible: true });
+  });
+
+  it("fixes a course's language once it holds a problem, and not before", async () => {
+    // The C track holds the exercise written above.
+    await expect(courses.update(manager, { academyId: ids.academy, courseId, language: "CPP" }))
+      .rejects.toMatchObject({ code: "CONTENT_VALIDATION_FAILED" });
+    expect((await prisma.course.findUniqueOrThrow({ where: { id: courseId } })).language).toBe("C");
+
+    // An empty course can still change its language.
+    const spare = await courseWithLecture("Spare", "PYTHON");
+    statements = 0;
+    const changed = await countedCourses.update(manager, { academyId: ids.academy, courseId: spare.courseId, language: "CPP" });
+    const changeStatements = statements;
+    expect(changed.language).toBe("CPP");
+
+    // The next problem is C++, whatever an old client might send.
+    statements = 0;
+    const cpp = await countedCourses.createExercise(manager, { ...exerciseInput({ courseId: spare.courseId, lectureId: spare.lectureId }), language: "C" } as never);
+    const createStatements = statements;
+    expect((await prisma.programmingExercise.findUniqueOrThrow({ where: { materialId: cpp.material!.id } })).language).toBe("CPP");
+    statements = 0;
+    await countedCourses.update(manager, { academyId: ids.academy, courseId: spare.courseId, title: "Spare course" });
+    const renameStatements = statements;
+    // A language change costs the course lock and one count over a plain
+    // update; a rename's title check costs one. Exercise creation reads the
+    // language from the lock it already takes: no statement of its own.
+    expect({ changeStatements, renameStatements, createStatements }).toEqual({ changeStatements: 14, renameStatements: 13, createStatements: 22 });
+
+    // A quiz-style problem has no code and is stored as Python, but it is a
+    // problem: a course holding only one is fixed too.
+    const quizzes = await courseWithLecture("Quizzes", "C");
+    const quiz = await courses.createExercise(manager, createProgrammingExerciseSchema.parse({
+      academyId: ids.academy, courseId: quizzes.courseId, lectureId: quizzes.lectureId, title: "Pick one", difficulty: "EASY",
+      description: "<p>Which?</p>", inputFormat: "", outputFormat: "", constraints: "", starterCode: "", solutions: [],
+      aiFeedbackEnabled: false, isVisible: true, testCases: [], grading: legacyGradingProfile, hints: [],
+      submissionPolicy: "AUTOMATIC",
+      quiz: { choices: [{ id: "a", text: "A" }, { id: "b", text: "B" }], correctChoiceId: "a", explanation: "" },
+    }));
+    expect((await prisma.programmingExercise.findUniqueOrThrow({ where: { materialId: quiz.material!.id } })).language).toBe("PYTHON");
+    await expect(courses.update(manager, { academyId: ids.academy, courseId: quizzes.courseId, language: "PYTHON" }))
+      .rejects.toMatchObject({ code: "CONTENT_VALIDATION_FAILED" });
+    // The course list counts that problem, which is what locks its form.
+    const listed = (await courses.list(manager, ids.academy)).courses.find((course) => course.id === quizzes.courseId);
+    expect(listed).toMatchObject({ language: "C", content: { problems: 1 } });
   });
 
   it("refuses a C submission while no GCC runtime is ready, recording nothing", async () => {

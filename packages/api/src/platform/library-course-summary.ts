@@ -1,4 +1,4 @@
-import type { LibraryCourse } from "@cove/shared";
+import type { ExerciseLanguage, LibraryCourse } from "@cove/shared";
 import {
   courseTreeCountSelect,
   courseTreeCounts,
@@ -10,6 +10,7 @@ export const librarySelect = {
   description: true,
   isVisible: true,
   retiredAt: true,
+  language: true,
   contentRevision: true,
   updatedAt: true,
   ...courseTreeCountSelect,
@@ -22,6 +23,7 @@ export function toLibraryCourse(record: {
   description: string;
   isVisible: boolean;
   retiredAt: Date | null;
+  language: ExerciseLanguage;
   contentRevision: number;
   updatedAt: Date;
   modules: {
@@ -36,6 +38,7 @@ export function toLibraryCourse(record: {
     description: record.description,
     isVisible: record.isVisible,
     retiredAt: record.retiredAt?.toISOString() ?? null,
+    language: record.language,
     contentRevision: record.contentRevision,
     ...courseTreeCounts(record),
     copyCount: record.copies.length,

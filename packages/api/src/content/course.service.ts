@@ -1,6 +1,6 @@
 import { courseCounts, emptyCourseCounts } from "./course-counts.js";
 import type { CourseContentCounts } from "@cove/shared";
-import { inferSubmissionPolicy, isCompiledLanguage, type SubmissionPolicy } from "@cove/shared";
+import { inferSubmissionPolicy, isCompiledLanguage, type ExerciseLanguage, type SubmissionPolicy } from "@cove/shared";
 import { rolesHavePermission } from "@cove/shared";
 import { taughtMaterialWhere } from "../classes/assigned-course-access.js";
 import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
@@ -193,8 +193,6 @@ type ExerciseRecord = Prisma.MaterialGetPayload<{
 
 type ExerciseWriteInput = {
   submissionPolicy?: SubmissionPolicy;
-  /** Absent keeps the stored language; a new exercise is Python. */
-  language?: "PYTHON" | "C" | "CPP";
   referencePdfMaterialId?: string | null;
   quiz?: QuizDefinition | null;
   academyId: string;
@@ -243,7 +241,7 @@ export class CourseService {
 
   async create(
     identity: SupabaseIdentity,
-    input: { academyId: string; title: string; description: string },
+    input: { academyId: string; title: string; description: string; language?: ExerciseLanguage },
     context: ContentRequestContext = {},
   ) {
     const actor = await this.requireCurriculumManager(
@@ -262,6 +260,7 @@ export class CourseService {
           title,
           description: input.description.trim(),
           isVisible: false,
+          language: input.language ?? "PYTHON",
           createdByUserId: actor.userId,
         },
         include: courseSummaryInclude,
@@ -273,7 +272,7 @@ export class CourseService {
         targetType: "Course",
         targetId: created.id,
         requestId: context.requestId,
-        after: { title: created.title, isVisible: false },
+        after: { title: created.title, isVisible: false, language: created.language },
       });
       return created;
     });
@@ -287,6 +286,7 @@ export class CourseService {
       courseId: string;
       title?: string;
       description?: string;
+      language?: ExerciseLanguage;
     },
     context: ContentRequestContext = {},
   ) {
@@ -295,6 +295,10 @@ export class CourseService {
       input.academyId,
     );
     const current = await this.requireCourse(input.academyId, input.courseId);
+    const language =
+      input.language !== undefined && input.language !== current.language
+        ? input.language
+        : undefined;
     const title = input.title?.trim();
     if (
       title &&
@@ -306,10 +310,22 @@ export class CourseService {
       if (title && actor.via === "platform" && await lockLibraryTitles(tx, input.academyId)) {
         await assertLibraryTitleAvailable(tx, input.academyId, title, input.courseId);
       }
+      if (language) {
+        // Starter code, solutions and test cases are written for the course's
+        // language, so it is fixed once the course holds a problem. Held under
+        // the course lock that exercise creation also takes.
+        await lockCourse(tx, current.id);
+        const problems = await tx.material.count({
+          where: { type: "PROGRAMMING_EXERCISE", lecture: { courseModule: { courseId: current.id } } },
+        });
+        if (problems > 0)
+          throw new AppException("CONTENT_VALIDATION_FAILED", HttpStatus.BAD_REQUEST, "The language is fixed once the course has problems.");
+      }
       const updated = await tx.course.update({
         where: { id: current.id },
         data: {
           ...(title === undefined ? {} : { title }),
+          ...(language ? { language } : {}),
           ...(input.description === undefined
             ? {}
             : { description: input.description.trim() }),
@@ -323,8 +339,8 @@ export class CourseService {
         targetType: "Course",
         targetId: current.id,
         requestId: context.requestId,
-        before: { title: current.title, description: current.description },
-        after: { title: updated.title, description: updated.description },
+        before: { title: current.title, description: current.description, language: current.language },
+        after: { title: updated.title, description: updated.description, language: updated.language },
       });
       // §9.2 — the course's content moved, so any import preview taken
       // against the old revision is now stale and will be refused.
@@ -1266,10 +1282,13 @@ export class CourseService {
     await this.requireLecture(input.courseId, input.lectureId);
     if (input.referencePdfMaterialId) await this.requireCurriculumManager(identity, input.academyId);
     assertGradingSupported(input, CREATED_EXERCISE_TIME_LIMIT_MS);
-    const language = input.language ?? "PYTHON";
-    if (isCompiledLanguage(language)) await this.requireCompiledLanguages(input.academyId);
     const record = await this.prisma.$transaction(async (tx) => {
-      await lockCourse(tx, input.courseId);
+      // The course's language, read under its lock so a concurrent language
+      // change cannot slip between the read and this exercise. A quiz has no
+      // code and stays Python.
+      const courseLanguage = await lockCourse(tx, input.courseId);
+      const language = input.quiz ? "PYTHON" : courseLanguage;
+      assertLanguageGrading(input, language);
       await validatePdfReference(tx, input, input.referencePdfMaterialId);
       await assertLessonImages(tx, { academyId: input.academyId, courseId: input.courseId, html: input.description });
       const position = await nextMaterialPosition(tx, input.lectureId);
@@ -1321,7 +1340,7 @@ export class CourseService {
         targetType: "Material",
         targetId: material.id,
         requestId: context.requestId,
-        after: exerciseAuditFromInput(input, position, false, 1),
+        after: exerciseAuditFromInput(input, position, false, 1, language),
       });
       // §9.2 — the course's content moved, so any import preview taken
       // against the old revision is now stale and will be refused.
@@ -1354,18 +1373,15 @@ export class CourseService {
     // Checked against the limit this exercise actually has, which an imported
     // or migrated problem may not share with the authoring default.
     assertGradingSupported(input, exercise.timeLimitMs);
-    // Absent keeps the stored language: an older client cannot change it.
-    const language = input.language ?? exercise.language;
-    if (language !== exercise.language && isCompiledLanguage(language))
-      await this.requireCompiledLanguages(input.academyId);
+    // An exercise keeps the language it was created in, its course's.
+    assertLanguageGrading(input, exercise.language);
     const profileColumns = exerciseProfileColumns(input.grading);
     const submissionPolicy = input.submissionPolicy ?? exercise.submissionPolicy ?? "AUTOMATIC";
     const definitionChanged =
       !sameQuizGrading(exercise.quiz, input.quiz) ||
       !sameGradingDefinition(exercise.testCases, input.testCases) ||
       !sameGradingProfile(exercise, profileColumns);
-    // A different language is a different program for every case.
-    const gradingChanged = definitionChanged || language !== exercise.language ||
+    const gradingChanged = definitionChanged ||
       submissionPolicy !== (exercise.submissionPolicy ?? "AUTOMATIC");
     const nextRevision = exercise.gradingRevision + (gradingChanged ? 1 : 0);
     const record = await this.prisma.$transaction(async (tx) => {
@@ -1388,7 +1404,6 @@ export class CourseService {
           outputFormat: input.outputFormat,
           constraints: input.constraints,
           starterCode: input.starterCode,
-          language,
 
           aiFeedbackEnabled: input.aiFeedbackEnabled,
           ...(gradingChanged
@@ -1624,17 +1639,6 @@ export class CourseService {
    * Choosing C or C++ is gated per academy. Running existing C/C++ exercises
    * is not: that depends on the native node's eligibility alone.
    */
-  private async requireCompiledLanguages(academyId: string) {
-    const flag = await this.prisma.academyFeatureFlag.findUnique({
-      where: { academyId_feature: { academyId, feature: "C_CPP_EXERCISES" } },
-      select: { isEnabled: true },
-    });
-    // The picker is offered only where the flag is on: this refuses a stale
-    // or forged request, so the generic permission answer is the right one.
-    if (!flag?.isEnabled)
-      throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
-  }
-
   private async currentTree(input: { academyId: string; courseId: string }) {
     return toCourseTree(await this.findCourseTree(input));
   }
@@ -1886,6 +1890,7 @@ function exerciseAuditFromInput(
   position: number,
   isVisible: boolean,
   gradingRevision: number,
+  language: ExerciseLanguage,
 ) {
   return {
     submissionPolicy: inferSubmissionPolicy(input),
@@ -1894,7 +1899,7 @@ function exerciseAuditFromInput(
     title: input.title.trim(),
     difficulty: input.difficulty,
     position,
-    language: input.language ?? "PYTHON",
+    language,
     timeLimitMs: CREATED_EXERCISE_TIME_LIMIT_MS,
     memoryLimitMb: 256,
     aiFeedbackEnabled: input.aiFeedbackEnabled,
@@ -1994,6 +1999,7 @@ export function toCourseSummary(course: {
   title: string;
   description: string;
   isVisible: boolean;
+  language: ExerciseLanguage;
   createdAt: Date;
   updatedAt: Date;
   libraryImport?: {
@@ -2026,6 +2032,7 @@ export function toCourseSummary(course: {
   if (!counts && !course.modules) throw new Error("Course counts or tree required");
   let lectures = 0;
   let exercises = 0;
+  let problems = 0;
   let visibleExercises = 0;
   let documents = 0;
   let visibleDocuments = 0;
@@ -2034,6 +2041,9 @@ export function toCourseSummary(course: {
     for (const lecture of courseModule.lectures) {
       exercises += lecture.materials.filter(
         (m) => m.type !== "PDF_DOCUMENT",
+      ).length;
+      problems += lecture.materials.filter(
+        (m) => m.type === "PROGRAMMING_EXERCISE",
       ).length;
       documents += lecture.materials.filter(
         (m) => m.type === "PDF_DOCUMENT",
@@ -2056,10 +2066,12 @@ export function toCourseSummary(course: {
     title: course.title,
     description: course.description,
     isVisible: course.isVisible,
+    language: course.language,
     content: counts ?? {
       modules: course.modules!.length,
       lectures,
       exercises,
+      problems,
       visibleExercises,
       documents,
       visibleDocuments,
@@ -2173,7 +2185,7 @@ function serializeExercise(
 function toExerciseAuthoringContext(record: ExerciseRecord) {
   const courseModule = record.lecture.courseModule;
   return {
-    course: { id: courseModule.course.id, title: courseModule.course.title },
+    course: { id: courseModule.course.id, title: courseModule.course.title, language: courseModule.course.language },
     module: { id: courseModule.id, title: courseModule.title },
     lecture: { id: record.lecture.id, title: record.lecture.title },
     material: {
@@ -2195,8 +2207,24 @@ function toExerciseAuthoringContext(record: ExerciseRecord) {
  * with an import or another move and leave two siblings contending for one
  * position.
  */
-async function lockCourse(tx: Prisma.TransactionClient, courseId: string) {
-  await tx.$queryRaw`SELECT id FROM courses WHERE id = ${courseId}::uuid FOR UPDATE`;
+/** Locks the course row for this transaction and returns its language. */
+async function lockCourse(tx: Prisma.TransactionClient, courseId: string): Promise<ExerciseLanguage> {
+  const rows = await tx.$queryRaw<Array<{ language: ExerciseLanguage }>>`SELECT language::text AS language FROM courses WHERE id = ${courseId}::uuid FOR UPDATE`;
+  return rows?.[0]?.language ?? "PYTHON";
+}
+
+/**
+ * C and C++ grade with weighted rules and keep every byte a program prints:
+ * the input-prompt setting only has a meaning for Python's `input()`.
+ */
+function assertLanguageGrading(input: ExerciseWriteInput, language: ExerciseLanguage) {
+  if (input.quiz || !isCompiledLanguage(language)) return;
+  if (input.grading.mode !== "ELICE_STDIO" || input.grading.inputPromptPolicy !== "INCLUDE")
+    throw new AppException(
+      "EXERCISE_VALIDATION_FAILED",
+      HttpStatus.BAD_REQUEST,
+      "grading: C and C++ problems use weighted grading and keep input prompts.",
+    );
 }
 
 function sameOrder(left: readonly string[], right: readonly string[]) {

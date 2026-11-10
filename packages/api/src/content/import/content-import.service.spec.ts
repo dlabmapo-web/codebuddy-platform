@@ -137,3 +137,43 @@ describe("ContentImportService session safety", () => {
     expect(rootSessionUpdate).not.toHaveBeenCalled();
   });
 });
+
+describe("ContentImportService problems in a course's language", () => {
+  const planned = {
+    key: "sum-two", action: "CREATE", title: "Sum two numbers", order: null,
+    difficulty: "EASY", description: "<p>Add.</p>", inputFormat: "", outputFormat: "", constraints: "",
+    starterCode: "", aiFeedbackEnabled: false, submissionPolicy: "AUTOMATIC",
+    testCases: [{ position: 1, input: "1 2\n", expectedOutput: "3", visibility: "SAMPLE" }],
+    hints: [], solutions: [],
+  };
+  async function importInto(language: "PYTHON" | "CPP") {
+    const create = vi.fn().mockResolvedValue({ id: "60000000-0000-4000-8000-000000000001" });
+    const tx = {
+      material: { create, aggregate: vi.fn().mockResolvedValue({ _max: { position: null } }) },
+      programmingExerciseSolution: { deleteMany: vi.fn(), createMany: vi.fn() },
+      programmingExercise: { update: vi.fn() },
+    };
+    const service = new ContentImportService({} as PrismaService, access(), audit());
+    await (service as unknown as { writeProblem: (tx: unknown, input: unknown) => Promise<string> }).writeProblem(tx, {
+      planned, existing: null, lectureId: "70000000-0000-4000-8000-000000000001", academyId, actorUserId, language,
+    });
+    return create.mock.calls[0]![0].data.programmingExercise.create;
+  }
+
+  it("creates a C++ course's new problem in C++, weighted, from the template", async () => {
+    const exercise = await importInto("CPP");
+    expect(exercise).toMatchObject({
+      language: "CPP",
+      gradingMode: "ELICE_STDIO",
+      inputPromptPolicy: "INCLUDE",
+      starterCode: expect.stringContaining("#include <iostream>"),
+    });
+  });
+
+  it("leaves a Python course's new problem as the import always made it", async () => {
+    const exercise = await importInto("PYTHON");
+    expect(exercise.language).toBe("PYTHON");
+    expect(exercise.gradingMode).toBeUndefined();
+    expect(exercise.starterCode).toBe("");
+  });
+});

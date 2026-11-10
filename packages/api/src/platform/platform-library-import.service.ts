@@ -250,6 +250,7 @@ export class PlatformLibraryImportService {
                 academyId: library.id,
                 title: input.title,
                 description: source.description,
+                language: source.language,
                 isVisible: false,
                 contentRevision: 1,
                 createdByUserId: actor.userId,

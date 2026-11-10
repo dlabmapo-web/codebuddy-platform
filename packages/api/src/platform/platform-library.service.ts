@@ -12,6 +12,7 @@ import {
   type LibraryCopy,
   type PreviewAcademyCourseInput,
   type ImportAcademyCourseInput,
+  type ExerciseLanguage,
   type LibraryCourse,
   type ListLibraryCoursesInput,
 } from "@cove/shared";
@@ -118,6 +119,7 @@ export class PlatformLibraryService {
           description: true,
           isVisible: true,
           retiredAt: true,
+          language: true,
           contentRevision: true,
           updatedAt: true,
           ...courseTreeCountSelect,
@@ -140,6 +142,7 @@ export class PlatformLibraryService {
         description: record.description,
         isVisible: record.isVisible,
         retiredAt: record.retiredAt?.toISOString() ?? null,
+        language: record.language,
         contentRevision: record.contentRevision,
         ...courseTreeCounts(record),
         copyCount: record.copies.length,
@@ -162,7 +165,7 @@ export class PlatformLibraryService {
    */
   async create(
     identity: SupabaseIdentity,
-    input: { title: string; description: string },
+    input: { title: string; description: string; language?: ExerciseLanguage },
   ): Promise<LibraryCourse> {
     const actor = await this.access.requirePermission(
       identity.authUserId,
@@ -201,6 +204,7 @@ export class PlatformLibraryService {
           academyId: library.id,
           title: input.title,
           description: input.description,
+          language: input.language ?? "PYTHON",
           createdByUserId: actor.userId,
         },
         select: librarySelect,

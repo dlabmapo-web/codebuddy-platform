@@ -24,6 +24,10 @@ import {
   type PlannedModule,
   type PlannedProblem,
   type WorkbookLocale,
+  compiledStarterTemplates,
+  defaultEliceGradingProfile,
+  isCompiledLanguage,
+  type ExerciseLanguage,
 } from "@cove/shared";
 
 import { AuditService } from "../../academies/audit.service.js";
@@ -31,6 +35,7 @@ import type { SupabaseIdentity } from "../../auth/auth.types.js";
 import { AcademyAccessService } from "../../authorization/academy-access.service.js";
 import { AppException } from "../../common/app-exception.js";
 import { PrismaService } from "../../database/prisma.service.js";
+import { exerciseProfileColumns } from "../../judge/grading-profile.js";
 import type { Prisma } from "../../generated/prisma/client.js";
 import {
   bumpContentRevision,
@@ -666,6 +671,7 @@ export class ContentImportService {
             academyId: input.academyId,
             actorUserId: input.actorUserId,
             requestId: input.requestId,
+            language: input.course.language,
           });
           materialIdsByKey.set(problem.key, materialId);
           entities.push({
@@ -913,6 +919,8 @@ export class ContentImportService {
       academyId: string;
       actorUserId: string;
       requestId?: string;
+      /** The course's language, which a new problem takes. */
+      language: ExerciseLanguage;
     },
   ): Promise<string> {
     const { planned, existing } = input;
@@ -937,6 +945,9 @@ export class ContentImportService {
     };
 
     if (!existing) {
+      // A C or C++ course's new problems grade as the editor's would: weighted,
+      // keeping every printed byte, from the language's template when blank.
+      const compiled = isCompiledLanguage(input.language);
       const material = await tx.material.create({
         data: {
           lectureId: input.lectureId,
@@ -956,11 +967,17 @@ export class ContentImportService {
             create: {
               externalKey: planned.key,
               legacyProblemNo: null,
-              language: "PYTHON",
+              language: input.language,
               timeLimitMs: 3000,
               memoryLimitMb: 256,
               gradingRevision: 1,
               ...exerciseFields,
+              ...(compiled
+                ? {
+                    ...exerciseProfileColumns(defaultEliceGradingProfile),
+                    ...(planned.starterCode.trim() ? {} : { starterCode: compiledStarterTemplates[input.language as "C" | "CPP"] }),
+                  }
+                : {}),
               testCases: { create: planned.testCases },
               hints: { create: planned.hints },
             },

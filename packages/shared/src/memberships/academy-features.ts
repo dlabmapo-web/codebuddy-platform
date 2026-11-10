@@ -20,7 +20,6 @@ export const academyFeatureNames = [
   "STUDENT_POINTS",
   "STUDENT_CLASS_LEADERBOARD",
   "SERVER_SAMPLE_CHECKS",
-  "C_CPP_EXERCISES",
 ] as const;
 
 export const academyFeatureNameSchema = z.enum(academyFeatureNames);
@@ -37,9 +36,6 @@ export type AcademyFeatureName = z.infer<typeof academyFeatureNameSchema>;
  */
 export const academyRolloutFeatures: ReadonlySet<AcademyFeatureName> = new Set([
   "SERVER_SAMPLE_CHECKS",
-  // C and C++ compile on the shared native node, and each academy turns them
-  // on once its classes are ready to use them.
-  "C_CPP_EXERCISES",
 ]);
 
 /**

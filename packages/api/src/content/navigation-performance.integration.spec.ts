@@ -137,7 +137,7 @@ describe.skipIf(!databaseUrl)("navigation projections against PostgreSQL", () =>
     const records = await client.course.findMany({ where: { academyId }, include: legacySummaryInclude });
     const counts = await courseCounts(prisma, academyId, records.map((r) => r.id));
     for (const record of records) expect(counts.get(record.id)).toEqual(toCourseSummary(record).content);
-    expect(counts.get(emptyCourseId)).toEqual({ modules: 0, lectures: 0, exercises: 0, visibleExercises: 0, documents: 0, visibleDocuments: 0 });
+    expect(counts.get(emptyCourseId)).toEqual({ modules: 0, lectures: 0, exercises: 0, problems: 0, visibleExercises: 0, documents: 0, visibleDocuments: 0 });
     expect(counts.get(courseId)?.modules).toBe(3);
     expect(counts.get(courseId)?.lectures).toBe(4);
     expect(counts.get(courseId)?.visibleExercises).toBeGreaterThan(0); // course itself is hidden

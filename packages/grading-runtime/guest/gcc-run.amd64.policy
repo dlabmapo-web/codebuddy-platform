@@ -1,0 +1,40 @@
+// Run jail for native-gcc programs: the exec gate (PID 1) and the learner
+// program it forks (PID 2). Default-deny. The gate installs a second filter in
+// the program that also denies process/thread creation, memfd and seccomp/prctl.
+// Nothing may name another process: the gate and program share uid 65534, and
+// Linux lets same-uid processes change each other's limits and scheduling, so
+// prlimit64/sched_getaffinity are allowed on the caller only and pidfd_*,
+// process_vm_*, kcmp, ptrace, set{priority,affinity,scheduler}, ioprio_set and
+// queued signals are absent. Plain signals stay: the namespace holds only the
+// gate, whose init status drops every signal it has no handler for.
+// execve starts the gate and then the program; the read-only root holds no
+// other executable and every writable mount is noexec.
+POLICY gcc_run {
+  ALLOW {
+    read, pread64, write, pwrite64, readv, writev, close, close_range,
+    newfstat, newfstatat, statx, lseek, openat, readlinkat, getdents64,
+    mmap, mprotect, munmap, mremap, madvise, brk,
+    rt_sigaction, rt_sigprocmask, rt_sigreturn, sigaltstack,
+    kill, tkill, tgkill,
+    futex, set_tid_address, set_robust_list, rseq,
+    getpid, getppid, gettid, getuid, geteuid, getgid, getegid,
+    clock_gettime, clock_getres, gettimeofday, nanosleep, clock_nanosleep, times, time,
+    getrandom, newuname, sysinfo, sched_yield, getrusage,
+    sched_getaffinity(pid) { pid == 0 },
+    prlimit64(pid) { pid == 0 },
+    getrlimit,
+    fcntl, ioctl, dup, dup3, pipe2, ppoll, pselect6,
+    faccessat, faccessat2,
+    mkdirat, unlinkat, renameat, renameat2, ftruncate, fsync, fdatasync,
+    umask, fchmod, fchmodat, chdir, fchdir, getcwd,
+    arch_prctl, readlink, newstat, newlstat, dup2, select, poll, pipe,
+    mkdir, unlink, rename, rmdir, open, access, chmod,
+    memfd_create, wait4,
+    seccomp(op) { op == 1 },
+    prctl(option) { option == 4 || option == 38 },
+    clone(flags) { flags == 17 },
+    execve, exit, exit_group, restart_syscall
+  },
+  ERRNO(38) { clone3 }
+}
+USE gcc_run DEFAULT KILL

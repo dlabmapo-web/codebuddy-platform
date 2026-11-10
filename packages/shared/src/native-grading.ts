@@ -2,6 +2,14 @@ import { z } from "zod";
 
 export const nativeDigestSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
 const revision = z.string().regex(/^[a-f0-9]{40}$/);
+const nativeComparatorSchema = z
+  .object({
+    engine: z.literal("pyodide"),
+    version: z.string().min(1).max(128),
+    packageDigest: nativeDigestSchema,
+    semanticsVersion: z.string().min(1).max(128),
+  })
+  .strict();
 /** Every semantic/build input participates in equality, never just Python's version. */
 export const nativeRuntimeDescriptorSchema = z
   .object({
@@ -16,28 +24,64 @@ export const nativeRuntimeDescriptorSchema = z
     sandboxPolicyVersion: z.literal("nsjail-cpython-v1"),
     sandboxPolicyDigest: nativeDigestSchema,
     guestBootstrapDigest: nativeDigestSchema,
-    comparator: z
-      .object({
-        engine: z.literal("pyodide"),
-        version: z.string().min(1).max(128),
-        packageDigest: nativeDigestSchema,
-        semanticsVersion: z.string().min(1).max(128),
-      })
-      .strict(),
+    comparator: nativeComparatorSchema,
   })
   .strict();
 export type NativeRuntimeDescriptor = z.infer<
   typeof nativeRuntimeDescriptorSchema
 >;
+/** The compiled languages and the argv each is compiled with. */
+export const nativeCompiledLanguages = ["C", "CPP"] as const;
+export type NativeCompiledLanguage = (typeof nativeCompiledLanguages)[number];
+const compilerArgvSchema = z.array(z.string().min(1).max(256)).min(1).max(32);
+/**
+ * GCC for C and C++. Its own family beside CPython, so a toolchain change never
+ * changes Python's identity or queues. Every field participates in identity,
+ * including each language's exact compiler argv and the precompiled header.
+ */
+export const nativeGccDescriptorSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    engine: z.literal("native-gcc"),
+    gccVersion: z.string().regex(/^12\.\d+\.\d+$/),
+    architecture: z.enum(["amd64", "arm64"]),
+    toolchainRootfsDigest: nativeDigestSchema,
+    runRootfsDigest: nativeDigestSchema,
+    packageManifestDigest: nativeDigestSchema,
+    compile: z
+      .object({
+        C: z.object({ argv: compilerArgvSchema }).strict(),
+        CPP: z.object({ argv: compilerArgvSchema, pchDigest: nativeDigestSchema }).strict(),
+      })
+      .strict(),
+    nsjailRevision: revision,
+    nsjailBinaryDigest: nativeDigestSchema,
+    sandboxPolicyVersion: z.literal("nsjail-gcc-v1"),
+    compilePolicyDigest: nativeDigestSchema,
+    runPolicyDigest: nativeDigestSchema,
+    execGateDigest: nativeDigestSchema,
+    comparator: nativeComparatorSchema,
+  })
+  .strict();
+export type NativeGccDescriptor = z.infer<typeof nativeGccDescriptorSchema>;
+export const nativeAnyRuntimeDescriptorSchema = z.discriminatedUnion("engine", [
+  nativeRuntimeDescriptorSchema,
+  nativeGccDescriptorSchema,
+]);
+export type NativeAnyRuntimeDescriptor = NativeRuntimeDescriptor | NativeGccDescriptor;
 /** Schema parse fixes property order and rejects unknown fields before comparison. */
 export function nativeRuntimeIdentity(
-  descriptor: NativeRuntimeDescriptor,
+  descriptor: NativeAnyRuntimeDescriptor,
 ): string {
-  return JSON.stringify(nativeRuntimeDescriptorSchema.parse(descriptor));
+  return JSON.stringify(
+    descriptor.engine === "native-gcc"
+      ? nativeGccDescriptorSchema.parse(descriptor)
+      : nativeRuntimeDescriptorSchema.parse(descriptor),
+  );
 }
 export function sameNativeRuntime(
-  a: NativeRuntimeDescriptor,
-  b: NativeRuntimeDescriptor,
+  a: NativeAnyRuntimeDescriptor,
+  b: NativeAnyRuntimeDescriptor,
 ): boolean {
   return nativeRuntimeIdentity(a) === nativeRuntimeIdentity(b);
 }
@@ -53,6 +97,14 @@ export const nativeNodeResourcesSchema = z
     maxCaseMemoryMb: z.number().int().min(16).max(4096),
     maxCasePids: z.number().int().min(1).max(128),
     scratchMb: z.number().int().min(1).max(128),
+    /** Process limit of one native-gcc compile (driver, compiler, assembler, linker). */
+    maxCompilePids: z.number().int().min(4).max(64).default(16),
+    /**
+     * The native-gcc artifact store's tmpfs. Its pages are charged to the
+     * service, outside every case reservation, so the service overhead must
+     * hold all of it (checked with a GCC runtime in the manifest below).
+     */
+    artifactStoreMb: z.number().int().min(64).max(4096).default(256),
   })
   .strict()
   .superRefine((r, ctx) => {
@@ -79,7 +131,9 @@ export const nativeNodeResourcesSchema = z
       fail("Certified case cannot fit in envelope");
   });
 export type NativeNodeResources = z.infer<typeof nativeNodeResourcesSchema>;
-const nativeAdmissionKindSchema = z.enum(["official", "staff-practice", "sample", "regrade"]);
+const nativeAdmissionKindSchema = z.enum(["official", "staff-practice", "sample", "regrade", "run"]);
+/** Absent means Python only, so an entry written before C/C++ admits what it did. */
+const nativeLanguagesSchema = z.array(z.enum(["PYTHON", "C", "CPP"])).min(1).max(3).optional();
 /** One certified exercise revision, exactly as authored when it was qualified. */
 export const nativeMaterialEligibilitySchema = z
   .object({
@@ -88,7 +142,8 @@ export const nativeMaterialEligibilitySchema = z
     materialId: z.string().uuid(),
     gradingRevision: z.number().int().nonnegative(),
     context: z.enum(["live", "preview"]),
-    kinds: z.array(nativeAdmissionKindSchema).min(1).max(4),
+    kinds: z.array(nativeAdmissionKindSchema).min(1).max(5),
+    languages: nativeLanguagesSchema,
     memoryLimitMb: z.number().int().min(16).max(4096),
     timeLimitMs: z.number().int().min(1).max(120_000),
     /** Absent retains the original default-only certification. */
@@ -111,7 +166,8 @@ export const nativeScopeEligibilitySchema = z
     organizationId: z.string().uuid().optional(),
     academyId: z.string().uuid().optional(),
     contexts: z.array(z.enum(["live", "preview"])).min(1).max(2),
-    kinds: z.array(nativeAdmissionKindSchema).min(1).max(4),
+    kinds: z.array(nativeAdmissionKindSchema).min(1).max(5),
+    languages: nativeLanguagesSchema,
     maxCaseTimeLimitMs: z.number().int().min(1).max(120_000),
   })
   .strict()
@@ -123,13 +179,32 @@ export const nativeEligibilitySchema = z.union([
   nativeScopeEligibilitySchema,
 ]);
 export type NativeEligibility = z.infer<typeof nativeEligibilitySchema>;
+/** One artifact's largest binary plus its diagnostics, rounded up. */
+export const NATIVE_ARTIFACT_RESERVATION_MB = 65;
 export const nativeReleaseManifestSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    /** 2 may carry a GCC runtime; 1 is a CPython-only node. */
+    schemaVersion: z.union([z.literal(1), z.literal(2)]),
     descriptor: nativeRuntimeDescriptorSchema,
+    gcc: nativeGccDescriptorSchema.optional(),
     resources: nativeNodeResourcesSchema,
     /** Explicit scope only. Empty means no admission, useful for qualification. */
     eligibility: z.array(nativeEligibilitySchema).max(10000),
   })
-  .strict();
+  .strict()
+  .superRefine((m, ctx) => {
+    if (!m.gcc) return;
+    const fail = (message: string) => ctx.addIssue({ code: "custom", message });
+    if (m.schemaVersion !== 2) fail("A GCC runtime needs manifest version 2");
+    if (m.gcc.architecture !== m.descriptor.architecture ||
+        m.gcc.nsjailRevision !== m.descriptor.nsjailRevision ||
+        m.gcc.nsjailBinaryDigest !== m.descriptor.nsjailBinaryDigest ||
+        JSON.stringify(m.gcc.comparator) !== JSON.stringify(m.descriptor.comparator))
+      fail("Both runtimes of one node share its architecture, NsJail and comparator");
+    // Every admitted attempt may lease its largest artifact at once.
+    if (m.resources.artifactStoreMb < m.resources.cpuSlots * NATIVE_ARTIFACT_RESERVATION_MB)
+      fail("Artifact store cannot hold every slot's largest artifact");
+    if (m.resources.artifactStoreMb >= m.resources.serviceOverheadMb)
+      fail("Service overhead must hold the whole artifact store");
+  });
 export type NativeReleaseManifest = z.infer<typeof nativeReleaseManifestSchema>;

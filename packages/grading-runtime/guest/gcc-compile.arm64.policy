@@ -1,0 +1,31 @@
+// Compile jail for native-gcc: the exec gate execs the GCC 12 driver, which
+// starts cpp/cc1/cc1plus, as and collect2/ld. Default-deny. Process creation is
+// fork/vfork-style only: no clone may create a namespace or a thread, and
+// clone3 (whose flags seccomp cannot read) is refused so glibc uses clone.
+// Signals stay inside the compile's own PID namespace. Calls that could name
+// another process are allowed on the caller only or absent. execve runs only
+// toolchain binaries: the root is read-only and every writable mount noexec.
+POLICY gcc_compile {
+  ALLOW {
+    read, pread64, write, pwrite64, readv, writev, close, close_range,
+    newfstat, newfstatat, statx, lseek, openat, readlinkat, getdents64,
+    mmap, mprotect, munmap, mremap, madvise, brk,
+    rt_sigaction, rt_sigprocmask, rt_sigreturn, sigaltstack,
+    kill, tkill, tgkill,
+    futex, set_tid_address, set_robust_list, rseq,
+    getpid, getppid, gettid, getuid, geteuid, getgid, getegid,
+    clock_gettime, clock_getres, gettimeofday, nanosleep, clock_nanosleep, times,
+    getrandom, newuname, sysinfo, sched_yield, getrusage,
+    sched_getaffinity(pid) { pid == 0 },
+    prlimit64(pid) { pid == 0 },
+    fcntl, ioctl, dup, dup3, pipe2, ppoll, pselect6,
+    faccessat, faccessat2,
+    mkdirat, unlinkat, renameat, renameat2, ftruncate, fsync, fdatasync,
+    umask, fchmod, fchmodat, fchown, chdir, fchdir, getcwd,
+    memfd_create, wait4, waitid,
+    clone(flags) { (flags & 0x7e030080) == 0 },
+    execve, exit, exit_group, restart_syscall
+  },
+  ERRNO(38) { clone3 }
+}
+USE gcc_compile DEFAULT KILL

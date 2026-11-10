@@ -78,7 +78,7 @@ test("fragmented request is accepted; oversized and slow frames close without ex
   );
   try {
     const raw = {
-      protocol: 1,
+      protocol: 2,
       id: randomUUID(),
       descriptor: manifest.descriptor,
       operation: "run",
@@ -234,7 +234,7 @@ test("forged stdout cannot produce health and mismatched response correlation is
     socket.on("data", () =>
       socket.end(
         encodeFrame({
-          protocol: 1,
+          protocol: 2,
           id: randomUUID(),
           descriptor: manifest.descriptor,
           generation: randomUUID(),

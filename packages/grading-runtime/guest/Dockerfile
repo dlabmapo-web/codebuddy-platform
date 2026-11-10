@@ -18,5 +18,15 @@ RUN cc -I/build/nsjail/kafel/include /opt/cove/check-policy.c /build/nsjail/kafe
 COPY tree-digest.py /opt/cove/tree_digest.py
 COPY build-rootfs.py /opt/cove/build-rootfs.py
 RUN python3 /opt/cove/build-rootfs.py
+# native-gcc: the static exec gate, both architectures' compile/run policies
+# compiled with the same Kafel, and the toolchain/run roots from the packages
+# already installed above (GCC 12.2 from the pinned snapshot).
+COPY exec-gate.c gcc-compile.amd64.policy gcc-compile.arm64.policy gcc-run.amd64.policy gcc-run.arm64.policy build-gcc-rootfs.py /opt/cove/
+RUN cp /opt/cove/gcc-compile.${TARGETARCH}.policy /opt/cove/gcc-compile.policy \
+ && cp /opt/cove/gcc-run.${TARGETARCH}.policy /opt/cove/gcc-run.policy \
+ && /opt/cove/check-policy /opt/cove/gcc-compile.amd64.policy /opt/cove/gcc-compile.arm64.policy \
+ && /opt/cove/check-policy /opt/cove/gcc-run.amd64.policy /opt/cove/gcc-run.arm64.policy \
+ && gcc -static -O2 -Wall -Wextra -Werror -o /opt/cove/exec-gate /opt/cove/exec-gate.c \
+ && cd /opt/cove && python3 /opt/cove/build-gcc-rootfs.py
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 CMD ["/usr/local/bin/nsjail", "--help"]

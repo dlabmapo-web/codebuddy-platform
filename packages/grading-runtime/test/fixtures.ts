@@ -33,6 +33,8 @@ export const manifest: NativeReleaseManifest = {
     maxCaseMemoryMb: 512,
     maxCasePids: 8,
     scratchMb: 16,
+    maxCompilePids: 16,
+    artifactStoreMb: 192,
   },
   eligibility: [],
 };

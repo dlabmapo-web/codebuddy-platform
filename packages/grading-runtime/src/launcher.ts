@@ -1,25 +1,41 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import {
+  chmodSync,
+  chownSync,
+  closeSync,
+  constants as fsConstants,
+  fstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
+  readdirSync,
   readFileSync,
+  readSync,
   readlinkSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { readFile, mkdir, readlink, lstat, statfs } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { randomUUID } from "node:crypto";
-import { arch, availableParallelism, totalmem } from "node:os";
+import { createHash, randomUUID } from "node:crypto";
+import { arch, availableParallelism, constants as osConstants, totalmem } from "node:os";
 import type { Duplex } from "node:stream";
 import {
   nativeReleaseManifestSchema,
+  nativeRuntimeIdentity,
   type NativeReleaseManifest,
 } from "@cove/shared";
 import { gradingDataLimits } from "@cove/shared/grading-limits";
 import {
+  binaryRequestSchema,
+  compileRequestSchema,
   requestSchema,
+  COMPILE_DIAGNOSTICS_LIMIT,
   NativeInfrastructureError,
+  terminationSignals,
+  type NativeBinaryRequest,
+  type NativeCompileRequest,
+  type NativeCompileResult,
   type NativeExecutionRequest,
   type NativeExecutionResult,
 } from "./contract.js";
@@ -27,11 +43,17 @@ import { CleanupUncertainError, type NativeBackend } from "./service.js";
 import type { ResourceBank } from "./resource-bank.js";
 import { ByteCapture } from "./framing.js";
 import {
+  binaryJailConfig,
+  compileJailConfig,
   cpuRlimitSeconds,
+  GCC_COMPILE_ARGV,
+  GCC_COMPILE_LIMITS,
+  GCC_SOURCE_NAME,
   jailConfig,
   NSJAIL_REVISION,
   POOL_CASE_TIME_LIMIT_MS,
 } from "./policy.js";
+import { ArtifactLeaseError, ArtifactStore, MAX_ARTIFACT_BYTES } from "./artifact-store.js";
 import { fileDigest, rootfsDigest } from "./identity.js";
 import { verifyCgroupLimits } from "./cgroup-limits.js";
 import { readStartupLog } from "./startup-log.js";
@@ -55,7 +77,49 @@ export type NsJailOptions = {
   cleanupTimeoutMs?: number;
   /** Idle verified jails per CPU slot; 0 starts every case cold. */
   standbyPerSlot?: number;
+  /** The native-gcc runtime's trees and stores, when the manifest carries one. */
+  gcc?: NsJailGccOptions;
 };
+export type NsJailGccOptions = {
+  rootPath: string;
+  runRootPath: string;
+  compilePolicyPath: string;
+  runPolicyPath: string;
+  /** Executable, nosuid/nodev tmpfs of `artifactStoreMb`, private to the launcher. */
+  artifactPath: string;
+  /** noexec tmpfs where compiles write; charged to each compile's own cgroup. */
+  stagingPath: string;
+};
+/** What a jail is started for: its NsJail config and what verification expects. */
+type JailProfile = {
+  standby: boolean;
+  config: (cgroup: string, log: string) => string;
+  pidsMax: number;
+  scratchBytes: number;
+  /** Further mounts verified before GO: their mount options, present and absent. */
+  mounts: Array<{ dst: string; has: string[]; lacks: string[] }>;
+};
+/** The case facts a flavour turns into its outcome, read after the supervisor exits. */
+type CaseFacts = {
+  exit: { code: number | null; signal: string | null };
+  oom: number;
+  timedOut: boolean;
+  record: string;
+};
+const MiB = 1024 * 1024;
+type TerminationSignal = (typeof terminationSignals)[number];
+// Built from the reported names, not the host table: there SIGIOT aliases
+// SIGABRT and a later alias would win.
+const SIGNAL_NAMES = new Map<number, string>(
+  terminationSignals
+    .filter((name) => name !== "OTHER")
+    .map((name) => [osConstants.signals[name as keyof typeof osConstants.signals], name]),
+);
+/** A probe exercising stdin, stdout and, for C++, the precompiled header. */
+const GCC_PROBES = {
+  C: '#include <stdio.h>\nint main(void) { int a, b; if (scanf("%d %d", &a, &b) != 2) return 1; printf("%d\\n", a * b); return 0; }\n',
+  CPP: "#include <bits/stdc++.h>\nusing namespace std;\nint main() { int a, b; cin >> a >> b; cout << a * b << endl; }\n",
+} as const;
 /** Idle interpreter peaks near 10 MiB; claim raises this to the authored limit. */
 const STANDBY_MEMORY_MB = 32;
 /** Part of every standby's backstop (`standbyBackstopMs`), so kept short. */
@@ -88,6 +152,12 @@ export class NsJailBackend implements NativeBackend {
   private probing = false;
   private manifest: NativeReleaseManifest;
   private options: NsJailOptions;
+  /** The leaf this service runs in; its memory must stay within the overhead. */
+  private serviceLeaf?: string;
+  private store?: ArtifactStore;
+  private gccReady = false;
+  /** Why the GCC runtime is not ready, for operators; never a learner value. */
+  gccFailure?: string;
   constructor(options: NsJailOptions) {
     this.manifest = nativeReleaseManifestSchema.parse(options.manifest);
     this.options = { ...options, manifest: this.manifest };
@@ -166,8 +236,10 @@ export class NsJailBackend implements NativeBackend {
         (await readControl(join(group, "cgroup.procs")))
           .split(/\s+/)
           .includes(String(process.pid))
-      )
+      ) {
         enclosed = true;
+        this.serviceLeaf = group;
+      }
     for (const group of groups) {
       const pids = (await readControl(join(group, "cgroup.procs")))
         .split(/\s+/)
@@ -251,8 +323,125 @@ export class NsJailBackend implements NativeBackend {
         "Native CPython readiness probe failed",
       );
     this.prepared = true;
+    // A GCC failure withdraws only GCC readiness; Python is ready either way.
+    if (this.manifest.gcc)
+      try {
+        await this.prepareGcc();
+      } catch (error) {
+        this.gccFailure = error instanceof Error ? error.message : String(error);
+        if (error instanceof CleanupUncertainError) this.bank?.quarantine();
+      }
     // Fill the pool before the first case asks for it.
     this.replenish();
+  }
+  /** Ready for compiles and compiled programs: identity, mounts, memory and probes passed. */
+  get gccAvailable() {
+    return this.gccReady;
+  }
+  /** Call after any GCC failure that is not a cleanup uncertainty. */
+  withdrawGcc(reason: string) {
+    this.gccReady = false;
+    this.gccFailure ??= reason;
+  }
+  /**
+   * The service leaf (launcher, worker and comparator, plus the artifact
+   * store's pages) within its overhead. Checked on every health probe, so a
+   * cache that grew too far withdraws readiness instead of taking memory that
+   * cases and standbys were promised.
+   */
+  withinServiceOverhead(): boolean {
+    if (!this.serviceLeaf) return true;
+    return (
+      Number(readFileSync(join(this.serviceLeaf, "memory.current"), "utf8").trim()) <=
+      this.manifest.resources.serviceOverheadMb * MiB
+    );
+  }
+  private async prepareGcc() {
+    const g = this.options.gcc,
+      d = this.manifest.gcc!,
+      r = this.manifest.resources;
+    if (!g) throw new NativeInfrastructureError("GCC runtime paths are not configured");
+    for (const p of Object.values(g))
+      if (!p.startsWith("/") || resolve(p) !== p)
+        throw new NativeInfrastructureError("Trusted paths must be canonical absolute paths");
+    if (
+      d.nsjailRevision !== NSJAIL_REVISION ||
+      JSON.stringify(d.compile.C.argv) !== JSON.stringify(GCC_COMPILE_ARGV.C) ||
+      JSON.stringify(d.compile.CPP.argv) !== JSON.stringify(GCC_COMPILE_ARGV.CPP) ||
+      (await fileDigest(g.compilePolicyPath)) !== d.compilePolicyDigest ||
+      (await fileDigest(g.runPolicyPath)) !== d.runPolicyDigest ||
+      (await fileDigest(join(g.rootPath, "opt/cove/exec-gate"))) !== d.execGateDigest ||
+      (await fileDigest(join(g.runRootPath, "opt/cove/exec-gate"))) !== d.execGateDigest ||
+      (await fileDigest(join(g.rootPath, "opt/cove/pch/bits/stdc++.h.gch"))) !== d.compile.CPP.pchDigest ||
+      (await fileDigest(join(g.rootPath, "opt/cove/packages.json"))) !== d.packageManifestDigest ||
+      (await rootfsDigest(g.rootPath)) !== d.toolchainRootfsDigest ||
+      (await rootfsDigest(g.runRootPath)) !== d.runRootfsDigest
+    )
+      throw new NativeInfrastructureError("Immutable GCC build identity mismatch");
+    const mounts = readFileSync("/proc/self/mountinfo", "utf8").split("\n");
+    const mount = (point: string) => {
+      const line = mounts.find((x) => x.split(" ")[4] === point);
+      if (!line || !line.includes(" - tmpfs "))
+        throw new NativeInfrastructureError(`${point} must be its own tmpfs`);
+      return line.split(" ")[5].split(",");
+    };
+    const store = mount(g.artifactPath),
+      staging = mount(g.stagingPath);
+    if (!["rw", "nosuid", "nodev"].every((x) => store.includes(x)) || store.includes("noexec"))
+      throw new NativeInfrastructureError("Artifact store must be executable, nosuid and nodev");
+    if (!["rw", "nosuid", "nodev", "noexec"].every((x) => staging.includes(x)))
+      throw new NativeInfrastructureError("Compile staging must be noexec, nosuid and nodev");
+    // The kernel's tmpfs bound is what makes the store's memory accountable.
+    const fs = await statfs(g.artifactPath);
+    if (Number(fs.blocks) * Number(fs.bsize) > r.artifactStoreMb * MiB)
+      throw new NativeInfrastructureError("Artifact store is larger than artifactStoreMb");
+    for (const p of [g.artifactPath, g.stagingPath]) {
+      const st = await lstat(p);
+      if (!st.isDirectory() || st.isSymbolicLink() || st.uid !== process.getuid?.())
+        throw new NativeInfrastructureError("GCC stores must be owned directories");
+      for (const name of readdirSync(p)) rmSync(join(p, name), { recursive: true, force: true });
+      // NsJail resolves a bind source inside the jail's user namespace, where
+      // the launcher's ownership grants nothing: path components must be
+      // traversable. Traverse-only (0711): nothing can be listed, read or
+      // written, and every name below is random or a content digest.
+      chmodSync(p, 0o711);
+      if (((await lstat(p)).mode & 0o7777) !== 0o711)
+        throw new NativeInfrastructureError("GCC stores must be traverse-only");
+    }
+    if (
+      Number(await readControl(join(this.options.cgroupRoot, "memory.current"))) +
+        (r.artifactStoreMb + 1) * MiB >
+      r.serviceOverheadMb * MiB
+    )
+      throw new NativeInfrastructureError("Service overhead cannot hold a full artifact store");
+    this.store = new ArtifactStore({ root: g.artifactPath, capacityBytes: r.artifactStoreMb * MiB });
+    // Both languages through the real jails, as the CPython probe does.
+    this.probing = true;
+    try {
+      for (const language of ["C", "CPP"] as const) {
+        const compiled = await this.compile(
+          { language, code: GCC_PROBES[language], leaseMs: 60_000 },
+          new AbortController().signal,
+          () => {},
+        );
+        if (compiled.status !== "COMPILED" || compiled.diagnostics)
+          throw new NativeInfrastructureError(`GCC ${language} readiness compile failed`, {
+            cause: { diagnostics: compiled.diagnostics },
+          });
+        const run = await this.executeBinary(
+          { artifact: compiled.artifact, lease: compiled.lease, stdin: "6 7\n", timeLimitMs: 1000, memoryLimitMb: Math.min(64, r.maxCaseMemoryMb), outputLimitBytes: 64 },
+          new AbortController().signal,
+          () => {},
+        );
+        this.store.release(compiled.lease);
+        if (run.outcome !== "PASSED" || run.stdout !== "42\n" || run.stderr || run.termination?.hasOwnProperty("signal"))
+          throw new NativeInfrastructureError(`GCC ${language} readiness probe failed`);
+      }
+    } finally {
+      this.probing = false;
+      this.store.clear();
+    }
+    this.gccReady = true;
   }
   private get standbyTarget() {
     return (
@@ -260,7 +449,7 @@ export class NsJailBackend implements NativeBackend {
       (this.options.standbyPerSlot ?? STANDBY_PER_SLOT)
     );
   }
-  private async verifyGatedChild(jail: Jail) {
+  private async verifyGatedChild(jail: Jail, profile: JailProfile) {
     const children = await childGroups(jail.cgroup);
     if (children.length !== 1)
       throw new NativeInfrastructureError(
@@ -272,13 +461,13 @@ export class NsJailBackend implements NativeBackend {
       (await readControl(join(child, "memory.max"))) !==
         String(r.maxCaseMemoryMb * 1024 * 1024) ||
       (await readControl(join(child, "memory.swap.max"))) !== "0" ||
-      (await readControl(join(child, "pids.max"))) !== String(r.maxCasePids) ||
+      (await readControl(join(child, "pids.max"))) !== String(profile.pidsMax) ||
       (await readControl(join(child, "cpu.max"))) !== "1000000 1000000"
     )
       throw new NativeInfrastructureError("Jail kernel controls mismatch");
     const pids = (await readControl(join(child, "cgroup.procs"))).split(/\s+/);
     if (pids.length !== 1 || !/^\d+$/.test(pids[0]))
-      throw new NativeInfrastructureError("Expected one gated Python process");
+      throw new NativeInfrastructureError("Expected one gated guest process");
     jail.inner = child;
     jail.pid = pids[0];
     const proc = `/proc/${pids[0]}`;
@@ -331,9 +520,38 @@ export class NsJailBackend implements NativeBackend {
     };
     if (
       !size ||
-      Number(size[1]) * multipliers[size[2]] > r.scratchMb * 1024 * 1024
+      Number(size[1]) * multipliers[size[2]] > profile.scratchBytes
     )
       throw new NativeInfrastructureError("Guest scratch is not bounded");
+    for (const expected of profile.mounts) {
+      const line = mounts.split("\n").find((x) => x.split(" ")[4] === expected.dst);
+      const options = line?.split(" ")[5].split(",") ?? [];
+      if (
+        !line ||
+        !expected.has.every((x) => options.includes(x)) ||
+        expected.lacks.some((x) => options.includes(x))
+      )
+        throw new NativeInfrastructureError(`Guest mount ${expected.dst} policy absent`);
+    }
+  }
+  private pythonProfile(standby: boolean, caseTimeLimitMs: number): JailProfile {
+    const o = this.options,
+      r = this.manifest.resources;
+    return {
+      standby,
+      pidsMax: r.maxCasePids,
+      scratchBytes: r.scratchMb * MiB,
+      mounts: [],
+      config: (cgroup, log) =>
+        jailConfig(
+          { rootfs: o.rootfsPath, policy: o.policyPath, cgroup, log },
+          r,
+          caseTimeLimitMs,
+          // The supervisor's own backstop also covers the longest standby wait.
+          (o.startupTimeoutMs ?? 10000) + (standby ? STANDBY_TTL_MS : 0),
+          o.cleanupTimeoutMs ?? 5000,
+        ),
+    };
   }
   /**
    * Spawns and fully verifies a jail gated before its request; never runs
@@ -341,11 +559,7 @@ export class NsJailBackend implements NativeBackend {
    * within the pool's limit; a jail started for a waiting case serves that
    * case's limit, with no standby wait in its backstop.
    */
-  private async startJail(
-    standby: boolean,
-    caseTimeLimitMs: number,
-    signal?: AbortSignal,
-  ): Promise<Jail> {
+  private async startJail(profile: JailProfile, signal?: AbortSignal): Promise<Jail> {
     const o = this.options,
       r = this.manifest.resources;
     const jail: Jail = {
@@ -377,7 +591,7 @@ export class NsJailBackend implements NativeBackend {
       writeControl(join(jail.cgroup, "pids.max"), String(r.maxCasePids));
       writeControl(join(jail.cgroup, "cpu.max"), "100000 100000");
       // A waiting standby yields CPU to running cases; claim restores the default.
-      if (standby) writeControl(join(jail.cgroup, "cpu.weight"), "1");
+      if (profile.standby) writeControl(join(jail.cgroup, "cpu.weight"), "1");
       writeControl(
         join(jail.cgroup, "cgroup.subtree_control"),
         "+cpu +memory +pids",
@@ -385,19 +599,7 @@ export class NsJailBackend implements NativeBackend {
       jail.directory = mkdtempSync(join(o.workRoot, "case-"));
       writeFileSync(
         join(jail.directory, "jail.cfg"),
-        jailConfig(
-          {
-            rootfs: o.rootfsPath,
-            policy: o.policyPath,
-            cgroup: jail.cgroup,
-            log: join(jail.directory, "nsjail.log"),
-          },
-          r,
-          caseTimeLimitMs,
-          // The supervisor's own backstop also covers the longest standby wait.
-          (o.startupTimeoutMs ?? 10000) + (standby ? STANDBY_TTL_MS : 0),
-          o.cleanupTimeoutMs ?? 5000,
-        ),
+        profile.config(jail.cgroup, join(jail.directory, "nsjail.log")),
         { mode: 0o600 },
       );
       if (signal?.aborted) throw cancelled();
@@ -460,7 +662,7 @@ export class NsJailBackend implements NativeBackend {
         if (signal?.aborted) onCancel();
         void jail.processClosed!.then(() => onEnd(), finish);
       });
-      await this.verifyGatedChild(jail);
+      await this.verifyGatedChild(jail, profile);
       if (signal?.aborted) throw cancelled();
       return jail;
     } catch (cause) {
@@ -597,7 +799,7 @@ export class NsJailBackend implements NativeBackend {
       if (!release) return;
       this.warming++;
       let started = false;
-      const warming = this.startJail(true, POOL_CASE_TIME_LIMIT_MS)
+      const warming = this.startJail(this.pythonProfile(true, POOL_CASE_TIME_LIMIT_MS))
         .then(
           (jail) => {
             jail.release = release;
@@ -639,7 +841,11 @@ export class NsJailBackend implements NativeBackend {
    * the kernel before GO: memory on both case cgroups, normal CPU weight, and
    * the CPU-time rlimit the bootstrap lowers once it holds the request.
    */
-  private async arm(jail: Jail, request: NativeExecutionRequest, signal: AbortSignal) {
+  private async arm(
+    jail: Jail,
+    request: { bytes: Buffer; memoryLimitMb: number; timeLimitMs: number },
+    signal: AbortSignal,
+  ) {
     const r = this.manifest.resources;
     const inner = String(request.memoryLimitMb * 1024 * 1024);
     const outer = String((request.memoryLimitMb + r.scratchMb) * 1024 * 1024);
@@ -680,7 +886,7 @@ export class NsJailBackend implements NativeBackend {
       gate.once("end", onEnd);
       signal.addEventListener("abort", onCancel, { once: true });
       if (signal.aborted) onCancel();
-      jail.child!.stdin!.end(guestRequest(request));
+      jail.child!.stdin!.end(request.bytes);
     });
     const seconds = String(cpuRlimitSeconds(request.timeLimitMs));
     const limits = readFileSync(`/proc/${jail.pid}/limits`, "utf8");
@@ -695,6 +901,7 @@ export class NsJailBackend implements NativeBackend {
       this.discard(jail);
     }
     while (this.background.size) await Promise.allSettled([...this.background]);
+    this.store?.clear();
   }
   async execute(
     raw: NativeExecutionRequest,
@@ -709,6 +916,272 @@ export class NsJailBackend implements NativeBackend {
       r = this.manifest.resources;
     if (request.memoryLimitMb > r.maxCaseMemoryMb)
       throw new NativeInfrastructureError("Memory exceeds native certificate");
+    return this.runCase(
+      {
+        claim: async () => {
+          const standby =
+            this.probing || request.timeLimitMs > POOL_CASE_TIME_LIMIT_MS
+              ? undefined
+              : this.claimStandby();
+          return standby
+            ? { jail: standby, prewarmed: true }
+            : { jail: await this.startJail(this.pythonProfile(false, request.timeLimitMs), signal), prewarmed: false };
+        },
+        bytes: guestRequest(request),
+        memoryLimitMb: request.memoryLimitMb,
+        timeLimitMs: request.timeLimitMs,
+        wallLimitMs: request.timeLimitMs,
+        outputLimitBytes: request.outputLimitBytes ?? gradingDataLimits.stdoutBytes,
+      },
+      ({ exit, oom, timedOut }) => {
+        if (exit.signal && !timedOut)
+          throw new NativeInfrastructureError(
+            "Native supervisor terminated unexpectedly",
+          );
+        return {
+          outcome:
+            oom > 0
+              ? "MEMORY_LIMIT"
+              : timedOut
+                ? "TIME_LIMIT"
+                : exit.code === 0
+                  ? "PASSED"
+                  : "RUNTIME_ERROR",
+        };
+      },
+      signal,
+      draining,
+      deliver,
+    );
+  }
+  /**
+   * One case of a compiled program in a fresh run jail: the leased artifact at
+   * `/box/main`, its exec gate reporting how the program ended. No pool: a jail
+   * can hold only the binary it was started with.
+   */
+  async executeBinary(
+    raw: NativeBinaryRequest,
+    signal: AbortSignal,
+    draining: () => void,
+    deliver?: (result: NativeExecutionResult) => void,
+  ): Promise<NativeExecutionResult> {
+    if (!this.gccReady && !this.probing)
+      throw new NativeInfrastructureError("GCC runtime is not ready");
+    const { signal: ignored, ...data } = raw;
+    const request = binaryRequestSchema.parse(data),
+      r = this.manifest.resources,
+      g = this.options.gcc!;
+    if (request.memoryLimitMb > r.maxCaseMemoryMb)
+      throw new NativeInfrastructureError("Memory exceeds native certificate");
+    const artifact = this.store?.resolve(request.artifact, request.lease);
+    if (!artifact) throw new ArtifactLeaseError("Artifact lease is not live");
+    const o = this.options;
+    const profile: JailProfile = {
+      standby: false,
+      pidsMax: r.maxCasePids,
+      scratchBytes: r.scratchMb * MiB,
+      mounts: [{ dst: "/box/main", has: ["ro", "nosuid", "nodev"], lacks: ["noexec"] }],
+      config: (cgroup, log) =>
+        binaryJailConfig(
+          { root: g.runRootPath, policy: g.runPolicyPath, cgroup, log, artifact },
+          r,
+          request.memoryLimitMb,
+          request.timeLimitMs,
+          o.startupTimeoutMs ?? 10000,
+          o.cleanupTimeoutMs ?? 5000,
+        ),
+    };
+    return this.runCase(
+      {
+        claim: async () => ({ jail: await this.startJail(profile, signal), prewarmed: false }),
+        bytes: gateRequest(Buffer.from(request.stdin, "utf8"), request.timeLimitMs),
+        memoryLimitMb: request.memoryLimitMb,
+        timeLimitMs: request.timeLimitMs,
+        wallLimitMs: request.timeLimitMs,
+        outputLimitBytes: request.outputLimitBytes ?? gradingDataLimits.stdoutBytes,
+        record: true,
+      },
+      ({ exit, oom, timedOut, record }) => {
+        // Host decisions outrank the record: the whole cgroup was killed.
+        if (oom > 0) return { outcome: "MEMORY_LIMIT" };
+        if (timedOut) return { outcome: "TIME_LIMIT" };
+        const ending = /^([XS]) (\d{1,3})\n$/.exec(record);
+        if (exit.signal || exit.code !== 0 || !ending)
+          throw new NativeInfrastructureError("Exec gate reported no ending");
+        const number = Number(ending[2]);
+        if (ending[1] === "X")
+          return number === 0
+            ? { outcome: "PASSED" }
+            : { outcome: "RUNTIME_ERROR", termination: { exit: number } };
+        // The kernel's CPU-time backstop fired before the host's own sampling.
+        if (number === osConstants.signals.SIGXCPU) return { outcome: "TIME_LIMIT" };
+        const signalName = (SIGNAL_NAMES.get(number) ?? "OTHER") as TerminationSignal;
+        return { outcome: "RUNTIME_ERROR", termination: { signal: signalName } };
+      },
+      signal,
+      draining,
+      deliver,
+    );
+  }
+  private compileKey(language: "C" | "CPP", code: string) {
+    return createHash("sha256")
+      .update(nativeRuntimeIdentity(this.manifest.gcc!))
+      .update("\0")
+      .update(language)
+      .update("\0")
+      .update(code, "utf8")
+      .digest("hex");
+  }
+  /**
+   * A cached compile of this exact source, leased for the attempt. Needs no
+   * CPU slot: nothing runs.
+   */
+  cachedCompile(raw: NativeCompileRequest): NativeCompileResult | undefined {
+    if (!this.gccReady || !this.store) return undefined;
+    const { signal: ignored, ...data } = raw;
+    const request = compileRequestSchema.parse(data);
+    const key = this.compileKey(request.language, request.code);
+    const cached = this.store.lookup(key);
+    if (!cached) return undefined;
+    return cached.artifact
+      ? {
+          status: "COMPILED",
+          artifact: cached.artifact,
+          lease: this.store.lease(key, request.leaseMs),
+          diagnostics: cached.diagnostics,
+          compileMs: 0,
+          cached: true,
+        }
+      : { status: "COMPILE_ERROR", reason: "ERRORS", diagnostics: cached.diagnostics, compileMs: 0, cached: true };
+  }
+  releaseLease(lease: string) {
+    this.store?.release(lease);
+  }
+  /**
+   * Compiles in a fresh compile jail. The binary is copied into the store and
+   * staging is deleted while the compile's cgroup, which its pages are charged
+   * to, still exists; the cgroup is removed after, and the caller releases the
+   * reservation last.
+   */
+  async compile(
+    raw: NativeCompileRequest,
+    signal: AbortSignal,
+    draining: () => void,
+  ): Promise<NativeCompileResult> {
+    if (!this.gccReady && !this.probing)
+      throw new NativeInfrastructureError("GCC runtime is not ready");
+    const { signal: ignored, ...data } = raw;
+    const request = compileRequestSchema.parse(data),
+      r = this.manifest.resources,
+      g = this.options.gcc!,
+      store = this.store!;
+    const key = this.compileKey(request.language, request.code);
+    // Room for this compile's binary is promised before the compiler runs.
+    const reservation = store.reserve();
+    const staging = mkdtempSync(join(g.stagingPath, "compile-"));
+    const source = join(staging, "src"),
+      output = join(staging, "out");
+    let outcome: NativeCompileResult | undefined;
+    try {
+      // Traverse-only, for NsJail's bind-mount lookup (see prepareGcc).
+      chmodSync(staging, 0o711);
+      mkdirSync(source, { mode: 0o755 });
+      writeFileSync(join(source, GCC_SOURCE_NAME[request.language]), request.code, { mode: 0o444 });
+      mkdirSync(output, { mode: 0o700 });
+      chownSync(output, 65534, 65534);
+      const o = this.options,
+        started = performance.now();
+      const profile: JailProfile = {
+        standby: false,
+        pidsMax: r.maxCompilePids,
+        scratchBytes: GCC_COMPILE_LIMITS.scratchMb * MiB,
+        mounts: [
+          { dst: "/src", has: ["ro", "nosuid", "nodev", "noexec"], lacks: [] },
+          { dst: "/out", has: ["rw", "nosuid", "nodev", "noexec"], lacks: [] },
+        ],
+        config: (cgroup, log) =>
+          compileJailConfig(
+            { root: g.rootPath, policy: g.compilePolicyPath, cgroup, log, source, output },
+            r,
+            request.language,
+            o.startupTimeoutMs ?? 10000,
+            o.cleanupTimeoutMs ?? 5000,
+          ),
+      };
+      await this.runCase(
+        {
+          claim: async () => ({ jail: await this.startJail(profile, signal), prewarmed: false }),
+          bytes: gateRequest(Buffer.alloc(0), GCC_COMPILE_LIMITS.cpuMs),
+          memoryLimitMb: r.maxCaseMemoryMb,
+          timeLimitMs: GCC_COMPILE_LIMITS.cpuMs,
+          wallLimitMs: GCC_COMPILE_LIMITS.wallMs,
+          outputLimitBytes: COMPILE_DIAGNOSTICS_LIMIT,
+          beforeDispose: () => rmSync(staging, { recursive: true, force: true }),
+        },
+        ({ exit, oom, timedOut }, stderr) => {
+          const diagnostics = boundedDiagnostics(stderr);
+          const compileMs = Math.max(0, performance.now() - started);
+          if (oom > 0 || timedOut) {
+            const limit = oom > 0
+              ? `${r.maxCaseMemoryMb} MiB of memory`
+              : `${GCC_COMPILE_LIMITS.cpuMs / 1000} s of compile time`;
+            outcome = {
+              status: "COMPILE_ERROR",
+              reason: "LIMITS",
+              diagnostics: boundedDiagnostics(`${diagnostics}${diagnostics && !diagnostics.endsWith("\n") ? "\n" : ""}The compiler stopped: compiling this program needs more than ${limit}.\n`),
+              compileMs,
+              cached: false,
+            };
+          } else if (exit.signal || exit.code === null || exit.code >= 125) {
+            // GCC exits 1 for errors and 4 for an internal compiler error. 125 and
+            // 126 are the gate's own faults, above 128 a killed driver (a missing
+            // syscall in the policy): ours, never the learner's compile error.
+            throw new NativeInfrastructureError("Compiler exited abnormally", { cause: { code: exit.code, signal: exit.signal, diagnostics } });
+          } else if (exit.code === 0) {
+            const binary = readStagedBinary(join(output, "main"));
+            const artifact = store.insert(key, reservation, { binary: { path: join(output, "main"), bytes: binary }, diagnostics })!;
+            outcome = { status: "COMPILED", artifact, lease: store.lease(key, request.leaseMs), diagnostics, compileMs, cached: false };
+          } else {
+            store.insert(key, reservation, { diagnostics });
+            outcome = { status: "COMPILE_ERROR", reason: "ERRORS", diagnostics, compileMs, cached: false };
+          }
+          // Staged pages leave while still charged to this compile's cgroup.
+          rmSync(staging, { recursive: true, force: true });
+          return { outcome: "PASSED" };
+        },
+        signal,
+        draining,
+      );
+      if (!outcome) throw new NativeInfrastructureError("Compile produced no result");
+      return outcome;
+    } finally {
+      reservation.release();
+      rmSync(staging, { recursive: true, force: true });
+    }
+  }
+  /**
+   * One gated case, from claim to proven cleanup: arm its limits, GO, enforce
+   * wall and CPU time, wait for the supervisor and every pipe, then let the
+   * flavour decide the outcome from the kernel's and the gate's facts.
+   */
+  private async runCase(
+    options: {
+      claim: () => Promise<{ jail: Jail; prewarmed: boolean }>;
+      bytes: Buffer;
+      memoryLimitMb: number;
+      timeLimitMs: number;
+      wallLimitMs: number;
+      outputLimitBytes: number;
+      /** Read the exec gate's status record from FD 3 after GO. */
+      record?: boolean;
+      /** Runs after the case is killed and before its cgroup is removed. */
+      beforeDispose?: () => void;
+    },
+    finish: (facts: CaseFacts, stderr: string) => Pick<NativeExecutionResult, "outcome" | "termination">,
+    signal: AbortSignal,
+    draining: () => void,
+    deliver?: (result: NativeExecutionResult) => void,
+  ): Promise<NativeExecutionResult> {
     const executionCallStarted = performance.now();
     let cleanupStarted: number | undefined;
     let completedResult: NativeExecutionResult | undefined;
@@ -740,31 +1213,27 @@ export class NsJailBackend implements NativeBackend {
     try {
       if (signal.aborted)
         throw new NativeInfrastructureError("Cancelled before launch");
-      jail =
-        this.probing || request.timeLimitMs > POOL_CASE_TIME_LIMIT_MS
-          ? undefined
-          : this.claimStandby();
-      prewarmed = Boolean(jail);
-      if (!jail) jail = await this.startJail(false, request.timeLimitMs, signal);
+      ({ jail, prewarmed } = await options.claim());
       if (!this.probing) this.replenish();
       const { child, gate, stderr } = jail;
-      const stdout = new ByteCapture(
-        request.outputLimitBytes ?? gradingDataLimits.stdoutBytes,
-      );
+      const stdout = new ByteCapture(options.outputLimitBytes);
       jail.stdout = stdout;
       if (jail.exited || jail.earlyOutput)
         throw new NativeInfrastructureError("Jail failed before learner start");
       signal.addEventListener("abort", abort, { once: true });
       if (signal.aborted)
         throw new NativeInfrastructureError("Native execution cancelled");
-      await this.arm(jail, request, signal);
+      await this.arm(jail, options, signal);
+      // The gate's ending arrives on FD 3 after GO; nothing else may use it.
+      const record = new ByteCapture(32);
+      if (options.record) gate!.on("data", (chunk: Buffer) => record.append(chunk));
       cpuStart = await cpuUsec(jail.cgroup);
       started = performance.now();
       gate!.end("G");
       wall = setTimeout(() => {
         timedOut = true;
         abort();
-      }, request.timeLimitMs);
+      }, options.wallLimitMs);
       const cgroup = jail.cgroup;
       // The case group runs on at most one CPU (its verified `cpu.max`), so its
       // CPU time can reach the limit no sooner than the remaining allowance from
@@ -776,7 +1245,7 @@ export class NsJailBackend implements NativeBackend {
             .then(
               (usage) => {
                 const remainingMs =
-                  request.timeLimitMs - (usage - cpuStart) / 1000;
+                  options.timeLimitMs - (usage - cpuStart) / 1000;
                 if (remainingMs <= 0) {
                   timedOut = true;
                   abort();
@@ -792,7 +1261,7 @@ export class NsJailBackend implements NativeBackend {
             });
         }, afterMs);
       };
-      watch(request.timeLimitMs);
+      watch(options.timeLimitMs);
       const exit = await jail.processClosed!;
       clearTimeout(wall);
       watching = false;
@@ -804,23 +1273,17 @@ export class NsJailBackend implements NativeBackend {
       const oom = await oomKills(cgroup);
       if (signal.aborted)
         throw new NativeInfrastructureError("Native execution cancelled");
-      if (exit.signal && !timedOut)
-        throw new NativeInfrastructureError(
-          "Native supervisor terminated unexpectedly",
-        );
+      const decided = finish(
+        { exit, oom, timedOut, record: record.truncated ? "" : record.text() },
+        stderr.text(),
+      );
       completedResult = {
         stdout: stdout.text(),
         stderr: stderr.text(),
-        outcome:
-          oom > 0
-            ? "MEMORY_LIMIT"
-            : timedOut
-              ? "TIME_LIMIT"
-              : exit.code === 0
-                ? "PASSED"
-                : "RUNTIME_ERROR",
+        outcome: decided.outcome,
         runtimeMs,
         ...(stdout.truncated ? { outputTruncated: true } : {}),
+        ...(decided.termination ? { termination: decided.termination } : {}),
       };
       return completedResult;
     } catch (cause) {
@@ -854,6 +1317,11 @@ export class NsJailBackend implements NativeBackend {
           cause,
         });
       }
+      try {
+        options.beforeDispose?.();
+      } catch (cause) {
+        cleanupError ??= new CleanupUncertainError("Native staging cleanup uncertain", { cause });
+      }
       // startJail already disposed a jail that failed before it was returned.
       if (jail)
         try {
@@ -865,6 +1333,53 @@ export class NsJailBackend implements NativeBackend {
       // A slot may be idle now; refill after a burst instead of at the next claim.
       if (!this.probing) this.replenish();
     }
+  }
+}
+/** The exec gate's request: one header line, then exactly the stdin bytes. */
+export function gateRequest(stdin: Buffer, timeLimitMs: number): Buffer {
+  return Buffer.concat([
+    Buffer.from(`cove-gate-1 ${stdin.length} ${timeLimitMs}\n`),
+    stdin,
+  ]);
+}
+/** GCC's messages within their byte bound, cut at a character boundary. */
+function boundedDiagnostics(text: string): string {
+  const bytes = Buffer.from(text, "utf8");
+  if (bytes.length <= COMPILE_DIAGNOSTICS_LIMIT) return text;
+  const marker = "\n[…]\n";
+  return (
+    new TextDecoder().decode(
+      bytes.subarray(0, COMPILE_DIAGNOSTICS_LIMIT - Buffer.byteLength(marker)),
+      { stream: true },
+    ) + marker
+  );
+}
+/**
+ * The compiler's output, read without following a name the learner could
+ * have chosen: a regular ELF file within the binary bound, or nothing.
+ */
+function readStagedBinary(path: string): Buffer {
+  let fd: number | undefined;
+  try {
+    fd = openSync(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+    const st = fstatSync(fd);
+    if (!st.isFile() || st.size < 4 || st.size > MAX_ARTIFACT_BYTES)
+      throw new NativeInfrastructureError("Compiler output is not a bounded regular file");
+    const bytes = Buffer.alloc(st.size);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const read = readSync(fd, bytes, offset, bytes.length - offset, offset);
+      if (read <= 0) throw new NativeInfrastructureError("Compiler output changed while reading");
+      offset += read;
+    }
+    if (bytes.readUInt32BE(0) !== 0x7f454c46)
+      throw new NativeInfrastructureError("Compiler output is not an ELF executable");
+    return bytes;
+  } catch (cause) {
+    if (cause instanceof NativeInfrastructureError) throw cause;
+    throw new NativeInfrastructureError("Compiler produced no readable program", { cause });
+  } finally {
+    if (fd !== undefined) closeSync(fd);
   }
 }
 /**

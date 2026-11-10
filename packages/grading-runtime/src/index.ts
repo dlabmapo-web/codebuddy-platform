@@ -4,3 +4,5 @@ export * from "./resource-bank.js";
 export * from "./service.js";
 export * from "./launcher.js";
 export * from "./identity.js";
+export * from "./artifact-store.js";
+export * from "./policy.js";

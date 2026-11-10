@@ -1,13 +1,18 @@
 import { connect, type Socket } from "node:net";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { nativeRuntimeDescriptorSchema, sameNativeRuntime } from "@cove/shared";
+import { nativeAnyRuntimeDescriptorSchema, sameNativeRuntime } from "@cove/shared";
 import {
   wireResponseSchema,
+  binaryRequestSchema,
+  compileRequestSchema,
   requestSchema,
   nativeRuntimeVersion,
   NativeInfrastructureError,
-  type NativeRuntimeDescriptor,
+  type NativeAnyRuntimeDescriptor,
+  type NativeBinaryRequest,
+  type NativeCompileRequest,
+  type NativeCompileResult,
   type NativeExecutionRequest,
   type NativeExecutionResult,
   type NativeHealth,
@@ -16,31 +21,47 @@ import {
 } from "./contract.js";
 import { FrameDecoder, encodeFrame } from "./framing.js";
 import type { Lane } from "./resource-bank.js";
+import { GCC_COMPILE_LIMITS } from "./policy.js";
+type Body = Pick<WireRequest, "request" | "binary" | "compile" | "release">;
+/**
+ * A case for either runtime. CPython runs `code`; a GCC client runs the
+ * artifact its compile leased and ignores `code`.
+ */
+export type NativeRunRequest = NativeExecutionRequest & {
+  artifact?: string;
+  lease?: string;
+};
 export class NativeExecutionClient {
   readonly version: string;
-  readonly descriptor: NativeRuntimeDescriptor;
+  readonly descriptor: NativeAnyRuntimeDescriptor;
   private sockets = new Set<Socket>();
   private disposed = false;
   private shutdown = new AbortController();
   constructor(
     private readonly options: {
       socketPath: string;
-      descriptor: NativeRuntimeDescriptor;
+      descriptor: NativeAnyRuntimeDescriptor;
       lane: Lane;
       acquisitionTimeoutMs?: number;
       requestTimeoutMs?: number;
     },
   ) {
-    this.descriptor = nativeRuntimeDescriptorSchema.parse(options.descriptor);
-    Object.freeze(this.descriptor.comparator);
-    Object.freeze(this.descriptor);
+    this.descriptor = nativeAnyRuntimeDescriptorSchema.parse(options.descriptor);
+    const freeze = (x: object) => {
+      Object.values(x).forEach((v) => {
+        if (v && typeof v === "object") freeze(v);
+      });
+      Object.freeze(x);
+    };
+    freeze(this.descriptor);
     this.options = { ...options };
     this.version = nativeRuntimeVersion(this.descriptor);
   }
   private exchange(
-    operation: "health" | "run",
-    request?: WireRequest["request"],
+    operation: WireRequest["operation"],
+    body: Body,
     signal?: AbortSignal,
+    budgetMs = 0,
   ): Promise<WireResponse> {
     if (this.disposed)
       return Promise.reject(
@@ -80,19 +101,19 @@ export class NativeExecutionClient {
           finish(
             new NativeInfrastructureError("Native server deadline exceeded"),
           ),
-        this.options.requestTimeoutMs ?? (request?.timeLimitMs ?? 0) + 20_000,
+        this.options.requestTimeoutMs ?? budgetMs + 20_000,
       );
       combined.addEventListener("abort", abort, { once: true });
       socket.once("connect", () => {
         try {
           socket.write(
             encodeFrame({
-              protocol: 1,
+              protocol: 2,
               id,
               descriptor: this.descriptor,
               operation,
               lane: this.options.lane,
-              ...(request ? { request } : {}),
+              ...body,
             }),
           );
         } catch (error) {
@@ -135,14 +156,19 @@ export class NativeExecutionClient {
             throw new NativeInfrastructureError(
               "Invalid native readiness identity",
             );
-          if (response.result && operation !== "run")
+          if (
+            (response.result && operation !== "run") ||
+            (response.compiled && operation !== "compile") ||
+            (response.released && operation !== "release")
+          )
             throw new NativeInfrastructureError(
-              "Unexpected native execution result",
+              "Unexpected native response body",
             );
+          const limit = (body.request ?? body.binary)?.outputLimitBytes;
           if (
             response.result &&
             (Buffer.byteLength(response.result.stdout) >
-              (request?.outputLimitBytes ?? 8 * 1024 * 1024) ||
+              (limit ?? 8 * 1024 * 1024) ||
               Buffer.byteLength(response.result.stderr) > 256 * 1024)
           )
             throw new NativeInfrastructureError(
@@ -156,31 +182,32 @@ export class NativeExecutionClient {
     });
   }
   async health(): Promise<NativeHealth> {
-    const response = await this.exchange("health");
+    const response = await this.exchange("health", {});
     if (!response.health)
       throw new NativeInfrastructureError("Invalid health response");
     return response.health;
   }
-  async run(request: NativeExecutionRequest): Promise<NativeExecutionResult> {
-    const { signal, ...data } = request;
-    const parsed = requestSchema.parse(data);
+  /**
+   * Retries a healthy busy answer (a slot or the artifact store) within the
+   * acquisition budget. A slot frees when a case exits, typically within
+   * milliseconds: back off from a short first retry. Acquisition never extends
+   * the learner's allowance and no ambiguous execution is retried.
+   */
+  private async acquire<T>(
+    attempt: () => Promise<WireResponse>,
+    take: (response: WireResponse) => T | undefined,
+    signal?: AbortSignal,
+  ): Promise<{ value: T; acquisitionMs: number }> {
     const acquisitionStarted = performance.now();
     const acquisitionEnd =
       performance.now() + (this.options.acquisitionTimeoutMs ?? 30_000);
-    // A slot frees when a case exits, typically within milliseconds; back off
-    // from a short first retry instead of adding a fixed 100 ms to every case.
     let retryMs = 5;
     for (;;) {
       const attemptStarted = performance.now();
-      const response = await this.exchange("run", parsed, signal);
-      if (response.result) {
-        if (response.result.timings)
-          response.result.timings.acquisitionMs = Math.max(
-            0,
-            attemptStarted - acquisitionStarted,
-          );
-        return response.result;
-      }
+      const response = await attempt();
+      const value = take(response);
+      if (value !== undefined)
+        return { value, acquisitionMs: Math.max(0, attemptStarted - acquisitionStarted) };
       if (
         response.error !== "UNAVAILABLE" ||
         performance.now() >= acquisitionEnd
@@ -199,6 +226,54 @@ export class NativeExecutionClient {
       );
       retryMs = Math.min(100, retryMs * 2);
     }
+  }
+  async run(request: NativeRunRequest): Promise<NativeExecutionResult> {
+    const { signal } = request;
+    const limits = {
+      stdin: request.stdin,
+      timeLimitMs: request.timeLimitMs,
+      memoryLimitMb: request.memoryLimitMb,
+      ...(request.outputLimitBytes === undefined ? {} : { outputLimitBytes: request.outputLimitBytes }),
+    };
+    const body: Body =
+      this.descriptor.engine === "native-gcc"
+        ? { binary: binaryRequestSchema.parse({ ...limits, artifact: request.artifact, lease: request.lease }) }
+        : {
+            request: requestSchema.parse({
+              ...limits,
+              code: request.code,
+              ...(request.inputPromptPolicy === undefined ? {} : { inputPromptPolicy: request.inputPromptPolicy }),
+            }),
+          };
+    const { value, acquisitionMs } = await this.acquire(
+      () => this.exchange("run", body, signal, request.timeLimitMs),
+      (response) => response.result,
+      signal,
+    );
+    if (value.timings) value.timings.acquisitionMs = acquisitionMs;
+    return value;
+  }
+  /** GCC only: compiles or reuses the cached build, leased for this attempt. */
+  async compile(request: NativeCompileRequest): Promise<NativeCompileResult> {
+    if (this.descriptor.engine !== "native-gcc")
+      throw new NativeInfrastructureError("Only a GCC runtime compiles");
+    const { signal, ...data } = request;
+    const body: Body = { compile: compileRequestSchema.parse(data) };
+    const { value } = await this.acquire(
+      () => this.exchange("compile", body, signal, GCC_COMPILE_LIMITS.wallMs),
+      (response) => response.compiled,
+      signal,
+    );
+    return value;
+  }
+  /** Ends a lease early; an unknown or expired lease is already released. */
+  async release(lease: string): Promise<void> {
+    if (this.descriptor.engine !== "native-gcc") return;
+    const response = await this.exchange("release", { release: { lease } });
+    if (!response.released)
+      throw new NativeInfrastructureError(
+        `Native release ${response.error ?? "invalid response"}`,
+      );
   }
   async dispose() {
     this.disposed = true;

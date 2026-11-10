@@ -14,6 +14,17 @@ const schema = z
     cgroupRoot: z.string(),
     workRoot: z.string(),
     standbyPerSlot: z.number().int().min(0).max(16).optional(),
+    gcc: z
+      .object({
+        rootPath: z.string(),
+        runRootPath: z.string(),
+        compilePolicyPath: z.string(),
+        runPolicyPath: z.string(),
+        artifactPath: z.string(),
+        stagingPath: z.string(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 const path = process.argv[2];

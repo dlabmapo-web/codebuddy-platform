@@ -26,6 +26,11 @@
     "e2e:dlab": "playwright test --config e2e/dlab.playwright.config.ts",
     "e2e:monitoring:materials": "bash packages/api/scripts/test-all-material-monitoring.sh",
     "test:dlab": "bash packages/api/scripts/test-dlab-isolated.sh",
+    "test:c-cpp:local": "bash packages/api/scripts/test-c-cpp-local.sh",
+    "dev:c-cpp": "bash packages/api/scripts/test-c-cpp-local.sh --playground",
+    "dev:c-cpp:stop": "bash packages/api/scripts/test-c-cpp-local.sh --stop",
+    "dev:c-cpp:regular": "node packages/api/scripts/start-development-c-cpp.mjs",
+    "dev:c-cpp:regular:stop": "node packages/api/scripts/start-development-c-cpp.mjs --stop",
     "native:build": "bash deploy/native/build-image.sh",
     "native:qualify": "bash deploy/native/qualify-linux.sh"
   },

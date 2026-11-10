@@ -6,7 +6,8 @@ import { sampleCheckDisplayLimit, type SampleCheckStatus } from "@cove/shared";
 import { evaluateEnhancedCase, GRADING_OVERHEAD_MS } from "./case-evaluator.js";
 import type { OutputComparator } from "./comparator-pool.js";
 import type { ExecutionCapacity } from "./execution-capacity.js";
-import type { ExecutionEngine } from "./execution-engine.js";
+import type { ExecutionEngine, ExecutionResult } from "./execution-engine.js";
+import { caseExit } from "./grading.service.js";
 import { caseOutcomeFor } from "./grading.js";
 import { sampleInputPromptPolicy } from "./sample-check-snapshot.js";
 import { runtimeMismatch } from "./grading-profile.js";
@@ -69,7 +70,10 @@ export class SampleCheckRunner {
       const running = await this.store.transition(record, ["QUEUED"], {
         status: "RUNNING",
         dispatchedAt,
-        timings: { ...record.timings, queueMs: dispatchedAt - record.acceptedAt },
+        // Acceptance and dispatch may be on different hosts. A small clock
+        // difference must not make an otherwise valid result fail the public
+        // contract's nonnegative duration check.
+        timings: { ...record.timings, queueMs: Math.max(0, dispatchedAt - record.acceptedAt) },
       });
       // Cancelled between the queue and the slot.
       if (!running) return;
@@ -98,7 +102,10 @@ export class SampleCheckRunner {
     let descriptor;
     try { descriptor = frozenNativeDescriptor(snapshot.executionRuntimeSnapshot); }
     catch { await this.end(record, ["RUNNING"], "UNAVAILABLE", { failure: "RUNTIME_VERSION_MISMATCH" }); return; }
-    if ((descriptor && nativeRuntimeVersion(descriptor) !== this.engine.version) || (!descriptor && this.engine.version.startsWith("native-cpython-"))) {
+    // C/C++ run only compiled, on the GCC runtime they were admitted to.
+    const compiled = snapshot.language !== undefined;
+    if ((descriptor && nativeRuntimeVersion(descriptor) !== this.engine.version) || (!descriptor && this.engine.version.startsWith("native-")) ||
+        compiled !== (descriptor?.engine === "native-gcc") || (compiled && !this.engine.compile)) {
       await this.end(record, ["RUNNING"], "UNAVAILABLE", { failure: "RUNTIME_VERSION_MISMATCH" }); return;
     }
     const legacy = snapshot.gradingMode === "LEGACY_STDIO";
@@ -127,10 +134,49 @@ export class SampleCheckRunner {
 
     // The same wall-clock budget Submit gives this case on a scaled engine.
     const deadlineAt = dispatchedAt + Math.ceil(snapshot.totalTimeLimitMs * timeScaleOf(this.engine)) + GRADING_OVERHEAD_MS;
+    // C/C++: compiled once, exactly as Submit compiles, before the case runs.
+    let build: { artifact: string; lease: string } | undefined;
+    let warnings: string | null = null;
+    if (compiled) {
+      let built;
+      try {
+        built = await this.engine.compile!({
+          language: snapshot.language!,
+          code: snapshot.code,
+          leaseMs: Math.min(30 * 60_000, Math.max(1000, deadlineAt - Date.now() + GRADING_OVERHEAD_MS)),
+        });
+      } catch (error) {
+        this.logger.error(`sample check ${record.checkId} compile failure: ${String(error)}`);
+        await this.end(record, ["RUNNING"], "UNAVAILABLE", { failure: "ENGINE_FAILURE" });
+        return;
+      }
+      if (Date.now() > deadlineAt) {
+        if (built.status === "COMPILED") await this.engine.release?.(built.lease).catch(() => undefined);
+        await this.end(record, ["RUNNING"], "TIMED_OUT", { failure: "DEADLINE" });
+        return;
+      }
+      if (built.status === "COMPILE_ERROR") {
+        await this.end(record, ["RUNNING"], "COMPLETED", {
+          result: {
+            outcome: "COMPILE_ERROR", outputMatched: null, softLimitExceeded: false,
+            stdout: "", stdoutTruncated: false, stderr: "", stderrTruncated: false,
+            exitCode: null, exitSignal: null, compileDiagnostics: built.diagnostics,
+          },
+          timings: { queueMs: record.timings.queueMs, executionMs: null, comparisonMs: null },
+        });
+        return;
+      }
+      build = { artifact: built.artifact, lease: built.lease };
+      warnings = built.diagnostics;
+    }
+    // A Run compares nothing: whatever the program printed is its result.
+    const judge: OutputComparator = snapshot.run
+      ? { version: comparator.version, compare: async () => ({ kind: "match" }) }
+      : comparator;
     let evaluation;
     try {
       evaluation = await evaluateEnhancedCase(
-        { engine: this.engine, comparator },
+        { engine: this.engine, comparator: judge },
         {
           inputPromptPolicy,
           code: snapshot.code,
@@ -141,10 +187,12 @@ export class SampleCheckRunner {
           deadlineAt,
           executionBudgetMs: snapshot.totalTimeLimitMs,
           testCase: snapshot.testCase,
+          ...(build ? { build } : {}),
         },
       );
     } catch (error) {
       this.logger.error(`sample check ${record.checkId} engine failure: ${String(error)}`);
+      if (build) await this.engine.release?.(build.lease).catch(() => undefined);
       await this.end(record, ["RUNNING"], "UNAVAILABLE", {
         failure: "ENGINE_FAILURE",
       });
@@ -173,12 +221,15 @@ export class SampleCheckRunner {
       const result: StoredSampleResult = {
         // Skipped never happens to a single case run on its own.
         outcome: outcome as StoredSampleResult["outcome"],
-        outputMatched: comparison === null ? null : comparison.kind === "match",
+        outputMatched: snapshot.run || comparison === null ? null : comparison.kind === "match",
         softLimitExceeded: outcome === "PASSED_WITH_WARNING",
         stdout: stdout.text,
         stdoutTruncated: stdout.truncated,
         stderr: stderr.text,
         stderrTruncated: stderr.truncated,
+        // Public or student-typed input only, so the ending may be shown.
+        ...caseExit(outcome as ExecutionResult["outcome"], run.termination),
+        compileDiagnostics: warnings,
       };
       await this.end(record, ["RUNNING"], "COMPLETED", {
         result,
@@ -195,6 +246,8 @@ export class SampleCheckRunner {
       // path is what lets abandoned practice work accumulate behind the
       // reservation that protects submissions.
       await pendingExecution;
+      // Only once nothing runs from it may the program be evicted.
+      if (build) await this.engine.release?.(build.lease).catch(() => undefined);
     }
   }
 

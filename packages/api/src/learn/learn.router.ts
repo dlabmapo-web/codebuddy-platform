@@ -106,6 +106,12 @@ export function createLearnRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) =>
         deps.sampleCheckService.start(context.identity, input)
       ),
+    // A C/C++ Run, on the server: same access, limits and polling as a check.
+    startRunCheck: os.learn.startRunCheck
+      .use(access.studentAuthenticated)
+      .handler(({ context, input }) =>
+        deps.sampleCheckService.startRun(context.identity, input)
+      ),
     getSampleCheck: os.learn.getSampleCheck
       .use(access.studentAuthenticated)
       .handler(({ context, input }) =>

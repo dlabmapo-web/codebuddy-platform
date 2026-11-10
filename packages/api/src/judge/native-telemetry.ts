@@ -17,6 +17,17 @@ export function measuredNativeClient(client: NativeExecutionClient, telemetry: E
       // budget that sets the next case's limit, are integers.
       return { ...result, runtimeMs: Math.round(result.runtimeMs) };
     },
+    // A GCC client compiles once per attempt and runs the leased artifact.
+    ...(client.descriptor?.engine === "native-gcc"
+      ? {
+          async compile(request: Parameters<NativeExecutionClient["compile"]>[0]) {
+            const result = await client.compile(request);
+            if (!result.cached) telemetry.observe("compile", result.compileMs);
+            return { ...result, compileMs: Math.round(result.compileMs) };
+          },
+          release: (lease: string) => client.release(lease),
+        }
+      : {}),
     dispose: () => client.dispose(),
   };
 }

@@ -1,6 +1,6 @@
 import { courseCounts, emptyCourseCounts } from "./course-counts.js";
 import type { CourseContentCounts } from "@cove/shared";
-import { inferSubmissionPolicy, type SubmissionPolicy } from "@cove/shared";
+import { inferSubmissionPolicy, isCompiledLanguage, type SubmissionPolicy } from "@cove/shared";
 import { rolesHavePermission } from "@cove/shared";
 import { taughtMaterialWhere } from "../classes/assigned-course-access.js";
 import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
@@ -193,6 +193,8 @@ type ExerciseRecord = Prisma.MaterialGetPayload<{
 
 type ExerciseWriteInput = {
   submissionPolicy?: SubmissionPolicy;
+  /** Absent keeps the stored language; a new exercise is Python. */
+  language?: "PYTHON" | "C" | "CPP";
   referencePdfMaterialId?: string | null;
   quiz?: QuizDefinition | null;
   academyId: string;
@@ -1264,6 +1266,8 @@ export class CourseService {
     await this.requireLecture(input.courseId, input.lectureId);
     if (input.referencePdfMaterialId) await this.requireCurriculumManager(identity, input.academyId);
     assertGradingSupported(input, CREATED_EXERCISE_TIME_LIMIT_MS);
+    const language = input.language ?? "PYTHON";
+    if (isCompiledLanguage(language)) await this.requireCompiledLanguages(input.academyId);
     const record = await this.prisma.$transaction(async (tx) => {
       await lockCourse(tx, input.courseId);
       await validatePdfReference(tx, input, input.referencePdfMaterialId);
@@ -1292,7 +1296,7 @@ export class CourseService {
               constraints: input.constraints,
               starterCode: input.starterCode,
 
-              language: "PYTHON",
+              language,
               timeLimitMs: CREATED_EXERCISE_TIME_LIMIT_MS,
               memoryLimitMb: 256,
               aiFeedbackEnabled: input.aiFeedbackEnabled,
@@ -1350,13 +1354,19 @@ export class CourseService {
     // Checked against the limit this exercise actually has, which an imported
     // or migrated problem may not share with the authoring default.
     assertGradingSupported(input, exercise.timeLimitMs);
+    // Absent keeps the stored language: an older client cannot change it.
+    const language = input.language ?? exercise.language;
+    if (language !== exercise.language && isCompiledLanguage(language))
+      await this.requireCompiledLanguages(input.academyId);
     const profileColumns = exerciseProfileColumns(input.grading);
     const submissionPolicy = input.submissionPolicy ?? exercise.submissionPolicy ?? "AUTOMATIC";
     const definitionChanged =
       !sameQuizGrading(exercise.quiz, input.quiz) ||
       !sameGradingDefinition(exercise.testCases, input.testCases) ||
       !sameGradingProfile(exercise, profileColumns);
-    const gradingChanged = definitionChanged || submissionPolicy !== (exercise.submissionPolicy ?? "AUTOMATIC");
+    // A different language is a different program for every case.
+    const gradingChanged = definitionChanged || language !== exercise.language ||
+      submissionPolicy !== (exercise.submissionPolicy ?? "AUTOMATIC");
     const nextRevision = exercise.gradingRevision + (gradingChanged ? 1 : 0);
     const record = await this.prisma.$transaction(async (tx) => {
       await lockCourse(tx, input.courseId);
@@ -1378,6 +1388,7 @@ export class CourseService {
           outputFormat: input.outputFormat,
           constraints: input.constraints,
           starterCode: input.starterCode,
+          language,
 
           aiFeedbackEnabled: input.aiFeedbackEnabled,
           ...(gradingChanged
@@ -1607,6 +1618,21 @@ export class CourseService {
       academyId,
       "exercises.manage",
     );
+  }
+
+  /**
+   * Choosing C or C++ is gated per academy. Running existing C/C++ exercises
+   * is not: that depends on the native node's eligibility alone.
+   */
+  private async requireCompiledLanguages(academyId: string) {
+    const flag = await this.prisma.academyFeatureFlag.findUnique({
+      where: { academyId_feature: { academyId, feature: "C_CPP_EXERCISES" } },
+      select: { isEnabled: true },
+    });
+    // The picker is offered only where the flag is on: this refuses a stale
+    // or forged request, so the generic permission answer is the right one.
+    if (!flag?.isEnabled)
+      throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
   }
 
   private async currentTree(input: { academyId: string; courseId: string }) {
@@ -1868,7 +1894,7 @@ function exerciseAuditFromInput(
     title: input.title.trim(),
     difficulty: input.difficulty,
     position,
-    language: "PYTHON",
+    language: input.language ?? "PYTHON",
     timeLimitMs: CREATED_EXERCISE_TIME_LIMIT_MS,
     memoryLimitMb: 256,
     aiFeedbackEnabled: input.aiFeedbackEnabled,

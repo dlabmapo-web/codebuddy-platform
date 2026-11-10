@@ -66,6 +66,24 @@ export function isJudgeFault(status: SubmissionStatus): boolean {
   return status === "ERRORED";
 }
 
+/**
+ * How a compiled program ended, as its trusted exec gate reported it. Named
+ * here, not passed through as a number, so a client never interprets raw
+ * kernel values; anything unexpected is `OTHER`.
+ */
+export const programExitSignals = [
+  "SIGSEGV",
+  "SIGFPE",
+  "SIGABRT",
+  "SIGSYS",
+  "SIGBUS",
+  "SIGILL",
+  "SIGKILL",
+  "OTHER",
+] as const;
+export const programExitSignalSchema = z.enum(programExitSignals);
+export type ProgramExitSignal = z.infer<typeof programExitSignalSchema>;
+
 export const submissionCaseSchema = z.object({
   position: z.number().int().positive(),
   isSample: z.boolean(),
@@ -82,6 +100,13 @@ export const submissionCaseSchema = z.object({
    */
   weight: z.number().int().nonnegative().nullable().default(null),
   awardedWeight: z.number().int().nonnegative().nullable().default(null),
+  /**
+   * A C/C++ runtime error's exit code or signal. Null for a hidden case
+   * whenever the reader may not see hidden cases: a program chooses its
+   * ending, so `return getchar();` would disclose hidden input through it.
+   */
+  exitCode: z.number().int().min(0).max(255).nullable().optional(),
+  exitSignal: programExitSignalSchema.nullable().optional(),
 });
 export type SubmissionCaseResult = z.infer<typeof submissionCaseSchema>;
 
@@ -108,6 +133,10 @@ export const submissionResultSchema = z.object({
   createdAt: z.iso.datetime(),
   gradedAt: z.iso.datetime().nullable(),
   cases: z.array(submissionCaseSchema),
+  /** C/C++ only: the program did not compile, so no case ran. */
+  compileFailed: z.boolean().optional(),
+  /** GCC's messages for a program that did not compile. */
+  compileDiagnostics: z.string().nullable().optional(),
 });
 export type SubmissionResult = z.infer<typeof submissionResultSchema>;
 
@@ -118,6 +147,7 @@ export const submissionSummarySchema = z.object({
   totalCount: z.number().int().nonnegative(),
   runtimeMs: z.number().int().nonnegative().nullable(),
   createdAt: z.iso.datetime(),
+  compileFailed: z.boolean().optional(),
 });
 export type SubmissionSummary = z.infer<typeof submissionSummarySchema>;
 

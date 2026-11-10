@@ -1,4 +1,5 @@
 import { quizFeedback } from "@cove/shared";
+import { programExit } from "../judge/program-exit.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
   TEACHER_ATTEMPTS_PAGE_SIZE,
@@ -632,8 +633,12 @@ export class TeacherProgressService {
           input: sample?.input ?? null,
           expectedOutput: sample?.expectedOutput ?? null,
           actualOutput: item.isSample ? item.actualOutput : null,
+          // The same rule for a program's ending: it can encode hidden input.
+          ...(item.isSample ? programExit(item) : { exitCode: null, exitSignal: null }),
         };
       }),
+      compileFailed: submission.compileFailed,
+      compileDiagnostics: submission.compileDiagnostics,
       hiddenPassed: hidden.filter((item) => isOutputCorrect(item.outcome)).length,
       hiddenTotal: hidden.length,
     };

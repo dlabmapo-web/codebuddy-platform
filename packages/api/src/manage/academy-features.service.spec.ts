@@ -1,3 +1,4 @@
+import { academyFeatureNames } from "@cove/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { AcademyFeaturesService } from "./academy-features.service.js";
@@ -41,7 +42,7 @@ describe("AcademyFeaturesService", () => {
 
     const { features } = await service.list(identity, { academyId });
 
-    expect(features).toHaveLength(5);
+    expect(features).toHaveLength(academyFeatureNames.length);
     expect(features.find((f) => f.feature === "STUDENT_POINTS")?.isEnabled).toBe(true);
     // No row is off — the same rule every reader of these flags applies.
     expect(features.find((f) => f.feature === "TEACHER_LIVE_MONITORING")?.isEnabled).toBe(false);

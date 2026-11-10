@@ -7,6 +7,7 @@ export * from "./manager-overview.js";
 export * from "./python-error-focus.js";
 export * from "./python-error.js";
 export * from "./sample-check.js";
+export * from "./gcc-diagnostics.js";
 export * from "./student-overview.js";
 export * from "./submission.js";
 export * from './latest-submission.js';

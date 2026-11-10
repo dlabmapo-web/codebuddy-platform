@@ -1,4 +1,4 @@
-import { academyFeatureNames } from "@cove/shared";
+import { academyFeatureNames, academyRolloutFeatures } from "@cove/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuditService } from "../academies/audit.service.js";
@@ -181,7 +181,7 @@ describe("PlatformAcademyService.create", () => {
     expect(transaction.academyFeatureFlag.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: academyFeatureNames
-          .filter((feature) => feature !== "SERVER_SAMPLE_CHECKS")
+          .filter((feature) => !academyRolloutFeatures.has(feature))
           .map((feature) => ({
             academyId: "academy-1",
             feature,

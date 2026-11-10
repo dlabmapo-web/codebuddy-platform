@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { nativeRuntimeDescriptorSchema, caseComparatorSchema, inputPromptPolicySchema, materialScorePolicySchema, quizSnapshotSchema } from "@cove/shared";
+import { nativeAnyRuntimeDescriptorSchema, caseComparatorSchema, exerciseLanguageSchema, inputPromptPolicySchema, materialScorePolicySchema, quizSnapshotSchema } from "@cove/shared";
 
 /** Internal only: this contains hidden expectations and must never cross an API boundary. */
 export const practiceSnapshotSchema = z.object({
@@ -7,6 +7,8 @@ export const practiceSnapshotSchema = z.object({
   submissionPolicy: z.literal("AUTOMATIC").default("AUTOMATIC"),
   courseId: z.uuid().optional(),
   gradingRevision: z.number().int(),
+  /** Absent on attempts recorded before C and C++: they were Python. */
+  language: exerciseLanguageSchema.default("PYTHON"),
   timeLimitMs: z.number().int().positive(),
   memoryLimitMb: z.number().int().positive(),
   inputPromptPolicy: inputPromptPolicySchema,
@@ -19,7 +21,7 @@ export const practiceSnapshotSchema = z.object({
   materialMaximumHundredths: z.number().nullable(),
   materialScorePolicy: materialScorePolicySchema.nullable(),
   gradingPolicySnapshot: z.unknown().optional(),
-  executionRuntimeSnapshot: nativeRuntimeDescriptorSchema.optional(),
+  executionRuntimeSnapshot: nativeAnyRuntimeDescriptorSchema.optional(),
   quizSnapshot: quizSnapshotSchema.nullable(),
   gradingCases: z.array(z.object({
     position: z.number().int().positive(),

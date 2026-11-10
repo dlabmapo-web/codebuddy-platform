@@ -1,9 +1,9 @@
 import { NativeAdmission, frozenNativeDescriptor } from "../judge/native-admission.js";
 import { JudgeQueue, runtimeQueueName } from "../judge/judge.queue.js";
 import { snapshotTransaction } from "../judge/snapshot-transaction.js";
-import type { NativeRuntimeDescriptor } from "@cove/shared";
+import type { NativeAnyRuntimeDescriptor } from "@cove/shared";
 import { nativeRuntimeVersion } from "@cove/grading-runtime";
-import { quizDefinitionSchema } from "@cove/shared";
+import { isCompiledLanguage, quizDefinitionSchema } from "@cove/shared";
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -508,7 +508,7 @@ export class RegradeService {
       runId: string;
       submissionId: string;
       requestId: string | null;
-    }, descriptor?: NativeRuntimeDescriptor | null) => Promise<void>,
+    }, descriptor?: NativeAnyRuntimeDescriptor | null) => Promise<void>,
   ): Promise<OperationRun> {
     const run = await this.prisma.platformOperationRun.findUnique({
       where: { id: input.runId },
@@ -556,7 +556,7 @@ export class RegradeService {
       }),
     );
 
-    const intents: Array<{ submissionId: string; descriptor: NativeRuntimeDescriptor | null }> = [];
+    const intents: Array<{ submissionId: string; descriptor: NativeAnyRuntimeDescriptor | null }> = [];
     // Finish every durable chunk before touching Redis. An outage must not erase the later work.
     for (let index = 0; index < stale.length; index += CREATE_CHUNK) {
       const chunk = stale.slice(index, index + CREATE_CHUNK);
@@ -682,7 +682,7 @@ export class RegradeService {
     tx: Prisma.TransactionClient,
     runId: string,
     chunk: StaleRow[],
-  ): Promise<Array<{ submissionId: string; descriptor: NativeRuntimeDescriptor | null }>> {
+  ): Promise<Array<{ submissionId: string; descriptor: NativeAnyRuntimeDescriptor | null }>> {
     const originals = await tx.submission.findMany({
       where: { id: { in: chunk.map((row) => row.submissionId) } },
       select: {
@@ -697,7 +697,7 @@ export class RegradeService {
       },
     });
 
-    const created: Array<{ submissionId: string; descriptor: NativeRuntimeDescriptor | null }> = [];
+    const created: Array<{ submissionId: string; descriptor: NativeAnyRuntimeDescriptor | null }> = [];
     for (const original of originals) {
       if (!original.materialId) continue;
       const material = await tx.material.findUnique({
@@ -768,8 +768,11 @@ export class RegradeService {
       // `SubmissionService` stamps it: a repair is graded now, by this
       // deployment, and must say so.
       const origin = frozenNativeDescriptor(original.executionRuntimeSnapshot);
+      // A repair runs on the original's family. An exercise moved between
+      // Python and C/C++ since has no runtime that could judge both.
+      if (!quiz && isCompiledLanguage(exercise.language) !== (origin?.engine === "native-gcc")) continue;
       const engineVersion = origin ? origin.comparator.version : (original.engineVersion?.replace(/^pyodide-/, "") ?? this.config.get("PYODIDE_VERSION", { infer: true }));
-      let descriptor: NativeRuntimeDescriptor | null = null;
+      let descriptor: NativeAnyRuntimeDescriptor | null = null;
       if (origin) {
         const academyId = (await tx.course.findUniqueOrThrow({ where: { id: original.courseId }, select: { academyId: true } })).academyId;
         descriptor = await this.native().retain(origin, {

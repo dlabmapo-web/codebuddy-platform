@@ -15,6 +15,7 @@ import {
   sampleCheckInputSchema,
   sampleCheckViewSchema,
   startSampleCheckSchema,
+  startRunCheckSchema,
 } from "../../content/sample-check.js";
 import {
   answerRecordsResultSchema,
@@ -153,6 +154,8 @@ export const learnContract = {
    * server with Submit's rules. Never a submission and never an attempt.
    */
   startSampleCheck: oc.input(startSampleCheckSchema).output(sampleCheckViewSchema),
+  /** A C/C++ Run on the server: the student's code on the input they typed. */
+  startRunCheck: oc.input(startRunCheckSchema).output(sampleCheckViewSchema),
   getSampleCheck: oc.input(sampleCheckInputSchema).output(sampleCheckViewSchema),
   cancelSampleCheck: oc.input(sampleCheckInputSchema).output(sampleCheckViewSchema),
 };

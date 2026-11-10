@@ -602,6 +602,8 @@ describe("getExerciseBootstrap with a selected submission", () => {
       createdAt: "2026-08-12T09:00:00.000Z",
       gradedAt: "2026-08-12T09:00:03.000Z",
       cases: [],
+      compileFailed: false,
+      compileDiagnostics: null,
     },
   };
 

@@ -1,5 +1,5 @@
 import { nativeRuntimeVersion } from "@cove/grading-runtime";
-import { nativeRuntimeDescriptorSchema, type NativeRuntimeDescriptor } from "@cove/shared";
+import { nativeAnyRuntimeDescriptorSchema, type NativeAnyRuntimeDescriptor } from "@cove/shared";
 import { inputPromptPolicySchema, programmingExerciseGradingModeSchema, inputPromptPolicyForSemanticVersion, type InputPromptPolicy } from "@cove/shared";
 import type { ExerciseGradingSource } from "./grading-profile.js";
 import { gradingSnapshotFor, gradingPolicySnapshotSchema, resolveGradingProfile } from "./grading-profile.js";
@@ -11,10 +11,13 @@ export function sampleSnapshotFor(
   testCase: ExerciseGradingSource["testCases"][number],
   code: string,
   engineVersion: string,
-  descriptor?: NativeRuntimeDescriptor | null,
+  descriptor?: NativeAnyRuntimeDescriptor | null,
 ): SampleSnapshot | null {
   const profile = resolveGradingProfile(exercise, exercise.testCases);
   if (profile.kind === "unsupported" || testCase.visibility !== "SAMPLE") return null;
+  const language = exercise.language && exercise.language !== "PYTHON" ? exercise.language : undefined;
+  // C and C++ run only on the GCC runtime, with weighted grading.
+  if (language && (profile.kind !== "elice" || descriptor?.engine !== "native-gcc")) return null;
   if (profile.kind === "legacy") {
     return {
       inputPromptPolicy: profile.inputPromptPolicy,
@@ -47,6 +50,7 @@ export function sampleSnapshotFor(
     totalTimeLimitMs: profile.totalTimeLimitMs,
     comparatorTimeLimitMs: profile.comparatorTimeLimitMs,
     ...(descriptor ? { executionRuntimeSnapshot: descriptor } : {}),
+    ...(language ? { language } : {}),
     policy: gradingPolicySnapshotSchema.parse(snapshot.submission.gradingPolicySnapshot),
     testCase: {
       input: selected.input,
@@ -58,9 +62,51 @@ export function sampleSnapshotFor(
   };
 }
 
+/**
+ * A C/C++ Run: the student's code on their own input, frozen like a sample
+ * check with that input as its one case. Nothing is compared; the case limit
+ * and memory are the exercise's, as Submit's would be.
+ */
+export function runSnapshotFor(
+  exercise: ExerciseGradingSource,
+  stdin: string,
+  code: string,
+  engineVersion: string,
+  descriptor: NativeAnyRuntimeDescriptor,
+): SampleSnapshot | null {
+  const language = exercise.language;
+  if (language !== "C" && language !== "CPP" || descriptor.engine !== "native-gcc") return null;
+  const profile = resolveGradingProfile(exercise, exercise.testCases);
+  if (profile.kind !== "elice") return null;
+  const input = {
+    input: stdin, expectedOutput: "", visibility: "SAMPLE" as const, comparator: "STDOUT" as const,
+    weight: 1, timeLimitMsOverride: null, softTimeLimitMs: null, softPenalty: null, label: null,
+  };
+  const snapshot = gradingSnapshotFor({ ...exercise, testCases: [input] }, { engineVersion, descriptor });
+  return {
+    inputPromptPolicy: "INCLUDE",
+    gradingSemanticVersion: exercise.gradingSemanticVersion,
+    code,
+    language,
+    run: true,
+    memoryLimitMb: exercise.memoryLimitMb,
+    totalTimeLimitMs: profile.totalTimeLimitMs,
+    comparatorTimeLimitMs: profile.comparatorTimeLimitMs,
+    executionRuntimeSnapshot: descriptor,
+    policy: gradingPolicySnapshotSchema.parse(snapshot.submission.gradingPolicySnapshot),
+    testCase: {
+      input: stdin,
+      expectedOutput: "",
+      comparator: "STDOUT",
+      softTimeLimitMs: null,
+      caseLimitMs: exercise.timeLimitMs,
+    },
+  };
+}
+
 /** Historical Redis records lack both fields. New semantics must be explicit. */
 export function sampleInputPromptPolicy(snapshot: SampleSnapshot): InputPromptPolicy | null {
-  if (snapshot.executionRuntimeSnapshot !== undefined && !nativeRuntimeDescriptorSchema.safeParse(snapshot.executionRuntimeSnapshot).success) return null;
+  if (snapshot.executionRuntimeSnapshot !== undefined && !nativeAnyRuntimeDescriptorSchema.safeParse(snapshot.executionRuntimeSnapshot).success) return null;
   const parsed = inputPromptPolicySchema.safeParse(snapshot.inputPromptPolicy === undefined ? "INCLUDE" : snapshot.inputPromptPolicy);
   if (!parsed.success) return null;
   const parsedMode = programmingExerciseGradingModeSchema.safeParse(

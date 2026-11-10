@@ -9,7 +9,7 @@ import { PrismaService } from "../database/prisma.service.js";
 import { PointAwardService } from "../points/point-award.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import type { OutputComparator } from "./comparator-pool.js";
-import type { ExecutionEngine, ExecutionResult } from "./execution-engine.js";
+import type { CompileResult, ExecutionEngine, ExecutionResult } from "./execution-engine.js";
 import { evaluateEnhancedCase, GRADING_OVERHEAD_MS } from "./case-evaluator.js";
 import {
   awardedWeightFor,
@@ -43,7 +43,7 @@ export type GradingWork = Pick<GradingSubmission,
   "timeLimitMs" | "memoryLimitMb" | "inputPromptPolicy" | "gradingMode" |
   "gradingSemanticVersion" | "totalTimeLimitMs" | "comparatorTimeLimitMs" |
   "continuationPolicy" | "exitStatusPolicy" | "materialMaximumHundredths" |
-  "materialScorePolicy"
+  "materialScorePolicy" | "language"
 > & {
   quizSnapshot: unknown;
   gradingPolicySnapshot?: unknown;
@@ -58,7 +58,7 @@ export type GradingWork = Pick<GradingSubmission,
 export type GradeSink = {
   complete: (summary: GradeSummary, cases: CaseRow[], weighted: {
     earnedWeight?: number; possibleWeight?: number; appliedScoreHundredths?: number | null;
-  }) => Promise<void>;
+  }, compileFailure?: { diagnostics: string }) => Promise<void>;
   fail: (reason: string, cases?: CaseRow[]) => Promise<void>;
 };
 
@@ -72,7 +72,24 @@ export type CaseRow = {
   actualOutput: string | null;
   awardedWeight: number | null;
   executionState: "EXECUTED" | "NOT_RUN";
+  /** A compiled program's runtime error: how it ended. Null otherwise. */
+  exitCode: number | null;
+  exitSignal: string | null;
 };
+
+/** The exit fields of a case: only a compiled program's runtime error has them. */
+export function caseExit(
+  outcome: ExecutionResult["outcome"],
+  termination: ExecutionResult["termination"],
+): Pick<CaseRow, "exitCode" | "exitSignal"> {
+  if (outcome !== "RUNTIME_ERROR" || !termination) return { exitCode: null, exitSignal: null };
+  return "exit" in termination
+    ? { exitCode: termination.exit, exitSignal: null }
+    : { exitCode: null, exitSignal: termination.signal };
+}
+
+/** C and C++ are compiled by the native GCC runtime before their first case. */
+const isCompiled = (language: GradingWork["language"]) => language === "C" || language === "CPP";
 
 type AbortReason = "TOTAL_DEADLINE" | "INFRASTRUCTURE_FAILURE";
 
@@ -131,7 +148,14 @@ export class GradingService {
     readonly telemetry = new ExecutionTelemetry(),
   ) {
     this.baseComparator = comparator;
-    this.engine = { get version() { return engine.version; }, get timeScale() { return engine.timeScale; }, run: request => this.telemetry.time("engine", () => engine.run(request)), dispose: () => engine.dispose() };
+    this.engine = {
+      get version() { return engine.version; },
+      get timeScale() { return engine.timeScale; },
+      run: request => this.telemetry.time("engine", () => engine.run(request)),
+      ...(engine.compile ? { compile: request => engine.compile!(request) } : {}),
+      ...(engine.release ? { release: lease => engine.release!(lease) } : {}),
+      dispose: () => engine.dispose(),
+    };
     this.comparator = { get version() { return comparator.version; }, compare: request => this.telemetry.time("compare", () => comparator.compare(request)) };
   }
 
@@ -221,11 +245,17 @@ export class GradingService {
     let descriptor;
     try { descriptor = frozenNativeDescriptor(submission.executionRuntimeSnapshot); }
     catch { await fail("RUNTIME_VERSION_MISMATCH"); return; }
+    const compiled = isCompiled(submission.language);
+    const nativePolicy = profile.kind === "elice" && (profile.policy?.version === 4 || profile.policy?.version === 5)
+      ? profile.policy : undefined;
     if ((descriptor && nativeRuntimeVersion(descriptor) !== this.engine.version) ||
-        (!descriptor && this.engine.version.startsWith("native-cpython-")) ||
-        (profile.kind === "elice" && profile.policy?.version === 4 &&
-          (!descriptor || !sameNativeRuntime(descriptor, profile.policy.runtime))) ||
-        (descriptor && profile.kind === "elice" && profile.policy?.version !== 4)) {
+        (!descriptor && this.engine.version.startsWith("native-")) ||
+        (nativePolicy && (!descriptor || !sameNativeRuntime(descriptor, nativePolicy.runtime))) ||
+        (descriptor && profile.kind === "elice" &&
+          profile.policy?.version !== (descriptor.engine === "native-gcc" ? 5 : 4)) ||
+        // C and C++ only ever run compiled, on the GCC runtime they were admitted to.
+        compiled !== (descriptor?.engine === "native-gcc") ||
+        (compiled && (profile.kind !== "elice" || !this.engine.compile))) {
       await fail("RUNTIME_VERSION_MISMATCH"); return;
     }
     if (profile.kind === "legacy") {
@@ -293,6 +323,8 @@ export class GradingService {
           actualOutput: isSample ? run.stdout.slice(0, 10_000) : null,
           awardedWeight: null,
           executionState: "EXECUTED",
+          exitCode: null,
+          exitSignal: null,
         });
 
         await report({
@@ -341,8 +373,19 @@ export class GradingService {
     let executionBudgetMs = profile.totalTimeLimitMs;
     const results: CaseRow[] = [];
     const cases = submission.gradingCases;
+    let build: { artifact: string; lease: string } | undefined;
 
     try {
+      if (isCompiled(submission.language)) {
+        // Once per attempt, within the job's deadline and never a case's limit.
+        const compiled = await this.compileFor(submission, deadline);
+        assertWithin(deadline);
+        if (compiled.status === "COMPILE_ERROR") {
+          await this.finalizeCompileError(submission, profile, compiled.diagnostics, sink);
+          return;
+        }
+        build = { artifact: compiled.artifact, lease: compiled.lease };
+      }
       let stopped = false;
       for (const testCase of cases) {
         const { position, isSample } = testCase;
@@ -368,6 +411,7 @@ export class GradingService {
               softTimeLimitMs: testCase.softTimeLimitMs,
               caseLimitMs: testCase.effectiveTimeLimitMs ?? submission.timeLimitMs,
             },
+            ...(build ? { build } : {}),
           },
         );
         if (evaluation.kind === "deadline") {
@@ -405,6 +449,7 @@ export class GradingService {
             softPenalty: testCase.softPenalty,
           }),
           executionState: "EXECUTED",
+          ...caseExit(outcome, run.termination),
         });
 
         await report({
@@ -442,6 +487,11 @@ export class GradingService {
         await abort.pendingExecution;
       }
       return;
+    } finally {
+      // After the last case and its cleanup: the program may now be evicted.
+      if (build)
+        await this.engine.release?.(build.lease).catch((error: unknown) =>
+          this.logger.warn(`release ${submissionId}: ${String(error)}`));
     }
 
     const summary = summarizeWeightedRun({
@@ -459,6 +509,44 @@ export class GradingService {
       possibleWeight: summary.possibleWeight,
       appliedScoreHundredths: summary.appliedScoreHundredths,
     }, sink);
+  }
+
+  /** Compiles a C/C++ attempt, leased until the job's deadline and its cleanup. */
+  private compileFor(submission: GradingWork, deadline: number): Promise<CompileResult> {
+    const language = submission.language as "C" | "CPP";
+    return this.engine.compile!({
+      language,
+      code: submission.code,
+      leaseMs: Math.min(30 * 60_000, Math.max(1000, deadline - Date.now() + GRADING_OVERHEAD_MS)),
+    });
+  }
+
+  /**
+   * A program that did not compile: the learner's failed attempt, worth 0 and
+   * counted as an attempt, with GCC's messages and no case run. It goes through
+   * `finalize` like any verdict, so progress and history see one rule.
+   */
+  private async finalizeCompileError(
+    submission: GradingWork,
+    profile: EliceProfile,
+    diagnostics: string,
+    sink?: GradeSink,
+  ): Promise<void> {
+    const results = submission.gradingCases.map((testCase) => ({
+      ...skipped(testCase.position, testCase.isSample),
+      awardedWeight: 0,
+    }));
+    const summary = summarizeWeightedRun({
+      cases: results.map((item) => ({ outcome: item.outcome, runtimeMs: 0, awardedWeight: 0 })),
+      caseWeights: submission.gradingCases.map((testCase) => testCase.weight),
+      materialMaximumHundredths: profile.materialMaximumHundredths,
+      materialScorePolicy: profile.materialScorePolicy,
+    });
+    await this.finalize(submission, { ...summary, status: "FAILED" }, results, {
+      earnedWeight: 0,
+      possibleWeight: summary.possibleWeight,
+      appliedScoreHundredths: summary.appliedScoreHundredths,
+    }, sink, { diagnostics });
   }
 
   /**
@@ -525,8 +613,9 @@ export class GradingService {
       appliedScoreHundredths?: number | null;
     },
     sink?: GradeSink,
+    compileFailure?: { diagnostics: string },
   ): Promise<void> {
-    if (sink) { await sink.complete(summary, results, weighted); return; }
+    if (sink) { await sink.complete(summary, results, weighted, compileFailure); return; }
     const submissionId = submission.id;
     // One transaction: a verdict and the progress it implies must never be
     // observable apart.
@@ -539,6 +628,7 @@ export class GradingService {
           score: summary.score,
           runtimeMs: summary.runtimeMs,
           ...weighted,
+          ...(compileFailure ? { compileFailed: true, compileDiagnostics: compileFailure.diagnostics } : {}),
           gradedAt: new Date(),
         },
       });
@@ -676,5 +766,7 @@ function skipped(position: number, isSample: boolean): CaseRow {
     actualOutput: null,
     awardedWeight: null,
     executionState: "NOT_RUN",
+    exitCode: null,
+    exitSignal: null,
   };
 }

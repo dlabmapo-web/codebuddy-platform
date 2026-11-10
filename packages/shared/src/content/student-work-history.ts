@@ -117,6 +117,8 @@ export const historyAttemptSchema = z.object({
   completed: z.boolean().nullable(),
   status: z.string(),
   currentRevision: z.boolean(),
+  /** C/C++ only: this attempt did not compile. */
+  compileFailed: z.boolean().optional(),
 });
 export const historyAttemptTargetSchema = historyStudentSchema.extend({
   materialId: z.uuid(),

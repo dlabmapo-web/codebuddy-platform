@@ -5,7 +5,7 @@ import type { Prisma } from "../generated/prisma/client.js";
 import { createPracticeAttempt } from "./staff-practice.repository.js";
 import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { quizDefinitionSchema, rolesHavePermission, submissionResultSchema, type SaveDraftResult } from "@cove/shared";
+import { isCompiledLanguage, quizDefinitionSchema, rolesHavePermission, submissionResultSchema, type SaveDraftResult } from "@cove/shared";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService, type AcademyAccess } from "../authorization/academy-access.service.js";
 import { learningScopeFor } from "../classes/assigned-course-access.js";
@@ -115,10 +115,13 @@ export class StaffPracticeService {
         academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision,
         context: input.preview ? "preview" : "live", kind: "staff-practice",
       }, exercise, tx);
+      // C and C++ have no compatibility runtime to fall back to.
+      if (!quiz && isCompiledLanguage(exercise.language) && descriptor?.engine !== "native-gcc")
+        throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
       const grading = gradingSnapshotFor(exercise, { engineVersion: String(this.config.get("PYODIDE_VERSION")), descriptor });
       const snapshot = practiceSnapshotSchema.parse({
         version: 1, courseId: material.lecture.courseModule.courseId, gradingRevision: exercise.gradingRevision,
-        timeLimitMs: exercise.timeLimitMs, memoryLimitMb: exercise.memoryLimitMb,
+        language: exercise.language, timeLimitMs: exercise.timeLimitMs, memoryLimitMb: exercise.memoryLimitMb,
         ...grading.submission, gradingCases: quiz ? [] : grading.cases,
         quizSnapshot: quiz ? { version: 1, title: material.title, description: exercise.description, definition: quiz } : null,
       });

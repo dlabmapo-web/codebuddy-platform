@@ -1,9 +1,10 @@
 import { nativeRuntimeVersion } from "@cove/grading-runtime";
-import type { NativeRuntimeDescriptor } from "@cove/shared";
+import type { NativeAnyRuntimeDescriptor } from "@cove/shared";
+import { programExit } from "../judge/program-exit.js";
 import { NativeAdmission } from "../judge/native-admission.js";
 import { snapshotTransaction } from "../judge/snapshot-transaction.js";
 import { runtimeQueueName } from "../judge/judge.queue.js";
-import { quizDefinitionSchema, quizFeedback } from "@cove/shared";
+import { isCompiledLanguage, quizDefinitionSchema, quizFeedback } from "@cove/shared";
 import { HttpStatus, Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -102,7 +103,7 @@ export class SubmissionService {
     }
     await this.consumeRateLimit(userId);
 
-    let createdSubmission: { id: string; totalCount: number; descriptor: NativeRuntimeDescriptor | null };
+    let createdSubmission: { id: string; totalCount: number; descriptor: NativeAnyRuntimeDescriptor | null };
     try {
       createdSubmission = await snapshotTransaction(this.prisma, async (tx) => {
         // Serialize admission against typed runtime conversion. A conversion
@@ -158,10 +159,19 @@ export class SubmissionService {
           );
         }
         const engineVersion = this.config.get("PYODIDE_VERSION", { infer: true });
+        const compiled = !quiz && isCompiledLanguage(exercise.language);
+        if (compiled && profile.kind !== "elice") {
+          this.logger.error(`material ${material.id} is ${exercise.language} without weighted grading`);
+          throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
+        }
         const descriptor = quiz ? null : await this.native().select({
           academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision,
           context: "live", kind: "official",
         }, exercise, tx);
+        // C and C++ run only on the native GCC runtime: no attempt is recorded
+        // while it is unavailable, and nothing falls back to Pyodide.
+        if (compiled && descriptor?.engine !== "native-gcc")
+          throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
         const snapshot = gradingSnapshotFor(exercise, { engineVersion, descriptor });
 
         await this.classContext.resolveWith(tx, {
@@ -369,8 +379,13 @@ export class SubmissionService {
           actualOutput: item.isSample ? item.actualOutput : null,
           weight: weighted ? (weightByPosition.get(item.position) ?? null) : null,
           awardedWeight: weighted ? item.awardedWeight : null,
+          // A program chooses its own ending (`return getchar();`), so a
+          // hidden case's would disclose hidden input: public cases only.
+          ...(item.isSample ? programExit(item) : { exitCode: null, exitSignal: null }),
         };
       }),
+      compileFailed: submission.compileFailed,
+      compileDiagnostics: submission.compileDiagnostics,
     };
   }
 
@@ -406,6 +421,7 @@ export class SubmissionService {
         totalCount: true,
         runtimeMs: true,
         createdAt: true,
+        compileFailed: true,
       },
     });
     return {
@@ -416,6 +432,7 @@ export class SubmissionService {
         totalCount: item.totalCount,
         runtimeMs: item.runtimeMs,
         createdAt: item.createdAt.toISOString(),
+        compileFailed: item.compileFailed,
       })),
     };
   }

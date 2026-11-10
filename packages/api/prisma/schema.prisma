@@ -122,6 +122,10 @@ enum AcademyFeature {
   /// Public Test buttons on enhanced-grading problems are judged by the server
   /// with Submit's rules. A rollout gate, off until an academy turns it on.
   SERVER_SAMPLE_CHECKS
+  /// Authors may write C and C++ exercises. Gates only choosing those
+  /// languages; running them depends on the native node's eligibility, and
+  /// existing C/C++ exercises keep working if this is turned off.
+  C_CPP_EXERCISES
 }
 
 /// Why one student earned points.
@@ -191,6 +195,10 @@ enum ExerciseDifficulty {
 
 enum ExerciseLanguage {
   PYTHON
+  /// Compiled by the native GCC runtime, as Elice compiles C (gnu11, no -O).
+  C
+  /// Compiled by the native GCC runtime with -O2 -std=gnu++17.
+  CPP
 }
 
 enum TestCaseVisibility {
@@ -1844,6 +1852,12 @@ model Submission {
   /// Which runtime produced the verdict, so a future upgrade stays auditable.
   engineVersion      String              @map("engine_version")
   failureReason      String?             @map("failure_reason")
+  /// C/C++ only: the program did not compile, so no case ran. A failed
+  /// attempt with 0 points, which counts as an attempt.
+  compileFailed      Boolean             @default(false) @map("compile_failed")
+  /// GCC's messages for a program that did not compile; set exactly when
+  /// `compileFailed` is. Detail views read it; lists read only the flag.
+  compileDiagnostics String?             @map("compile_diagnostics") @db.Text
   /// Server-owned. v1 accepted a client-reported elapsed time.
   startedAt          DateTime            @default(now()) @map("started_at") @db.Timestamptz(6)
   gradedAt           DateTime?           @map("graded_at") @db.Timestamptz(6)
@@ -1962,6 +1976,11 @@ model SubmissionCase {
   /// Whether the case ran at all. A case that was never executed must not read
   /// as an executed wrong answer to anything downstream.
   executionState CaseExecutionState @default(EXECUTED) @map("execution_state")
+  /// C/C++ runtime errors only: how the program ended, from its exec gate. At
+  /// most one is set. A student never reads either for a hidden case: the
+  /// program chooses its ending, so it could encode hidden input in it.
+  exitCode       Int?               @map("exit_code")
+  exitSignal     String?            @map("exit_signal")
   /// Populated only for SAMPLE cases. A hidden case records an outcome and
   /// nothing else — otherwise a student could reconstruct hidden expectations
   /// by submitting probes.

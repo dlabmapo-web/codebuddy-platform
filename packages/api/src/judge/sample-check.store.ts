@@ -1,4 +1,4 @@
-import type { NativeRuntimeDescriptor, InputPromptPolicy, SampleCheckOutcome, SampleCheckStatus } from "@cove/shared";
+import type { NativeAnyRuntimeDescriptor, InputPromptPolicy, SampleCheckOutcome, SampleCheckStatus } from "@cove/shared";
 import type { Redis } from "ioredis";
 
 import type { EnhancedCase } from "./case-evaluator.js";
@@ -27,7 +27,14 @@ export const SAMPLE_TERMINAL_TTL_MS = 15 * 60_000;
  * an edit made after acceptance cannot change a check already running.
  */
 export type SampleSnapshot = {
-  executionRuntimeSnapshot?: NativeRuntimeDescriptor;
+  executionRuntimeSnapshot?: NativeAnyRuntimeDescriptor;
+  /** C/C++: compiled on the GCC runtime first. Absent is Python. */
+  language?: "C" | "CPP";
+  /**
+   * A C/C++ Run: `testCase` carries the student's own input and nothing is
+   * compared. The program's own outcome is the result.
+   */
+  run?: boolean;
   inputPromptPolicy?: InputPromptPolicy;
   gradingSemanticVersion?: string;
   code: string;
@@ -48,10 +55,16 @@ export type StoredSampleResult = {
   stdoutTruncated: boolean;
   stderr: string;
   stderrTruncated: boolean;
+  /** C/C++ only. Absent on records written before compiled languages. */
+  exitCode?: number | null;
+  exitSignal?: string | null;
+  compileDiagnostics?: string | null;
 };
 
 export type SampleCheckRecord = {
   checkId: string;
+  /** A public sample's check, or a C/C++ Run (position 0). Absent is a sample. */
+  kind?: "sample" | "run";
   userId: string;
   academyId: string;
   classId: string;

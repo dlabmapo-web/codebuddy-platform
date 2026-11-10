@@ -591,6 +591,7 @@ export class StudentWorkHistoryService {
         maximum: 100,
         completed: a.status === "PASSED",
         status: a.status,
+        ...(a.compileFailed ? { compileFailed: true } : {}),
         currentRevision:
           revisions.find((r) => r.id === a.id)?.gradingRevision ===
           material.programmingExercise?.gradingRevision,

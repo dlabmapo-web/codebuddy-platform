@@ -15,9 +15,19 @@ export const exerciseDifficulties = ["EASY", "MEDIUM", "HARD"] as const;
 export const exerciseDifficultySchema = z.enum(exerciseDifficulties);
 export type ExerciseDifficulty = z.infer<typeof exerciseDifficultySchema>;
 
-export const exerciseLanguages = ["PYTHON"] as const;
+export const exerciseLanguages = ["PYTHON", "C", "CPP"] as const;
 export const exerciseLanguageSchema = z.enum(exerciseLanguages);
 export type ExerciseLanguage = z.infer<typeof exerciseLanguageSchema>;
+/**
+ * Languages compiled by the native GCC runtime. They run only on the server:
+ * Run, Test and Submit all go to the native node, with no browser runtime and
+ * no compatibility fallback.
+ */
+export function isCompiledLanguage(
+  language: ExerciseLanguage,
+): language is "C" | "CPP" {
+  return language === "C" || language === "CPP";
+}
 
 export const testCaseVisibilities = ["SAMPLE", "HIDDEN"] as const;
 export const testCaseVisibilitySchema = z.enum(testCaseVisibilities);
@@ -691,6 +701,11 @@ export const exerciseDraftFieldsSchema = z.object({
   outputFormat: z.string().max(10_000),
   constraints: z.string().max(10_000),
   starterCode: z.string().max(100_000),
+  /**
+   * Absent keeps what is stored, and a new exercise is Python, so a client
+   * that predates C and C++ can never turn a C exercise back into Python.
+   */
+  language: exerciseLanguageSchema.optional(),
   solutions: exerciseSolutionsSchema,
   aiFeedbackEnabled: z.boolean(),
   isVisible: z.boolean(),
@@ -743,6 +758,14 @@ function refineGrading(value: ExerciseDraftFields, context: z.RefinementCtx) {
     if ((test.comparator === "STDOUT" || test.comparator === "STDOUT_MATCH") && !test.expectedOutput.trim()) context.addIssue({ code: "custom", path: ["testCases", index, "expectedOutput"], message: "Enter expected output for this test case." });
   });
   if (!value.quiz && value.submissionPolicy === "AUTOMATIC" && !value.testCases.length) context.addIssue({ code: "custom", path: ["testCases"], message: "Add at least one test case for automatic grading." });
+  if (value.language && isCompiledLanguage(value.language)) {
+    if (value.quiz)
+      context.addIssue({ code: "custom", path: ["language"], message: "A quiz is not a C or C++ exercise." });
+    if (value.grading.mode !== "ELICE_STDIO")
+      context.addIssue({ code: "custom", path: ["grading", "mode"], message: "C and C++ exercises use weighted grading." });
+    if (value.grading.inputPromptPolicy !== "INCLUDE")
+      context.addIssue({ code: "custom", path: ["grading", "inputPromptPolicy"], message: "Input prompts can be ignored only in Python." });
+  }
   if (value.quiz && value.referencePdfMaterialId) {
     context.addIssue({ code: "custom", path: ["referencePdfMaterialId"], message: "PDF references require a Python exercise." });
   }

@@ -1,4 +1,4 @@
-import type { CaseOutcome, InputPromptPolicy } from "@cove/shared";
+import type { CaseOutcome, InputPromptPolicy, ProgramExitSignal } from "@cove/shared";
 import { gradingDataLimits } from "@cove/shared/grading-limits";
 
 /**
@@ -18,6 +18,9 @@ export type ExecutionRequest = {
   memoryLimitMb: number;
   /** Frozen enhanced-policy cap; older submissions retain their smaller cap. */
   outputLimitBytes?: number;
+  /** A compiled language: the leased artifact this case runs instead of `code`. */
+  artifact?: string;
+  lease?: string;
 };
 
 export type ExecutionResult = {
@@ -27,7 +30,21 @@ export type ExecutionResult = {
   runtimeMs: number;
   /** Captured stdout is incomplete and cannot be accepted as a correct answer. */
   outputTruncated?: boolean;
+  /** A compiled program's runtime error: its exit code or signal. */
+  termination?: { exit: number } | { signal: ProgramExitSignal };
 };
+
+export type CompileRequest = {
+  language: "C" | "CPP";
+  code: string;
+  /** How long the attempt holds its program: at most its whole job budget. */
+  leaseMs: number;
+  signal?: AbortSignal;
+};
+
+export type CompileResult =
+  | { status: "COMPILED"; artifact: string; lease: string; diagnostics: string; compileMs: number; cached: boolean }
+  | { status: "COMPILE_ERROR"; reason: "ERRORS" | "LIMITS"; diagnostics: string; compileMs: number; cached: boolean };
 
 /**
  * Runs untrusted student code.
@@ -47,5 +64,12 @@ export interface ExecutionEngine {
    */
   readonly timeScale?: number;
   run(request: ExecutionRequest): Promise<ExecutionResult>;
+  /**
+   * Compiled languages only: builds the program once per attempt and leases
+   * it. Every case then runs the artifact; `release` ends the lease after the
+   * last case. Absent on an engine that runs source.
+   */
+  compile?(request: CompileRequest): Promise<CompileResult>;
+  release?(lease: string): Promise<void>;
   dispose(): Promise<void>;
 }

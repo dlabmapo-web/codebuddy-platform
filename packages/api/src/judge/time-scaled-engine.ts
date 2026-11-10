@@ -43,6 +43,14 @@ export class TimeScaledEngine implements ExecutionEngine {
     return { ...result, runtimeMs: Math.round(result.runtimeMs / this.timeScale) };
   }
 
+  get compile() {
+    return this.inner.compile?.bind(this.inner);
+  }
+
+  get release() {
+    return this.inner.release?.bind(this.inner);
+  }
+
   dispose(): Promise<void> {
     return this.inner.dispose();
   }

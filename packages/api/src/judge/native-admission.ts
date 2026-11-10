@@ -1,6 +1,6 @@
 import { open, stat } from "node:fs/promises";
 import { Logger } from "@nestjs/common";
-import { nativeReleaseManifestSchema, nativeRuntimeDescriptorSchema, type NativeReleaseManifest, type NativeRuntimeDescriptor } from "@cove/shared";
+import { nativeAnyRuntimeDescriptorSchema, nativeReleaseManifestSchema, type NativeAnyRuntimeDescriptor, type NativeReleaseManifest } from "@cove/shared";
 import type { Prisma } from "../generated/prisma/client.js";
 import type { PrismaService } from "../database/prisma.service.js";
 import type { ExerciseGradingSource } from "./grading-profile.js";
@@ -24,10 +24,10 @@ export async function loadNativeManifest(path: string): Promise<NativeReleaseMan
   } finally { await file.close(); }
 }
 /** A present malformed descriptor is an error, never implicit Pyodide routing. */
-export function frozenNativeDescriptor(value: unknown): NativeRuntimeDescriptor | null {
-  return value == null ? null : nativeRuntimeDescriptorSchema.parse(value);
+export function frozenNativeDescriptor(value: unknown): NativeAnyRuntimeDescriptor | null {
+  return value == null ? null : nativeAnyRuntimeDescriptorSchema.parse(value);
 }
-export function nativeReadinessKey(descriptor: NativeRuntimeDescriptor, lane: "official" | "background") {
+export function nativeReadinessKey(descriptor: NativeAnyRuntimeDescriptor, lane: "official" | "background") {
   return `cove:native-ready:${runtimeQueueName("official", descriptor)}:${lane}`;
 }
 export const NATIVE_READINESS_HEARTBEAT = `
@@ -46,7 +46,7 @@ return redis.call('ZCARD', KEYS[1])
 `;
 export type NativeAdmissionContext = {
   academyId: string; materialId: string; gradingRevision: number;
-  context: "live" | "preview"; kind: "official" | "staff-practice" | "sample" | "regrade";
+  context: "live" | "preview"; kind: "official" | "staff-practice" | "sample" | "regrade" | "run";
 };
 export class NativeAdmission {
   private readonly logger = new Logger(NativeAdmission.name);
@@ -55,7 +55,12 @@ export class NativeAdmission {
   private loaded?: { path: string; mtimeMs: number; size: number; ino: number };
   private lastFailureLog = 0;
   constructor(private readonly config: { get(key: string): unknown }, private readonly prisma: PrismaService, private readonly queue?: JudgeQueue) {}
-  async select(context: NativeAdmissionContext, exercise: ExerciseGradingSource, reader: Pick<Prisma.TransactionClient, "academy"> = this.prisma): Promise<NativeRuntimeDescriptor | null> {
+  /**
+   * The runtime new work goes to, or null. For Python, null means compatibility
+   * grading. For C and C++ there is no compatibility runtime: callers refuse
+   * the work as unavailable, never route it to Pyodide.
+   */
+  async select(context: NativeAdmissionContext, exercise: ExerciseGradingSource, reader: Pick<Prisma.TransactionClient, "academy"> = this.prisma): Promise<NativeAnyRuntimeDescriptor | null> {
     if (this.config.get("NATIVE_GRADING_ENABLED") !== true || !this.queue) return null;
     if (this.config.get("NATIVE_GRADING_BRIDGE_ACK") !== "filtered-compatibility-workers-v1") throw new Error("Native admission requires completed filtered compatibility worker rollout");
     const path = this.config.get("NATIVE_GRADING_MANIFEST") as string | undefined;
@@ -86,7 +91,7 @@ export class NativeAdmission {
     return this.manifest;
   }
   /** Repairs retain their original family. A new native revision needs explicit certification. */
-  async retain(descriptor: NativeRuntimeDescriptor, context: NativeAdmissionContext, exercise: ExerciseGradingSource, reader: Pick<Prisma.TransactionClient, "academy"> = this.prisma) {
+  async retain(descriptor: NativeAnyRuntimeDescriptor, context: NativeAdmissionContext, exercise: ExerciseGradingSource, reader: Pick<Prisma.TransactionClient, "academy"> = this.prisma) {
     const path = this.config.get("NATIVE_GRADING_MANIFEST") as string | undefined;
     if (!path || !this.queue) throw new Error("Native repair requires retained certification");
     const manifest = await this.current(path);
@@ -96,6 +101,10 @@ export class NativeAdmission {
     return selected;
   }
   private async certified(manifest: NativeReleaseManifest, context: NativeAdmissionContext, exercise: ExerciseGradingSource, reader: Pick<Prisma.TransactionClient, "academy">, requireReady: boolean) {
+    const language = exercise.language ?? "PYTHON";
+    // Each language has one native family: CPython, or GCC for C and C++.
+    const descriptor = language === "PYTHON" ? manifest.descriptor : manifest.gcc;
+    if (!descriptor) return null;
     // The node's certified class bounds every entry; the job gate refuses larger work.
     if (exercise.memoryLimitMb > Math.min(512, manifest.resources.maxCaseMemoryMb) || !exercise.testCases.length) return null;
     const longestCaseMs = Math.max(...exercise.testCases.map(c => c.timeLimitMsOverride ?? exercise.timeLimitMs));
@@ -104,6 +113,8 @@ export class NativeAdmission {
       Buffer.byteLength(exercise.testCases.map(c => c.input).join(""), "utf8") <= 65536;
     const academy = await reader.academy.findUnique({ where: { id: context.academyId }, select: { organizationId: true } });
     if (!academy || !manifest.eligibility.some(e => e.kinds.includes(context.kind) &&
+      // An entry written before C/C++ lists no languages and admits Python only.
+      (e.languages ?? ["PYTHON"]).includes(language) &&
       ("materialId" in e
         ? benchmarkSized && e.organizationId === academy.organizationId && e.academyId === context.academyId && e.materialId === context.materialId &&
           e.gradingRevision === context.gradingRevision && e.context === context.context &&
@@ -112,9 +123,9 @@ export class NativeAdmission {
         : (e.organizationId === undefined || e.organizationId === academy.organizationId) &&
           (e.academyId === undefined || e.academyId === context.academyId) &&
           e.contexts.includes(context.context) && longestCaseMs <= e.maxCaseTimeLimitMs))) return null;
-    if (!requireReady) return manifest.descriptor;
+    if (!requireReady) return descriptor;
     const redis = await this.queue!.redis();
-    const count = Number(await redis.eval(READ_READY, 1, nativeReadinessKey(manifest.descriptor, context.kind === "official" ? "official" : "background")));
-    return count > 0 ? manifest.descriptor : null;
+    const count = Number(await redis.eval(READ_READY, 1, nativeReadinessKey(descriptor, context.kind === "official" ? "official" : "background")));
+    return count > 0 ? descriptor : null;
   }
 }

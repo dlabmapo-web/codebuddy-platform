@@ -72,6 +72,8 @@ export async function evaluateEnhancedCase(
     deadlineAt: number;
     executionBudgetMs?: number;
     testCase: EnhancedCase;
+    /** A compiled language: the attempt's leased program, run instead of `code`. */
+    build?: { artifact: string; lease: string };
   },
 ): Promise<EnhancedCaseEvaluation> {
   const { testCase, deadlineAt } = input;
@@ -93,6 +95,7 @@ export async function evaluateEnhancedCase(
     timeLimitMs: limit,
     memoryLimitMb: input.memoryLimitMb,
     ...(input.outputLimitBytes === undefined ? {} : { outputLimitBytes: input.outputLimitBytes }),
+    ...(input.build ? { artifact: input.build.artifact, lease: input.build.lease } : {}),
   });
   // The engine enforces `limit` once student execution starts. Acquiring a
   // fresh isolated runner and retiring it also take time, especially after

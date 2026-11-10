@@ -1,3 +1,4 @@
+import { academyFeatureNames } from "@cove/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_POINT_POLICY } from "@cove/shared";
@@ -85,7 +86,7 @@ describe("every academy's features, in one board", () => {
     const board = await service.features(identity, {});
 
     const never = board.rows.find((row) => row.academyId === seoul)!;
-    expect(never.features).toHaveLength(5);
+    expect(never.features).toHaveLength(academyFeatureNames.length);
     expect(never.features.every((state) => state.isEnabled === false)).toBe(
       true,
     );

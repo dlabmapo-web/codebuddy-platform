@@ -89,7 +89,7 @@ describe.skipIf(!databaseUrl || !redisUrl)("native application launcher-contract
       sandboxPolicyVersion: "nsjail-cpython-v1", sandboxPolicyDigest: digest, guestBootstrapDigest: digest,
       comparator: await actualComparatorIdentity() as NativeReleaseManifest["descriptor"]["comparator"] },
       resources: { physicalMemoryMb: 4096, envelopeMemoryMb: 2048, serviceOverheadMb: 256, caseOverheadMb: 128, cpuSlots: 2,
-        officialReservedSlots: 1, officialReservedMemoryMb: 768, maxCaseMemoryMb: 512, maxCasePids: 8, scratchMb: 16 },
+        officialReservedSlots: 1, officialReservedMemoryMb: 768, maxCaseMemoryMb: 512, maxCasePids: 8, scratchMb: 16, maxCompilePids: 16, artifactStoreMb: 192 },
       eligibility: [1, 2].flatMap(gradingRevision => ["live", "preview"].map(context => ({ organizationId: ids.org, academyId: ids.academy,
         materialId: ids.material, gradingRevision, context: context as "live" | "preview", kinds: ["official", "staff-practice", "sample", "regrade"] as const as unknown as Array<"official" | "staff-practice" | "sample" | "regrade">,
         memoryLimitMb: 128, timeLimitMs: 1000 }))) };

@@ -426,6 +426,54 @@ describe("getSubmissionReview", () => {
     expect(teacherSubmissionReviewSchema.safeParse(review).success).toBe(true);
   });
 
+  it("shows a public case's program ending but never a hidden one's (C/C++)", async () => {
+    const crashed = {
+      ...submission,
+      language: "CPP",
+      code: "int main() { return 3; }\n",
+      compileFailed: false,
+      compileDiagnostics: null,
+      cases: [
+        { ...submission.cases[0], outcome: "RUNTIME_ERROR", exitCode: null, exitSignal: "SIGSEGV" },
+        // A hidden case's exit code could encode its input, so it stays unread.
+        { ...submission.cases[1], outcome: "RUNTIME_ERROR", exitCode: 42, exitSignal: null },
+      ],
+    };
+    const { service } = createService({
+      findSubmissionForReview: vi.fn(async () => crashed),
+    });
+    const review = await service.getSubmissionReview(identity, {
+      academyId,
+      classId,
+      membershipId: alice.membershipId,
+      submissionId: submission.id,
+    });
+    expect(review.cases[0]).toMatchObject({ exitCode: null, exitSignal: "SIGSEGV" });
+    expect(review.cases[1]).toMatchObject({ outcome: "RUNTIME_ERROR", exitCode: null, exitSignal: null });
+    expect(review.language).toBe("CPP");
+    expect(teacherSubmissionReviewSchema.safeParse(review).success).toBe(true);
+  });
+
+  it("carries GCC's messages for an attempt that did not compile", async () => {
+    const diagnostics = "main.c:1:13: error: expected ';' before '}' token";
+    const { service } = createService({
+      findSubmissionForReview: vi.fn(async () => ({
+        ...submission,
+        language: "C",
+        compileFailed: true,
+        compileDiagnostics: diagnostics,
+        cases: [],
+      })),
+    });
+    const review = await service.getSubmissionReview(identity, {
+      academyId,
+      classId,
+      membershipId: alice.membershipId,
+      submissionId: submission.id,
+    });
+    expect(review).toMatchObject({ compileFailed: true, compileDiagnostics: diagnostics });
+  });
+
   it("refuses an attempt whose frozen exercise no longer matches its relation", async () => {
     const { service } = createService({
       findSubmissionForReview: vi.fn(async () => ({

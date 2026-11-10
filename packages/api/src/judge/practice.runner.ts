@@ -2,6 +2,7 @@ import { quizFeedback, submissionResultSchema } from "@cove/shared";
 import type { PrismaService } from "../database/prisma.service.js";
 import type { GradingService, GradeSink } from "./grading.service.js";
 import { practiceSnapshotSchema } from "./practice-snapshot.js";
+import { programExit } from "./program-exit.js";
 
 /** Dispatches through the same evaluator, with a persistence sink that has no student writes. */
 export class PracticeRunner {
@@ -19,7 +20,7 @@ export class PracticeRunner {
       return;
     }
     const snapshot = parsed.data;
-    const finish: GradeSink["complete"] = async (summary, cases, weighted) => {
+    const finish: GradeSink["complete"] = async (summary, cases, weighted, compileFailure) => {
       const gradedAt = new Date();
       const result = submissionResultSchema.parse({
         submissionId: id, materialId: row.materialId, ...summary,
@@ -33,8 +34,12 @@ export class PracticeRunner {
           return { ...item, input: item.isSample ? source?.input ?? null : null,
             expectedOutput: item.isSample ? source?.expectedOutput ?? null : null,
             actualOutput: item.isSample ? item.actualOutput : null,
-            weight: snapshot.gradingMode === "ELICE_STDIO" ? source?.weight ?? null : null };
+            weight: snapshot.gradingMode === "ELICE_STDIO" ? source?.weight ?? null : null,
+            // Staff practising may read every case of the problem they author.
+            ...programExit(item) };
         }),
+        compileFailed: Boolean(compileFailure),
+        compileDiagnostics: compileFailure?.diagnostics ?? null,
       });
       await this.prisma.staffPracticeAttempt.updateMany({
         where: { id, status: "RUNNING" }, data: { status: summary.status, gradedAt, result },
@@ -51,7 +56,7 @@ export class PracticeRunner {
           totalCount: snapshot.quizSnapshot ? 1 : snapshot.gradingCases.length, score: 0,
           runtimeMs: null, failureReason: reason, elapsedSec: 0, attemptCount: 0,
           createdAt: row.createdAt.toISOString(), gradedAt: new Date().toISOString(),
-          cases: cases.map((item) => ({ ...item, input: null, expectedOutput: null, actualOutput: null })),
+          cases: cases.map((item) => ({ ...item, input: null, expectedOutput: null, actualOutput: null, ...programExit(item) })),
         });
         await this.prisma.staffPracticeAttempt.updateMany({
           where: { id, status: "RUNNING" }, data: { status: "ERRORED", result, gradedAt: new Date() },

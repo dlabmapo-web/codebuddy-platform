@@ -1,5 +1,5 @@
 import { nativeRuntimeVersion } from "@cove/grading-runtime";
-import { nativeRuntimeDescriptorSchema, type NativeRuntimeDescriptor } from "@cove/shared";
+import { nativeAnyRuntimeDescriptorSchema, type NativeAnyRuntimeDescriptor } from "@cove/shared";
 import { Injectable, Logger, type OnModuleDestroy } from "@nestjs/common";
 import { Queue, QueueEvents, Worker, type ConnectionOptions } from "bullmq";
 import { Redis } from "ioredis";
@@ -33,9 +33,12 @@ export const REGRADE_QUEUE = "cove-regrade";
 export const SAMPLE_QUEUE = "cove-sample-checks";
 
 export type WorkKind = "official" | "practice" | "sample" | "regrade";
-export function runtimeQueueName(kind: WorkKind, descriptor?: NativeRuntimeDescriptor | null): string {
+export function runtimeQueueName(kind: WorkKind, descriptor?: NativeAnyRuntimeDescriptor | null): string {
   const base = { official: GRADING_QUEUE, practice: PRACTICE_QUEUE, sample: SAMPLE_QUEUE, regrade: REGRADE_QUEUE }[kind];
-  return descriptor ? `${base}-native-v1-${nativeRuntimeVersion(descriptor).slice("native-cpython-".length)}` : base;
+  if (!descriptor) return base;
+  // CPython's names are unchanged since native grading began; GCC has its own.
+  const family = descriptor.engine === "native-gcc" ? "native-gcc-v1" : "native-v1";
+  return `${base}-${family}-${nativeRuntimeVersion(descriptor).slice(`${descriptor.engine}-`.length)}`;
 }
 
 export type SampleCheckJob = { checkId: string };
@@ -122,13 +125,13 @@ export class JudgeQueue implements OnModuleDestroy {
   private rateLimitConnection: Promise<void> | null = null;
 
   private readonly families = new Map<string, JudgeQueue>();
-  readonly descriptor?: NativeRuntimeDescriptor;
-  constructor(private readonly redisUrl: string, descriptor?: NativeRuntimeDescriptor) {
-    this.descriptor = descriptor ? nativeRuntimeDescriptorSchema.parse(descriptor) : undefined;
+  readonly descriptor?: NativeAnyRuntimeDescriptor;
+  constructor(private readonly redisUrl: string, descriptor?: NativeAnyRuntimeDescriptor) {
+    this.descriptor = descriptor ? nativeAnyRuntimeDescriptorSchema.parse(descriptor) : undefined;
     if (this.descriptor) { Object.freeze(this.descriptor.comparator); Object.freeze(this.descriptor); }
   }
   /** Bound producer/event connections across retained releases. No per-submission clients. */
-  forRuntime(descriptor?: NativeRuntimeDescriptor | null): JudgeQueue {
+  forRuntime(descriptor?: NativeAnyRuntimeDescriptor | null): JudgeQueue {
     if (!descriptor) {
       if (this.descriptor) throw new Error("Native queue cannot dispatch compatibility work");
       return this;
@@ -210,7 +213,7 @@ export class JudgeQueue implements OnModuleDestroy {
   }
 
   /** `jobId` is the check id: a retried dispatch cannot run a check twice. */
-  async enqueueSampleCheck(checkId: string, descriptor?: NativeRuntimeDescriptor | null): Promise<void> {
+  async enqueueSampleCheck(checkId: string, descriptor?: NativeAnyRuntimeDescriptor | null): Promise<void> {
     await (descriptor ? this.forRuntime(descriptor) : this).sampleQueue.add("sample", { checkId }, { jobId: checkId });
   }
 
@@ -218,7 +221,7 @@ export class JudgeQueue implements OnModuleDestroy {
    * Removes a check that has not started. A job already running is locked
    * and stays; the worker sees the cancel and discards its result.
    */
-  async removeSampleCheck(checkId: string, descriptor?: NativeRuntimeDescriptor | null): Promise<void> {
+  async removeSampleCheck(checkId: string, descriptor?: NativeAnyRuntimeDescriptor | null): Promise<void> {
     const job = await (descriptor ? this.forRuntime(descriptor) : this).sampleQueue.getJob(checkId);
     await job?.remove().catch(() => undefined);
   }
@@ -239,7 +242,7 @@ export class JudgeQueue implements OnModuleDestroy {
    * `jobId` is the submission id, so BullMQ deduplicates: a retried request or
    * a double-clicked button cannot enqueue the same grading twice.
    */
-  async enqueue(submissionId: string, descriptor?: NativeRuntimeDescriptor | null): Promise<void> {
+  async enqueue(submissionId: string, descriptor?: NativeAnyRuntimeDescriptor | null): Promise<void> {
     await (descriptor ? this.forRuntime(descriptor) : this).queue.add(
       "grade",
       { submissionId },
@@ -247,7 +250,7 @@ export class JudgeQueue implements OnModuleDestroy {
     );
   }
 
-  async enqueuePractice(attemptId: string, descriptor?: NativeRuntimeDescriptor | null): Promise<void> {
+  async enqueuePractice(attemptId: string, descriptor?: NativeAnyRuntimeDescriptor | null): Promise<void> {
     await (descriptor ? this.forRuntime(descriptor) : this).practiceQueue.add("practice", { attemptId }, { jobId: attemptId });
   }
 
@@ -260,7 +263,7 @@ export class JudgeQueue implements OnModuleDestroy {
    * readable in a worker log and makes a retried dispatch inside one run
    * deduplicate exactly as the live path does.
    */
-  async enqueueRegrade(job: RegradeJob, descriptor?: NativeRuntimeDescriptor | null): Promise<void> {
+  async enqueueRegrade(job: RegradeJob, descriptor?: NativeAnyRuntimeDescriptor | null): Promise<void> {
     await (descriptor ? this.forRuntime(descriptor) : this).regradeQueue.add("regrade", job, {
       jobId: `regrade-${job.runId}-${job.submissionId}`,
     });

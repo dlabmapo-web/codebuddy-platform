@@ -1,4 +1,10 @@
-import { nativeRuntimeDescriptorSchema, type NativeRuntimeDescriptor } from "@cove/shared";
+import {
+  nativeAnyRuntimeDescriptorSchema,
+  nativeGccDescriptorSchema,
+  nativeRuntimeDescriptorSchema,
+  type ExerciseLanguage,
+  type NativeAnyRuntimeDescriptor,
+} from "@cove/shared";
 import { nativeRuntimeVersion } from "@cove/grading-runtime";
 import {
   gradingProfileBounds,
@@ -50,6 +56,8 @@ type CaseGrading = {
 
 /** What an exercise must supply to be snapshotted. */
 export type ExerciseGradingSource = ProfileColumns & {
+  /** Absent means Python, as every exercise was before C and C++. */
+  language?: ExerciseLanguage;
   timeLimitMs: number;
   memoryLimitMb: number;
   testCases: ReadonlyArray<
@@ -106,7 +114,23 @@ const nativePolicySchema = z.object({
       policy.comparator.engineVersion !== policy.runtime.comparator.version)
     ctx.addIssue({ code: "custom", message: "Inconsistent native policy" });
 });
-export const gradingPolicySnapshotSchema = z.union([historicalPolicySchema, nativePolicySchema]);
+/**
+ * A C/C++ submission on the native GCC runtime. Its own version, so a judge
+ * that predates compiled languages refuses it rather than running it as
+ * Python. Prompts are always included: there is no `input()` to strip.
+ */
+const gccPolicySchema = z.object({
+  version: z.literal(5), language: z.enum(["C", "CPP"]), inputPromptPolicy: z.literal("INCLUDE"),
+  semanticVersion: z.literal("elice-v1"),
+  runtime: nativeGccDescriptorSchema,
+  comparator: z.object({ runtime: z.literal("pyodide-cpython"), engineVersion: z.string(), budgetMs: z.number().int().positive() }),
+  ceilings: z.object({ totalTimeLimitMs: z.number().int().positive(), caseTimeLimitMs: z.number().int().positive(),
+    memoryLimitMb: z.number().int().min(16).max(512), outputBytes: z.number().int().positive().max(MAX_OUTPUT_BYTES) }),
+}).superRefine((policy, ctx) => {
+  if (policy.comparator.engineVersion !== policy.runtime.comparator.version)
+    ctx.addIssue({ code: "custom", message: "Inconsistent GCC policy" });
+});
+export const gradingPolicySnapshotSchema = z.union([historicalPolicySchema, nativePolicySchema, gccPolicySchema]);
 export type GradingPolicySnapshot = z.infer<typeof gradingPolicySnapshotSchema>;
 
 /**
@@ -119,7 +143,7 @@ export type GradingPolicySnapshot = z.infer<typeof gradingPolicySnapshotSchema>;
  */
 export function gradingSnapshotFor(
   exercise: ExerciseGradingSource,
-  runtime: { engineVersion: string; descriptor?: NativeRuntimeDescriptor | null },
+  runtime: { engineVersion: string; descriptor?: NativeAnyRuntimeDescriptor | null },
 ) {
   const enhanced = exercise.gradingMode === "ELICE_STDIO";
   let policy: GradingPolicySnapshot | null = enhanced
@@ -148,13 +172,22 @@ export function gradingSnapshotFor(
       }
     : null;
 
-  if (policy && runtime.descriptor) policy = nativePolicySchema.parse({ ...policy, version: 4,
+  const language = exercise.language ?? "PYTHON";
+  if (policy && runtime.descriptor?.engine === "native-gcc") {
+    if (language === "PYTHON") throw new Error("A Python exercise cannot be snapshotted for GCC");
+    policy = gccPolicySchema.parse({ ...policy, version: 5, language,
+      inputPromptPolicy: "INCLUDE", runtime: runtime.descriptor,
+      comparator: { ...policy.comparator, engineVersion: runtime.descriptor.comparator.version },
+    });
+  } else if (policy && runtime.descriptor) policy = nativePolicySchema.parse({ ...policy, version: 4,
     inputPromptPolicy: exercise.inputPromptPolicy ?? "INCLUDE", runtime: runtime.descriptor,
     comparator: { ...policy.comparator, engineVersion: runtime.descriptor.comparator.version },
   });
+  if (language !== "PYTHON" && (!policy || policy.version !== 5))
+    throw new Error("C and C++ submissions need weighted grading on the GCC runtime");
   return {
     submission: {
-      ...(runtime.descriptor ? { executionRuntimeSnapshot: nativeRuntimeDescriptorSchema.parse(runtime.descriptor) } : {}),
+      ...(runtime.descriptor ? { executionRuntimeSnapshot: nativeAnyRuntimeDescriptorSchema.parse(runtime.descriptor) } : {}),
       submissionPolicy: "AUTOMATIC" as const,
       inputPromptPolicy: exercise.inputPromptPolicy ?? "INCLUDE",
       gradingMode: exercise.gradingMode,
@@ -307,7 +340,9 @@ export function runtimeMismatch(
   policy: GradingPolicySnapshot,
   running: { engine: string | null; comparator: string | null },
 ): string | null {
-  const recordedEngine = policy.version === 4 ? nativeRuntimeVersion(policy.runtime) : `pyodide-${policy.runtime.engineVersion}`;
+  const recordedEngine = policy.version === 4 || policy.version === 5
+    ? nativeRuntimeVersion(policy.runtime)
+    : `pyodide-${policy.runtime.engineVersion}`;
   const recordedComparator = `pyodide-${policy.comparator.engineVersion}`;
   if (running.engine !== recordedEngine) {
     return `runner is ${running.engine ?? "unknown"}, submission recorded ${recordedEngine}`;

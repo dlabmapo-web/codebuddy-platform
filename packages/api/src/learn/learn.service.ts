@@ -1,5 +1,5 @@
 import { resolveGradingProfile } from "../judge/grading-profile.js";
-import { rolesHavePermission, roleCanMonitor } from "@cove/shared";
+import { isCompiledLanguage, rolesHavePermission, roleCanMonitor } from "@cove/shared";
 import { StaffPracticeService } from "./staff-practice.service.js";
 import { referencePdfMetadata } from "../documents/pdf-reference.js";
 import { publicQuiz } from "@cove/shared";
@@ -448,7 +448,8 @@ export class LearnService {
         gradingMode: exercise.gradingMode,
         inputPromptPolicy: exercise.inputPromptPolicy,
         gradingRevision: exercise.gradingRevision,
-        serverSampleChecks: sampleChecks?.isEnabled ?? false,
+        // C and C++ have no browser runtime: their samples are always the server's.
+        serverSampleChecks: isCompiledLanguage(exercise.language) || (sampleChecks?.isEnabled ?? false),
         sampleTestCases: (exercise.submissionPolicy === "PRACTICE_ONLY" ? [] : exercise.testCases)
           .filter((testCase) => testCase.visibility === "SAMPLE")
           .map((testCase) => ({

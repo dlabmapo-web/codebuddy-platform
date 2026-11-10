@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { sampleCheckViewSchema } from "@cove/shared";
 
 import type { ComparisonResult, OutputComparator } from "./comparator-pool.js";
 import { ExecutionCapacity } from "./execution-capacity.js";
@@ -127,6 +128,20 @@ function setup(options: {
 }
 
 describe("SampleCheckRunner", () => {
+  it("keeps timing responses valid when the API clock is ahead of the worker", async () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(10_000);
+    try {
+      const { runner, store, checkId } = setup({ record: { acceptedAt: 11_000 } });
+      await runner.run(checkId);
+      const done = store.records.get(checkId)!;
+      expect(done.status).toBe("COMPLETED");
+      expect(sampleCheckViewSchema.shape.timings.safeParse(done.timings).success).toBe(true);
+      expect(done.timings.queueMs).toBe(0);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it.each([false, true])("passes frozen prompt suppression to execution, enhanced=%s", async (enhanced) => {
     const initial = record().snapshot;
     const snapshot = enhanced

@@ -367,6 +367,7 @@ export class TeacherProgressRepository {
         runtimeMs: true,
         solveElapsedSec: true,
         createdAt: true,
+        compileFailed: true,
       },
     });
   }
@@ -407,6 +408,8 @@ export class TeacherProgressRepository {
         quizSnapshot: true,
         code: true,
         language: true,
+        compileFailed: true,
+        compileDiagnostics: true,
         problemTitle: true,
         courseTitle: true,
         moduleTitle: true,
@@ -422,6 +425,8 @@ export class TeacherProgressRepository {
             outcome: true,
             runtimeMs: true,
             actualOutput: true,
+            exitCode: true,
+            exitSignal: true,
           },
         },
         // Sample cases only. A hidden grading case is never selected, so the

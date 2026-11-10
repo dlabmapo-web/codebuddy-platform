@@ -5,8 +5,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { HttpStatus, Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
+  isCompiledLanguage,
   isSampleCheckActive,
   type SampleCheckView,
+  type StartRunCheckInput,
   type StartSampleCheckInput,
 } from "@cove/shared";
 
@@ -17,7 +19,7 @@ import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
-import { sampleSnapshotFor } from "../judge/sample-check-snapshot.js";
+import { runSnapshotFor, sampleSnapshotFor } from "../judge/sample-check-snapshot.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
 import { SAMPLE_QUEUE_WAIT_MS } from "../judge/sample-check.runner.js";
 import {
@@ -26,6 +28,7 @@ import {
 } from "../judge/sample-check.store.js";
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
 import { LearningClassContextService } from "./learning-class-context.service.js";
+import { programExit } from "../judge/program-exit.js";
 
 /** Beyond the run's own bounds, before an active check is presumed lost. */
 const LOST_SLACK_MS = 60_000;
@@ -104,7 +107,8 @@ export class SampleCheckService {
       requestedClassId: input.classId,
     });
 
-    if (!(await this.enabledFor(input.academyId))) {
+    // C and C++ have no browser runtime: their Test is always the server's.
+    if (!isCompiledLanguage(exercise.language) && !(await this.enabledFor(input.academyId))) {
       // Disabled academies retain their existing local practice flow.
       throw unavailable();
     }
@@ -137,17 +141,96 @@ export class SampleCheckService {
         codeHash,
       ]),
     );
+    return this.admit(store, queue, {
+      kind: "sample", userId, input, materialId: material.id, position: testCase.position,
+      exerciseRevision: exercise.gradingRevision, codeHash, requestHash, snapshot,
+    });
+  }
 
+  /**
+   * A C/C++ Run: the student's code on the input they typed, judged by
+   * nothing. The same access rules, admission, limits and polling as a sample
+   * check, and none of Submit's consequences. Python's Run stays in the
+   * browser, so only compiled languages are accepted here.
+   */
+  async startRun(
+    identity: SupabaseIdentity,
+    input: StartRunCheckInput,
+  ): Promise<SampleCheckView> {
+    const actor = await this.access.requirePermission(
+      identity.authUserId,
+      input.academyId,
+      "submissions.own.create",
+    );
+    const { userId } = actor;
+    const store = this.store;
+    const queue = this.queue;
+    if (!store || !queue) throw unavailable();
+    const material = await snapshotTransaction(this.prisma, tx => tx.material.findFirst({
+      where: {
+        id: input.materialId,
+        type: 'PROGRAMMING_EXERCISE',
+        ...reachableMaterialWhere(input.academyId, learningScopeFor(input.academyId, actor)),
+      },
+      include: exerciseInclude,
+    }));
+    const exercise = material?.programmingExercise;
+    if (!material || !exercise || !isCompiledLanguage(exercise.language)) throw notFound();
+    await this.classContext.resolve({
+      academyId: input.academyId,
+      userId,
+      courseId: material.lecture.courseModule.courseId,
+      requestedClassId: input.classId,
+    });
+    if (exercise.gradingRevision !== input.workspaceRevision) {
+      throw new AppException("SAMPLE_CHECK_STALE", HttpStatus.CONFLICT);
+    }
+    const descriptor = await this.native().select({
+      academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision, context: "live", kind: "run",
+    }, exercise);
+    if (descriptor?.engine !== "native-gcc") throw unavailable();
+    const snapshot = runSnapshotFor(
+      exercise, input.stdin, input.code,
+      this.config.get("PYODIDE_VERSION", { infer: true }), descriptor,
+    );
+    if (!snapshot) throw unavailable();
+    const codeHash = sha256(input.code);
+    const requestHash = sha256(
+      JSON.stringify(["run", input.materialId, input.classId, input.workspaceRevision, codeHash, sha256(input.stdin)]),
+    );
+    return this.admit(store, queue, {
+      kind: "run", userId, input, materialId: material.id, position: 0,
+      exerciseRevision: exercise.gradingRevision, codeHash, requestHash, snapshot,
+    });
+  }
+
+  private async admit(
+    store: SampleCheckStore,
+    queue: JudgeQueue,
+    check: {
+      kind: "sample" | "run";
+      userId: string;
+      input: { academyId: string; classId: string; clientRequestId: string };
+      materialId: string;
+      position: number;
+      exerciseRevision: number;
+      codeHash: string;
+      requestHash: string;
+      snapshot: SampleCheckRecord["snapshot"];
+    },
+  ): Promise<SampleCheckView> {
+    const { input, userId, snapshot, codeHash, requestHash } = check;
     try {
       const now = Date.now();
       const record: SampleCheckRecord = {
         checkId: randomUUID(),
+        kind: check.kind,
         userId,
         academyId: input.academyId,
         classId: input.classId,
-        materialId: material.id,
-        position: testCase.position,
-        exerciseRevision: exercise.gradingRevision,
+        materialId: check.materialId,
+        position: check.position,
+        exerciseRevision: check.exerciseRevision,
         codeHash,
         requestHash,
         clientRequestId: input.clientRequestId,
@@ -335,13 +418,15 @@ export class SampleCheckService {
     if (!exercise) throw notFound();
     // The rule is shown only while this exact case is still public at this
     // revision. A reordered or hidden case withholds it rather than risk
-    // describing a different case under the same position.
+    // describing a different case under the same position. A Run has no case:
+    // its input was the student's own.
     const visible =
       exercise.gradingRevision === record.exerciseRevision &&
-      exercise.testCases.some(
-        (candidate) =>
-          candidate.position === record!.position && candidate.visibility === "SAMPLE",
-      );
+      (record.kind === "run" ||
+        exercise.testCases.some(
+          (candidate) =>
+            candidate.position === record!.position && candidate.visibility === "SAMPLE",
+        ));
     return { store, record, visible };
   }
 
@@ -370,17 +455,22 @@ export class SampleCheckService {
 
 /** The public projection. The snapshot's code never leaves; its case only if still public. */
 export function toView(record: SampleCheckRecord, visible: boolean): SampleCheckView {
+  const run = record.kind === "run";
   return {
     checkId: record.checkId,
+    kind: run ? "run" : "sample",
     status: record.status,
-    position: record.position,
+    position: run ? null : record.position,
     codeHash: record.codeHash,
     exerciseRevision: record.exerciseRevision,
     result:
       record.status === "COMPLETED" && record.result
         ? {
             ...record.result,
-            rule: visible
+            // A check's input is public or the student's own: its ending may be shown.
+            ...programExit({ exitCode: record.result.exitCode ?? null, exitSignal: record.result.exitSignal ?? null }),
+            compileDiagnostics: record.result.compileDiagnostics ?? null,
+            rule: visible && !run
               ? {
                   comparator: record.snapshot.testCase.comparator,
                   expected: record.snapshot.testCase.expectedOutput,
@@ -396,6 +486,7 @@ export function toView(record: SampleCheckRecord, visible: boolean): SampleCheck
 function expiredView(checkId: string): SampleCheckView {
   return {
     checkId,
+    kind: "sample",
     status: "EXPIRED",
     position: null,
     codeHash: null,

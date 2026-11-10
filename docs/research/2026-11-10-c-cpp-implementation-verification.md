@@ -8,7 +8,7 @@ follows the approved [design](../superpowers/specs/2026-11-09-c-cpp-execution-de
 ## Delivered (phase 1)
 
 - C (`gcc -std=gnu11 -lm`, no `-O`) and C++ (`g++ -O2 -std=gnu++17`), GCC 12.2,
-  one language per exercise, compiled once per attempt on the native node as a
+  one language per course, compiled once per attempt on the native node as a
   second runtime family (`native-gcc`). CPython's descriptor, version string
   and queues are unchanged.
 - Submit, Test, and a Run whose input is typed into a Program input box first.
@@ -18,8 +18,11 @@ follows the approved [design](../superpowers/specs/2026-11-09-c-cpp-execution-de
   the history. The teacher's attempt list labels it.
 - A runtime error explains a public case's signal or exit code. A hidden case's
   ending is never projected to students or teachers.
-- Authoring offers the language picker only where the `C_CPP_EXERCISES` feature
-  is on; the API refuses C/C++ elsewhere with `PERMISSION_DENIED`.
+- A course's language (Python, C or C++) is chosen when the course is
+  created, in the library or an academy, and every coding problem in it
+  follows. It is fixed once the course has a problem. Every academy offers all
+  three; there is no per-academy switch. See "Follow-up: one language per
+  course" below.
 - Every editor that shows exercise code highlights by its language: student
   workspace, authoring, preview, live view, staff pane, submission review,
   history and both solution viewers. A staff member's own Run in the live view
@@ -58,8 +61,11 @@ teacher's attempt list adds a column, not a statement.
    On the production host: `docker compose run --rm native-grader qualify`
    must print PASS for `actual-linux-gcc` and for CPython. A missing syscall
    fails closed.
-2. **Production database migration.** Development is now migrated (see below).
-   The production database has not been changed.
+2. **Database migrations.** Production needs both
+   `20261110090000_c_cpp_exercises` and `20261110120000_course_language`.
+   Development has the first (see below) but **not the second**: this branch's
+   API cannot read the development database's courses until it is applied
+   there. Both are the owner's to run.
 3. **Capacity gates, spec §8, on the production host:**
    - one C++ Run;
    - 30 simultaneous C++ Runs;
@@ -201,11 +207,53 @@ only to the trusted worker through a temporary private env file (removed
 after container creation), never to compiler/program jails. Production was
 not modified.
 
+## Follow-up: one language per course
+
+On 2026-11-10 the owner moved the language choice from each exercise to the
+course ([Course language](../superpowers/specs/2026-11-10-course-language-design.md))
+and asked for Python, C and C++ in every academy without a switch.
+
+- The course create and edit forms (academy, library and the console's
+  content modal) offer **Programming language**. The exercise editor has no
+  picker: a new problem takes the course's language, template and grading.
+- The API sets each exercise's language from its course under the course
+  lock, refuses a language change once the course has a problem, enforces
+  weighted grading for C/C++ server-side, and copies the language on adoption,
+  library import and spreadsheet import.
+- `C_CPP_EXERCISES` no longer gates anything and is gone from the feature
+  board; production eligibility lists `PYTHON`, `C` and `CPP` and `run` for
+  every academy.
+- New migration `20261110120000_course_language`: `courses.language`, with
+  existing courses Python. A course already holding C/C++ exercises takes the
+  language most of them use.
+
+| Check | Result |
+| --- | --- |
+| `@cove/shared` / `@cove/i18n` | 935 / 140 passed |
+| `@cove/api` unit | 1,723 passed, 250 skipped (database specs) |
+| `@cove/api` database specs, 12 files named, disposable PostgreSQL 16 and Redis 8 | 123 passed. One earlier run failed once, intermittently, in a Python sample-check test this change does not touch; it passed alone and on the full rerun |
+| `@cove/web` unit | 1,570 passed |
+| API and web typechecks, ESLint on changed web files, `validate-local.sh`, both rollback suites | passed |
+| `test-c-cpp-local.sh` against `sha256:12ab69d2…` (real native grader, API, Next, Chromium) | 5 passed, including creating a C course from the form and a new problem in a C++ course starting from the C++ template with no picker |
+
+Statement counts (`compiled-exercises.integration.spec.ts`): a course
+language change is 14 statements against 13 for a rename (the course lock and
+one count; a rename's title check is one); exercise creation is 22, reading
+the language from the lock it already takes; the course list's count query
+gains one column, no statement. The API (`nest build`) and web (`next build`)
+production builds passed.
+
+The development seeder (`pnpm dev:c-cpp:regular`) now creates **C Practice**
+(`c1000000-0000-4000-8000-000000000101`) and **C++ Practice**
+(`…000000000201`) and no longer writes a feature row. It was **not** rerun:
+it writes to the shared development database. The mixed **C and C++
+Practice** course from the earlier run stays until it is deleted.
+
 ## Notes
 
-- Releasing this branch changes nothing visible on its own. Production
-  eligibility lists no languages, which means Python only, and
-  `C_CPP_EXERCISES` is off for every academy.
+- Releasing this branch turns C and C++ on for every academy: production
+  eligibility lists `PYTHON`, `C` and `CPP`. The release gates above come
+  before the deploy.
 - On 2026-11-10, three integration specs that are hard-wired to the shared
   Supabase dev database were run once by mistake:
   `staff-practice.integration.spec.ts`, `exercise-solutions.integration.spec.ts`

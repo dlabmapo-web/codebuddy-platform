@@ -21,7 +21,7 @@ Compiling, running and grading C and C++ are unchanged.
 | Can students switch language? | No. The editor has no language selector. It shows the language as a label. |
 | Which academies offer C and C++ | All of them. No per-academy switch. |
 | Existing courses | Python, and they stay Python. |
-| Changing a course's language later | Allowed only while the course has no coding exercises. Once it has one, the language is locked. |
+| Changing a course's language later | Allowed only while the course has no problems. Once it has one, the language is locked. |
 
 Why it's locked: a course's starter code, solutions and test cases are written
 for its language. Switching a course that has content would leave hundreds of
@@ -42,8 +42,8 @@ problems in the wrong language.
 - **New course** gains the same **Programming language** choice, in every
   academy.
 - **Course settings** show the language. It can be changed only while the
-  course has no coding exercises. After that the field is read-only, with the
-  note "The language is fixed once the course has coding problems."
+  course has no problems. After that the field is read-only, with the note
+  "The language is fixed once the course has problems."
 - **Copying from the library** (adoption) keeps the library course's language.
   The library browser shows each course's language.
 
@@ -76,9 +76,12 @@ view work as already built and tested.
 1. **Create.** `language` is optional on create and defaults to `PYTHON`. Every
    academy and the library accept all three.
 2. **Change.** A changed `language` on course update is refused with
-   `CONTENT_VALIDATION_FAILED` when the course has a coding exercise: a
-   programming exercise that is not quiz-style. Quiz-style problems, Turtle
-   exercises and other materials do not lock it.
+   `CONTENT_VALIDATION_FAILED` when the course has a problem: a
+   programming-exercise material, quiz-style included. Turtle exercises and
+   other materials do not lock it. Quiz-style problems count because the
+   course list and the course tree can both count them from the material type
+   alone, so the number a form reads and the number the API checks are one
+   number, at no extra statement.
 3. **Exercises follow the course.** Create, update and import never take a
    language from the client. Create and import copy the course's language;
    update keeps the exercise's stored language. The exercise `language` field
@@ -157,9 +160,15 @@ the UI never offers a refused action.
 
 **`packages/web`**
 
-- A language select in the academy's new-course and course-settings forms
-  (`use-courses-manager.ts` and its form) and in the platform admin's library
-  course modal (`library-course-modal.tsx`, `content-record-modal.tsx`).
+- A language select (`components/studio/course-language-field.tsx`) in:
+  - the academy's course form, for creating and editing. It locks from
+    `content.problems`, which the course list counts in its existing count
+    query and a course tree counts the same way;
+  - the platform admin's library course modal, for creating and editing. A
+    library row counts every material, so it locks at the first material: a
+    little earlier than the API, never later;
+  - the admin console's cross-academy content modal, for creating only.
+    Changes go through the academy's own course form.
 - A language label in course lists and the library browser.
 - The exercise editor shows the course's language instead of the picker.
   Templates and grading defaults come from it.
@@ -184,19 +193,23 @@ the UI never offers a refused action.
 
 - **Course create, adoption and library import:** one more column in rows
   they already write. No new statement.
-- **Course update with a changed language:** one count of the course's coding
-  exercises. It runs only when the language changes.
+- **Course update with a changed language:** the course lock and one count of
+  its problems, run only when the language changes. Measured: 14
+  statements, against 13 for a rename (whose title check costs one).
 - **Exercise create:** the language comes from the existing `lockCourse` row,
-  and the feature-flag read is gone: one statement fewer for C/C++.
-- **Course lists and the library list:** one more selected column.
+  and the feature-flag read is gone: one statement fewer for C/C++. Measured:
+  22 statements.
+- **Course lists and the library list:** one more selected column; the
+  academy list's count query gains one counted column, in the same
+  statement.
 - **Student and teacher pages:** unchanged.
 
 ## 8. Testing
 
 - API unit:
   - create with each language, in an academy and in the library;
-  - a language change refused once a coding exercise exists, and allowed when
-    the course is empty or holds only quizzes;
+  - a language change refused once a problem exists, quiz-style included, and
+    allowed while the course is empty;
   - an exercise created in a C course is C with the weighted profile, whatever
     the client sends;
   - adoption keeps the language;
@@ -216,7 +229,7 @@ the UI never offers a refused action.
 ## 9. Out of scope
 
 - A student language selector, and one problem offered in several languages.
-- Changing the language of a course that has coding exercises. To offer a
+- Changing the language of a course that has problems. To offer a
   course in another language, create a new course in that language.
 - Per-language starter code within one exercise.
 - C or C++ for Turtle exercises and code-file written responses.

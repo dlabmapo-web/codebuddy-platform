@@ -1,13 +1,19 @@
-# C and C++ exercises: enabling, operating and rolling back
+# C and C++ exercises: releasing, operating and rolling back
 
-Design: [C and C++ exercises on the native grader](../superpowers/specs/2026-11-09-c-cpp-execution-design.md).
+Design: [C and C++ exercises on the native grader](../superpowers/specs/2026-11-09-c-cpp-execution-design.md)
+and [Course language](../superpowers/specs/2026-11-10-course-language-design.md).
 C and C++ compile and run only on the native node (`native-grader`), as a second
 runtime family (`native-gcc`) beside CPython. There is no browser runtime and no
 Pyodide fallback for them.
 
+Every academy offers Python, C and C++. The language belongs to a course: it is
+chosen when the course is created (in the library or an academy), every coding
+problem in the course uses it, and it is fixed once the course has a coding
+problem. Existing courses are Python.
+
 ## Use the regular localhost:3000 app
 
-To add the practice course to **Cove Development Academy** and connect the
+To add the practice courses to **Cove Development Academy** and connect the
 regular development API to the local native grader:
 
 ```bash
@@ -17,20 +23,22 @@ pnpm dev
 
 If the API is already running, restart it after the first command so it reads
 the new `packages/api/.env.local` native settings. The web address stays
-**http://localhost:3000**. Open the course:
+**http://localhost:3000**. Open the courses:
 
-http://localhost:3000/academy/development-academy/learn/courses/c1000000-0000-4000-8000-000000000001
+- http://localhost:3000/academy/development-academy/learn/courses/c1000000-0000-4000-8000-000000000101
+- http://localhost:3000/academy/development-academy/learn/courses/c1000000-0000-4000-8000-000000000201
 
-The course is **C and C++ Practice**, with C addition, C++ addition, and a
-ten-case C++ problem. It is assigned to **C/C++ Practice Class**, including the
-existing development student (`cove-student`). Sign in with that student to
+**C Practice** has C addition; **C++ Practice** has C++ addition and a ten-case
+C++ problem. Both are assigned to **C/C++ Practice Class**, including the
+existing development student (`cove-student`). An earlier version of this
+command seeded one **C and C++ Practice** course mixing both languages
+(`c1000000-0000-4000-8000-000000000001`); delete it from the course list. Sign in with that student to
 use **Program input**, **Run**, **Test run**, and **Submit**. Staff can inspect
 and author the course and submit their own graded practice; C/C++ Run/Test in
 their private staff copy is deferred.
 
-This command deliberately uses the configured **shared development database**
-and enables `C_CPP_EXERCISES` only in Development Academy. It does not replace
-existing course content or student drafts when rerun. Docker runs
+This command deliberately uses the configured **shared development database**.
+It does not replace existing course content or student drafts when rerun. Docker runs
 `cove-native-development`, using the existing local Redis; its eligibility
 admits C/C++ in this academy. Python keeps its existing grading path. Database
 credentials stay in the trusted worker and are never passed to learner jails.
@@ -50,9 +58,9 @@ pnpm dev:c-cpp
 ```
 
 Open **http://127.0.0.1:4327/** when the terminal says it is ready. Choose a
-problem to sign in as the local student; no password is required. The course
-**C and C++ Practice** contains C addition, C++ addition, and a C++ exercise with
-ten grading cases. All three have working starter code.
+problem to sign in as the local student; no password is required. **C
+Practice** contains C addition; **C++ Practice** contains C++ addition and a C++
+exercise with ten grading cases. All three have working starter code.
 
 1. Type `40 2` into **Program input** and click **Run**; it prints `42`.
 2. Click **Test run** to check the public example.
@@ -77,16 +85,17 @@ the next start. It does not modify shared development/production courses.
 If the native image is missing, build it first with
 `bash deploy/native/build-image.sh cove-native-node:cpp-local-verification`.
 
-## What a release changes by itself
+## What a release turns on
 
-Nothing visible. A release that carries the GCC trees publishes a version 2
-manifest with a `gcc` descriptor, but:
+Deploying turns C and C++ on for every academy at once:
 
-- the production `NATIVE_ELIGIBILITY` entry lists no `languages`, which means
-  Python only, so no C/C++ work is admitted;
-- `C_CPP_EXERCISES` is a rollout feature, off for every academy, so nobody can
-  author C or C++;
-- Python's descriptor, version string and queue names are unchanged.
+- the production `NATIVE_ELIGIBILITY` lists `PYTHON`, `C` and `CPP` and the
+  `run` kind for every academy;
+- any author can create a C or C++ course;
+- Python's descriptor, version string and queue names are unchanged, and
+  existing courses stay Python.
+
+So the checks below come **before** the deploy, not after it.
 
 ## Qualify on the production host first
 
@@ -101,7 +110,7 @@ pnpm test:c-cpp:local
 It uses new local PostgreSQL and Redis containers, a synthetic identity
 provider, and the real API, Next application and native grader. It checks C/C++
 Run, Test and Submit, diagnostics, hidden-case redaction, teacher review/history,
-the language picker, and a ten-case C++ submission. It does not enable or create
+choosing a course's language, and a ten-case C++ submission. It does not create
 content in an existing academy. Ports 3317, 4317 and 4327 must be free. The image
 can be overridden with `COVE_CPP_NATIVE_IMAGE`; logs are saved under
 `test-results/c-cpp-local` and browser artifacts under `test-results/c-cpp-browser`.
@@ -120,7 +129,8 @@ docker compose run --rm native-grader qualify
 ```
 
 It must print `{"gate":"actual-linux-gcc","status":"PASS",...}` with its
-compile timings, then the CPython gate. Anything else: do not enable C/C++.
+compile timings, then the CPython gate. Anything else: do not deploy a release
+that admits C/C++; remove `C` and `CPP` from the eligibility first (Rollback).
 
 Then check readiness on the running node:
 
@@ -130,25 +140,12 @@ docker exec cove-production-native-grader-1 /opt/cove/node -e \
 docker logs cove-production-native-grader-1 2>&1 | grep -i gcc
 ```
 
-## Enabling for one academy
+## Capacity before classes use it
 
-1. Add the languages and the `run` kind to the eligibility in
-   `compose.production.yml`, scoped to the pilot academy first:
-
-   ```json
-   [{"contexts":["live","preview"],"kinds":["official","staff-practice","sample","regrade"],"maxCaseTimeLimitMs":60000},
-    {"organizationId":"<org>","academyId":"<academy>","contexts":["live","preview"],
-     "kinds":["official","staff-practice","sample","regrade","run"],"maxCaseTimeLimitMs":60000,
-     "languages":["PYTHON","C","CPP"]}]
-   ```
-
-2. Deploy. The node republishes its manifest; the API rereads it on change.
-3. Turn on **C and C++ exercises** for that academy in the console's feature
-   board.
-4. Measure the capacity gates of spec §8 on this host before widening:
-   one C++ Run, 30 simultaneous C++ Runs, Python Submit during that burst, a
-   10-case C++ Submit, and the full-cache memory scenario. If a gate fails, the
-   remedy is a larger or separate execution host, never higher limits.
+Measure the capacity gates of spec §8 on this host: one C++ Run, 30
+simultaneous C++ Runs, a Python Submit during that burst, a 10-case C++ Submit,
+and the full-cache memory scenario. If a gate fails, the remedy is a larger or
+separate execution host, never higher limits.
 
 ## Day-to-day facts
 
@@ -168,6 +165,11 @@ docker logs cove-production-native-grader-1 2>&1 | grep -i gcc
 
 ## Authoring guidance for teachers
 
+- Choose the course's **Programming language** when creating it. Every coding
+  problem in the course uses it; quiz-style problems, Turtle exercises and
+  other materials are unaffected. It can be changed only while the course has
+  no problems (quiz-style ones included): to teach the same course in another
+  language, create a new course.
 - C is compiled like Elice compiles it: `gcc -std=gnu11 -lm`, no optimization.
   C++ uses `g++ -O2 -std=gnu++17`. `ONLINE_JUDGE` is defined.
 - Visual Studio–only code does not compile: `scanf_s`, `<conio.h>`,
@@ -179,8 +181,9 @@ docker logs cove-production-native-grader-1 2>&1 | grep -i gcc
 
 ## Rollback
 
-- Switching C/C++ off: remove `C`/`CPP` from the eligibility entry and turn the
-  feature off. Python is untouched. This is the supported rollback.
+- Switching C/C++ off: remove `C` and `CPP` from the eligibility entry and
+  deploy. Run, Test and Submit then answer "temporarily unavailable" in C and
+  C++ courses, and Python is untouched. This is the supported rollback.
 - **Application rollback** below the C/C++ release is refused by
   `deploy/scripts/rollback.sh` once any C/C++ exercise or submission exists,
   because an older API cannot read those rows (submissions keep their language

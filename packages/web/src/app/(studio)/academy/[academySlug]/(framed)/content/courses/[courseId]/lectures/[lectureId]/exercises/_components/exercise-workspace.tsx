@@ -11,9 +11,7 @@ import { useSearchParams } from 'next/navigation';
 import { ReferencePdfPicker } from '@/components/pdf/reference-pdf-picker';
 import { useTranslation } from 'react-i18next';
 import { QuizEditor } from './quiz-editor';
-import { isCompiledLanguage, type ExerciseAuthoringContext } from '@cove/shared';
-
-import { withLanguage } from '../_lib/exercise-draft';
+import type { ExerciseAuthoringContext } from '@cove/shared';
 
 import { useExerciseAuthoring } from '../_hooks/use-exercise-authoring';
 import { SubmissionPolicyEditor } from './submission-policy-editor';
@@ -33,7 +31,6 @@ export function ExerciseWorkspace({
   initialContext,
   canEdit,
   initialSolutions,
-  compiledLanguages = false,
 }: {
   academyId: string;
   courseId: string;
@@ -41,8 +38,6 @@ export function ExerciseWorkspace({
   initialContext: ExerciseAuthoringContext;
   canEdit: boolean;
   initialSolutions: ExerciseSolutionEntry[];
-  /** The academy may author C and C++ (`C_CPP_EXERCISES`). */
-  compiledLanguages?: boolean;
 }) {
   const { t: tq } = useTranslation('quiz');
   const { t } = useTranslation(['content', 'pdf-practice']);
@@ -108,13 +103,6 @@ export function ExerciseWorkspace({
           editable={editable}
           onImageUpload={uploadImage}
           update={update}
-          languages={compiledLanguages || isCompiledLanguage(draft.language)}
-          onLanguageChange={(language) => {
-            const next = withLanguage(draft, language);
-            update('language', next.language);
-            update('starterCode', next.starterCode);
-            update('grading', next.grading);
-          }}
         />
         {draft.quiz ? <QuizEditor value={draft.quiz} disabled={!editable} onChange={(quiz) => update('quiz', quiz)} /> : <>
         <StarterCodeEditor

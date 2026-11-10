@@ -114,5 +114,10 @@
     "select": "Select course",
     "retry": "Try again",
     "search": "Search academy courses"
+  },
+  "language": {
+    "label": "Programming language",
+    "hint": "Every coding problem in this course is written and graded in this language.",
+    "locked": "The language is fixed once the course has problems."
   }
 }

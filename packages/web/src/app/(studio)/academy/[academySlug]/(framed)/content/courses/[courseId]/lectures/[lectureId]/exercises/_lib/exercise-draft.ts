@@ -93,7 +93,9 @@ export function contextToDraft(
 ): ExerciseDraft {
   const exercise = context.material?.programmingExercise;
   if (!exercise) {
-    return {
+    // A new problem is written in its course's language, from that
+    // language's template and grading defaults.
+    return withLanguage({
       submissionPolicy: 'AUTOMATIC',
       referencePdfMaterialId: null,
       title: '',
@@ -110,7 +112,7 @@ export function contextToDraft(
       testCases: [newTestCaseDraft('new-sample', 'SAMPLE')],
       grading: legacyGradingProfile,
       hints: [],
-    };
+    }, context.course.language ?? 'PYTHON');
   }
 
   return {
@@ -157,8 +159,8 @@ export function contextToDraft(
 }
 
 /**
- * A language change. C and C++ grade with weighted rules and no prompt
- * stripping, so the profile follows; an untouched starter becomes the new
+ * A draft in the given language. C and C++ grade with weighted rules and no
+ * prompt stripping, so the profile follows; an untouched starter becomes the
  * language's template, and anything an author wrote stays.
  */
 export function withLanguage(draft: ExerciseDraft, language: ExerciseLanguage): ExerciseDraft {
@@ -194,7 +196,6 @@ export function draftToPayload(draft: ExerciseDraft) {
     outputFormat: draft.outputFormat,
     constraints: draft.constraints,
     starterCode: draft.starterCode,
-    language: draft.quiz ? 'PYTHON' as const : draft.language,
     solutions: draft.quiz ? [] : draft.referencePdfMaterialId ? draft.solutions.filter(solution => solution.code.trim() || solution.title?.trim()) : draft.solutions,
     aiFeedbackEnabled: draft.aiFeedbackEnabled,
     isVisible: draft.isVisible,

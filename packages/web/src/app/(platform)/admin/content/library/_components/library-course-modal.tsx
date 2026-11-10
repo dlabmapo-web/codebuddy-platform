@@ -1,10 +1,11 @@
 'use client';
 
-import type { LibraryCourse } from '@cove/shared';
+import type { ExerciseLanguage, LibraryCourse } from '@cove/shared';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/studio/button';
+import { CourseLanguageField } from '@/components/studio/course-language-field';
 import { CoursePathPreview } from '@/components/studio/course-path-preview';
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useErrorText } from '@/i18n/client/use-error-text';
@@ -48,10 +49,14 @@ export function LibraryCourseModal({
   const errorText = useErrorText();
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
+  const [language, setLanguage] = React.useState<ExerciseLanguage>('PYTHON');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<unknown>(null);
 
   const editing = course !== null;
+  // A library row counts every material, not only problems, so this fixes the
+  // language at the first material; the API's rule is exact.
+  const languageLocked = editing && course.exerciseCount > 0;
 
   // Seeded from the row each time the dialog opens on a different course, so
   // reopening on another row never shows the previous one's words.
@@ -67,6 +72,7 @@ export function LibraryCourseModal({
     setSeededFor(seedKey);
     setTitle(course?.title ?? '');
     setDescription(course?.description ?? '');
+    setLanguage(course?.language ?? 'PYTHON');
     setError(null);
   }
 
@@ -96,12 +102,14 @@ export function LibraryCourseModal({
                   courseId: course.id,
                   title: title.trim(),
                   description: description.trim(),
+                  ...(languageLocked ? {} : { language }),
                 });
                 onDone(course.id);
               } else {
                 const created = await orpc.platformLibrary.create({
                   title: title.trim(),
                   description: description.trim(),
+                  language,
                 });
                 onDone(created.id);
               }
@@ -143,6 +151,17 @@ export function LibraryCourseModal({
                 value={description}
               />
             </label>
+
+            <CourseLanguageField
+              copy={{
+                label: t('language.label'),
+                hint: t('language.hint'),
+                locked: t('language.locked'),
+              }}
+              locked={languageLocked}
+              onChange={setLanguage}
+              value={language}
+            />
 
             {editing ? null : (
               <CoursePathPreview

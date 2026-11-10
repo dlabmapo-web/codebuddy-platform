@@ -2,7 +2,7 @@
 
 import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
-import type { CourseSummary } from '@cove/shared';
+import type { CourseSummary, ExerciseLanguage } from '@cove/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
@@ -25,6 +25,7 @@ export function useCoursesManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [language, setLanguage] = useState<ExerciseLanguage>('PYTHON');
   const queryKey = academyCoursesQueryKey(academyId);
 
   const coursesQuery = useQuery({
@@ -33,6 +34,8 @@ export function useCoursesManager({
     initialData: { courses: initialCourses },
     retry: false,
   });
+  const editing = coursesQuery.data.courses.find((course) => course.id === editingId);
+  const languageLocked = (editing?.content.problems ?? 0) > 0;
 
   const openCourse = useCallback(
     (course: CourseSummary) => {
@@ -43,10 +46,11 @@ export function useCoursesManager({
 
   const createMutation = useMutation({
     mutationFn: () =>
-      orpc.academyCourses.create({ academyId, title, description }),
+      orpc.academyCourses.create({ academyId, title, description, language }),
     onSuccess: async (course) => {
       setTitle('');
       setDescription('');
+      setLanguage('PYTHON');
       setShowCreate(false);
       await queryClient.invalidateQueries({ queryKey });
       openCourse(course);
@@ -60,6 +64,8 @@ export function useCoursesManager({
         courseId: editingId!,
         title,
         description,
+        // Sent only while it can change, so a rename never trips the rule.
+        ...(languageLocked ? {} : { language }),
       }),
     onSuccess: async () => {
       setEditingId(null);
@@ -98,6 +104,7 @@ export function useCoursesManager({
     setEditingId(null);
     setTitle('');
     setDescription('');
+    setLanguage('PYTHON');
   };
 
   /**
@@ -123,6 +130,7 @@ export function useCoursesManager({
       setEditingId(null);
       setTitle('');
       setDescription('');
+      setLanguage('PYTHON');
       setShowCreate(true);
     },
     openEdit: (course: CourseSummary) => {
@@ -130,12 +138,17 @@ export function useCoursesManager({
       setEditingId(course.id);
       setTitle(course.title);
       setDescription(course.description);
+      setLanguage(course.language);
     },
     closeForm,
     title,
     setTitle,
     description,
     setDescription,
+    language,
+    setLanguage,
+    /** Fixed once the course being edited holds a problem. */
+    languageLocked,
     submit: () =>
       editingId ? updateMutation.mutate() : createMutation.mutate(),
     submitPending: createMutation.isPending || updateMutation.isPending,

@@ -64,7 +64,8 @@
     }
   },
   "language": {
-    "label": "Language",
-    "hint": "C and C++ programs compile and run on the grading server, with weighted grading."
+    "label": "Programming language",
+    "hint": "Every coding problem in this course is written and graded in this language.",
+    "locked": "The language is fixed once the course has problems."
   }
 }

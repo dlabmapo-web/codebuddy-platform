@@ -1,10 +1,11 @@
 'use client';
 
-import type { ContentLens } from '@cove/shared';
+import type { ContentLens, ExerciseLanguage } from '@cove/shared';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CourseLanguageField } from '@/components/studio/course-language-field';
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
@@ -93,6 +94,7 @@ export function ContentRecordModal({
   onSaved: () => void;
 }) {
   const { t } = useTranslation('platform');
+  const { t: library } = useTranslation('platform-library');
   const { t: copy } = useLayoutTranslation(['courses', 'classes', 'common']);
   const errorText = useErrorText();
   const router = useRouter();
@@ -103,6 +105,9 @@ export function ContentRecordModal({
   const [academyId, setAcademyId] = React.useState<string | null>(null);
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
+  // Chosen when a course is created here; changed from the academy's own
+  // course settings, which know whether the course already holds problems.
+  const [language, setLanguage] = React.useState<ExerciseLanguage>('PYTHON');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<unknown>(null);
 
@@ -115,6 +120,7 @@ export function ContentRecordModal({
     setError(null);
     setTitle(draft?.mode === 'edit' ? draft.title : '');
     setDescription(draft?.mode === 'edit' ? draft.description : '');
+    setLanguage('PYTHON');
     setAcademyId(draft?.mode === 'edit' ? draft.academyId : lockedAcademyId);
   }
 
@@ -161,6 +167,7 @@ export function ContentRecordModal({
           academyId: chosen.id,
           title: title.trim(),
           description: description.trim(),
+          language,
         });
         onSaved();
         router.push(
@@ -268,6 +275,18 @@ export function ContentRecordModal({
                 value={description}
               />
             </label>
+
+            {kind === 'courses' && !editing ? (
+              <CourseLanguageField
+                copy={{
+                  label: library('language.label'),
+                  hint: library('language.hint'),
+                  locked: library('language.locked'),
+                }}
+                onChange={setLanguage}
+                value={language}
+              />
+            ) : null}
 
             {editing ? null : (
               <p className="rounded-lg bg-canvas px-3.5 py-2.5 text-[13.5px] leading-5 text-sub">

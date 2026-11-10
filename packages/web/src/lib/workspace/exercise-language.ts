@@ -1,4 +1,4 @@
-import { isCompiledLanguage, parseGccDiagnostics, type ExerciseLanguage } from '@cove/shared';
+import { compiledStarterTemplates, isCompiledLanguage, parseGccDiagnostics, type ExerciseLanguage } from '@cove/shared';
 
 import type { MonacoCodeEditor } from '@/lib/monitoring/yjs-monaco';
 
@@ -27,11 +27,7 @@ export function runCommandFor(language: ExerciseLanguage | undefined): string {
       : 'python solution.py';
 }
 
-/** Starter code a new C or C++ exercise gets (spec §3.1). */
-export const compiledStarterTemplates = {
-  C: '#include <stdio.h>\n\nint main(void) {\n\n    return 0;\n}\n',
-  CPP: '#include <iostream>\nusing namespace std;\n\nint main() {\n\n    return 0;\n}\n',
-} as const;
+export { compiledStarterTemplates };
 
 /**
  * The starter code to keep or replace when an author changes language: an

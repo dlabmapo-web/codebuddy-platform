@@ -24,6 +24,7 @@ import { orpc } from '@/lib/orpc';
 
 import { academyCoursesQueryKey } from '../../courses/_lib/courses-query';
 import { useLayoutTranslation } from '@/i18n';
+import { CourseLanguageBadge } from '@/components/studio/course-language-field';
 
 /**
  * What head office publishes, and the one button that makes it yours.
@@ -162,6 +163,7 @@ export function LibraryBrowser({
               <div className="flex-1 px-5 pb-4 pt-5">
                 <h3 className="text-[15px] font-bold text-ink">
                   {course.title}
+                  <CourseLanguageBadge language={course.language} />
                 </h3>
                 {course.description ? (
                   <p className="mt-1 line-clamp-2 text-[13.5px] leading-5 text-sub">

@@ -165,7 +165,7 @@ describe('exercise draft helpers', () => {
     // contract defaulted the rest: opening a 30/30/40 problem and saving it
     // untouched turned it into 1/1/1.
     const loaded = contextToDraft({
-      course: { id: '10000000-0000-4000-8000-000000000001', title: 'Course' },
+      course: { id: '10000000-0000-4000-8000-000000000001', title: 'Course', language: 'PYTHON' },
       module: { id: '20000000-0000-4000-8000-000000000001', title: 'Module' },
       lecture: { id: '30000000-0000-4000-8000-000000000001', title: 'Lecture' },
       material: {
@@ -352,7 +352,6 @@ describe('withLanguage', () => {
     expect(next.grading.mode).toBe('ELICE_STDIO');
     expect(next.grading.inputPromptPolicy).toBe('INCLUDE');
     expect(next.starterCode).toContain('#include <stdio.h>');
-    expect(draftToPayload(next).language).toBe('C');
   });
 
   it('keeps an author-written starter and swaps an untouched template between C and C++', () => {
@@ -369,7 +368,26 @@ describe('withLanguage', () => {
     expect(next.grading).toEqual({ ...weighted.grading, inputPromptPolicy: 'INCLUDE' });
   });
 
-  it('sends Python for a quiz whatever the draft held', () => {
-    expect(draftToPayload(draft({ quiz: { choices: [], correctChoiceId: '', explanation: '' }, language: 'C' })).language).toBe('PYTHON');
+  it('never sends a language: the course decides it', () => {
+    expect(draftToPayload(withLanguage(draft(), 'C'))).not.toHaveProperty('language');
+  });
+});
+
+describe('a new problem', () => {
+  const context = (language: 'PYTHON' | 'C' | 'CPP') => ({
+    course: { id: '10000000-0000-4000-8000-000000000001', title: 'Course', language },
+    module: { id: '20000000-0000-4000-8000-000000000001', title: 'Module' },
+    lecture: { id: '30000000-0000-4000-8000-000000000001', title: 'Lecture' },
+    material: null,
+  });
+
+  it("starts in its C++ course's language, template and weighted grading", () => {
+    const fresh = contextToDraft(context('CPP'));
+    expect(fresh).toMatchObject({ language: 'CPP', grading: { mode: 'ELICE_STDIO', inputPromptPolicy: 'INCLUDE' } });
+    expect(fresh.starterCode).toContain('#include <iostream>');
+  });
+
+  it('starts a Python course\'s problem exactly as before', () => {
+    expect(contextToDraft(context('PYTHON'))).toMatchObject({ language: 'PYTHON', starterCode: '', grading: { mode: 'LEGACY_STDIO' } });
   });
 });

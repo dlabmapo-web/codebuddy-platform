@@ -46,6 +46,7 @@ import { LibraryStateChip } from './library-state-chip';
 import { LibraryCourseModal } from './library-course-modal';
 import { LibraryCopiesPanel } from './library-copies-panel';
 import { AcademyCoursePicker } from './academy-course-picker';
+import { CourseLanguageBadge } from '@/components/studio/course-language-field';
 
 export type LibraryPage = {
   courses: LibraryCourse[];
@@ -167,6 +168,7 @@ export function LibraryTable({
         cell: ({ row }) => (
           <div className="min-w-0 max-w-md">
             <span className="text-[15px] font-bold">{row.original.title}</span>
+            <CourseLanguageBadge language={row.original.language} />
             <p className="mt-0.5 line-clamp-1 text-[13.5px] text-sub">
               {row.original.description || t('no_description')}
             </p>

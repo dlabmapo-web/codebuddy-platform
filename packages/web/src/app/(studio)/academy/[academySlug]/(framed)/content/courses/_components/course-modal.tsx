@@ -1,9 +1,11 @@
 'use client';
 
+import { CourseLanguageField } from '@/components/studio/course-language-field';
 import { CoursePathPreview } from '@/components/studio/course-path-preview';
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
+import { useTranslation } from 'react-i18next';
 
 import type { CoursesManagerState } from '../_hooks/use-courses-manager';
 
@@ -13,6 +15,7 @@ import type { CoursesManagerState } from '../_hooks/use-courses-manager';
  */
 export function CourseModal({ manager }: { manager: CoursesManagerState }) {
   const { t } = useLayoutTranslation(['courses', 'common']);
+  const { t: grading } = useTranslation('grading');
   const errorText = useErrorText();
   const ready = manager.title.trim().length > 0;
   const editing = manager.editingId !== null;
@@ -68,6 +71,17 @@ export function CourseModal({ manager }: { manager: CoursesManagerState }) {
                 value={manager.description}
               />
             </label>
+
+            <CourseLanguageField
+              copy={{
+                label: grading('language.label'),
+                hint: grading('language.hint'),
+                locked: grading('language.locked'),
+              }}
+              locked={editing && manager.languageLocked}
+              onChange={manager.setLanguage}
+              value={manager.language}
+            />
 
             {editing ? null : (
               <CoursePathPreview

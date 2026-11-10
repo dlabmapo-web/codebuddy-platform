@@ -37,6 +37,7 @@ import type { CoursesManagerState } from '../_hooks/use-courses-manager';
 import { useContentDate } from '../../_components/content-date';
 import { VisibilityConfirmModal } from '../../_components/visibility-confirm-modal';
 import { VisibilityToggle } from '../../_components/visibility-toggle';
+import { CourseLanguageBadge } from '@/components/studio/course-language-field';
 
 function VisibilityIndicator({ isVisible }: { isVisible: boolean }) {
   const { t } = useLayoutTranslation('courses');
@@ -122,6 +123,7 @@ export function CoursesTable({
           return (
             <div className="min-w-0 max-w-md">
               <span className="text-[15px] font-bold">{course.title}</span>
+              <CourseLanguageBadge language={course.language} />
               <p className="mt-0.5 line-clamp-1 text-[13.5px] text-sub">
                 {course.description || t('no_description')}
               </p>

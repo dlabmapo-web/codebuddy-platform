@@ -37,6 +37,17 @@
     "video": {
       "title": "Video lesson",
       "description": "Teach with a video or recording."
+    },
+    "explanation": {
+      "title": "Explanation",
+      "description": "Teach a topic with text, images, and examples."
     }
+  },
+  "explanation": {
+    "badge": "Explanation",
+    "count_one": "{{count}} explanation",
+    "count_other": "{{count}} explanations",
+    "delete_title": "Delete explanation?",
+    "delete_confirm": "Delete explanation"
   }
 }

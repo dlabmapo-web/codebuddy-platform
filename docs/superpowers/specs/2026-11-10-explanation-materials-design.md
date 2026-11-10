@@ -1,7 +1,7 @@
 # Explanation-only lecture materials
 
 Date: 2026-11-10 (Asia/Seoul)
-Status: User approved the feature design; specification complete; implementation not started.
+Status: Implemented on the feature branch; local checks and coverage limits are recorded in the [verification report](../../research/2026-11-10-explanation-materials-verification.md). Release is separate work.
 Branch: `feat/explanation-materials`
 Base: local `feat/cove-studio-v2` at `689e5617f1244125695f40e00d82e53257013dc2`.
 Research: [Elice evidence and Cove source findings](../../research/2026-11-10-explanation-materials.md).
@@ -10,7 +10,7 @@ Research: [Elice evidence and Cove source findings](../../research/2026-11-10-ex
 
 Add a separate **Explanation** material to a lecture for teaching a topic with formatted text and images. Authors use the same rich-text editor they know from coding-exercise descriptions. Students open a reading page, with lecture navigation and the authored content filling the main area.
 
-The user approved a separate material type with the existing rich-text and image editor, a reading-only student view, and no coding or grading fields. This specification records that design. The current request is to create the feature branch and specification; implementation and release are separate work.
+The user approved a separate material type with the existing rich-text and image editor, a reading-only student view, and no coding or grading fields. This specification records that design. The user subsequently requested implementation with Elice-inspired material separation and Cove's existing visual design. Release remains separate work.
 
 Example: an instructor adds “How loops work,” writes a heading and explanation, inserts an animated diagram, and includes a formatted code example. A student reads that page and moves to the next material. Opening the explanation does not start a coding runtime or require an answer.
 
@@ -163,4 +163,4 @@ Use `COVE_INTEGRATION_DATABASE_URL` and the `Prisma log: [{ emit: "event", level
 
 Keep the work focused across shared contracts, Prisma migration, explanation API, existing image helpers, authoring UI, reading page, and material integration points. Avoid expanding the programming-exercise draft schema or adding explanation branches to the grader. Extract a small shared image helper only where needed to remove a coding/manual dependency or a per-image SQL lookup; unrelated refactoring is outside scope.
 
-Before writing application code, read the installed relevant Next.js guides in `packages/web/node_modules/next/dist/docs/` as required by `AGENTS.md`. Prepare an implementation plan against this specification, then implement and validate on this feature branch when requested. This documentation commit changes no database read path, performs no migration, and claims no application/test or SQL-count results.
+Before writing application code, read the installed relevant Next.js guides in `packages/web/node_modules/next/dist/docs/` as required by `AGENTS.md`. The [implementation plan](../plans/2026-11-10-explanation-materials-implementation.md) records the implementation boundaries. Actual application/test results and SQL counts belong to the verification report linked above; the migration has only been applied to disposable local PostgreSQL during verification.

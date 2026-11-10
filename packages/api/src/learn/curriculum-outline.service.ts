@@ -98,7 +98,7 @@ export class CurriculumOutlineService {
 
   /** The same fold, for a caller that already read the course graph. */
   async outlineFor(
-    course: VisibleCourse,
+    course: Pick<VisibleCourse, "id" | "title" | "description" | "modules">,
     userId: string,
     classId?: string,
     staffPractice = false,
@@ -187,6 +187,7 @@ export class CurriculumOutlineService {
             ];
           }),
           videos:lecture.materials.flatMap(material=>material.videoLesson?.asset.state==="READY"&&material.videoLesson.placement!=="SUPPLEMENTARY"?[{materialId:material.id,title:material.title,position:material.position,video:videoMetadata(material.videoLesson),status:statuses.get(material.id)?.status??"NOT_STARTED"}]:[]),
+          explanations: lecture.materials.filter(m => m.type === "EXPLANATION").map(m => ({ materialId: m.id, title: m.title, position: m.position })),
           documents: lecture.materials.flatMap((material) =>
             material.pdfDocument?.asset.state === "READY"
               ? [
@@ -362,6 +363,7 @@ export function courseSummaryFor(
         0,
       ),
       exercises: exercises.length,
+      explanations: modules.reduce((sum, module) => sum + module.lectures.reduce((n, lecture) => n + lecture.materials.filter(m => m.type === "EXPLANATION").length, 0), 0),
       documents: modules.reduce(
         (sum, module) =>
           sum +
@@ -383,12 +385,13 @@ export function courseSummaryFor(
 
 /** A lecture with no exercise is a heading; a module of those is not a module. */
 export function nonemptyModules(
-  course: VisibleCourse,
+  course: Pick<VisibleCourse, "modules">,
 ): VisibleCourse["modules"] {
   return course.modules.flatMap((courseModule) => {
     const lectures = courseModule.lectures.filter((lecture) =>
       lecture.materials.some(
         (material) =>
+          material.type === "EXPLANATION" ||
           material.programmingExercise != null ||
           material.manualMaterial != null ||
           material.pdfDocument?.asset.state === "READY" || material.videoLesson?.asset.state === "READY",

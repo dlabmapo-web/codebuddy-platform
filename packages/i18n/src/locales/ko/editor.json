@@ -37,5 +37,6 @@
   "image_upload_failed": "이미지를 업로드하지 못했습니다. 다시 시도하세요.",
   "image_too_large": "이미지를 줄여도 5MB를 넘어요. 더 작은 이미지를 사용하세요.",
   "image_too_large_unshrinkable": "GIF와 SVG 이미지는 5MB 이하여야 해요.",
-  "resize_image": "드래그로 이미지 너비 조절"
+  "resize_image": "드래그로 이미지 너비 조절",
+  "dismiss_error": "닫기"
 }

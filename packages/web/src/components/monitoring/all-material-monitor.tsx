@@ -329,6 +329,7 @@ function MonitorContent(props: {
                     )
                   )
                     type = "VIDEO_LESSON";
+                  if (lecture.explanations?.some(item => item.materialId === materialId)) type = 'EXPLANATION';
                   const manual = lecture.manualMaterials?.find(
                     (item) => item.materialId === materialId,
                   );

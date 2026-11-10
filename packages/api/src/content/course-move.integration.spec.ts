@@ -298,18 +298,19 @@ describe.skipIf(!databaseUrl)("moving curriculum between parents", () => {
     expect(await positionsAreDense()).toBe(true);
   });
 
-  it.each(["PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE", "VIDEO_LESSON"] as const)(
+  it.each(["PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE", "VIDEO_LESSON", "EXPLANATION"] as const)(
     "moves %s across modules into an empty lecture and preserves its payload", async (type) => {
       const material = type === "PDF_DOCUMENT" ? await addReferencePdf() : await prisma.material.create({ data: {
         lectureId: lecture.L1!, type, title: `Move ${type}`, position: 4, isVisible: true,
         ...(type === "PROGRAMMING_EXERCISE" ? { programmingExercise: { create: { externalKey: randomUUID(), difficulty: "EASY" as const, starterCode: "print(1)" } } }
+          : type === "EXPLANATION" ? { explanationMaterial: { create: { body: "<p>A concept to keep</p>" } } }
           : type === "VIDEO_LESSON" ? { videoLesson: { create: { requestKey: randomUUID(), asset: { create: {
             requestKey: randomUUID(), objectKey: `move/${randomUUID()}`, uploaderUserId: ids.manager,
             academyId, courseId, lectureId: lecture.L1!, filename: "fixture.mp4", byteSize: 100, state: "READY",
           } } } } } : { manualMaterial: { create: { description: "Keep instructions", files: { "main.py": "print(1)" } } } }),
       } });
       const payload = () => prisma.material.findUniqueOrThrow({ where: { id: material.id }, include: {
-        programmingExercise: true, pdfDocument: true, manualMaterial: true, videoLesson: true,
+        explanationMaterial: true, programmingExercise: true, pdfDocument: true, manualMaterial: true, videoLesson: true,
       } });
       const before = await payload();
       await courses.moveExercise(manager, { academyId, courseId, materialId: material.id,

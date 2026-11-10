@@ -107,7 +107,7 @@ describe.skipIf(!databaseUrl)("navigation projections against PostgreSQL", () =>
     const hiddenLecture = await client.lecture.create({ data: { courseModuleId: module.id, title: "Hidden lecture", externalKey: randomUUID(), position: 2 } });
     const moduleHiddenLecture = await client.lecture.create({ data: { courseModuleId: hiddenModule.id, title: "Hidden ancestor", externalKey: randomUUID(), position: 1, isVisible: true } });
     await client.lecture.create({ data: { courseModuleId: module.id, title: "Empty lecture", externalKey: randomUUID(), position: 3 } });
-    const types = ["PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE", "VIDEO_LESSON"] as const;
+    const types = ["PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE", "VIDEO_LESSON", "EXPLANATION"] as const;
     const materials = Array.from({ length: 427 }, (_, index) => ({ id: randomUUID(), lectureId: index < 400 ? lectureId : index < 415 ? hiddenLecture.id : moduleHiddenLecture.id,
       type: types[index % types.length]!, title: `Material ${index}`, position: index + 1, isVisible: index % 7 !== 0,
     }));
@@ -137,7 +137,7 @@ describe.skipIf(!databaseUrl)("navigation projections against PostgreSQL", () =>
     const records = await client.course.findMany({ where: { academyId }, include: legacySummaryInclude });
     const counts = await courseCounts(prisma, academyId, records.map((r) => r.id));
     for (const record of records) expect(counts.get(record.id)).toEqual(toCourseSummary(record).content);
-    expect(counts.get(emptyCourseId)).toEqual({ modules: 0, lectures: 0, exercises: 0, visibleExercises: 0, documents: 0, visibleDocuments: 0 });
+    expect(counts.get(emptyCourseId)).toEqual({ modules: 0, lectures: 0, exercises: 0, visibleExercises: 0, documents: 0, visibleDocuments: 0, explanations: 0, visibleExplanations: 0 });
     expect(counts.get(courseId)?.modules).toBe(3);
     expect(counts.get(courseId)?.lectures).toBe(4);
     expect(counts.get(courseId)?.visibleExercises).toBeGreaterThan(0); // course itself is hidden

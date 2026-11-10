@@ -274,7 +274,8 @@
       "WRITTEN_RESPONSE": "Written response",
       "MULTIPLE_CHOICE": "Multiple choice",
       "PDF_DOCUMENT": "PDF document",
-      "VIDEO_LESSON": "Video lesson"
+      "VIDEO_LESSON": "Video lesson",
+      "EXPLANATION": "Explanation"
     },
     "statuses": {
       "not_started": "Not started",

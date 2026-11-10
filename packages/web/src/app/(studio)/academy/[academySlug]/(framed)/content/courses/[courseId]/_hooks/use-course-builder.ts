@@ -2,6 +2,7 @@
 import {videoApi} from "@/lib/video-api";
 
 import { manualApi } from '@/lib/manual-api';
+import { explanationApi } from '@/lib/explanation-api';
 import { pdfApi } from '@/lib/pdf-api';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -237,7 +238,7 @@ export function useCourseBuilder({
       materialId: string;
       isVisible: boolean;
     }) =>
-      isVideo(input.materialId) ? videoApi.mutate({...target,...input}).then(()=>orpc.academyCourses.getOutline(target)) : isManual(input.materialId) ? manualApi.visibility({...target,...input}).then(()=>orpc.academyCourses.getOutline(target)) : isPdf(input.materialId)
+      isExplanation(input.materialId) ? explanationApi.mutate({ ...target, ...input }).then(() => orpc.academyCourses.getOutline(target)) : isVideo(input.materialId) ? videoApi.mutate({...target,...input}).then(()=>orpc.academyCourses.getOutline(target)) : isManual(input.materialId) ? manualApi.visibility({...target,...input}).then(()=>orpc.academyCourses.getOutline(target)) : isPdf(input.materialId)
         ? pdfApi
             .mutate({ ...target, ...input })
             .then(() => orpc.academyCourses.getOutline(target))
@@ -261,11 +262,12 @@ export function useCourseBuilder({
     }) => orpc.academyCourses.moveLecture({ ...target, ...input }),
     onSuccess: applyTree,
   });
+  const isExplanation = (id: string) => tree.modules.some(m => m.lectures.some(l => l.materials.some(x => x.id === id && x.type === 'EXPLANATION')));
   const isVideo=(id:string)=>tree.modules.some(m=>m.lectures.some(l=>l.materials.some(x=>x.id===id&&x.type==='VIDEO_LESSON')));
   const isManual=(id:string)=>tree.modules.some(m=>m.lectures.some(l=>l.materials.some(x=>x.id===id&&(x.type==='TURTLE_EXERCISE'||x.type==='WRITTEN_RESPONSE'||x.type==='MULTIPLE_CHOICE'))));
   const deleteExerciseMutation = useMutation({
     mutationFn: (input: { lectureId: string; materialId: string }) =>
-      isVideo(input.materialId) ? videoApi.mutate({...target,...input}).then(()=>orpc.academyCourses.getOutline(target)) : isManual(input.materialId) ? manualApi.remove({...target,...input}).then(()=>orpc.academyCourses.getOutline(target)) : isPdf(input.materialId)
+      isExplanation(input.materialId) ? explanationApi.mutate({ ...target, ...input }).then(() => orpc.academyCourses.getOutline(target)) : isVideo(input.materialId) ? videoApi.mutate({...target,...input}).then(()=>orpc.academyCourses.getOutline(target)) : isManual(input.materialId) ? manualApi.remove({...target,...input}).then(()=>orpc.academyCourses.getOutline(target)) : isPdf(input.materialId)
         ? pdfApi
             .mutate({ ...target, ...input })
             .then(() => orpc.academyCourses.getOutline(target))

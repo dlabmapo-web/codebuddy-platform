@@ -60,6 +60,7 @@ const fixture: AcademyCourseImportPreview = {
   sourceCourseTitle: source.title,
   sourceContentRevision: 7,
   materialCounts: {
+    EXPLANATION: 0,
     PROGRAMMING_EXERCISE: 1,
     PDF_DOCUMENT: 1,
     TURTLE_EXERCISE: 1,

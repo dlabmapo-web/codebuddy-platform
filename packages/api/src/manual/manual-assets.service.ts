@@ -139,6 +139,19 @@ export class ManualAssetsService {
     return { assetId: id, name, byteSize: size };
   }
   /** A stored picture as a data URL (same-origin, so it displays under COEP), or null for any other asset. */
+  async imageDataUrls(assetIds: readonly string[]): Promise<Record<string, string | null>> {
+    const ids = [...new Set(assetIds)];
+    if (!ids.length) return {};
+    const rows = await this.db.manualAsset.findMany({ where: { id: { in: ids }, mimeType: { startsWith: "image/" } }, select: { id: true, mimeType: true, objectKey: true, byteSize: true, sha256: true } });
+    const result: Record<string, string | null> = Object.fromEntries(ids.map(id => [id, null]));
+    for (let offset = 0; offset < rows.length; offset += 4) {
+      await Promise.all(rows.slice(offset, offset + 4).map(async row => {
+        try { result[row.id] = `data:${row.mimeType};base64,${await this.download(row)}`; }
+        catch { result[row.id] = null; }
+      }));
+    }
+    return result;
+  }
   async imageDataUrl(assetId: string): Promise<string | null> {
     const row = await this.db.manualAsset.findUnique({ where: { id: assetId } });
     if (!row?.mimeType.startsWith("image/")) return null;

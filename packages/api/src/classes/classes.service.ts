@@ -166,7 +166,7 @@ export class ClassesService {
       classes.flatMap((record) => record.courseAssignments.map((a) => a.course.id)));
     // The existing class badge counts every visible material, including PDFs.
     const visibleCounts = new Map([...counts].map(([id, count]) => [
-      id, count.visibleExercises + (count.visibleDocuments ?? 0),
+      id, count.visibleExercises + (count.visibleDocuments ?? 0) + (count.visibleExplanations ?? 0),
     ]));
     return { classes: classes.map((record) => classSummaryFields(
       record, record._count.enrollments, visibleCounts,

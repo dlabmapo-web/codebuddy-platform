@@ -1,14 +1,15 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { toNavigatorContext, workspaceMaterialSequence } from '@cove/shared';
+import { toNavigatorContext, workspaceMaterialSequence, type LearnCourseOutline } from '@cove/shared';
 import { useRouter } from 'next/navigation';
 import { orpc } from '@/lib/orpc';
 import { routes } from '@/lib/routes';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 
-export function useMaterialNavigation({ academyId, courseId, materialId, classId, preview, materials = [] }: {
+export function useMaterialNavigation({ academyId, courseId, materialId, classId, preview, initialOutline, materials = [] }: {
   academyId: string; courseId?: string; materialId: string; classId?: string; preview?: boolean;
+  initialOutline?: LearnCourseOutline;
   materials?: ReadonlyArray<{ materialId: string; title: string; type: string }>;
 }) {
   const slug = useAcademySlug();
@@ -16,6 +17,7 @@ export function useMaterialNavigation({ academyId, courseId, materialId, classId
   const query = useQuery({
     queryKey: ['material-navigation', academyId, courseId, classId, Boolean(preview)],
     queryFn: () => orpc.learn.getCourseOutline({ academyId, courseId: courseId!, classId, preview: preview || undefined }),
+    initialData: initialOutline,
     enabled: Boolean(courseId), retry: false, staleTime: 30_000,
   });
   const context = query.data ? toNavigatorContext(query.data, materialId) : null;

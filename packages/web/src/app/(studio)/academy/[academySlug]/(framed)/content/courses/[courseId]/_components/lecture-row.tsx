@@ -1,3 +1,5 @@
+import dynamic from 'next/dynamic';
+const ExplanationAuthorDialog = dynamic(() => import('@/components/explanation/explanation-author-dialog').then(module => module.ExplanationAuthorDialog));
 import {VideoAuthorDialog} from "@/components/video/video-author-dialog";
 import { publicConfig } from '@/lib/config';
 import { ManualAuthorDialog } from '@/components/manual/manual-author-dialog';
@@ -130,6 +132,7 @@ function ExerciseRow({
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [pdfMode, setPdfMode] = useState<'preview' | 'edit' | null>(null);
+  const [explanationMode, setExplanationMode] = useState<'edit' | 'preview' | null>(null);
   const [manualOpen,setManualOpen]=useState(false);
   const [videoOpen,setVideoOpen]=useState(false);
   const isManual=material.type==='TURTLE_EXERCISE'||material.type==='WRITTEN_RESPONSE'||material.type==='MULTIPLE_CHOICE';
@@ -167,6 +170,8 @@ function ExerciseRow({
     ) > 1;
   const href = exercisePath(lectureId, material.id);
   const viewHref = surface !== 'academy' ? href
+    : material.type === 'EXPLANATION'
+      ? routes.academyLearnMaterial(academySlug, material.id, material.type, { preview: true })
     : material.type === 'VIDEO_LESSON'
       ? routes.academyLearnVideo(academySlug, material.id, { preview: true })
       : isManual
@@ -174,14 +179,15 @@ function ExerciseRow({
         : routes.academyLearnExercise(academySlug, material.id, !parentEffectivelyVisible || !material.isVisible ? { preview: true } : undefined);
   const exercise = material.programmingExercise;
   const effectivelyVisible = parentEffectivelyVisible && material.isVisible;
-  const materialKind: MaterialCreationKind = material.type === 'PDF_DOCUMENT'
-    ? 'pdf' : material.type === 'VIDEO_LESSON'
-      ? 'video' : material.type === 'TURTLE_EXERCISE'
-        ? 'turtle' : material.type === 'MULTIPLE_CHOICE'
-          ? 'multipleChoice' : material.type === 'WRITTEN_RESPONSE'
-            ? 'written' : exercise?.referencePdfMaterialId ? 'pdfPractice' : 'python';
+  const materialKind: MaterialCreationKind = material.type === 'EXPLANATION' ? 'explanation'
+    : material.type === 'PDF_DOCUMENT' ? 'pdf'
+    : material.type === 'VIDEO_LESSON' ? 'video'
+    : material.type === 'TURTLE_EXERCISE' ? 'turtle'
+    : material.type === 'MULTIPLE_CHOICE' ? 'multipleChoice'
+    : material.type === 'WRITTEN_RESPONSE' ? 'written'
+    : exercise?.referencePdfMaterialId ? 'pdfPractice' : 'python';
   const MaterialIcon = {
-    pdf: FileText, video: Video, turtle: Turtle, multipleChoice: ListChecks,
+    explanation: BookOpen, pdf: FileText, video: Video, turtle: Turtle, multipleChoice: ListChecks,
     written: PenLine, shortAnswer: PenLine, pdfPractice: FileCode2, python: Braces,
   }[materialKind];
   const titleClass = `block max-w-full truncate rounded text-left text-[14px] font-semibold text-ink hover:text-brand focus-visible:outline-2 focus-visible:outline-brand ${effectivelyVisible ? '' : 'opacity-55'}`;
@@ -202,7 +208,7 @@ function ExerciseRow({
       <div className="min-w-0 flex-1">
         {surface === 'academy' && material.type !== 'PDF_DOCUMENT' ? (
           <Link className={titleClass} href={viewHref}>{material.title}</Link>
-        ) : material.type==='VIDEO_LESSON' ? <button type="button" className={titleClass} onClick={()=>setVideoOpen(true)}>{material.title}</button> : isManual ? <button type="button" className={titleClass} onClick={()=>setManualOpen(true)}>{material.title}</button> : material.type === 'PDF_DOCUMENT' ? (
+        ) : material.type === 'EXPLANATION' ? <button type="button" className={titleClass} onClick={() => setExplanationMode('preview')}>{material.title}</button> : material.type==='VIDEO_LESSON' ? <button type="button" className={titleClass} onClick={()=>setVideoOpen(true)}>{material.title}</button> : isManual ? <button type="button" className={titleClass} onClick={()=>setManualOpen(true)}>{material.title}</button> : material.type === 'PDF_DOCUMENT' ? (
           <button
             type="button"
             className={`${titleClass} text-brand hover:underline`}
@@ -256,7 +262,7 @@ function ExerciseRow({
       {rowEditable ? (
         <RowMenu
           kindLabel={
-            material.pdfDocument ? t('pdf.badge') : t('row.kind_exercise')
+            material.type === 'EXPLANATION' ? t('material-picker:explanation.badge') : material.pdfDocument ? t('pdf.badge') : t('row.kind_exercise')
           }
           renameLabel={material.pdfDocument ? t('pdf.edit_action') : t('row.edit')}
           extraItems={
@@ -283,7 +289,7 @@ function ExerciseRow({
           // A problem's title lives with the rest of its content, so renaming
           // opens the problem instead of editing the row in place.
           onRename={() =>
-            isManual ? setManualOpen(true) : material.type === 'VIDEO_LESSON' ? setVideoOpen(true) : material.type === 'PDF_DOCUMENT'
+            material.type === 'EXPLANATION' ? setExplanationMode('edit') : isManual ? setManualOpen(true) : material.type === 'VIDEO_LESSON' ? setVideoOpen(true) : material.type === 'PDF_DOCUMENT'
               ? setPdfMode('edit')
               : router.push(href)
           }
@@ -301,7 +307,7 @@ function ExerciseRow({
       <DeleteModal
         dependencyTitles={referringExercises.map(row => row.title)}
         itemTitle={material.title}
-        kind={material.type === 'PDF_DOCUMENT' ? 'pdf' : 'exercise'}
+        kind={material.type === 'EXPLANATION' ? 'explanation' : material.type === 'PDF_DOCUMENT' ? 'pdf' : 'exercise'}
         onCancel={() => setDeleting(false)}
         onConfirm={() => {
           setDeleting(false);
@@ -309,6 +315,7 @@ function ExerciseRow({
         }}
         open={deleting}
       />
+      {explanationMode ? <ExplanationAuthorDialog target={{ ...builder.target, lectureId }} material={material} editable={rowEditable} initialPreview={explanationMode === 'preview'} onClose={() => setExplanationMode(null)} onSaved={builder.refresh} /> : null}
       {manualOpen ? <ManualAuthorDialog target={{...builder.target,lectureId}} material={material} onClose={()=>setManualOpen(false)} onSaved={builder.refresh}/> : null}
       {videoOpen?<VideoAuthorDialog target={{...builder.target,lectureId}} material={material} editable={rowEditable} onClose={()=>setVideoOpen(false)} onSaved={builder.refresh}/>:null}
       {pdfMode ? (
@@ -343,13 +350,15 @@ export function LectureRow({
   moduleNumber: number;
   parentEffectivelyVisible: boolean;
 }) {
-  const { t } = useTranslation(['content', 'courses', 'pdf-practice']);
+  const { t } = useTranslation(['content', 'courses', 'pdf-practice', 'material-picker']);
   const visibilityIsReal = useContentSurface() !== 'library';
+  const [explanationAdding, setExplanationAdding] = useState(false);
   const [pdfAdding, setPdfAdding] = useState(false);
   const router = useRouter();
   const materialKinds = availableMaterialKinds({ ...publicConfig, editable: builder.editable, exerciseEditable: builder.exerciseEditable });
   function chooseMaterial(kind: MaterialCreationKind) {
     switch (kind) {
+      case 'explanation': setExplanationAdding(true); break;
       case 'python': router.push(exercisePath(lecture.id, 'new')); break;
       case 'pdfPractice': router.push(`${exercisePath(lecture.id, 'new')}?referencePdf=required`); break;
       case 'pdf': setPdfAdding(true); break;
@@ -394,9 +403,10 @@ export function LectureRow({
   const open = !builder.isCollapsed(lecture.id);
   const hasExercises = lecture.materials.length > 0;
   const exerciseCount = lecture.materials.filter(
-    (m) => m.type !== 'PDF_DOCUMENT',
+    (m) => m.type !== 'PDF_DOCUMENT' && m.type !== 'EXPLANATION',
   ).length;
-  const documentCount = lecture.materials.length - exerciseCount;
+  const documentCount = lecture.materials.filter(m => m.type === 'PDF_DOCUMENT').length;
+  const explanationCount = lecture.materials.filter(m => m.type === 'EXPLANATION').length;
 
   return (
     <Collapsible.Root
@@ -448,6 +458,7 @@ export function LectureRow({
                     })
                   : ''
                 : t('lecture.no_exercises')}
+              {explanationCount ? ` · ${t('material-picker:explanation.count', { count: explanationCount })}` : ''}
               {documentCount
                 ? ` · ${t('pdf.document_count', { count: documentCount })}`
                 : ''}
@@ -501,6 +512,7 @@ export function LectureRow({
           ) : null}
         </Collapsible.Content>
 
+        {explanationAdding ? <ExplanationAuthorDialog target={{ ...builder.target, lectureId: lecture.id }} onClose={() => setExplanationAdding(false)} onSaved={builder.refresh} /> : null}
         {videoAdding?<VideoAuthorDialog target={{...builder.target,lectureId:lecture.id}} onClose={()=>setVideoAdding(false)} onSaved={builder.refresh}/>:null}
         {choiceAdding ? <ManualAuthorDialog type="MULTIPLE_CHOICE" target={{...builder.target,lectureId:lecture.id}} onClose={()=>setChoiceAdding(false)} onSaved={builder.refresh}/> : null}
         {shortAdding ? <ManualAuthorDialog shortAnswer type="WRITTEN_RESPONSE" target={{...builder.target,lectureId:lecture.id}} onClose={()=>setShortAdding(false)} onSaved={builder.refresh}/> : null}
@@ -536,7 +548,7 @@ export function LectureRow({
           />
         ) : null}
         <DeleteModal
-          cascade={{ exercises: exerciseCount, documents: documentCount }}
+          cascade={{ exercises: exerciseCount, documents: documentCount, explanations: explanationCount }}
           itemTitle={lecture.title}
           kind="lecture"
           onCancel={() => setDeleting(false)}
@@ -550,9 +562,10 @@ export function LectureRow({
           affected={[
             {
               label: t('visibility_confirm.problems'),
-              value: lecture.materials.filter((m) => m.type !== 'PDF_DOCUMENT').length,
+              value: exerciseCount,
             },
-            { label: t('pdf.badge'), value: lecture.materials.filter((m) => m.type === 'PDF_DOCUMENT').length },
+            { label: t('pdf.badge'), value: documentCount },
+            { label: t('material-picker:explanation.badge'), value: explanationCount },
           ]}
           itemTitle={lecture.title}
           kindLabel={t('row.kind_lecture')}

@@ -7,7 +7,7 @@ import { gradingDataLimits } from "../grading-limits.js";
 
 import { libraryImportOriginSchema, courseProvenanceSchema } from "../platform/library.js";
 
-export const materialTypes = ["PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE", "VIDEO_LESSON"] as const;
+export const materialTypes = ["EXPLANATION", "PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE", "VIDEO_LESSON"] as const;
 export const materialTypeSchema = z.enum(materialTypes);
 export type MaterialType = z.infer<typeof materialTypeSchema>;
 
@@ -134,6 +134,8 @@ export const courseContentCountsSchema = z.object({
    * that legible instead of baffling.
    */
   visibleExercises: z.number().int().nonnegative(),
+  explanations: z.number().int().nonnegative().optional(),
+  visibleExplanations: z.number().int().nonnegative().optional(),
   documents: z.number().int().nonnegative().optional(),
   visibleDocuments: z.number().int().nonnegative().optional(),
 });
@@ -315,11 +317,11 @@ export const setCourseContentVisibilitySchema = z.object({
  */
 export function courseHasNoVisibleContent(course: {
   isVisible: boolean;
-  content: { visibleExercises: number; visibleDocuments?: number };
+  content: { visibleExercises: number; visibleDocuments?: number; visibleExplanations?: number };
 }): boolean {
   return (
     course.isVisible &&
-    course.content.visibleExercises + (course.content.visibleDocuments ?? 0) ===
+    course.content.visibleExercises + (course.content.visibleDocuments ?? 0) + (course.content.visibleExplanations ?? 0) ===
       0
   );
 }

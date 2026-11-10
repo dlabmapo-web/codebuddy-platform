@@ -2,7 +2,7 @@
 
 Date: 2026-11-10
 Branch inspected: `feat/cove-studio-v2` at `689e5617`.
-Status: design approved by the user; [feature specification](../superpowers/specs/2026-11-10-explanation-materials-design.md) written on `feat/explanation-materials`; implementation not started.
+Status: design approved by the user; [feature specification](../superpowers/specs/2026-11-10-explanation-materials-design.md) written on `feat/explanation-materials`; [implementation verification](2026-11-10-explanation-materials-verification.md) records the completed feature and local evidence.
 
 ## Request
 

@@ -161,6 +161,13 @@
       "video": {
         "saved": "동영상 강의 저장",
         "visibility": "동영상 강의 공개 상태 변경"
+      },
+      "explanation": {
+        "created": "설명 자료 생성",
+        "updated": "설명 자료 수정",
+        "deleted": "설명 자료 삭제",
+        "moved": "설명 자료 이동",
+        "visibility": "설명 자료 공개 설정 변경"
       }
     },
     "platform": {

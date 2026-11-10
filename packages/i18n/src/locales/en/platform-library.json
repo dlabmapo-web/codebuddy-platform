@@ -99,7 +99,8 @@
       "TURTLE_EXERCISE": "Turtle",
       "WRITTEN_RESPONSE": "Written response",
       "MULTIPLE_CHOICE": "Multiple choice",
-      "VIDEO_LESSON": "Video"
+      "VIDEO_LESSON": "Video",
+      "EXPLANATION": "Explanation"
     },
     "blockers": {
       "INVALID_DEFINITION": "Invalid material definition",

@@ -37,7 +37,7 @@ export function BuilderHeader({
   const surface = useContentSurface();
   const academySlug = useContentAcademySlug();
   const shellOwnsBack = surface === 'console';
-  const { t } = useTranslation('content');
+  const { t } = useTranslation(['content', 'material-picker']);
   const [hiding, setHiding] = useState(false);
   const course = builder.tree.course;
 
@@ -90,7 +90,7 @@ export function BuilderHeader({
           }}
           title={course.title}
         />
-        {builder.editable && course.content.exercises + (course.content.documents ?? 0) > 0 ? (
+        {builder.editable && course.content.exercises + (course.content.documents ?? 0) + (course.content.explanations ?? 0) > 0 ? (
           <ContentVisibilityControl builder={builder} />
         ) : null}
         {builder.tree.modules.length > 0 ? (
@@ -115,6 +115,7 @@ export function BuilderHeader({
           { label: t('visibility_confirm.lectures'), value: course.content.lectures },
           { label: t('visibility_confirm.problems'), value: course.content.exercises },
           { label: t('pdf.badge'), value: course.content.documents ?? 0 },
+          { label: t('material-picker:explanation.badge'), value: course.content.explanations ?? 0 },
         ]}
         itemTitle={course.title}
         kindLabel={t('row.kind_course')}

@@ -31,6 +31,7 @@ export const courseCopyInclude = {
           materials: {
             orderBy: [{ position: "asc" }, { id: "asc" }],
             include: {
+              explanationMaterial: true,
               manualMaterial: true,
               videoLesson: { include: { asset: true } },
               pdfDocument: { include: { asset: true } },
@@ -64,6 +65,7 @@ export const courseImportPreviewInclude = {
           materials: {
             orderBy: courseCopyInclude.modules.include.lectures.include.materials.orderBy,
             include: {
+              explanationMaterial: true,
               manualMaterial: true,
               programmingExercise: { select: { quiz: true } },
               pdfDocument: { include: { asset: { select: { state: true } } } },
@@ -94,6 +96,7 @@ export async function copyCourseTree(
   const lectures: Prisma.LectureCreateManyInput[] = [];
   const materials: Prisma.MaterialCreateManyInput[] = [];
   const documents: Prisma.PdfDocumentCreateManyInput[] = [];
+  const explanations: Prisma.ExplanationMaterialCreateManyInput[] = [];
   const materialIds = new Map<string, string>();
   const references: Array<{ exercise: Prisma.ProgrammingExerciseCreateManyInput; referenceId: string }> = [];
   const copiedSolutions: Prisma.ProgrammingExerciseSolutionCreateManyInput[] = [];
@@ -146,6 +149,7 @@ export async function copyCourseTree(
                 !material.manualMaterial?.multipleChoice,
         });
 
+        if (material.explanationMaterial) explanations.push({ materialId, body: material.explanationMaterial.body, revision: 1 });
         if (material.videoLesson) {
           const {
             assetId,
@@ -286,6 +290,7 @@ export async function copyCourseTree(
       throw new ConflictException("Only ready video lessons can be adopted");
     }
   }
+  if (explanations.length) await tx.explanationMaterial.createMany({ data: explanations });
   if (videos.length) await tx.videoLesson.createMany({ data: videos });
   if (documents.length) await tx.pdfDocument.createMany({ data: documents });
   if (manuals.length) await tx.manualMaterial.createMany({ data: manuals });

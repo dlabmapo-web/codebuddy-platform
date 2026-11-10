@@ -26,13 +26,14 @@ export function ContentVisibilityControl({
 }: {
   builder: CourseBuilderState;
 }) {
-  const { t } = useTranslation('content');
+  const { t } = useTranslation(['content', 'material-picker']);
   const [hiding, setHiding] = useState(false);
   const { course } = builder.tree;
   const everythingVisible =
-    course.content.exercises + (course.content.documents ?? 0) > 0 &&
+    course.content.exercises + (course.content.documents ?? 0) + (course.content.explanations ?? 0) > 0 &&
     course.content.visibleExercises === course.content.exercises &&
-    (course.content.visibleDocuments ?? 0) === (course.content.documents ?? 0);
+    (course.content.visibleDocuments ?? 0) === (course.content.documents ?? 0) &&
+    (course.content.visibleExplanations ?? 0) === (course.content.explanations ?? 0);
 
   return (
     <>
@@ -65,6 +66,7 @@ export function ContentVisibilityControl({
             value: course.content.exercises,
           },
           { label: t('pdf.badge'), value: course.content.documents ?? 0 },
+          { label: t('material-picker:explanation.badge'), value: course.content.explanations ?? 0 },
         ]}
         itemTitle={course.title}
         kindLabel={t('builder.all_content_kind')}
@@ -95,7 +97,7 @@ export function ContentReadinessNotice({
 }: {
   builder: CourseBuilderState;
 }) {
-  const { t } = useTranslation('content');
+  const { t } = useTranslation(['content', 'material-picker']);
   // A library master has no students to be unreachable to, and its course-level
   // state means "adoptable", not "live".
   const isLibrary = useContentSurface() === 'library';

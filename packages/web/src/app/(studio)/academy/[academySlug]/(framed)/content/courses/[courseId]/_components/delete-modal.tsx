@@ -22,22 +22,23 @@ export function DeleteModal({
 }: {
   /** How many children disappear along with this row. */
   dependencyTitles?: string[];
-  cascade?: { lectures?: number; exercises?: number; documents?: number };
+  cascade?: { lectures?: number; exercises?: number; documents?: number; explanations?: number };
   itemTitle: string;
-  kind: 'module' | 'lecture' | 'exercise' | 'pdf';
+  kind: 'module' | 'lecture' | 'exercise' | 'pdf' | 'explanation';
   onCancel: () => void;
   onConfirm: () => void;
   open: boolean;
 }) {
-  const { t } = useTranslation(['content', 'common', 'pdf-practice']);
+  const { t } = useTranslation(['content', 'common', 'pdf-practice', 'material-picker']);
   const lectures = cascade?.lectures ?? 0;
   const exercises = cascade?.exercises ?? 0;
   const documents = cascade?.documents ?? 0;
-  const losesChildren = lectures > 0 || exercises > 0 || documents > 0;
+  const explanations = cascade?.explanations ?? 0;
+  const losesChildren = lectures > 0 || exercises > 0 || documents > 0 || explanations > 0;
 
   return (
     <Modal onOpenChange={(next) => (next ? null : onCancel())} open={open}>
-      <ModalContent title={t(`delete.${kind}_title`)}>
+      <ModalContent title={kind === 'explanation' ? t('material-picker:explanation.delete_title') : t(`delete.${kind}_title`)}>
         <div className="px-6 py-5">
           <p className="text-[14.5px] leading-6">
             {t('delete.body', { title: itemTitle })}
@@ -53,6 +54,7 @@ export function DeleteModal({
                   {lectures > 0 ? (
                     <li>{t('delete.cascade_lectures', { count: lectures })}</li>
                   ) : null}
+                  {explanations > 0 ? <li>{t('material-picker:explanation.count', { count: explanations })}</li> : null}
                   {documents > 0 ? (
                     <li>{t('pdf.document_count', { count: documents })}</li>
                   ) : null}
@@ -85,7 +87,7 @@ export function DeleteModal({
             onClick={onConfirm}
             type="button"
           >
-            {t(`delete.${kind}_confirm`)}
+            {kind === 'explanation' ? t('material-picker:explanation.delete_confirm') : t(`delete.${kind}_confirm`)}
           </button>
         </div>
       </ModalContent>

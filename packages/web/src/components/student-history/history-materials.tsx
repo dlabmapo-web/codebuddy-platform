@@ -173,6 +173,7 @@ export function HistoryMaterialGroups({
 
 function MaterialTypeIcon({ type }: { type: HistoryMaterial["type"] }) {
   const Icon = {
+    EXPLANATION: BookOpen,
     PROGRAMMING_EXERCISE: Code2,
     TURTLE_EXERCISE: Turtle,
     MULTIPLE_CHOICE: ListChecks,
@@ -181,6 +182,7 @@ function MaterialTypeIcon({ type }: { type: HistoryMaterial["type"] }) {
     VIDEO_LESSON: Video,
   }[type];
   const colors = {
+    EXPLANATION: "bg-brand-soft text-brand",
     PROGRAMMING_EXERCISE: "bg-brand-soft text-brand",
     TURTLE_EXERCISE: "bg-peer-soft text-peer",
     MULTIPLE_CHOICE: "bg-success/10 text-success",

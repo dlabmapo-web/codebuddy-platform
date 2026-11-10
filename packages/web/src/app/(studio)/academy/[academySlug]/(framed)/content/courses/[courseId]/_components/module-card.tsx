@@ -26,7 +26,7 @@ export function ModuleCard({
   courseModule: CourseModule;
   exercisePath: (lectureId: string, materialId: string) => string;
 }) {
-  const { t } = useTranslation(['content', 'common']);
+  const { t } = useTranslation(['content', 'common', 'material-picker']);
   // A `LIBRARY` academy has no students, so nothing in it is hidden *from*
   // anyone, and `adopt` lands every copied row visible whatever these flags
   // say. Showing the control there would promise head office an exclusion it
@@ -41,12 +41,13 @@ export function ModuleCard({
   const addingLecture = builder.lectureModuleId === courseModule.id;
   const effectivelyVisible =
     builder.tree.course.isVisible && courseModule.isVisible;
+  const explanationCount = courseModule.lectures.reduce((total, lecture) => total + lecture.materials.filter(m => m.type === 'EXPLANATION').length, 0);
   const documentCount = courseModule.lectures.reduce(
     (total, lecture) => total + lecture.materials.filter((m) => m.type === 'PDF_DOCUMENT').length,
     0,
   );
   const exerciseCount = courseModule.lectures.reduce(
-    (total, lecture) => total + lecture.materials.filter((m) => m.type !== 'PDF_DOCUMENT').length,
+    (total, lecture) => total + lecture.materials.filter((m) => m.type !== 'PDF_DOCUMENT' && m.type !== 'EXPLANATION').length,
     0,
   );
 
@@ -110,6 +111,7 @@ export function ModuleCard({
             {t('module.lecture_count', {
               count: courseModule.lectures.length,
             })}
+            {explanationCount > 0 ? <span className="text-xs text-sub">{t('material-picker:explanation.count', { count: explanationCount })}</span> : null}
             {exerciseCount > 0 ? (
               <span className="text-sub/70">
                 {' · '}
@@ -238,7 +240,7 @@ export function ModuleCard({
       <DeleteModal
         cascade={{
           exercises: exerciseCount,
-          documents: documentCount,
+          documents: documentCount, explanations: explanationCount,
           lectures: courseModule.lectures.length,
         }}
         itemTitle={courseModule.title}
@@ -261,6 +263,7 @@ export function ModuleCard({
             value: exerciseCount,
           },
           { label: t('pdf.badge'), value: documentCount },
+          { label: t('material-picker:explanation.badge'), value: explanationCount },
         ]}
         itemTitle={courseModule.title}
         kindLabel={t('row.kind_module')}

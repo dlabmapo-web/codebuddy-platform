@@ -48,6 +48,8 @@ describe.skipIf(!databaseUrl)("one-statement curriculum read matches the Prisma 
       const manual = await materialOf(lecture.id, "WRITTEN_RESPONSE", 3, true);
       const video = await materialOf(lecture.id, "VIDEO_LESSON", 1, true);
       const pdf = await materialOf(lecture.id, "PDF_DOCUMENT", 2, true);
+      const explanation = await materialOf(lecture.id, "EXPLANATION", 6, true);
+      await tx.explanationMaterial.create({ data: { materialId: explanation.id, body: "<p>Explanation body must not appear in an outline</p>" } });
       await materialOf(lecture.id, "PROGRAMMING_EXERCISE", 5, false); // hidden material
       await materialOf(earlier.id, "TURTLE_EXERCISE", 1, true); // no detail row at all
       const pdfAsset = await tx.pdfAsset.create({ data: { objectKey: `pdfs/${run}`, originalFilename: "notes.pdf", byteSize: 12_345, checksumSha256: "0".repeat(64), pageCount: 7, uploaderUserId: user.id, academyId: academy.id, courseId: full.id, lectureId: lecture.id, state: "READY" } });

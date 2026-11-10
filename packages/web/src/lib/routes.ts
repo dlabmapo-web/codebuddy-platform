@@ -173,7 +173,7 @@ export const routes = {
   ) => withQuery(`${academyRoot(academySlug)}/learn/records`, query),
   academyTeachVideo:(academySlug:string,classId:string,materialId:string)=>`${academyRoot(academySlug)}/teach/classes/${segment(classId)}/videos/${segment(materialId)}`,
   academyLearnVideo:(academySlug:string,materialId:string,query?:Record<string,QueryValue>)=>withQuery(`${academyRoot(academySlug)}/learn/videos/${segment(materialId)}`,query),
-  academyLearnMaterial:(academySlug:string,materialId:string,type:string,query?:Record<string,QueryValue>)=>withQuery(`${academyRoot(academySlug)}/learn/${type==='VIDEO_LESSON'?'videos':type==='PDF_DOCUMENT'?'documents':type==='PROGRAMMING_EXERCISE'?'exercises':type==='MULTIPLE_CHOICE'?'quizzes':'turtle'}/${segment(materialId)}`,query),
+  academyLearnMaterial:(academySlug:string,materialId:string,type:string,query?:Record<string,QueryValue>)=>withQuery(`${academyRoot(academySlug)}/learn/${type==='EXPLANATION'?'explanations':type==='VIDEO_LESSON'?'videos':type==='PDF_DOCUMENT'?'documents':type==='PROGRAMMING_EXERCISE'?'exercises':type==='MULTIPLE_CHOICE'?'quizzes':'turtle'}/${segment(materialId)}`,query),
   academyLearnQuiz: (academySlug: string, materialId: string, query?: Record<string, QueryValue>) =>
     withQuery(`${academyRoot(academySlug)}/learn/quizzes/${segment(materialId)}`,query),
   academyLearnAssessment: (academySlug:string, materialId:string, type:string, query?:Record<string,QueryValue>) =>

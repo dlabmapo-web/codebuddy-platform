@@ -11,9 +11,9 @@ describe('material creation permissions', () => {
     expect(availableMaterialKinds({ ...options, exerciseEditable: true, guiEnabled: true, multipleChoiceEnabled: true, shortAnswerEnabled: true, videoEnabled: true })).toEqual(['python']);
   });
   it('retains standard authoring choices when optional features are disabled', () => {
-    expect(availableMaterialKinds({ ...options, editable: true, exerciseEditable: true })).toEqual(['python', 'pdfPractice', 'pdf', 'written']);
+    expect(availableMaterialKinds({ ...options, editable: true, exerciseEditable: true })).toEqual(['python', 'explanation', 'pdfPractice', 'pdf', 'written']);
   });
   it('offers enabled manual/video types and replaces written response with turtle in GUI mode', () => {
-    expect(availableMaterialKinds({ ...options, editable: true, guiEnabled: true, multipleChoiceEnabled: true, shortAnswerEnabled: true, videoEnabled: true })).toEqual(['pdfPractice', 'pdf', 'turtle', 'multipleChoice', 'shortAnswer', 'video']);
+    expect(availableMaterialKinds({ ...options, editable: true, guiEnabled: true, multipleChoiceEnabled: true, shortAnswerEnabled: true, videoEnabled: true })).toEqual(['explanation', 'pdfPractice', 'pdf', 'turtle', 'multipleChoice', 'shortAnswer', 'video']);
   });
 });

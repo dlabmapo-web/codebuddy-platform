@@ -5,6 +5,9 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 previous="$deploy_root/state/previous-deployment.env"
 require_file "$previous"
 
+# Before anything stops: a target that cannot read C/C++ rows is refused.
+"$script_dir/check-language-floor.sh" "$previous"
+
 current_copy="$deploy_root/state/failed-deployment.env"
 install -m 600 "$deployment_env" "$current_copy"
 # Stop the newer web before restoring an API that may lack its endpoints.

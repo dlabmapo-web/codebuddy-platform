@@ -13,7 +13,7 @@ class BrowserRollback(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); self.root = pathlib.Path(self.tmp.name)
         scripts = self.root / 'scripts'; scripts.mkdir(); (self.root / 'bin').mkdir()
-        for name in ('common.sh', 'rollback.sh', 'deploy.sh', 'drain-turtle-browser.sh', 'turtle-browser-drain.mjs'):
+        for name in ('common.sh', 'rollback.sh', 'check-language-floor.sh', 'deploy.sh', 'drain-turtle-browser.sh', 'turtle-browser-drain.mjs'):
             shutil.copy(SCRIPTS / name, scripts / name)
         (self.root / 'state').mkdir()
         self.old = 'API_IMAGE=ghcr.io/test/api:sha-' + 'a'*40 + '\n'

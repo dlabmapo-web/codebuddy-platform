@@ -98,6 +98,15 @@ sizing = json.loads(node["environment"]["NATIVE_NODE_RESOURCES"])
 assert float(node["cpus"]) == sizing["cpuSlots"]
 assert int(node["mem_limit"]) == int(node["memswap_limit"]) == sizing["envelopeMemoryMb"] * 1024**2
 assert int(node["pids_limit"]) == 256
+# native-gcc stores: the artifact store is executable and exactly
+# artifactStoreMb (the launcher refuses a larger one); staging is noexec and
+# holds one maximum-size binary per slot.
+mounts = {entry.split(":", 1)[0]: entry.split(":", 1)[1].split(",") for entry in node["tmpfs"]}
+artifacts, staging = mounts["/var/lib/cove-native/artifacts"], mounts["/var/lib/cove-native/staging"]
+assert "exec" in artifacts and "noexec" not in artifacts and {"nosuid", "nodev", "mode=0700"} <= set(artifacts)
+assert f"size={sizing.get('artifactStoreMb', 256)}m" in artifacts
+assert {"noexec", "nosuid", "nodev", "mode=0700", f"size={sizing['cpuSlots'] * 64}m"} <= set(staging)
+assert sizing.get("artifactStoreMb", 256) < sizing["serviceOverheadMb"]
 scope = json.loads(node["environment"]["NATIVE_ELIGIBILITY"])
 assert scope and all("materialId" not in entry for entry in scope)
 assert api["environment"]["NATIVE_GRADING_MANIFEST"] == "/run/cove-native-shared/manifest.json"
@@ -166,6 +175,7 @@ assert not any(v["target"].endswith("docker.sock") for v in node["volumes"])
 print("Turtle monitoring: separate main-project overlay, metrics-only token and textfiles")
 '
 python3 "$deploy_root/scripts/turtle-startup.test.py"
+python3 "$deploy_root/scripts/language-floor.test.py"
 
 # The previous image's validator pins the Render origin. Restoring its older
 # manifest must restore that origin too, even with the new Compose assets.

@@ -186,6 +186,8 @@ try {
         assert.equal((await readdir(config.cgroupRoot)).filter(n => n.startsWith('case-')).length, 0);
         passed++;
         console.log(JSON.stringify({ gate: 'cold-start', status: 'PASS', coldStartupMs: cold.timings.startupMs }));
+        if (config.manifest.gcc)
+            await (await import('./gcc-qualification.mjs')).qualifyGcc({ runtime, config });
         console.log(JSON.stringify({ gate: 'actual-linux-containment', status: 'PASS', passed, descriptor: config.manifest.descriptor }));
     }
 }

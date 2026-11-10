@@ -391,8 +391,10 @@ services:
       - ./secrets/api.env
     environment:
       # Must match cpus/mem_limit below: the launcher refuses a different envelope.
-      NATIVE_NODE_RESOURCES: '{"cpuSlots":3,"officialReservedSlots":1,"envelopeMemoryMb":3376,"serviceOverheadMb":1024,"officialReservedMemoryMb":656,"maxCaseMemoryMb":512,"caseOverheadMb":128,"scratchMb":16,"maxCasePids":8}'
+      NATIVE_NODE_RESOURCES: '{"cpuSlots":3,"officialReservedSlots":1,"envelopeMemoryMb":3376,"serviceOverheadMb":1024,"officialReservedMemoryMb":656,"maxCaseMemoryMb":512,"caseOverheadMb":128,"scratchMb":16,"maxCasePids":8,"maxCompilePids":16,"artifactStoreMb":256}'
       # Every academy; exercises above 512 MiB or a 60 s case stay on judge-worker.
+      # No `languages` means Python only: C/C++ are admitted once an entry lists
+      # them (docs/operations/c-cpp-exercises.md).
       NATIVE_ELIGIBILITY: '[{"contexts":["live","preview"],"kinds":["official","staff-practice","sample","regrade"],"maxCaseTimeLimitMs":60000}]'
       NATIVE_HEALTH_PORT: "4102"
     networks:
@@ -403,6 +405,11 @@ services:
     tmpfs:
       - /run/cove-native:rw,nosuid,nodev,noexec,size=64m,mode=0700
       - /tmp:rw,nosuid,nodev,noexec,size=64m
+      # native-gcc: compiled programs (executable, so a jail can run the one it
+      # mounts; sized by artifactStoreMb and counted in serviceOverheadMb) and
+      # compile staging (noexec; cpuSlots x 64 MiB, charged to each compile).
+      - /var/lib/cove-native/artifacts:rw,nosuid,nodev,exec,size=256m,mode=0700
+      - /var/lib/cove-native/staging:rw,nosuid,nodev,noexec,size=192m,mode=0700
     depends_on:
       redis:
         condition: service_healthy

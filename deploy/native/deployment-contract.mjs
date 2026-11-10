@@ -15,7 +15,9 @@ export function validateDeployment(plan, config) {
     const r = config.manifest.resources;
     if (r.envelopeMemoryMb > r.physicalMemoryMb - Math.max(1024, Math.ceil(r.physicalMemoryMb * .2)))
         throw Error('Insufficient OS memory headroom');
-    if (!Array.isArray(plan.mounts) || plan.mounts.some(m => !['artifact', 'work', 'socket', 'cgroup'].includes(m.kind) || (m.kind === 'artifact' && !m.readOnly)))
+    // The two native-gcc stores are launcher-private tmpfs mounts; the launcher
+    // verifies their flags (executable artifacts, noexec staging) itself.
+    if (!Array.isArray(plan.mounts) || plan.mounts.some(m => !['artifact', 'work', 'socket', 'cgroup', 'gcc-artifacts', 'gcc-staging'].includes(m.kind) || (m.kind === 'artifact' && !m.readOnly)))
         throw Error('Unexpected writable mount');
     return true;
 }

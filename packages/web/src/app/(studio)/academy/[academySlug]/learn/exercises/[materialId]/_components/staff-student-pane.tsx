@@ -8,10 +8,11 @@ import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, X, MessageSquare, Play, Square, LockKeyhole, Pencil } from 'lucide-react';
-import type { MonitoringStudentContext } from '@cove/shared';
+import { isCompiledLanguage, type MonitoringStudentContext } from '@cove/shared';
 import { orpc } from '@/lib/orpc';
 import { useLiveWorkspace } from '@/lib/monitoring/use-live-workspace';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
+import { monacoLanguageFor, sourceFileName } from '@/lib/workspace/exercise-language';
 import { TerminalPanel } from '@/components/workspace/terminal-panel';
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 import { LiveEditor } from '@/app/(studio)/academy/[academySlug]/teach/classes/[classId]/students/[membershipId]/live/_components/live-editor';
@@ -38,7 +39,10 @@ function StudentSession({ academyId, materialId, userId, student, context, start
   const slug=useAcademySlug(),router=useRouter();
   const historyHref=`${routes.academyTeachProgress(slug,student.classId)}?view=students&student=${student.membershipId}`;
   const live = useLiveWorkspace({ academyId, classId: student.classId, studentMembershipId: student.membershipId, autoEdit: true });
-  const runner = usePythonRunner();
+  const language = context.exercise?.exercise?.language;
+  // A staff member's own Run is browser Python; C and C++ have none in this phase.
+  const compiled = isCompiledLanguage(language ?? 'PYTHON');
+  const runner = usePythonRunner({ browserRuntime: !compiled });
   const [note, setNote] = React.useState('');
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const [terminal, setTerminal] = React.useState<'you' | 'student'>('you');
@@ -61,7 +65,7 @@ function StudentSession({ academyId, materialId, userId, student, context, start
     return () => { if (beforeChangeRef.current === prepare) beforeChangeRef.current = null; };
   }, [beforeChangeRef, feedbackOpen, live, note, stored, t]);
   const savedCode = context.exercise?.draftCode ?? starterCode;
-  const canRun = runner.ready && !runner.running;
+  const canRun = !compiled && runner.ready && !runner.running;
   return <div className="flex h-full min-h-0 flex-col bg-card">
     <RemotePointer name={student.displayName} pointer={exact ? live.remote.pointer : null} />
     <div className="grid shrink-0 grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-card px-4 py-3 sm:flex sm:flex-wrap">
@@ -80,11 +84,11 @@ function StudentSession({ academyId, materialId, userId, student, context, start
     </div>
     {live.pendingRecovery ? <div role="status" className="flex shrink-0 gap-3 border-b border-warning/30 bg-warning/10 px-4 py-2 text-xs"><span>{tm('workspace.pending_blocked')}</span><button type="button" onClick={live.follow}>{t('dialog_retry')}</button><button type="button" onClick={() => {
       const url = URL.createObjectURL(new Blob([live.text.toString()], { type: 'text/plain' }));
-      const link = document.createElement('a'); link.href = url; link.download = 'unsynced-teacher-code.py'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const link = document.createElement('a'); link.href = url; link.download = `unsynced-teacher-code.${sourceFileName(language).split('.')[1]}`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     }}>{t('download')}</button></div> : null}
     {!synchronized ? <p role="status" className="shrink-0 border-b border-border px-4 py-2 text-xs text-sub">{t('tutoring_saved_snapshot')} <button type="button" onClick={live.follow} className="font-bold text-brand">{t('dialog_retry')}</button></p> : null}
     <div className="flex min-h-32 flex-1 flex-col bg-editor-bg" {...surfaceProps('editor')}>
-      {synchronized ? <LiveEditor pointerIdentity={live.session ? { draftId: live.session.draftId, material: live.session.materialId } : undefined} fontSize={13} readOnly={!live.canEditCode} text={live.text} /> : <MonacoEditor beforeMount={registerPaircodeTheme} language="python" theme="paircode-dark" height="100%" value={savedCode} options={{ ariaLabel: t('tutoring_saved_code'), automaticLayout: true, readOnly: true, fontFamily: EDITOR_FONT_FAMILY, fontSize: 13, minimap: { enabled: false }, scrollBeyondLastLine: false }} />}
+      {synchronized ? <LiveEditor pointerIdentity={live.session ? { draftId: live.session.draftId, material: live.session.materialId } : undefined} fontSize={13} language={language} readOnly={!live.canEditCode} text={live.text} /> : <MonacoEditor beforeMount={registerPaircodeTheme} language={monacoLanguageFor(language)} theme="paircode-dark" height="100%" value={savedCode} options={{ ariaLabel: t('tutoring_saved_code'), automaticLayout: true, readOnly: true, fontFamily: EDITOR_FONT_FAMILY, fontSize: 13, minimap: { enabled: false }, scrollBeyondLastLine: false }} />}
     </div>
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-y border-border bg-canvas px-3 py-2">
       <button type="button" disabled={!canRun} onClick={() => { setTerminal('you'); void runner.run(synchronized ? live.text.toString() : savedCode); }} className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-xs font-bold text-on-brand hover:bg-brand-deep disabled:opacity-50"><Play aria-hidden className="size-3.5" />{t('tutoring_run')}</button>

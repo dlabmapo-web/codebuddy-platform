@@ -135,3 +135,49 @@ describe('narrateSampleCheck', () => {
     ]);
   });
 });
+
+describe('narrateSampleCheck for C and C++', () => {
+  const compiled = (result: Partial<NonNullable<SampleCheckView['result']>>, extra: Partial<SampleCheckView> = {}) =>
+    view({ result: { ...view().result!, rule: null, outputMatched: null, ...result }, ...extra });
+
+  it('shows GCC’s messages and a compile error, and runs nothing', () => {
+    const diagnostics = "main.c:1:30: error: 'x' undeclared\n";
+    const narration = narrateSampleCheck(
+      compiled({ outcome: 'COMPILE_ERROR', stdout: '', compileDiagnostics: diagnostics }),
+      { codeChanged: false },
+    );
+    expect(narration.lines[0]).toEqual({ kind: 'err', text: diagnostics });
+    expect(messages(narration)).toEqual(['workspace.compile_error']);
+    expect(narration).toMatchObject({ lifecycle: 'FAILED', passedCount: 0, stdout: null, failed: true, compileDiagnostics: diagnostics });
+    expect(narration.verdict).toEqual({ kind: 'skipped', reason: 'error' });
+  });
+
+  it('explains a crashed sample by its signal or exit code', () => {
+    const signal = narrateSampleCheck(compiled({ outcome: 'RUNTIME_ERROR', stdout: '', exitSignal: 'SIGSEGV' }), { codeChanged: false });
+    expect(messages(signal)).toEqual(['workspace.sample_check_runtime_error', 'workspace.exit.SIGSEGV']);
+    const code = narrateSampleCheck(compiled({ outcome: 'RUNTIME_ERROR', stdout: '', exitCode: 3 }), { codeChanged: false });
+    expect(code.lines).toContainEqual({ kind: 'info', message: 'workspace.exit.code', values: { code: 3 } });
+  });
+
+  it('puts warnings of a program that compiled before its output', () => {
+    const narration = narrateSampleCheck(compiled({ compileDiagnostics: 'main.c:2:9: warning: unused variable\n' }), { codeChanged: false });
+    expect(narration.lines[0]).toEqual({ kind: 'info', text: 'main.c:2:9: warning: unused variable\n' });
+    expect(narration.lines[1]).toEqual({ kind: 'out', text: '4\n' });
+  });
+
+  it('narrates a Run by how the program ended, never as a verdict', () => {
+    const finished = narrateSampleCheck(compiled({ stdout: '42\n' }, { kind: 'run', position: null }), { codeChanged: false });
+    expect(messages(finished)).toEqual(['workspace.run_finished']);
+    expect(finished).toMatchObject({ lifecycle: 'COMPLETED', passedCount: 0, verdict: { kind: 'unchecked' }, failed: false });
+
+    const crashed = narrateSampleCheck(
+      compiled({ outcome: 'RUNTIME_ERROR', stdout: '', exitSignal: 'SIGFPE' }, { kind: 'run', position: null }),
+      { codeChanged: true },
+    );
+    expect(messages(crashed)).toEqual(['workspace.run_runtime_error', 'workspace.exit.SIGFPE', 'workspace.run_earlier_code']);
+    expect(crashed).toMatchObject({ lifecycle: 'FAILED', failed: true });
+
+    const slow = narrateSampleCheck(compiled({ outcome: 'TIME_LIMIT', stdout: '' }, { kind: 'run', position: null }), { codeChanged: false });
+    expect(messages(slow)).toEqual(['workspace.run_time_limit']);
+  });
+});

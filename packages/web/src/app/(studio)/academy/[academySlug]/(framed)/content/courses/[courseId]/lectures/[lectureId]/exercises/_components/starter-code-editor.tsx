@@ -3,7 +3,10 @@ import dynamic from 'next/dynamic';
 
 import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
+import type { ExerciseLanguage } from '@cove/shared';
+
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
+import { languageLabelKey, monacoLanguageFor } from '@/lib/workspace/exercise-language';
 
 import { SectionCard } from './authoring-fields';
 
@@ -15,10 +18,12 @@ export function StarterCodeEditor({
   value,
   onChange,
   editable,
+  language = 'PYTHON',
 }: {
   value: string;
   onChange: (value: string) => void;
   editable: boolean;
+  language?: ExerciseLanguage;
 }) {
   const { t } = useTranslation('content');
   const { t: common } = useLayoutTranslation('common');
@@ -31,13 +36,13 @@ export function StarterCodeEditor({
     >
       <div className="overflow-hidden rounded-xl border border-[#2d2d2d] bg-[#1e1e1e]">
         <div className="border-b border-white/10 bg-[#2d2d2d] px-3 py-2 font-mono text-[12px] text-[#a5a5a5]">
-          {t('exercise.language_python')}
+          {t(`exercise.${languageLabelKey(language)}`)}
         </div>
         <MonacoEditor
           beforeMount={registerPaircodeTheme}
           loading={common('state.loading')}
           height="280px"
-          language="python"
+          language={monacoLanguageFor(language)}
           onChange={(next) => onChange(next ?? '')}
           options={{
             automaticLayout: true,

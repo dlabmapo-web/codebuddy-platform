@@ -1,4 +1,6 @@
-import type { ExerciseDifficulty } from '@cove/shared';
+import { exerciseLanguages, type ExerciseDifficulty, type ExerciseLanguage } from '@cove/shared';
+
+import { languageLabelKey } from '@/lib/workspace/exercise-language';
 import { BookOpen } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -32,15 +34,20 @@ export function BasicInformation({
   editable,
   onImageUpload,
   update,
+  languages,
+  onLanguageChange,
 }: {
   authoring: ExerciseAuthoring;
   draft: ExerciseDraft;
   editable: boolean;
+  /** Offered when the academy has C/C++ on, or the exercise already uses one. */
+  languages?: boolean;
+  onLanguageChange?: (language: ExerciseLanguage) => void;
   /** Stores a picture privately for this course and returns its `cove-asset:` source. */
   onImageUpload?: (file: File) => Promise<string>;
   update: ExerciseDraftUpdate;
 }) {
-  const { t } = useTranslation(['content', 'pdf-practice']);
+  const { t } = useTranslation(['content', 'pdf-practice', 'grading']);
   const titleError = authoring.errorFor('title');
   const descriptionError = authoring.errorFor('description');
 
@@ -129,6 +136,24 @@ export function BasicInformation({
           value={draft.title}
         />
       </Field>
+      {languages && !draft.quiz ? (
+        <Field label={t('grading:language.label')}>
+          <select
+            aria-describedby="exercise-language-hint"
+            className={inputClass}
+            disabled={!editable}
+            onChange={(event) => onLanguageChange?.(event.target.value as ExerciseLanguage)}
+            value={draft.language}
+          >
+            {exerciseLanguages.map((language) => (
+              <option key={language} value={language}>
+                {t(`exercise.${languageLabelKey(language)}`)}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-sub" id="exercise-language-hint">{t('grading:language.hint')}</p>
+        </Field>
+      ) : null}
       <Field as="group" label={t('exercise.field.difficulty')} required>
         <DifficultyPicker
           disabled={!editable}

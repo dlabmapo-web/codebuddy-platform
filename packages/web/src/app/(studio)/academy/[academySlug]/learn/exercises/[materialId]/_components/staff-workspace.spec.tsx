@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { LearnExerciseBootstrap } from '@cove/shared';
 import { StaffWorkspace } from './staff-workspace';
-const mocks = vi.hoisted(() => ({ draft: vi.fn(), editor: vi.fn() }));
+const mocks = vi.hoisted(() => ({ draft: vi.fn(), editor: vi.fn(), runnerOptions: vi.fn(), run: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock('@/i18n', () => ({ useLocale: () => 'en', useLayoutTranslation: () => ({ t: (key: string) => key }) }));
@@ -14,7 +14,7 @@ vi.mock('@/lib/orpc', () => ({ orpc: {} }));
 vi.mock('../_hooks/use-draft-autosave', () => ({ useDraftAutosave: (input: unknown) => { mocks.draft(input); return { code: 'private code', saveState: 'saved', setCode: vi.fn(), flushNow: vi.fn(), flushWithoutPromoting: vi.fn(), resetTo: vi.fn() }; } }));
 vi.mock('../_hooks/use-practice-submission', () => ({ usePracticeSubmission: () => ({ submitting: false, history: [], submit: vi.fn(), reset: vi.fn(), cells: [] }) }));
 vi.mock('../_lib/python-error-lines', () => ({ usePythonErrorLines: () => vi.fn() }));
-vi.mock('@/lib/workspace/use-python-runner', () => ({ usePythonRunner: () => ({ running: false, run: vi.fn(), clear: vi.fn(), stop: vi.fn() }) }));
+vi.mock('@/lib/workspace/use-python-runner', () => ({ usePythonRunner: (options: unknown) => { mocks.runnerOptions(options); return { running: false, run: mocks.run, clear: vi.fn(), stop: vi.fn() }; } }));
 vi.mock('@/lib/workspace/use-sample-runner', () => ({ useSampleRunner: () => ({ runSample: vi.fn() }) }));
 vi.mock('@/lib/workspace/use-split-pane', () => ({ useSplitPane: () => ({ size: 40, dividerProps: {}, containerRef: { current: null } }) }));
 vi.mock('@/lib/workspace/use-navigator-panel', () => ({ useNavigatorPanel: () => ({ open: false, panelId: 'practice', triggerRef: { current: null }, toggle: vi.fn(), close: vi.fn() }) }));
@@ -42,6 +42,19 @@ function bootstrap(overrides = {}): LearnExerciseBootstrap {
   } as unknown as LearnExerciseBootstrap;
 }
 describe('staff workspace participation', () => {
+  it.each(['C', 'CPP'] as const)('never runs %s staff practice through Python', async (language) => {
+    const data = bootstrap();
+    data.workspace.exercise.language = language;
+    mocks.run.mockClear();
+    const html = renderToStaticMarkup(<StaffWorkspace academyId="academy" bootstrap={data} userId="manager" />);
+    expect(mocks.runnerOptions).toHaveBeenLastCalledWith(expect.objectContaining({ browserRuntime: false }));
+    expect(mocks.editor).toHaveBeenLastCalledWith(expect.objectContaining({ language, canRun: false, canSubmit: true }));
+    const props = mocks.editor.mock.lastCall![0];
+    props.onRun();
+    await props.onRunAll();
+    expect(mocks.run).not.toHaveBeenCalled();
+    expect(html).toContain('workspace.staff_run_notice');
+  });
   it('shows shared work plus explicit curriculum actions for managers', () => {
     const html = renderToStaticMarkup(<StaffWorkspace academyId="academy" bootstrap={bootstrap()} userId="owner" />);
     expect(html).toContain('Personal editor'); expect(html).toContain('notice');

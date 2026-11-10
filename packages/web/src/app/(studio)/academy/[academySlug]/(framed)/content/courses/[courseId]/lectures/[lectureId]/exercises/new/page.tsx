@@ -7,7 +7,7 @@ import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_compo
 import {
   canManageExercises,
 } from '@/lib/academy-access-state';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { createServerORPCClient, getAcademyFeatures } from '@/lib/orpc-server';
 import { ExerciseWorkspace } from '../_components/exercise-workspace';
 
 export default async function NewExercisePage({
@@ -25,7 +25,11 @@ export default async function NewExercisePage({
   // write control from an operator the API would have allowed.
   const { academyId, roles } = await requireAcademyRoute(academySlug);
   const client = createServerORPCClient();
-  const tree = await client.academyCourses.getOutline({ academyId, courseId });
+  // Independent reads, started together.
+  const [tree, compiledLanguages] = await Promise.all([
+    client.academyCourses.getOutline({ academyId, courseId }),
+    compiledLanguagesFor(academyId),
+  ]);
   const courseModule = tree.modules.find((item) =>
     item.lectures.some((lecture) => lecture.id === lectureId),
   );
@@ -48,9 +52,22 @@ export default async function NewExercisePage({
         canEdit
         courseId={courseId}
         initialContext={context}
+        compiledLanguages={compiledLanguages}
         initialSolutions={[]}
         lectureId={lectureId}
       />
     </StudioPage>
+  );
+}
+
+/**
+ * Whether this academy may author C and C++. The feature list may be closed
+ * to some authoring roles; a refused read offers Python only, which the API
+ * enforces either way.
+ */
+function compiledLanguagesFor(academyId: string): Promise<boolean> {
+  return getAcademyFeatures(academyId).then(
+    ({ features }) => features.some((item) => item.feature === 'C_CPP_EXERCISES' && item.isEnabled),
+    () => false,
   );
 }

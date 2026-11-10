@@ -61,6 +61,8 @@
     "code_help": "Optional code students see when they first open the problem.",
     "solution_code_help": "Required correct Python solution. Only authorized problem authors and a teacher actively monitoring the assigned student can view it.",
     "language_python": "Python 3",
+    "language_c": "C (GCC 12, gnu11)",
+    "language_cpp": "C++17 (GCC 12)",
     "required": {
       "title": "Problem title",
       "difficulty": "Difficulty",

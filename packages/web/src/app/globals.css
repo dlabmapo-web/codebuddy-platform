@@ -749,6 +749,20 @@ h1, h2, h3, h4 {
   margin-left: 5px;
 }
 
+/* A compiler warning on a line that still compiled: amber, never red. */
+.cove-warning-line {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--warning);
+}
+.cove-warning-glyph {
+  background: var(--warning);
+  border-radius: 999px;
+  width: 8px !important;
+  height: 8px !important;
+  margin-top: 5px;
+  margin-left: 5px;
+}
+
 /* The peer's caret, name, and selection inside a shared editor.
    Never interactive: none of it may swallow a click meant for the code
    beneath, and none of it may be reached by the caret or a screen reader —

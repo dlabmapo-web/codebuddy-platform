@@ -62,5 +62,9 @@
       "rule_STDOUT_REGEX_NOMATCH": "Pass when a Python regular expression finds no match.",
       "fix_fields": "Correct the highlighted fields before saving."
     }
+  },
+  "language": {
+    "label": "Language",
+    "hint": "C and C++ programs compile and run on the grading server, with weighted grading."
   }
 }

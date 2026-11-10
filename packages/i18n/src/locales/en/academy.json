@@ -38,6 +38,10 @@
       "SERVER_SAMPLE_CHECKS": {
         "title": "Server-checked samples",
         "body": "The Test buttons on weighted problems run on the grading server and show pass or fail by the same rules as Submit. Practice only: never an attempt or a score."
+      },
+      "C_CPP_EXERCISES": {
+        "title": "C and C++ exercises",
+        "body": "Authors may write C and C++ problems. Students' programs compile and run on the grading server; Run, Test and Submit all need it."
       }
     }
   },

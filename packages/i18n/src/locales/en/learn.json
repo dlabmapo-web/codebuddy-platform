@@ -138,6 +138,8 @@
     "tab_result": "Result",
     "tab_coach": "Error interpretation",
     "language_python": "Python 3",
+    "language_c": "C (GCC 12)",
+    "language_cpp": "C++17 (GCC 12)",
     "font_smaller": "Decrease editor font size",
     "font_larger": "Increase editor font size",
     "copy_input": "Copy",

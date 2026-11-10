@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalContent, ModalTrigger } from '@/components/studio/primitives';
 import { orpc } from '@/lib/orpc';
+import type { ExerciseLanguage } from '@cove/shared';
 import { SolutionAnswerBlock } from '@/components/workspace/solution-answer-block';
 
 type Context = {
@@ -14,6 +15,7 @@ type Context = {
   courseId: string;
   materialId: string;
   userId: string;
+  language?: ExerciseLanguage;
 };
 const actionClass = lessonAction;
 
@@ -29,7 +31,7 @@ export function StaffSolutionDialog(props: Context & { lectureId: string }) {
   </Modal>;
 }
 
-function SolutionContents({ academyId, courseId, lectureId, materialId, userId }: Context & { lectureId: string }) {
+function SolutionContents({ academyId, courseId, lectureId, materialId, userId, language }: Context & { lectureId: string }) {
   const { t } = useTranslation('practice');
   const query = useQuery({
     queryKey: ['staff-solution-dialog', academyId, userId, courseId, lectureId, materialId],
@@ -39,7 +41,7 @@ function SolutionContents({ academyId, courseId, lectureId, materialId, userId }
   });
   if (query.isError) return <DialogError message={t('solution_error')} retry={() => void query.refetch()} />;
   if (!query.data) return <p role="status" className="text-sm text-sub">{t('dialog_loading')}</p>;
-  return query.data.solutions.length ? <div className="space-y-5">{query.data.solutions.map((solution, index) => <SolutionAnswerBlock key={index} solution={solution} index={index} fontSize={14} />)}</div> : <p className="text-sm text-sub">{t('no_solutions')}</p>;
+  return query.data.solutions.length ? <div className="space-y-5">{query.data.solutions.map((solution, index) => <SolutionAnswerBlock key={index} solution={solution} index={index} fontSize={14} language={language} />)}</div> : <p className="text-sm text-sub">{t('no_solutions')}</p>;
 }
 
 function DialogError({ message, retry }: { message: string; retry: () => void }) {

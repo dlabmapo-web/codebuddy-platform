@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { Code2, LogOut, Pencil, History, ClipboardList } from 'lucide-react';
-import { workspaceMaterialSequence, type LearnExerciseBootstrap } from '@cove/shared';
+import { isCompiledLanguage, workspaceMaterialSequence, type LearnExerciseBootstrap } from '@cove/shared';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import { RichTextFrame } from '@/components/studio/rich-text-frame';
 import { GradingNotice } from '@/components/pdf/grading-notice';
@@ -15,6 +15,7 @@ import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-
 import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
 import { ProblemStatement } from '@/components/workspace/problem-statement';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
+import { sourceFileName } from '@/lib/workspace/exercise-language';
 import { useSampleRunner, type SampleRun } from '@/lib/workspace/use-sample-runner';
 import { useSplitPane } from '@/lib/workspace/use-split-pane';
 import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
@@ -34,10 +35,12 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   academyId: string; bootstrap: LearnExerciseBootstrap; userId: string;
 }) {
   const { t } = useTranslation('practice');
+  const { t: tc } = useTranslation('sample-check');
   const slug = useAcademySlug();
   const router = useRouter();
   const { workspace, access } = bootstrap;
   const { exercise, breadcrumb } = workspace;
+  const compiled = isCompiledLanguage(exercise.language);
   const preview = access?.preview ?? false;
   const rootRef = React.useRef<HTMLDivElement>(null);
   const [selectedStudent, setSelectedStudent] = React.useState<TutoringStudent | null>(null);
@@ -52,7 +55,7 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   const runningBatch = React.useRef(false);
   const [navigating, setNavigating] = React.useState(false);
   const formatError = usePythonErrorLines();
-  const runner = usePythonRunner({ formatError });
+  const runner = usePythonRunner({ browserRuntime: !compiled, formatError });
   const sampleRunner = useSampleRunner(runner);
   const { open: panelOpen, toggle: togglePanel, close: closePanel, panelId, triggerRef } = useNavigatorPanel('staff-practice-curriculum');
   const { size, containerRef, dividerProps } = useSplitPane({
@@ -94,6 +97,7 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
     router.push(routes.academyLearnMaterial(slug, id, destination?.type ?? 'PROGRAMMING_EXERCISE', preview ? { preview: true } : undefined));
   }
   async function runSample(index: number) {
+    if (compiled) return;
     const sample = exercise.sampleTestCases[index];
     if (!sample) return;
     setTab('terminal'); setSample(index);
@@ -105,7 +109,7 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
     } finally { setSample(null); }
   }
   async function runAll() {
-    if (busy) return;
+    if (busy || compiled) return;
     setTesting(true); setSamples([]); runningBatch.current = true;
     try {
       for (let i = 0; i < exercise.sampleTestCases.length && runningBatch.current; i++) {
@@ -122,7 +126,7 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
       <span className="hidden items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand sm:inline-flex"><Code2 className="size-3.5" />{t(selectedStudent ? 'tutoring' : 'label')}</span>
       <button type="button" aria-label={t('history')} aria-expanded={historyOpen} onClick={() => setHistoryOpen(!historyOpen)} className="inline-flex items-center gap-1.5 rounded-lg p-2 text-sub hover:bg-accent"><History className="size-4" />{submission.history[0]?.score != null ? <span className="hidden text-xs font-semibold tabular-nums sm:inline" title={t('last_score', { score: submission.history[0].score })}>{submission.history[0].score}/100</span> : null}</button>
       {access?.canParticipateAsStudent ? <Link href={routes.academyLearnExercise(slug, exercise.materialId, { mode: 'student' })} onClick={(event) => void leaveTo(routes.academyLearnExercise(slug, exercise.materialId, { mode: 'student' }), event)} className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold text-sub">{t('learn_as_student')}</Link> : null}
-      {access?.canViewSolutions ? <StaffSolutionDialog academyId={academyId} courseId={breadcrumb.course.id} lectureId={breadcrumb.lecture.id} materialId={exercise.materialId} userId={userId} /> : null}
+      {access?.canViewSolutions ? <StaffSolutionDialog academyId={academyId} courseId={breadcrumb.course.id} lectureId={breadcrumb.lecture.id} materialId={exercise.materialId} userId={userId} language={exercise.language} /> : null}
       {access?.canObserve && !exercise.quiz ? <StaffTutoringDrawer academyId={academyId} courseId={breadcrumb.course.id} materialId={exercise.materialId} userId={userId} assignedTeacher={access.canObserveAssignedStudents ?? false} selected={selectedStudent} onSelect={selectStudent} /> : null}
       {access?.canReview && !access.canAuthor ? <Link href={editPath} onClick={(event) => void leaveTo(editPath, event)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-sub hover:text-brand"><ClipboardList aria-hidden className="size-4 shrink-0" />{t('review')}</Link> : null}
       {access?.canAuthor ? <Link href={editPath} onClick={(event) => void leaveTo(editPath, event)} className={lessonAction}><Pencil className="size-3.5" />{t('edit')}</Link> : null}
@@ -133,9 +137,10 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
       <span className="font-bold sm:hidden">{t('label')}</span><span>{t(selectedStudent ? 'tutoring_notice' : 'notice')}</span>
       <span className="ml-auto" aria-live="polite">{draft.saveState !== 'idle' ? t(`save.${draft.saveState}`) : null}</span>
       {(draft.saveState === 'error' || draft.saveState === 'conflict') ? <button className="underline" type="button" onClick={() => {
-        const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([draft.code], { type: 'text/plain' })); link.download = 'practice.py'; link.click(); URL.revokeObjectURL(link.href);
+        const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([draft.code], { type: 'text/plain' })); link.download = sourceFileName(exercise.language); link.click(); URL.revokeObjectURL(link.href);
       }}>{t('download')}</button> : null}
     </div>
+    {compiled ? <p role="note" className="border-b border-border bg-card px-4 py-2 text-xs text-sub">{tc('workspace.staff_run_notice')}</p> : null}
     {workspace.draft?.gradingRevision !== undefined && workspace.draft.gradingRevision !== exercise.gradingRevision ? <p role="status" className="border-b border-warning/25 bg-warning/5 px-4 py-2 text-xs text-warning">{t('revision_changed')}</p> : null}
     {preview ? <p role="status" className="border-b border-warning/25 bg-warning/5 px-4 py-2 text-xs font-semibold text-warning">{t('preview')}</p> : null}
     {historyOpen ? <section className="max-h-44 shrink-0 overflow-auto border-b border-border bg-card px-4 py-3" aria-label={t('history')}>
@@ -166,10 +171,10 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
         </section>
         <div aria-hidden className="hidden w-1 shrink-0 cursor-col-resize bg-border hover:bg-brand/40 md:block" {...dividerProps} />
         <section className={`min-w-0 flex-1 flex-col ${mobile === 'code' ? 'flex' : 'hidden'} md:flex`}>
-          <div className={selectedStudent ? "hidden" : "flex min-h-0 flex-1 flex-col"}><EditorPane code={draft.code} onCodeChange={draft.setCode} runner={runner} submission={submission}
+          <div className={selectedStudent ? "hidden" : "flex min-h-0 flex-1 flex-col"}><EditorPane code={draft.code} onCodeChange={draft.setCode} runner={runner} submission={submission} language={exercise.language} canRun={!compiled}
             sampleTestCases={exercise.sampleTestCases} activeSample={activeSample} testingSamples={testing} sampleResults={samples} sampleRunFailed={false}
             onReset={() => { if (draft.code !== exercise.starterCode && window.confirm(t('reset_confirm'))) { draft.resetTo(exercise.starterCode); runner.clear(); submission.reset(); } }}
-            onSubmit={submit} practiceOnly={isPdfRunOnly(exercise)} canSubmit={Boolean(access?.canSubmit) && !isPdfRunOnly(exercise) && exercise.submissionAvailability !== "INVALID_GRADING"} onRun={() => { setTab('terminal'); setSamples([]); void runner.run(draft.code); }}
+            onSubmit={submit} practiceOnly={isPdfRunOnly(exercise)} canSubmit={Boolean(access?.canSubmit) && !isPdfRunOnly(exercise) && exercise.submissionAvailability !== "INVALID_GRADING"} onRun={() => { if (compiled) return; setTab('terminal'); setSamples([]); void runner.run(draft.code); }}
             onRunSample={(index) => { void runSample(index); }} onRunAll={() => { void runAll(); }}
             onStop={() => { runningBatch.current = false; runner.stop(); }} tab={tab} /></div>
           {selectedStudent ? <StaffStudentPane key={`${selectedStudent.classId}:${selectedStudent.membershipId}`} academyId={academyId} materialId={exercise.materialId} userId={userId} starterCode={exercise.starterCode} student={selectedStudent} beforeChangeRef={beforeStudentChange} close={() => selectStudent(null)} /> : null}

@@ -50,6 +50,7 @@ import { useAcademySlug } from "@/components/studio/academy-route-provider";
 import { ExerciseImageProvider, ManualImageProvider } from "@/components/studio/lesson-image-providers";
 import { routes } from "@/lib/routes";
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from "@/lib/monaco/theme";
+import { languageLabelKey, monacoLanguageFor } from "@/lib/workspace/exercise-language";
 import {
   historyAction,
   historyPrimaryAction,
@@ -182,7 +183,7 @@ export function DraftWorkspace({
         draft: preview.studentCode === null ? "starter" : "saved",
         review: {
           code: preview.studentCode ?? preview.exercise.starterCode,
-          language: "PYTHON",
+          language: preview.exercise.language ?? "PYTHON",
           problemTitle: preview.exercise.title,
           studentName: name,
           statement: preview.exercise.description,
@@ -219,6 +220,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
   const { t: tc } = useLayoutTranslation("courses");
   const { t: mt } = useManualTranslation();
   const { t: tl } = useTranslation("learn");
+  const { t: ts } = useTranslation("sample-check");
   const original = React.useMemo(
     () =>
       data.kind === "programming"
@@ -701,11 +703,33 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                   · {data.review.hiddenPassed ?? 0} /{" "}
                   {data.review.hiddenTotal ?? 0} {t("history.hidden_tests")}
                 </p>
+                {data.review.compileFailed ? (
+                  <div className="mt-3 text-xs" role="status">
+                    <p className="font-semibold text-danger">
+                      {ts("workspace.compile_error_title")}
+                    </p>
+                    <p className="mt-1 text-sub">
+                      {ts("workspace.compile_error_result")}
+                    </p>
+                    {data.review.compileDiagnostics ? (
+                      <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded bg-canvas p-2 font-mono">
+                        {data.review.compileDiagnostics}
+                      </pre>
+                    ) : null}
+                  </div>
+                ) : null}
                 {(data.review.cases ?? [])
                   .filter((c) => c.isSample)
                   .map((c) => (
                     <div key={c.position} className="mt-3 text-xs">
                       <p>{c.outcome}</p>
+                      {c.outcome === "RUNTIME_ERROR" && (c.exitSignal || c.exitCode) ? (
+                        <p className="text-danger">
+                          {c.exitSignal
+                            ? ts(`workspace.exit.${c.exitSignal}`)
+                            : ts("workspace.exit.code", { code: c.exitCode })}
+                        </p>
+                      ) : null}
                       <pre className="whitespace-pre-wrap rounded bg-canvas p-2">
                         {c.actualOutput ?? ""}
                       </pre>
@@ -765,7 +789,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
               >
                 {coding ? (
                   <span className="self-center px-3 py-2 font-mono text-xs text-white/60">
-                    {tl("workspace.language_python")}
+                    {tl(`workspace.${languageLabelKey(data.review.language)}`)}
                   </span>
                 ) : null}
                 {!coding &&
@@ -790,7 +814,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                   beforeMount={registerPaircodeTheme}
                   language={
                     data.kind === "programming"
-                      ? data.review.language.toLowerCase()
+                      ? monacoLanguageFor(data.review.language)
                       : "python"
                   }
                   theme="paircode-dark"
@@ -1022,6 +1046,14 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                       <p>
                         {score ?? "—"} / {maximum}
                       </p>
+                      {data.review.compileFailed ? (
+                        <pre className="mt-3 whitespace-pre-wrap text-[#fb7185]">
+                          {ts("workspace.compile_error_title")}
+                          {data.review.compileDiagnostics
+                            ? `\n${data.review.compileDiagnostics}`
+                            : ""}
+                        </pre>
+                      ) : null}
                       {(data.review.cases ?? [])
                         .filter((c) => c.isSample)
                         .map((c) => (

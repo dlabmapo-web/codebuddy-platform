@@ -5,6 +5,7 @@ import { routes } from '@/lib/routes';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 
 import {
+  isCompiledLanguage,
   navigatorPathFromBreadcrumb,
   type MonitoringStudentContext,
   type ObservationSnapshot,
@@ -34,6 +35,7 @@ import { navigatorRow } from '@/lib/workspace/navigator-geometry';
 import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
 import { useEditorPreferences } from '@/lib/workspace/use-editor-preferences';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
+import { languageLabelKey } from '@/lib/workspace/exercise-language';
 import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
 import {
   STATEMENT_CANVAS_MIN_WIDTH,
@@ -323,6 +325,7 @@ export function LiveWorkspace({
     dividerProps: outputDividerProps,
   } = useSplitPane({ axis: 'vertical', initial: 240, min: 96, max: 1_200 });
 
+  const shownLanguage = (previewed?.exercise ?? liveExercise?.exercise)?.language;
   const getCode = React.useCallback(() => previewed ? previewed.studentCode ?? previewed.exercise.starterCode : live.text.toString(), [live.text, previewed]);
 
   /**
@@ -390,6 +393,7 @@ export function LiveWorkspace({
                 classId={classId}
                 fontSize={preferences.fontSize}
                 hasSolution={liveExercise.hasSolution}
+                language={liveExercise.exercise.language}
                 key={live.session.visitId}
                 materialId={live.session.materialId}
                 membershipId={membershipId}
@@ -598,7 +602,7 @@ export function LiveWorkspace({
               <header className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#2d2d2d] px-3 py-1.5">
                 {/* theme-lint-ignore */}
                 <span className="font-mono text-[11.5px] text-[#a5a5a5]">
-                  {tl('workspace.language_python')}
+                  {tl(`workspace.${languageLabelKey(shownLanguage)}`)}
                 </span>
                 <div className="ml-auto">
                   <FontSizeControls {...preferences} />
@@ -616,11 +620,13 @@ export function LiveWorkspace({
                   <PreviewEditor
                     code={previewed.studentCode ?? previewed.exercise.starterCode}
                     fontSize={preferences.fontSize}
+                    language={shownLanguage}
                   />
                 ) : (
                   <LiveEditor
                     pointerIdentity={live.session ? { draftId: live.session.draftId, material: live.session.materialId } : undefined}
                     fontSize={preferences.fontSize}
+                    language={shownLanguage}
                     readOnly={!live.canEditCode || !display.isLive}
                     text={live.text}
                   />
@@ -643,7 +649,9 @@ export function LiveWorkspace({
               >
                 <LiveOutput
                   activeSample={activeSample}
-                  canRun={Boolean(shown)}
+                  // C/C++ compile on the server for the student only; a teacher
+                  // follows the student's mirrored runs rather than running their own.
+                  canRun={Boolean(shown) && !isCompiledLanguage(shownLanguage ?? 'PYTHON')}
                   onRun={handleRun}
                   onRunSample={(index) => void handleRunSample(index)}
                   academySlug={academySlug}

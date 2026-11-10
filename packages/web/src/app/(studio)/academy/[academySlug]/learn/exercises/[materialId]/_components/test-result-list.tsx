@@ -15,6 +15,8 @@ import {
   X,
 } from 'lucide-react';
 
+import { useTranslation } from 'react-i18next';
+
 import { useLayoutTranslation } from '@/i18n';
 
 import { firstFailedSample, outcomeTone } from '../_lib/scoring';
@@ -45,11 +47,15 @@ const rowTone = {
 export function TestResultList({
   cells,
   result,
+  compiled = false,
 }: {
   cells: CaseCell[];
   result: SubmissionResult | null;
+  /** C/C++: a runtime error is explained by how the program ended. */
+  compiled?: boolean;
 }) {
   const { t } = useLayoutTranslation('learn');
+  const { t: tc } = useTranslation('sample-check');
   const resultByPosition = new Map(
     result?.cases.map((item) => [item.position, item]) ?? [],
   );
@@ -111,6 +117,18 @@ export function TestResultList({
                       ? null
                       : ` · ${t('submit.runtime', { ms: caseResult.runtimeMs })}`}
                   </p>
+                  {compiled && outcome === 'RUNTIME_ERROR' && caseResult ? (
+                    <p className="mt-0.5 text-[10.5px] leading-snug text-[#fda4af]">
+                      {caseResult.exitSignal
+                        ? tc(`workspace.exit.${caseResult.exitSignal}`)
+                        : caseResult.exitCode
+                          ? tc('workspace.exit.code', { code: caseResult.exitCode })
+                          // A hidden case's exact ending would disclose its input.
+                          : !caseResult.isSample
+                            ? tc('workspace.exit.hidden')
+                            : null}
+                    </p>
+                  ) : null}
                 </div>
                 <span
                   className={`shrink-0 text-right text-[10.5px] font-bold ${visual.outcome}`}

@@ -1,6 +1,8 @@
 'use client';
 import { QuizFeedback } from '@/components/workspace/quiz-feedback';
 
+import { useTranslation } from 'react-i18next';
+
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { useLayoutTranslation } from '@/i18n';
 
@@ -10,8 +12,16 @@ import { ResultHero } from './result-hero';
 import { ResultMetrics } from './result-metrics';
 import { TestResultList } from './test-result-list';
 
-export function ResultPanel({ submission }: { submission: SubmissionState }) {
+export function ResultPanel({
+  submission,
+  compiled = false,
+}: {
+  submission: SubmissionState;
+  /** C/C++: shows a compile error and explains runtime errors. */
+  compiled?: boolean;
+}) {
   const { t } = useLayoutTranslation('learn');
+  const { t: tc } = useTranslation('sample-check');
   const errorText = useErrorText();
   const { result, cells, submitting, error } = submission;
 
@@ -46,9 +56,20 @@ export function ResultPanel({ submission }: { submission: SubmissionState }) {
         </p>
       ) : null}
 
+      {!suppressesResults && result?.compileFailed ? (
+        <section className="space-y-2 rounded-xl border border-danger/25 bg-danger/[0.055] px-3 py-2.5" role="status">
+          <h4 className="text-[12px] font-bold text-[#fb7185]">{tc('workspace.compile_error_title')}</h4>
+          <p className="text-[11.5px] leading-relaxed text-[#aab3c2]">{tc('workspace.compile_error_result')}</p>
+          {result.compileDiagnostics ? (
+            <pre className="max-h-48 overflow-auto rounded-lg bg-[#171717] px-2.5 py-2 font-mono text-[11.5px] leading-[1.5] text-[#fda4af] ring-1 ring-inset ring-white/[0.06]">
+              {result.compileDiagnostics}
+            </pre>
+          ) : null}
+        </section>
+      ) : null}
       {!suppressesResults && result?.quiz ? <QuizFeedback quiz={result.quiz} /> : null}
       {!suppressesResults && !result?.quiz ? (
-        <TestResultList cells={cells} result={result} />
+        <TestResultList cells={cells} compiled={compiled} result={result} />
       ) : null}
 
       {hiddenResults > 0 ? (

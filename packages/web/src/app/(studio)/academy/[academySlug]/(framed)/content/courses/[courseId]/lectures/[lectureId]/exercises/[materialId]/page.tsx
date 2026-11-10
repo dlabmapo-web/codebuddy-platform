@@ -7,7 +7,7 @@ import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_compo
 import {
   canManageExercises,
 } from '@/lib/academy-access-state';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { createServerORPCClient, getAcademyFeatures } from '@/lib/orpc-server';
 import { routes } from '@/lib/routes';
 import { redirectIfExerciseMoved } from '../../../../_lib/moved-exercise';
 import { ExerciseWorkspace } from '../_components/exercise-workspace';
@@ -29,6 +29,8 @@ export default async function ExercisePage({
   const { academyId, roles } = await requireAcademyRoute(academySlug);
   const client = createServerORPCClient();
   const canEdit = canManageExercises(roles);
+  // Started beside the exercise read; consulted only when rendering.
+  const compiledLanguagesRequest = canEdit ? compiledLanguagesFor(academyId) : Promise.resolve(false);
   // Requested beside the exercise rather than after it; the role decides
   // whether it is needed, and it is only consulted once the exercise exists.
   const solutionsRequest = canEdit
@@ -68,6 +70,7 @@ export default async function ExercisePage({
     solutions = read.solutions;
   }
 
+  const compiledLanguages = await compiledLanguagesRequest;
   return (
     <StudioPage bleed title={context.course.title}>
       <ExerciseWorkspace
@@ -75,9 +78,22 @@ export default async function ExercisePage({
         canEdit={canEdit}
         courseId={courseId}
         initialContext={context}
+        compiledLanguages={compiledLanguages}
         initialSolutions={solutions}
         lectureId={lectureId}
       />
     </StudioPage>
+  );
+}
+
+/**
+ * Whether this academy may author C and C++. The feature list may be closed
+ * to some authoring roles; a refused read offers Python only, which the API
+ * enforces either way.
+ */
+function compiledLanguagesFor(academyId: string): Promise<boolean> {
+  return getAcademyFeatures(academyId).then(
+    ({ features }) => features.some((item) => item.feature === 'C_CPP_EXERCISES' && item.isEnabled),
+    () => false,
   );
 }

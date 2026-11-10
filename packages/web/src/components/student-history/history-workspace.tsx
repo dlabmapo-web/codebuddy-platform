@@ -94,6 +94,7 @@ export function HistoryWorkspace(props: Props) {
   );
 }
 function HistoryContent(props: Props) {
+  const { t: ts } = useTranslation("sample-check");
   const { t } = useTranslation("teach"),
     locale = useLocale(),
     slug = useAcademySlug();
@@ -714,6 +715,11 @@ function HistoryContent(props: Props) {
                             {!a.currentRevision ? (
                               <span className="ml-2 text-sub">
                                 {t("history.statuses.previous_revision")}
+                              </span>
+                            ) : null}
+                            {a.compileFailed ? (
+                              <span className="ml-2 rounded bg-danger/10 px-2 py-1 text-danger">
+                                {ts("workspace.compile_error_title")}
                               </span>
                             ) : null}
                             <span className="mt-1 block text-sub">

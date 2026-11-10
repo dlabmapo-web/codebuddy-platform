@@ -10,7 +10,7 @@ import Link from 'next/link';
 
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 
-import { workspaceMaterialSequence, toSharedDocumentText, type LearnExerciseBootstrap } from '@cove/shared';
+import { isCompiledLanguage, workspaceMaterialSequence, toSharedDocumentText, type LearnExerciseBootstrap } from '@cove/shared';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -26,6 +26,7 @@ import { useStudentMonitoring } from '@/lib/monitoring/use-student-monitoring';
 import { navigatorRow } from '@/lib/workspace/navigator-geometry';
 import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
 import { markErrorLine } from '@/lib/workspace/error-line-decoration';
+import { markCompileDiagnostics, runCommandFor } from '@/lib/workspace/exercise-language';
 import { createRunId, runSampleSequence } from '@/lib/workspace/sample-run';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
 import { useSampleRunner, type SampleRun } from '@/lib/workspace/use-sample-runner';
@@ -127,8 +128,13 @@ function ProgrammingWorkspace({
   }, []);
   const formatError = usePythonErrorLines();
   const headline = usePythonErrorHeadline();
-  const runner = usePythonRunner({ formatError });
-  const { runSample, serverCheck } = useSampleRunner(runner);
+  // C and C++ run on the server: no Pyodide download for a C/C++ page. A later
+  // Python problem reached in-page still loads it on its first Run.
+  const runner = usePythonRunner({
+    formatError,
+    browserRuntime: !isCompiledLanguage(bootstrap.workspace.exercise.language),
+  });
+  const { runSample, runOnServer, serverCheck } = useSampleRunner(runner);
   const navigation = useExerciseNavigation({
     academyId,
     bootstrap,
@@ -148,6 +154,16 @@ function ProgrammingWorkspace({
   } = useNavigatorPanel('workspace-curriculum');
 
   const { exercise } = workspace;
+  const compiled = isCompiledLanguage(exercise.language);
+  /**
+   * What a C/C++ Run sends as stdin. Starts as the first example's input and
+   * belongs to the problem on screen: moving to another problem starts over.
+   */
+  const firstInput = exercise.sampleTestCases[0]?.input ?? '';
+  const [runInputState, setRunInputState] = React.useState<{ materialId: string; value: string } | null>(null);
+  const runInput = runInputState?.materialId === exercise.materialId ? runInputState.value : firstInput;
+  /** GCC's messages from the latest C/C++ Run or Test, marked in the editor. */
+  const [compileMarks, setCompileMarks] = React.useState<{ materialId: string; diagnostics: string | null } | null>(null);
   // A transition inside the workspace leaves the reviewed attempt behind: it
   // described the problem the student entered on, not the one they moved to.
   const selected =
@@ -262,6 +278,7 @@ function ProgrammingWorkspace({
       // One id for both halves of the report: the presence summary and the
       // mirrored terminal describe the same execution, so a teacher cannot see
       // a transcript from one run beside a verdict from another.
+      if (compiled) setCompileMarks(null);
       const result = await runSample(draft.code, sample, index, {
         clientRunId,
         sampleCount: exercise.sampleTestCases.length,
@@ -281,6 +298,7 @@ function ProgrammingWorkspace({
       });
       const { outcome, verdict, report } = result;
       setActiveSample(null);
+      if (compiled) setCompileMarks({ materialId: exercise.materialId, diagnostics: result.compileDiagnostics ?? null });
       // A server check that ended without judging the program — stopped,
       // timed out, unavailable — reports as cancelled, never as a wrong answer.
       if (report && (report.lifecycle === 'CANCELLED' || !outcome)) {
@@ -332,6 +350,7 @@ function ProgrammingWorkspace({
       exercise.materialId,
       exercise.sampleTestCases,
       exercise.serverSampleChecks,
+      compiled,
       monitoring,
       runSample,
     ],
@@ -377,6 +396,32 @@ function ProgrammingWorkspace({
       output: '',
     });
 
+    if (compiled) {
+      // Compiled and run on the server with the Input panel's text as stdin;
+      // the terminal narrates it, and teachers mirror it, as for a sample.
+      setCompileMarks(null);
+      const result = await runOnServer(
+        draft.code,
+        { stdin: runInput, command: runCommandFor(exercise.language) },
+        {
+          academyId,
+          classId,
+          materialId: exercise.materialId,
+          workspaceRevision: exercise.gradingRevision,
+          currentCode: () => latestCodeRef.current,
+        },
+        { clientRunId },
+      );
+      setCompileMarks({ materialId: exercise.materialId, diagnostics: result.compileDiagnostics ?? null });
+      monitoring.publishRun({
+        clientRunId,
+        lifecycle: result.report?.lifecycle ?? 'CANCELLED',
+        sampleCount: 0,
+        passedCount: 0,
+        output: result.outcome?.stdout ?? '',
+      });
+      return;
+    }
     const outcome = await runner.run(draft.code, {
       banner: [{ text: '$ python solution.py\n', kind: 'meta' }],
       clientRunId,
@@ -413,12 +458,19 @@ function ProgrammingWorkspace({
             .join('')
         : outcome.stdout,
     });
-  }, [draft.code, formatError, monitoring, runner]);
+  }, [academyId, classId, compiled, draft.code, exercise.gradingRevision, exercise.language, exercise.materialId, formatError, monitoring, runInput, runOnServer, runner]);
 
   /**
    * The mark lives exactly as long as the error does: a new run clears
    * `lastError` and the cleanup takes the red line with it.
    */
+  const marks = compileMarks?.materialId === exercise.materialId ? compileMarks.diagnostics : null;
+  React.useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !editorReady) return;
+    return markCompileDiagnostics(editor, marks);
+  }, [editorReady, marks]);
+
   const runnerError = runner.lastError;
   React.useEffect(() => {
     const editor = editorRef.current;
@@ -721,6 +773,12 @@ function ProgrammingWorkspace({
               onRun={() => void handleRun()}
               onRunSample={(index) => void handleRunSample(index)}
               serverCheck={serverCheck}
+              language={exercise.language}
+              runInput={compiled ? {
+                value: runInput,
+                onChange: (value) => setRunInputState({ materialId: exercise.materialId, value }),
+                onReset: firstInput ? () => setRunInputState({ materialId: exercise.materialId, value: firstInput }) : undefined,
+              } : undefined}
               runner={runner}
               practiceOnly={isPdfRunOnly(exercise)} canSubmit={!isPdfRunOnly(exercise) && exercise.submissionAvailability !== "INVALID_GRADING"}
               sampleTestCases={exercise.sampleTestCases}

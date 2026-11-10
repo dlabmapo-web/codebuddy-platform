@@ -4,6 +4,7 @@ import { defaultEliceGradingProfile, exerciseDraftFieldsSchema, legacyGradingPro
 
 import {
   contextToDraft,
+  withLanguage,
   withSubmissionPolicy,
   draftGradingIssues,
   draftToPayload,
@@ -24,6 +25,7 @@ const legacyFields = {
 function draft(overrides: Partial<ExerciseDraft> = {}): ExerciseDraft {
   return {
     title: ' Sum two numbers ',
+    language: 'PYTHON',
     difficulty: 'EASY',
     description: '<p>Add the values.</p>',
     inputFormat: '',
@@ -341,4 +343,33 @@ it('starts an empty PDF grader at 100 absolute points with a hidden case', () =>
   expect(automatic.testCases[0]).toMatchObject({ visibility: 'HIDDEN', weight: 100 });
   expect(draftToPayload(automatic).testCases).toHaveLength(1);
   expect(exerciseCompleteness(automatic).find(field => field.id === 'test')).toMatchObject({ optional: false, complete: false });
+});
+
+describe('withLanguage', () => {
+  it('moves a C exercise to weighted grading with prompts included and fills an empty starter', () => {
+    const next = withLanguage(draft({ starterCode: '' }), 'C');
+    expect(next.language).toBe('C');
+    expect(next.grading.mode).toBe('ELICE_STDIO');
+    expect(next.grading.inputPromptPolicy).toBe('INCLUDE');
+    expect(next.starterCode).toContain('#include <stdio.h>');
+    expect(draftToPayload(next).language).toBe('C');
+  });
+
+  it('keeps an author-written starter and swaps an untouched template between C and C++', () => {
+    expect(withLanguage(draft({ starterCode: 'int main(void) { return 1; }' }), 'CPP').starterCode)
+      .toBe('int main(void) { return 1; }');
+    const c = withLanguage(draft({ starterCode: '' }), 'C');
+    expect(withLanguage(c, 'CPP').starterCode).toContain('#include <iostream>');
+    expect(withLanguage(c, 'PYTHON').starterCode).toBe('');
+  });
+
+  it('keeps an already weighted profile and only clears prompt stripping', () => {
+    const weighted = draft({ grading: { ...defaultEliceGradingProfile, inputPromptPolicy: 'IGNORE', totalTimeLimitMs: 20_000 } });
+    const next = withLanguage(weighted, 'CPP');
+    expect(next.grading).toEqual({ ...weighted.grading, inputPromptPolicy: 'INCLUDE' });
+  });
+
+  it('sends Python for a quiz whatever the draft held', () => {
+    expect(draftToPayload(draft({ quiz: { choices: [], correctChoiceId: '', explanation: '' }, language: 'C' })).language).toBe('PYTHON');
+  });
 });

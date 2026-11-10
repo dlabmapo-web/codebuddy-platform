@@ -1,6 +1,6 @@
 'use client';
 
-import type { LearnSampleTestCase } from '@cove/shared';
+import { isCompiledLanguage, type ExerciseLanguage, type LearnSampleTestCase } from '@cove/shared';
 import { RotateCcw, Send } from 'lucide-react';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,9 @@ import { useLayoutTranslation } from '@/i18n';
 import { SubmissionSummary } from '@/components/workspace/submission-summary';
 import { FontSizeControls } from '@/components/workspace/font-size-controls';
 import { RunControls } from '@/components/workspace/run-controls';
+import { StdinPanel } from '@/components/workspace/stdin-panel';
 import { TerminalPanel } from '@/components/workspace/terminal-panel';
+import { languageLabelKey, monacoLanguageFor } from '@/lib/workspace/exercise-language';
 import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import { useEditorPreferences } from '@/lib/workspace/use-editor-preferences';
 import type { SampleRun } from '@/lib/workspace/use-sample-runner';
@@ -34,6 +36,7 @@ export function EditorPane({
   onReset,
   onSubmit,
   canSubmit = true,
+  canRun = true,
   practiceOnly = false,
   code,
   collaborating = false,
@@ -48,6 +51,8 @@ export function EditorPane({
   onEditorMount,
   onFocusLine,
   serverCheck,
+  language = 'PYTHON',
+  runInput,
 }: {
   onRunAll: () => void;
   onStop: () => void;
@@ -57,6 +62,7 @@ export function EditorPane({
   onReset: () => void;
   onSubmit: () => void;
   canSubmit?: boolean;
+  canRun?: boolean;
   practiceOnly?: boolean;
   code: string;
   collaborating?: boolean;
@@ -75,7 +81,11 @@ export function EditorPane({
   onFocusLine?: (line: number, column: number) => void;
   /** A sample check judged on the server, which Stop must reach too. */
   serverCheck?: { active: boolean; stopping: boolean; stop: () => void };
+  language?: ExerciseLanguage;
+  /** C/C++ only: the input a server Run sends, owned by the workspace. */
+  runInput?: { value: string; onChange: (value: string) => void; onReset?: () => void };
 }) {
+  const compiled = isCompiledLanguage(language);
   const { t } = useLayoutTranslation('learn');
   const { t: tc } = useTranslation('sample-check');
   const preferences = useEditorPreferences();
@@ -99,7 +109,7 @@ export function EditorPane({
     >
       <header className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#2d2d2d] px-3 py-1.5">
         <span className="font-mono text-[11.5px] text-[#a5a5a5]">
-          {t('workspace.language_python')}
+          {t(`workspace.${languageLabelKey(language)}`)}
         </span>
         <div className="ml-auto">
           <FontSizeControls {...preferences} />
@@ -113,6 +123,7 @@ export function EditorPane({
           code={code}
           documentManaged={collaborating}
           fontSize={preferences.fontSize}
+          language={monacoLanguageFor(language)}
           onChange={onCodeChange}
           onMount={onEditorMount}
         />
@@ -134,7 +145,7 @@ export function EditorPane({
       >
         <div className="@container flex shrink-0 flex-wrap items-center gap-2 py-1 border-b border-white/10 bg-[#2d2d2d] px-2">
           <button type="button" disabled={testingSamples || runner.running || submission.submitting} onClick={onReset} className="inline-flex shrink-0 items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[12px] text-white disabled:opacity-50"><RotateCcw className="size-3" />{t('workspace.reset')}</button>
-          <RunControls
+          {canRun ? <RunControls
             activeSample={activeSample}
             onRun={onRun}
             onRunSample={onRunSample}
@@ -144,10 +155,18 @@ export function EditorPane({
             running={runner.running || testingSamples || Boolean(serverCheck?.active)}
             stopping={Boolean(serverCheck?.stopping)}
             sampleTestCases={practiceOnly ? [] : sampleTestCases}
-          />
+          /> : null}
           {!practiceOnly ? <button type="button" disabled={!canSubmit || testingSamples || runner.running || submission.submitting} onClick={onSubmit} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/20 px-2 py-1 text-[12px] text-white disabled:opacity-50"><Send className="size-3" />{t('workspace.submit')}</button> : null}
           {!practiceOnly ? <SubmissionSummary latest={submission.latestSubmission} loading={submission.summaryLoading} failed={submission.summaryError} onRefresh={submission.refreshSummary} refreshing={submission.summaryRefreshing} dark /> : null}
         </div>
+        {compiled && runInput && tab !== 'result' ? (
+          <StdinPanel
+            disabled={runner.running || testingSamples || Boolean(serverCheck?.active)}
+            onChange={runInput.onChange}
+            onReset={runInput.onReset}
+            value={runInput.value}
+          />
+        ) : null}
 
         <div
           aria-label={t('workspace.tab_result')}
@@ -204,7 +223,7 @@ export function EditorPane({
             />
             ) : null}
           </>) : (
-            <ResultPanel submission={submission} />
+            <ResultPanel compiled={compiled} submission={submission} />
           )}
         </div>
       </div>

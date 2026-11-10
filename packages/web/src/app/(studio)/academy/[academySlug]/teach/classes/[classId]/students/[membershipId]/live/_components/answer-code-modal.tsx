@@ -1,6 +1,6 @@
 'use client';
 
-import type { ExerciseSolutionEntry } from '@cove/shared';
+import type { ExerciseLanguage, ExerciseSolutionEntry } from '@cove/shared';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -25,6 +25,7 @@ function AnswerCodeModalSession({
   visitId,
   hasSolution,
   fontSize,
+  language,
 }: {
   academyId: string;
   classId: string;
@@ -33,6 +34,7 @@ function AnswerCodeModalSession({
   visitId: string;
   hasSolution: boolean;
   fontSize: number;
+  language?: ExerciseLanguage;
 }) {
   const { t } = useTranslation('monitoring');
   const [open, setOpen] = React.useState(false);
@@ -116,7 +118,7 @@ function AnswerCodeModalSession({
             </div>
           ) : (
             <div className="space-y-6">
-              {solutions.map((solution, index) => <SolutionAnswerBlock key={index} solution={solution} index={index} fontSize={fontSize} />)}
+              {solutions.map((solution, index) => <SolutionAnswerBlock key={index} solution={solution} index={index} fontSize={fontSize} language={language} />)}
             </div>
           )}
 

@@ -49,6 +49,8 @@ export type SampleRun = {
    */
   /** Preserve authoritative server verdicts and diagnostics in batch results. */
   serverDetails?: SampleCheckLine[];
+  /** C/C++: GCC's messages, to mark the lines they name in the editor. */
+  compileDiagnostics?: string | null;
   report?: { lifecycle: Exclude<TerminalLifecycle, 'STARTED'>; passedCount: number };
 };
 
@@ -127,8 +129,10 @@ export function useSampleRunner(runner: PythonRunnerState) {
   const runServer = React.useCallback(
     async (
       code: string,
-      sample: LearnSampleTestCase,
-      index: number,
+      /** A public sample's check, or a C/C++ Run on the student's own input. */
+      check:
+        | { kind: 'sample'; sample: LearnSampleTestCase; index: number }
+        | { kind: 'run'; stdin: string; command: string },
       target: ServerSampleTarget,
       options: { clientRunId?: string; sampleCount?: number },
     ): Promise<SampleRun> => {
@@ -144,14 +148,20 @@ export function useSampleRunner(runner: PythonRunnerState) {
       currentRef.current = current;
       setActive(true);
       setStopping(false);
-      const number = index + 1;
+      const number = check.kind === 'sample' ? check.index + 1 : 0;
       const clientRunId = options.clientRunId ?? crypto.randomUUID();
 
       runner.beginExternalRun({
         clientRunId,
         sampleCount: options.sampleCount ?? 0,
         banner: [
-          { text: `$ ${tc('workspace.sample_check_banner', { number })}\n`, kind: 'meta' },
+          check.kind === 'sample'
+            ? { text: `$ ${tc('workspace.sample_check_banner', { number })}\n`, kind: 'meta' }
+            : { text: `$ ${check.command}\n`, kind: 'meta' },
+          // What the program will read, as a terminal would have echoed it.
+          ...(check.kind === 'run' && check.stdin
+            ? [{ text: check.stdin.endsWith('\n') ? check.stdin : `${check.stdin}\n`, kind: 'in' as const }]
+            : []),
         ],
       });
       runner.appendLine(`${tc('workspace.sample_check_queued')}\n`, 'info');
@@ -173,16 +183,18 @@ export function useSampleRunner(runner: PythonRunnerState) {
 
       let view: SampleCheckView;
       try {
-        view = await orpc.learn.startSampleCheck({
+        const address = {
           academyId: target.academyId,
           classId: target.classId,
           materialId: target.materialId,
-          position: sample.position,
           code,
           workspaceRevision: target.workspaceRevision,
           // One per click: a retried or doubled request starts one check.
           clientRequestId: clientRunId,
-        });
+        };
+        view = check.kind === 'sample'
+          ? await orpc.learn.startSampleCheck({ ...address, position: check.sample.position })
+          : await orpc.learn.startRunCheck({ ...address, stdin: check.stdin });
       } catch (error) {
         if (abort.signal.aborted) return abandoned();
         runner.appendLine(`${errorText(error)}\n`, 'err');
@@ -230,7 +242,7 @@ export function useSampleRunner(runner: PythonRunnerState) {
               : t(`workspace.sample_rule.${line.rule.comparator}`);
           runner.appendLine(`${label}\n${line.rule.expected || '(empty)'}\n`, line.kind);
         } else {
-          const sentence = tc(line.message, { number });
+          const sentence = tc(line.message, { number, ...line.values });
           runner.appendLine(
             line.mark ? `\n${line.mark} ${sentence}\n` : `${sentence}\n`,
             line.kind,
@@ -245,6 +257,7 @@ export function useSampleRunner(runner: PythonRunnerState) {
               : { stdout: narration.stdout, stopped: false, failed: narration.failed, error: null },
           verdict: narration.verdict,
           serverDetails: narration.lines,
+          compileDiagnostics: narration.compileDiagnostics,
         },
         narration.lifecycle,
         narration.passedCount,
@@ -270,7 +283,7 @@ export function useSampleRunner(runner: PythonRunnerState) {
       },
     ): Promise<SampleRun> => {
       if (options?.server) {
-        return runServer(code, sample, index, options.server, options);
+        return runServer(code, { kind: 'sample', sample, index }, options.server, options);
       }
 
       const outcome = await runner.run(code, {
@@ -402,8 +415,24 @@ export function useSampleRunner(runner: PythonRunnerState) {
   }, [releaseServerCheck]);
   React.useEffect(() => () => releaseRef.current(), []);
 
+  /**
+   * A C/C++ Run: the code and the student's input go to the server, which
+   * compiles and runs them; the terminal narrates it like a sample check.
+   */
+  const runOnServer = React.useCallback(
+    (
+      code: string,
+      run: { stdin: string; command: string },
+      target: ServerSampleTarget,
+      options: { clientRunId?: string } = {},
+    ): Promise<SampleRun> =>
+      runServer(code, { kind: 'run', ...run }, target, { ...options, sampleCount: 0 }),
+    [runServer],
+  );
+
   return {
     runSample,
+    runOnServer,
     serverCheck: { active, stopping, stop: stopServerCheck, abandon: abandonServerCheck },
   };
 }

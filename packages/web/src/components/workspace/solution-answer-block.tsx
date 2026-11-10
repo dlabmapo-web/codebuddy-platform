@@ -1,12 +1,14 @@
 'use client';
-import type { ExerciseSolutionEntry } from '@cove/shared';
+import type { ExerciseLanguage, ExerciseSolutionEntry } from '@cove/shared';
 import dynamic from 'next/dynamic';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
+import { monacoLanguageFor } from '@/lib/workspace/exercise-language';
 const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), { ssr: false });
 
-export function SolutionAnswerBlock({ solution, index, fontSize }: { solution: ExerciseSolutionEntry; index: number; fontSize: number }) {
+/** `language` is the exercise's; a solution is always written in it. */
+export function SolutionAnswerBlock({ solution, index, fontSize, language }: { solution: ExerciseSolutionEntry; index: number; fontSize: number; language?: ExerciseLanguage }) {
   const { t } = useTranslation('solutions');
   const { t: tm } = useTranslation('monitoring');
   const ref = React.useRef<HTMLElement>(null);
@@ -30,7 +32,7 @@ export function SolutionAnswerBlock({ solution, index, fontSize }: { solution: E
       }}>{copied ? tm('answer.copied') : tm('answer.copy')}</button>
     </div>
     <div className="h-[280px] overflow-hidden rounded-xl border border-border">
-      {visible && <MonacoEditor beforeMount={registerPaircodeTheme} height="280px" language="python" theme="paircode-dark" value={solution.code}
+      {visible && <MonacoEditor beforeMount={registerPaircodeTheme} height="280px" language={monacoLanguageFor(language)} theme="paircode-dark" value={solution.code}
         options={{ ariaLabel: t('answer', { number: index + 1 }), automaticLayout: true, fontFamily: EDITOR_FONT_FAMILY, fontSize, lineNumbers: 'on', minimap: { enabled: false }, readOnly: true, scrollBeyondLastLine: false, tabSize: 4, wordWrap: 'off' }} />}
     </div>
     {failed && <p role="alert" className="text-sm text-danger">{tm('answer.copy_failed')}</p>}

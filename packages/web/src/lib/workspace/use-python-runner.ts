@@ -83,12 +83,19 @@ export type PythonErrorFormatter = (
 
 export function usePythonRunner(options?: {
   formatError?: PythonErrorFormatter;
+  /**
+   * False for C and C++: their programs run on the server, so the 13 MB
+   * Pyodide runtime is never downloaded and the terminal is ready at once.
+   * The transcript, external runs and mirroring work the same either way.
+   */
+  browserRuntime?: boolean;
 }) {
+  const browserRuntime = options?.browserRuntime ?? true;
   const [transcript, setTranscript] =
     React.useState<TerminalTranscript>(emptyTranscript);
   const [running, setRunning] = React.useState(false);
   const [awaitingInput, setAwaitingInput] = React.useState(false);
-  const [ready, setReady] = React.useState(false);
+  const [ready, setReady] = React.useState(!browserRuntime);
   /** The error the coach is explaining, until the next run replaces it. */
   const [lastError, setLastError] = React.useState<PythonExecutionError | null>(
     null,
@@ -309,6 +316,7 @@ export function usePythonRunner(options?: {
    * forever would be worse than the one capability that mode lacks.
    */
   React.useEffect(() => {
+    if (!browserRuntime) return;
     const runner = ensureRunner();
     void runner.whenReady().then(() => setReady(!runner.isFailed));
     return () => {
@@ -316,7 +324,7 @@ export function usePythonRunner(options?: {
       runnerRef.current = null;
       if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
     };
-  }, [ensureRunner]);
+  }, [browserRuntime, ensureRunner]);
 
   const run = React.useCallback(
     (

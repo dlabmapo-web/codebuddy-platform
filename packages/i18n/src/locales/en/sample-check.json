@@ -19,6 +19,30 @@
     "sample_check_truncated": "(Output shortened for display. The whole output was checked.)",
     "sample_check_earlier_code": "This result is for your code as it was when you pressed Test {{number}}.",
     "sample_check_refresh": "This problem changed after the check. Refresh the page to see its current samples.",
-    "stopping": "Stopping…"
+    "stopping": "Stopping…",
+    "compile_error": "The program did not compile. Fix the lines GCC names above; they are marked in the editor.",
+    "run_finished": "The program finished.",
+    "run_runtime_error": "The program ended with an error.",
+    "run_time_limit": "The program ran longer than this problem's time limit and was stopped.",
+    "run_memory_limit": "The program used more memory than this problem allows and was stopped.",
+    "run_earlier_code": "This result is for your code as it was when you pressed Run.",
+    "exit": {
+      "SIGSEGV": "Invalid memory access: an array index out of range, a null pointer, or recursion that is too deep.",
+      "SIGFPE": "Arithmetic error, usually integer division by zero.",
+      "SIGABRT": "The program aborted: a failed assert, or a C++ exception that was not caught.",
+      "SIGSYS": "The program used a system feature that is not allowed, such as system() or fork().",
+      "SIGBUS": "Invalid memory access (bus error).",
+      "SIGILL": "The program executed an invalid instruction.",
+      "SIGKILL": "The program was killed.",
+      "OTHER": "The program was stopped by a signal.",
+      "code": "The program ended with exit code {{code}}. main should return 0.",
+      "hidden": "The program crashed or ended with a nonzero exit code on a hidden test. Check array bounds, division by zero, and that main returns 0."
+    },
+    "staff_run_notice": "C/C++ Run and Test are available in the student workspace. Submit here to grade your own staff practice.",
+    "stdin_label": "Program input",
+    "stdin_hint": "What the program reads when you press Run. Typing into a running program is coming later.",
+    "stdin_reset": "Use example 1",
+    "compile_error_title": "Compile error",
+    "compile_error_result": "This submission did not compile, so no test ran. It counts as an attempt with 0 points."
   }
 }

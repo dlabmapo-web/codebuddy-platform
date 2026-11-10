@@ -1,4 +1,6 @@
 'use client';
+import type { ExerciseLanguage } from '@cove/shared';
+import { monacoLanguageFor } from '@/lib/workspace/exercise-language';
 
 import dynamic from 'next/dynamic';
 import * as React from 'react';
@@ -36,11 +38,13 @@ function EditorFallback() {
 export function LiveEditor({
   pointerIdentity,
   fontSize,
+  language,
   readOnly,
   text,
 }: {
   pointerIdentity?: { draftId: string; material: string };
   fontSize: number;
+  language?: ExerciseLanguage;
   readOnly: boolean;
   text: Y.Text;
 }) {
@@ -63,7 +67,7 @@ export function LiveEditor({
       <MonacoEditor
         beforeMount={registerPaircodeTheme}
         height="100%"
-        language="python"
+        language={monacoLanguageFor(language)}
         onMount={setEditor}
         options={{
           automaticLayout: true,

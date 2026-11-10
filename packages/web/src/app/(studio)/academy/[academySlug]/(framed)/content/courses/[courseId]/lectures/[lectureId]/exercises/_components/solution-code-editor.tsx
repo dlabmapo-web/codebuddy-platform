@@ -1,20 +1,22 @@
 'use client';
 
-import { exerciseSolutionEntrySchema, exerciseSolutionsSchema, type ExerciseSolutionEntry } from '@cove/shared';
+import { exerciseSolutionEntrySchema, exerciseSolutionsSchema, type ExerciseLanguage, type ExerciseSolutionEntry } from '@cove/shared';
 import { BadgeCheck } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
+import { monacoLanguageFor } from '@/lib/workspace/exercise-language';
 import { useLayoutTranslation } from '@/i18n';
 import { SectionCard } from './authoring-fields';
 
 const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), { ssr: false });
 
-export function SolutionCodeEditor({ value, onChange, error }: {
+export function SolutionCodeEditor({ value, onChange, error, language = 'PYTHON' }: {
   value: ExerciseSolutionEntry[];
   onChange: (value: ExerciseSolutionEntry[]) => void;
   error: string | null;
+  language?: ExerciseLanguage;
 }) {
   const { t } = useTranslation('solutions');
   const { t: common } = useLayoutTranslation('common');
@@ -61,7 +63,7 @@ export function SolutionCodeEditor({ value, onChange, error }: {
           <input className="mt-1 w-full rounded-lg border border-border bg-canvas px-3 py-2" maxLength={80} value={entry.title ?? ''} onChange={event => change(keys[index], { title: event.target.value || null })} />
         </label>
         <div className="overflow-hidden rounded-lg border border-border">
-          <MonacoEditor loading={common('state.loading')} beforeMount={registerPaircodeTheme} height="280px" language="python" theme="paircode-dark" value={entry.code}
+          <MonacoEditor loading={common('state.loading')} beforeMount={registerPaircodeTheme} height="280px" language={monacoLanguageFor(language)} theme="paircode-dark" value={entry.code}
             onMount={editor => { if (focusNew.current && index === value.length - 1) { editor.focus(); focusNew.current = false; } }}
             onChange={code => change(keys[index], { code: code ?? '' })}
             options={{ ariaLabel: t('answer', { number: index + 1 }), automaticLayout: true, fontFamily: EDITOR_FONT_FAMILY, fontSize: 13, lineNumbers: 'on', minimap: { enabled: false }, scrollBeyondLastLine: false, tabSize: 4, wordWrap: 'off' }} />

@@ -1,4 +1,6 @@
-import { defaultEliceGradingProfile, inferSubmissionPolicy, type SubmissionPolicy } from "@cove/shared";
+import { defaultEliceGradingProfile, inferSubmissionPolicy, isCompiledLanguage, type ExerciseLanguage, type SubmissionPolicy } from "@cove/shared";
+
+import { starterAfterLanguageChange } from '@/lib/workspace/exercise-language';
 
 import type { ExerciseSolutionEntry } from "@cove/shared";
 import { exerciseSolutionsSchema } from "@cove/shared";
@@ -69,6 +71,8 @@ export type ExerciseDraft = {
   outputFormat: string;
   constraints: string;
   starterCode: string;
+  /** Python, or C/C++ compiled on the native GCC runtime. */
+  language: ExerciseLanguage;
   solutions: ExerciseSolutionEntry[];
   aiFeedbackEnabled: boolean;
   isVisible: boolean;
@@ -99,6 +103,7 @@ export function contextToDraft(
       outputFormat: '',
       constraints: '',
       starterCode: '',
+      language: 'PYTHON',
       solutions: solutions.length ? solutions : [{ title: null, code: '' }],
       aiFeedbackEnabled: false,
       isVisible: false,
@@ -119,6 +124,7 @@ export function contextToDraft(
     outputFormat: exercise.outputFormat,
     constraints: exercise.constraints,
     starterCode: exercise.starterCode,
+    language: exercise.language,
     solutions: exercise.quiz ? [] : solutions.length ? solutions : [{ title: null, code: '' }],
     aiFeedbackEnabled: exercise.aiFeedbackEnabled,
     isVisible: context.material!.isVisible,
@@ -150,6 +156,22 @@ export function contextToDraft(
   };
 }
 
+/**
+ * A language change. C and C++ grade with weighted rules and no prompt
+ * stripping, so the profile follows; an untouched starter becomes the new
+ * language's template, and anything an author wrote stays.
+ */
+export function withLanguage(draft: ExerciseDraft, language: ExerciseLanguage): ExerciseDraft {
+  const next = { ...draft, language, starterCode: starterAfterLanguageChange(draft.starterCode, language) };
+  if (!isCompiledLanguage(language)) return next;
+  return {
+    ...next,
+    grading: draft.grading.mode === 'ELICE_STDIO'
+      ? { ...draft.grading, inputPromptPolicy: 'INCLUDE' }
+      : defaultEliceGradingProfile,
+  };
+}
+
 /** Policy toggles preserve cases; only a fresh empty PDF grader gets enhanced defaults. */
 export function withSubmissionPolicy(draft: ExerciseDraft, submissionPolicy: SubmissionPolicy): ExerciseDraft {
   const fresh = !draft.testCases.length || draft.testCases.every(test => test.key === 'new-sample' && !test.input && !test.expectedOutput && !test.label);
@@ -172,6 +194,7 @@ export function draftToPayload(draft: ExerciseDraft) {
     outputFormat: draft.outputFormat,
     constraints: draft.constraints,
     starterCode: draft.starterCode,
+    language: draft.quiz ? 'PYTHON' as const : draft.language,
     solutions: draft.quiz ? [] : draft.referencePdfMaterialId ? draft.solutions.filter(solution => solution.code.trim() || solution.title?.trim()) : draft.solutions,
     aiFeedbackEnabled: draft.aiFeedbackEnabled,
     isVisible: draft.isVisible,

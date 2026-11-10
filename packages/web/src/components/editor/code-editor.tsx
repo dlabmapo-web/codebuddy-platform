@@ -60,6 +60,7 @@ function EditorFallback() {
 export function CodeEditor({
   code,
   fontSize,
+  language = 'python',
   onChange,
   onMount,
   readOnly = false,
@@ -68,6 +69,8 @@ export function CodeEditor({
 }: {
   code: string;
   fontSize: number;
+  /** Monaco's language id: `python`, `c` or `cpp`. */
+  language?: 'python' | 'c' | 'cpp';
   onChange: (value: string) => void;
   onMount?: OnMount;
   readOnly?: boolean;
@@ -83,7 +86,7 @@ export function CodeEditor({
         beforeMount={registerPaircodeTheme}
         defaultValue={code}
         height="100%"
-        language="python"
+        language={language}
         // The dynamic import above covers the React wrapper; this covers
         // Monaco itself, which is fetched separately and is the slow half.
         loading={<EditorFallback />}

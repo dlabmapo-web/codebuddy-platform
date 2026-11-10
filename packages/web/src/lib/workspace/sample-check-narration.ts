@@ -1,4 +1,4 @@
-import type { CaseComparator, SampleCheckView } from '@cove/shared';
+import type { CaseComparator, ProgramExitSignal, SampleCheckView } from '@cove/shared';
 
 import type { SampleVerdict } from './sample-run';
 import type { TerminalKind, TerminalLifecycle } from './terminal-transcript';
@@ -17,13 +17,21 @@ export type SampleCheckMessage =
   | 'workspace.sample_check_expired'
   | 'workspace.sample_check_truncated'
   | 'workspace.sample_check_refresh'
-  | 'workspace.sample_check_earlier_code';
+  | 'workspace.sample_check_earlier_code'
+  | 'workspace.compile_error'
+  | 'workspace.run_finished'
+  | 'workspace.run_runtime_error'
+  | 'workspace.run_time_limit'
+  | 'workspace.run_memory_limit'
+  | 'workspace.run_earlier_code'
+  | `workspace.exit.${ProgramExitSignal}`
+  | 'workspace.exit.code';
 
 export type SampleCheckLine =
   /** Text exactly as the program printed it. */
   | { kind: TerminalKind; text: string }
   /** A translated sentence, optionally led by a verdict mark. */
-  | { kind: TerminalKind; message: SampleCheckMessage; mark?: '✓' | '!' | '✕' }
+  | { kind: TerminalKind; message: SampleCheckMessage; mark?: '✓' | '!' | '✕'; values?: Record<string, string | number> }
   /** The public rule a mismatch is explained against. */
   | { kind: TerminalKind; rule: { comparator: CaseComparator; expected: string } };
 
@@ -40,7 +48,19 @@ export type SampleCheckNarration = {
   /** The program's own stdout, when it ran. */
   stdout: string | null;
   failed: boolean;
+  /** C/C++: GCC's messages, for marking the editor, or null. */
+  compileDiagnostics: string | null;
 };
+
+/** How a compiled program's runtime error is explained, or nothing for Python. */
+export function exitExplanation(result: {
+  exitCode?: number | null;
+  exitSignal?: ProgramExitSignal | null;
+}): SampleCheckLine | null {
+  if (result.exitSignal) return { kind: 'info', message: `workspace.exit.${result.exitSignal}` };
+  if (result.exitCode) return { kind: 'info', message: 'workspace.exit.code', values: { code: result.exitCode } };
+  return null;
+}
 
 /**
  * What a finished server check says in the terminal, and what it counts as.
@@ -75,10 +95,29 @@ export function narrateSampleCheck(
       passedCount: 0,
       stdout: null,
       failed: false,
+      compileDiagnostics: null,
     };
   }
 
+  const run = view.kind === 'run';
   const lines: SampleCheckLine[] = [];
+  if (result.outcome === 'COMPILE_ERROR') {
+    // Nothing ran: GCC's own messages are the whole story, in red.
+    lines.push({ kind: 'err', text: result.compileDiagnostics ?? '' });
+    lines.push({ kind: 'err', message: 'workspace.compile_error', mark: '✕' });
+    if (context.codeChanged) lines.push({ kind: 'info', message: run ? 'workspace.run_earlier_code' : 'workspace.sample_check_earlier_code' });
+    return {
+      lines,
+      verdict: { kind: 'skipped', reason: 'error' },
+      lifecycle: 'FAILED',
+      passedCount: 0,
+      stdout: null,
+      failed: true,
+      compileDiagnostics: result.compileDiagnostics ?? null,
+    };
+  }
+  // Warnings of a program that compiled come before what it printed.
+  if (result.compileDiagnostics) lines.push({ kind: 'info', text: result.compileDiagnostics });
   if (result.stdout) lines.push({ kind: 'out', text: result.stdout });
   if (result.stderr) lines.push({ kind: 'err', text: `${result.stderr}\n` });
   if (result.stdoutTruncated || result.stderrTruncated) {
@@ -88,6 +127,36 @@ export function narrateSampleCheck(
   let verdict: SampleVerdict;
   let lifecycle: Exclude<TerminalLifecycle, 'STARTED'> = 'FAILED';
   let passedCount = 0;
+  const ending = result.outcome === 'RUNTIME_ERROR' ? exitExplanation(result) : null;
+  if (run) {
+    // A Run judges nothing: it says how the program ended and stops there.
+    if (result.outcome === 'PASSED' || result.outcome === 'PASSED_WITH_WARNING') {
+      lines.push({ kind: 'meta', message: 'workspace.run_finished' });
+      lifecycle = 'COMPLETED';
+    } else {
+      lines.push({
+        kind: 'err',
+        message:
+          result.outcome === 'TIME_LIMIT'
+            ? 'workspace.run_time_limit'
+            : result.outcome === 'MEMORY_LIMIT'
+              ? 'workspace.run_memory_limit'
+              : 'workspace.run_runtime_error',
+        mark: '✕',
+      });
+      if (ending) lines.push(ending);
+    }
+    if (context.codeChanged) lines.push({ kind: 'info', message: 'workspace.run_earlier_code' });
+    return {
+      lines,
+      verdict: { kind: 'unchecked' },
+      lifecycle,
+      passedCount: 0,
+      stdout: result.stdout,
+      failed: result.outcome !== 'PASSED' && result.outcome !== 'PASSED_WITH_WARNING',
+      compileDiagnostics: result.compileDiagnostics ?? null,
+    };
+  }
   switch (result.outcome) {
     case 'PASSED':
       lines.push({ kind: 'meta', message: 'workspace.sample_check_passed', mark: '✓' });
@@ -124,6 +193,7 @@ export function narrateSampleCheck(
               : 'workspace.sample_check_memory_limit',
         mark: '✕',
       });
+      if (ending) lines.push(ending);
       // The program's own limit or crash, not a wrong answer.
       verdict = { kind: 'skipped', reason: 'error' };
       break;
@@ -139,5 +209,6 @@ export function narrateSampleCheck(
     passedCount,
     stdout: result.stdout,
     failed: result.outcome === 'RUNTIME_ERROR',
+    compileDiagnostics: result.compileDiagnostics ?? null,
   };
 }

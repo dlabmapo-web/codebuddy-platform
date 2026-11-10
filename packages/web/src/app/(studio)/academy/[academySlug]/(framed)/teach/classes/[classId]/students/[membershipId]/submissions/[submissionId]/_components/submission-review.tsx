@@ -1,4 +1,5 @@
 'use client';
+import { monacoLanguageFor } from '@/lib/workspace/exercise-language';
 import { QuizFeedback } from '@/components/workspace/quiz-feedback';
 
 import type { TeacherReviewCase, TeacherSubmissionReview } from '@cove/shared';
@@ -127,7 +128,7 @@ export function SubmissionReview({
             <MonacoEditor
               beforeMount={registerPaircodeTheme}
               height="100%"
-              language="python"
+              language={monacoLanguageFor(review.language)}
               options={{
                 automaticLayout: true,
                 // Read-only and announced as such, but still focusable and
@@ -151,6 +152,7 @@ export function SubmissionReview({
         </section>}
 
         <div className="flex flex-col gap-4">
+          {review.compileFailed ? <CompileFailure diagnostics={review.compileDiagnostics ?? null} /> : null}
           <section className="rounded-card border border-border bg-card">
             <h2 className="border-b border-border px-4 py-2.5 text-[13px] font-bold">
               {t('progress.review.cases_heading')}
@@ -236,7 +238,36 @@ function SampleCase({ item }: { item: TeacherReviewCase }) {
           value={item.actualOutput}
         />
       </dl>
+      <ProgramEnding item={item} />
     </li>
+  );
+}
+
+/** C/C++: how a public case's program ended, worded as the student read it. */
+function ProgramEnding({ item }: { item: TeacherReviewCase }) {
+  const { t } = useTranslation('sample-check');
+  if (item.outcome !== 'RUNTIME_ERROR') return null;
+  const text = item.exitSignal
+    ? t(`workspace.exit.${item.exitSignal}`)
+    : item.exitCode
+      ? t('workspace.exit.code', { code: item.exitCode })
+      : null;
+  return text ? <p className="mt-2 text-[12px] text-danger">{text}</p> : null;
+}
+
+/** C/C++: the attempt did not compile, so no case ran. */
+function CompileFailure({ diagnostics }: { diagnostics: string | null }) {
+  const { t } = useTranslation('sample-check');
+  return (
+    <section className="rounded-card border border-danger/30 bg-danger/5 px-4 py-3.5" role="status">
+      <h2 className="text-[13px] font-bold text-danger">{t('workspace.compile_error_title')}</h2>
+      <p className="mt-1 text-[12.5px] leading-[1.5] text-sub">{t('workspace.compile_error_result')}</p>
+      {diagnostics ? (
+        <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded bg-accent px-2 py-1.5 font-mono text-[12px]">
+          {diagnostics}
+        </pre>
+      ) : null}
+    </section>
   );
 }
 

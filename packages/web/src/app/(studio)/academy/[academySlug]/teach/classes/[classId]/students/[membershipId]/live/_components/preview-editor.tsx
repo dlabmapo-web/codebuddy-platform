@@ -1,4 +1,6 @@
 'use client';
+import type { ExerciseLanguage } from '@cove/shared';
+import { monacoLanguageFor } from '@/lib/workspace/exercise-language';
 
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
@@ -31,16 +33,18 @@ function EditorFallback() {
 export function PreviewEditor({
   code,
   fontSize,
+  language,
 }: {
   code: string;
   fontSize: number;
+  language?: ExerciseLanguage;
 }) {
   return (
     <div className="min-h-0 flex-1 bg-editor-bg">
       <MonacoEditor
         beforeMount={registerPaircodeTheme}
         height="100%"
-        language="python"
+        language={monacoLanguageFor(language)}
         options={{
           automaticLayout: true,
           domReadOnly: true,

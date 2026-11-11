@@ -23,9 +23,16 @@ for native_try in {1..100}; do [ -S "$native_work/socket/executor.sock" ] && bre
 setpriv --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs \
  "$native_node" --max-old-space-size=512 "$native_artifact/tools/application-fixture.mjs" "$native_artifact" "$native_work/config.json" "$native_work/authority.json" > "$native_work/evidence/application.log" 2>&1 & native_fixture=$!
 for native_try in {1..150}; do [ -f "$native_work/authority.json" ] && break; kill -0 "$native_fixture"; sleep .2; done
+# The Next server and the browser stand in for production's separate web
+# containers and visitors, so they run beside the node's service leaf, not in
+# it: the launcher holds that leaf to serviceOverheadMb on every health probe
+# and withdraws readiness above it. Created after the launcher's envelope check.
+native_fixture_group="$native_cgroup/fixture-browser"
+mkdir "$native_fixture_group"
+in_fixture_group() { echo "$BASHPID" > "$native_fixture_group/cgroup.procs"; exec "$@"; }
 # Real sanitized Next app, real Nest API and synthetic auth provider all share the owned fixture.
-setsid setpriv --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs \
- bash "$native_artifact/tools/next-fixture-start.sh" "$native_work/next-source" "http://127.0.0.1:$COVE_NATIVE_AUTH_PORT" "http://127.0.0.1:$COVE_NATIVE_API_PORT" "$COVE_NATIVE_NEXT_ORIGIN" "$native_node" > "$native_work/evidence/next-server.log" 2>&1 & native_next=$!
+( in_fixture_group setsid setpriv --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs \
+ bash "$native_artifact/tools/next-fixture-start.sh" "$native_work/next-source" "http://127.0.0.1:$COVE_NATIVE_AUTH_PORT" "http://127.0.0.1:$COVE_NATIVE_API_PORT" "$COVE_NATIVE_NEXT_ORIGIN" "$native_node" ) > "$native_work/evidence/next-server.log" 2>&1 & native_next=$!
 for native_try in {1..100}; do if curl -fsS "$COVE_NATIVE_NEXT_ORIGIN/login" >/dev/null; then break; fi; kill -0 "$native_next"; sleep .2; done
 # Strict growth stops after the first correctness/resource failure. Never run 200 here.
 for native_clients in 1 2 4 10; do
@@ -42,11 +49,16 @@ for native_clients in 1 2 4 10; do
 mkdir -m 700 "$native_work/browser-home" "$native_work/browser-home/config" "$native_work/browser-home/cache"
 # One student first: the plain Submit-to-visible-score path, before two arrive together.
 for native_clients in 1 2; do
-setpriv --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs \
+( in_fixture_group setpriv --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs \
  env HOME="$native_work/browser-home" XDG_CONFIG_HOME="$native_work/browser-home/config" XDG_CACHE_HOME="$native_work/browser-home/cache" \
- xvfb-run -a "$native_node" --max-old-space-size=512 "$native_repo/packages/api/scripts/benchmark-native-classroom.mjs" --mode next-browser --fixture "$native_work/authority.json" --output "$native_work/evidence/next-browser-$native_clients-10.json" --clients "$native_clients" --cases 10 --max-seconds 120
+ xvfb-run -a "$native_node" --max-old-space-size=512 "$native_repo/packages/api/scripts/benchmark-native-classroom.mjs" --mode next-browser --fixture "$native_work/authority.json" --output "$native_work/evidence/next-browser-$native_clients-10.json" --clients "$native_clients" --cases 10 --max-seconds 120 )
 done
 kill -- -"$native_next"; wait "$native_next" || true; native_next=''
+# Empty and remove the browser group: the crash test's launcher refuses an
+# envelope holding a populated group it does not own.
+echo 1 > "$native_fixture_group/cgroup.kill"
+for native_try in {1..100}; do grep -q '^populated 0$' "$native_fixture_group/cgroup.events" && break; sleep .1; done
+rmdir "$native_fixture_group"
 kill "$native_fixture"; wait "$native_fixture" || true; native_fixture=''
 kill "$native_launcher"; wait "$native_launcher"; native_launcher=''
 # Crash test is last because retained empty case evidence intentionally prevents readiness.

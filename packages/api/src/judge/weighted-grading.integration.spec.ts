@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import {
   createProgrammingExerciseSchema,
   defaultEliceGradingProfile,
+  defaultExerciseTimeLimitMs,
   legacyGradingProfile,
   updateProgrammingExerciseSchema,
 } from "@cove/shared";
@@ -297,7 +298,7 @@ else:
       expect(row.gradingSemanticVersion).toBe("elice-v1");
       expect(row.gradingCases.map((testCase) => testCase.weight)).toEqual([30, 30, 40]);
       expect(row.gradingCases.map((testCase) => testCase.effectiveTimeLimitMs)).toEqual([
-        3_000, 3_000, 3_000,
+        defaultExerciseTimeLimitMs, defaultExerciseTimeLimitMs, defaultExerciseTimeLimitMs,
       ]);
       expect(row.gradingPolicySnapshot).toEqual(
         expect.objectContaining({ version: 2, semanticVersion: "elice-v1" }),

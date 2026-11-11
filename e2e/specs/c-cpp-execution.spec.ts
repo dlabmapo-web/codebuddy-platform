@@ -114,6 +114,61 @@ for (const name of ['C', 'CPP'] as const) {
   });
 }
 
+test('a student\'s C Run reads line after line like a terminal, and takes a pasted block with Ctrl+D', async ({ browser }) => {
+  const f = fixture();
+  const context = await browser.newContext({ storageState: f.auth.student });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const starts: string[] = [];
+  page.on('request', request => { if (request.url().includes('startRunCheck')) starts.push(request.postData() ?? ''); });
+  await page.goto(routes.academyLearnExercise(f.slug, f.ids.C, { classId: f.ids.class }));
+  // Prompts with no newline and no fflush, as students write them.
+  await setCode(page, [
+    '#include <stdio.h>',
+    'int main(void) {',
+    '  int n, x, total = 0, words = 0; char w[64];',
+    '  printf("How many? "); if (scanf("%d", &n) != 1) return 1;',
+    '  for (int i = 1; i <= n; i++) { printf("Number %d: ", i); scanf("%d", &x); total += x; }',
+    '  printf("Total %d\\nWords, then Ctrl+D:\\n", total);',
+    '  while (scanf("%63s", w) == 1) words++;',
+    '  printf("Words %d\\n", words);',
+    '  return 0;',
+    '}',
+  ].join('\n'));
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  const terminal = page.locator('#workspace-terminal-panel');
+  const input = page.getByRole('textbox', { name: 'Program input', exact: true });
+  // Each prompt is on screen before its line is typed, as in a terminal.
+  for (const [prompt, line] of [['How many? ', '3'], ['Number 1: ', '10'], ['Number 2: ', '20'], ['Number 3: ', '12']]) {
+    await expect(terminal).toContainText(prompt, { timeout: 45_000 });
+    await input.fill(line);
+    await input.press('Enter');
+  }
+  await expect(terminal).toContainText('Words, then Ctrl+D:', { timeout: 45_000 });
+  // A copied block: its complete line goes at once, the rest waits in the
+  // field, and Ctrl+D sends it with the end of input in one step.
+  await input.evaluate((field, text) => {
+    const data = new DataTransfer();
+    data.setData('text/plain', text);
+    field.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  }, 'alpha beta\ngamma');
+  await expect(input).toHaveValue('gamma', { timeout: 45_000 });
+  await input.press('Control+d');
+  await expect(terminal).toContainText('The program finished.', { timeout: 45_000 });
+  const transcript = await terminal.innerText();
+  // One transcript that carried on, not one restarted for every line.
+  expect(transcript.match(/How many\?/g)).toHaveLength(1);
+  for (const text of ['How many? 3', 'Number 1: 10', 'Number 3: 12', 'Total 42', 'Words 3']) expect(transcript).toContain(text);
+  // The start, four lines, the pasted line, and the last line with Ctrl+D:
+  // each a request of its own, every later one naming the step it continues.
+  expect(starts).toHaveLength(7);
+  expect(starts.filter(body => body.includes('"continues"'))).toHaveLength(6);
+  expect(new Set(starts.map(body => /"clientRequestId":"([^"]+)"/.exec(body)?.[1])).size).toBe(7);
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
 test('C++ submits all ten cases through the native worker', async ({ browser }) => {
   const f = fixture();
   const context = await browser.newContext({ storageState: f.auth.student });
@@ -172,7 +227,9 @@ test('a course is Python or C/C++, and a C/C++ problem chooses C or C++', async 
   const choices = page.getByRole('radio');
   await expect(choices).toHaveCount(2);
   await expect(page.getByRole('radio', { name: /Python/ })).toBeChecked();
-  await page.getByRole('radio', { name: /C \/ C\+\+/ }).check();
+  // The radio is visually hidden inside its card: a person clicks the card.
+  await page.locator('label').filter({ hasText: 'C / C++' }).click();
+  await expect(page.getByRole('radio', { name: /C \/ C\+\+/ })).toBeChecked();
   await page.screenshot({ path: test.info().outputPath('course-language.png'), fullPage: true });
   await page.getByRole('button', { name: 'Create and open' }).click();
   await expect.poll(async () =>

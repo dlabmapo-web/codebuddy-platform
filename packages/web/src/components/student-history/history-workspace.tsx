@@ -109,6 +109,13 @@ function HistoryContent(props: Props) {
     mode: props.initialMode ?? "student",
   }));
   const state = props.standalone ? readHistoryState(params.toString()) : local;
+  // A bookmark of the old in-dashboard review (student, material and attempt
+  // in the URL) opens the student-work page instead (the effect below).
+  // Nothing is read or shown for it meanwhile: a review drawn here was
+  // replaced under the teacher, losing a click, and its reads were discarded.
+  const redirecting = Boolean(
+    props.standalone && state.student && state.material && state.attempt,
+  );
   const openWork = React.useCallback(
     (
       materialId: string,
@@ -145,7 +152,7 @@ function HistoryContent(props: Props) {
   );
   React.useEffect(() => {
     // Existing bookmarks used to mount a review inside the dashboard card.
-    if (props.standalone && state.student && state.material && state.attempt)
+    if (redirecting)
       openWork(
         state.material,
         state.student,
@@ -154,7 +161,7 @@ function HistoryContent(props: Props) {
         true,
       );
   }, [
-    props.standalone,
+    redirecting,
     state.student,
     state.material,
     state.attempt,
@@ -290,6 +297,7 @@ function HistoryContent(props: Props) {
             q: state.rosterQ,
             page: state.rosterPage,
           }),
+    enabled: !redirecting,
     ...common,
   });
   const summary = useQuery({
@@ -300,7 +308,7 @@ function HistoryContent(props: Props) {
         membershipId: state.student,
         courseId: state.course || undefined,
       }),
-    enabled: Boolean(state.student),
+    enabled: !redirecting && Boolean(state.student),
     ...common,
   });
   const filter = historyFilterSchema.parse({
@@ -323,7 +331,7 @@ function HistoryContent(props: Props) {
   const materials = useQuery({
     queryKey: [...key, "materials", filter],
     queryFn: () => orpc.studentWorkHistory.listStudentMaterials(filter),
-    enabled: Boolean(state.student),
+    enabled: !redirecting && Boolean(state.student),
     ...common,
   });
   const attempts = useQuery({
@@ -341,7 +349,7 @@ function HistoryContent(props: Props) {
         materialId: state.material,
         page: state.attemptPage,
       }),
-    enabled: Boolean(state.student && state.material),
+    enabled: !redirecting && Boolean(state.student && state.material),
     ...common,
   });
   const data = summary.data;
@@ -353,6 +361,12 @@ function HistoryContent(props: Props) {
   const denied = [roster, summary, materials, attempts].some(
     (query) => query.isError && isExplicitAccessDeniedError(query.error),
   );
+  if (redirecting)
+    return (
+      <p role="status" className="p-5 text-sm text-sub">
+        {t("history.loading")}
+      </p>
+    );
   if (denied)
     return (
       <div role="alert" className="p-6 text-sm">

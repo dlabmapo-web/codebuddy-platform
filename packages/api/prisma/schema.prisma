@@ -166,6 +166,7 @@ enum MonitoringVisitEndReason {
 }
 
 enum MaterialType {
+  EXPLANATION
   VIDEO_LESSON
   PROGRAMMING_EXERCISE
   PDF_DOCUMENT
@@ -1620,6 +1621,7 @@ model Material {
   updatedAt  DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   lecture             Lecture                   @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  explanationMaterial ExplanationMaterial?
   programmingExercise ProgrammingExercise?
   drafts              ExerciseDraft[]
   submissions         Submission[]
@@ -2840,4 +2842,13 @@ model StaffPracticeAttempt {
   @@index([academyId, userId, materialId, context, createdAt(sort: Desc)], map: "staff_practice_attempts_owner_history_idx")
   @@index([status, createdAt])
   @@map("staff_practice_attempts")
+}
+
+model ExplanationMaterial {
+  materialId String @id @map("material_id") @db.Uuid
+  body String @db.Text
+  revision Int @default(1)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  @@map("explanation_materials")
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { CodeExample } from './code-example';
 import { ChoiceSelector } from '@/components/studio/choice-selector';
 import { useEditorTranslation } from './use-editor-translation';
 import { usePrivateImageResolver } from './private-image-context';
@@ -22,7 +23,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { mergeAttributes } from '@tiptap/react';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import {
-  Bold, Italic, UnderlineIcon, Strikethrough, AlignLeft, AlignCenter, AlignRight,
+  Code2, Bold, Italic, UnderlineIcon, Strikethrough, AlignLeft, AlignCenter, AlignRight,
   List, ListOrdered, Table as TableIcon, ImageIcon, Link as LinkIcon,
   Minus, Highlighter, Type, Undo, Redo,
   ArrowDownToLine, ArrowUpToLine, ArrowLeftToLine, ArrowRightToLine,
@@ -69,7 +70,7 @@ function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps)
     >
       <span ref={containerRef as React.RefObject<HTMLSpanElement>} style={{ display: 'inline-block', position: 'relative' }}>
         <img
-          src={resolvedSrc}
+          src={resolvedSrc || undefined}
           alt={alt ?? ''}
           crossOrigin="anonymous"
           style={{
@@ -181,6 +182,9 @@ type Props = {
   placeholder?: string;
   minHeight?: number;
   onImageUpload?: (file: File) => Promise<string>;
+  onImageUploadStateChange?: (state: { pending: boolean; error: boolean }) => void;
+  editable?: boolean;
+  codeExamples?: boolean;
 };
 
 const FONT_SIZES = ['12', '14', '16', '18', '20', '24', '28', '32'];
@@ -188,16 +192,19 @@ const COLORS = ['#16181D', '#DC2626', '#D97706', '#16A34A', '#1B64DA', '#7C3AED'
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function RichEditor({ value, onChange, onImageUpload, placeholder, minHeight = 280 }: Props) {
+export function RichEditor({ value, onChange, onImageUpload, onImageUploadStateChange, editable = true, codeExamples = false, placeholder, minHeight = 280 }: Props) {
   const { t } = useEditorTranslation();
   const editorPlaceholder = placeholder ?? t('placeholder');
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [uploadError,setUploadError]=useState("");
+  const uploadFiles = useRef<(files: File[]) => void>(() => {});
+  const pendingUploads = useRef(0);
   const [inTable, setInTable] = useState(false);
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({ link: false, underline: false, ...(codeExamples ? { codeBlock: false } : {}) }),
+      ...(codeExamples ? [CodeExample] : []),
       Underline,
       TextStyle,
       Color,
@@ -219,6 +226,8 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder, minHei
       }),
       Placeholder.configure({ placeholder: editorPlaceholder }),
     ],
+    immediatelyRender: false,
+    editable,
     content: value,
     onUpdate({ editor }) {
       onChange(editor.getHTML());
@@ -228,8 +237,18 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder, minHei
       setInTable(editor.isActive('table'));
     },
     editorProps: {
+      handlePaste: (_view, event) => {
+        const files = [...(event.clipboardData?.files ?? [])].filter(file => file.type.startsWith('image/'));
+        if (!onImageUpload || !editable || !files.length) return false;
+        event.preventDefault(); uploadFiles.current(files); return true;
+      },
+      handleDrop: (_view, event) => {
+        const files = [...(event.dataTransfer?.files ?? [])].filter(file => file.type.startsWith('image/'));
+        if (!onImageUpload || !editable || !files.length) return false;
+        event.preventDefault(); uploadFiles.current(files); return true;
+      },
       attributes: {
-        style: `min-height: ${minHeight}px; padding: 16px; outline: none; font-size: 15px; line-height: 1.8; color: #16181D;`,
+        style: `min-height: ${minHeight}px; padding: 16px; outline: none; font-size: 15px; line-height: 1.8; color: var(--ink); background: var(--card);`,
       },
     },
   });
@@ -240,14 +259,24 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder, minHei
     }
   }, [value, editor]);
 
+  useEffect(() => { editor?.setEditable(editable); }, [editor, editable]);
+
   // Only an editor given an uploader can take pictures; v2 has no generic upload route.
   const uploadImage = useCallback(async (file: File) => {
     if (!editor || !onImageUpload) return;
     // A laptop photo is shrunk and a non-ASCII name made safe before upload;
     // the original name stays as the alt text.
-    const prepared = await prepareLessonImage(file);
-    editor.chain().focus().setImage({ src: await onImageUpload(prepared), alt: file.name }).run();
-  }, [editor, onImageUpload]);
+    pendingUploads.current += 1;
+    setUploadError("");
+    onImageUploadStateChange?.({ pending: true, error: false });
+    let failed = false;
+    try {
+      const prepared = await prepareLessonImage(file);
+      const src = await onImageUpload(prepared);
+      if (!editor.isDestroyed) editor.chain().focus().setImage({ src, alt: file.name }).run();
+    } catch (error) { failed = true; throw error; }
+    finally { pendingUploads.current -= 1; onImageUploadStateChange?.({ pending: pendingUploads.current > 0, error: failed }); }
+  }, [editor, onImageUpload, onImageUploadStateChange]);
 
   const handleImageChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -262,6 +291,13 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder, minHei
     e.target.value = '';
   }, [uploadImage, t]);
 
+  uploadFiles.current = (files) => { void (async () => {
+    for (const file of files) {
+      try { await uploadImage(file); }
+      catch (error) { setUploadError(error instanceof LessonImageError ? t(error.reason === 'too-large' ? 'image_too_large' : 'image_too_large_unshrinkable') : t('image_upload_failed')); break; }
+    }
+  })(); };
+
   const setLink = useCallback(() => {
     const url = window.prompt(t('link_prompt'));
     if (!url) return;
@@ -273,6 +309,13 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder, minHei
   }, [editor]);
 
   if (!editor) return null;
+
+  function toggleCodeExample() {
+    if (!editor) return;
+    editor.chain().toggleCodeBlock({ language: 'python' }).run();
+    // Resolve the caret after the React code view mounts, even if the editor already has focus.
+    editor.commands.focus(editor.state.selection.from);
+  }
 
   return (
     <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #E5E8EC' }}>
@@ -327,6 +370,7 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder, minHei
 
         <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title={t('bullet_list')}><List size={14} /></ToolBtn>
         <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title={t('numbered_list')}><ListOrdered size={14} /></ToolBtn>
+        {codeExamples ? <ToolBtn onClick={toggleCodeExample} active={editor.isActive('codeBlock')} title={t('code_example')}><Code2 size={16} /></ToolBtn> : null}
         <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title={t('divider')}><Minus size={14} /></ToolBtn>
         <Divider />
 
@@ -399,7 +443,7 @@ export function RichEditor({ value, onChange, onImageUpload, placeholder, minHei
         </div>
       )}
 
-      {uploadError?<p role="alert">{uploadError}</p>:null}
+      {uploadError ? <div role="alert" className="flex items-center gap-3 bg-danger/10 px-4 py-3 text-sm text-danger"><p className="flex-1">{uploadError}</p><button type="button" onClick={() => { setUploadError(''); onImageUploadStateChange?.({ pending: pendingUploads.current > 0, error: false }); }} className="font-semibold underline">{t('dismiss_error')}</button></div> : null}
       {onImageUpload && <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp,image/svg+xml,.png,.jpg,.jpeg,.gif,.webp,.avif,.bmp,.svg" className="hidden" onChange={handleImageChange} />}
 
       <div className="bg-card">

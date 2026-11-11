@@ -61,6 +61,7 @@ function session(user, previous) {
 function authUser(input) {
   return { id: input.id ?? randomUUID(), aud: 'authenticated', role: 'authenticated', email: input.email, email_confirmed_at: new Date().toISOString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString(), app_metadata: { provider: 'email', providers: ['email'], ...input.app_metadata }, user_metadata: input.user_metadata ?? {}, identities: [] };
 }
+const explanationAssets = new Map();
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, origin), path = url.pathname;
@@ -78,6 +79,18 @@ const server = createServer(async (req, res) => {
       if (range) { const from = Number(range[1]), to = range[2] ? Math.min(Number(range[2]), bytes.length - 1) : bytes.length - 1;
         res.writeHead(206, { 'content-type': mime, 'content-range': `bytes ${from}-${to}/${bytes.length}`, 'content-length': to - from + 1, 'accept-ranges': 'bytes' }); return res.end(bytes.subarray(from, to + 1)); }
       res.writeHead(200, { 'content-type': mime, 'content-length': bytes.length, 'accept-ranges': 'bytes' }); return res.end(bytes);
+    }
+    if (path.startsWith('/storage/v1/object/turtle-assets/') || path.startsWith('/storage/v1/object/authenticated/turtle-assets/')) {
+      if (req.headers.authorization !== 'Bearer local-e2e-admin-key') return json(res, { error: 'forbidden' }, 403);
+      const key = path.replace('/storage/v1/object/authenticated/', '').replace('/storage/v1/object/', '');
+      if (req.method === 'POST') {
+        const chunks = []; for await (const chunk of req) chunks.push(chunk);
+        explanationAssets.set(key, { bytes: Buffer.concat(chunks), mime: req.headers['content-type'] });
+        return json(res, { Key: key });
+      }
+      const asset = explanationAssets.get(key);
+      if (!asset) return json(res, { error: 'missing_asset' }, 404);
+      res.writeHead(200, { 'content-type': asset.mime }); return res.end(asset.bytes);
     }
     if (path.startsWith('/storage/v1/object/sign/') && req.method === 'POST') return json(res, { signedURL: '/object/sign/fixture.pdf?token=local-test-only' });
     if (path === '/health') return json(res, { ok: true });

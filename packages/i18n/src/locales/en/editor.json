@@ -37,5 +37,12 @@
   "image_upload_failed": "Could not upload the image. Try again.",
   "image_too_large": "This image is still over 5 MB after shrinking. Use a smaller image.",
   "image_too_large_unshrinkable": "GIF and SVG images must be 5 MB or smaller.",
-  "resize_image": "Drag to resize the image"
+  "resize_image": "Drag to resize the image",
+  "dismiss_error": "Dismiss",
+  "code_example": "Code example",
+  "code_language": "Code language",
+  "copy_code": "Copy code",
+  "copied": "Copied",
+  "copy_failed": "Copy failed",
+  "plain_text": "Plain text"
 }

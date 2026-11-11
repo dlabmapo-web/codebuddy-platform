@@ -68,7 +68,7 @@ export function CourseOutline({
   }, [outline.requestedLectureId]);
 
   const empty = initialOutline.modules.every((module) =>
-    module.lectures.every((lecture) => lecture.exercises.length === 0 && !lecture.documents?.length && !lecture.manualMaterials?.length),
+    module.lectures.every((lecture) => lecture.exercises.length === 0 && !lecture.explanations?.length && !lecture.documents?.length && !lecture.manualMaterials?.length),
   );
 
   return (

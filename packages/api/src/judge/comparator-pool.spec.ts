@@ -135,7 +135,11 @@ describe("ComparatorPool", () => {
     expect(results.every((result) => result.kind === "match")).toBe(true);
     expect((await busy).kind).toBe("timeout");
     expect((await pool.compare({ comparator: "STDOUT_NOMATCH", actual: "answer", expected: "missing", deadlineAt: Date.now() - 1 })).kind).toBe("deadline");
-  }, 30_000);
+    // The runaway pattern cost the pool its only interpreter. Wait for the
+    // replacement here, as "keeps serving after a comparator was destroyed"
+    // does, so the next Python comparison is not timed on a cold start.
+    expect(await compare("STDOUT", "recovered", "recovered")).toBe("match");
+  }, 60_000);
 
   describe("STDOUT_MATCH — contains", () => {
     it("matches a substring anywhere", async () => {

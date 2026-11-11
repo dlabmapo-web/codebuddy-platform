@@ -104,6 +104,7 @@ export function WorkspaceCurriculumNavigator({
     for (const courseModule of context?.course.modules ?? []) {
       for (const lecture of courseModule.lectures) {
         const materials = [
+          ...(allowPdfNavigation ? lecture.explanations ?? [] : []),
           ...lecture.exercises,
           ...(allowPdfNavigation?lecture.videos??[]:[]),
           ...(allowPdfNavigation ? lecture.manualMaterials??[] : []),
@@ -327,6 +328,7 @@ function ModuleBranch({
                 {lectureOpen ? (
                   <ul>
                     {[
+                      ...(allowPdfNavigation ? lecture.explanations ?? [] : []).map(explanation => ({ kind: 'explanation' as const, position: explanation.position, explanation })),
                       ...(allowPdfNavigation?lecture.videos??[]:[]).map(video=>({kind:'video' as const,position:video.position,video})),
                       ...(allowPdfNavigation?lecture.manualMaterials??[]:[]).map(manual=>({kind:'manual' as const,position:manual.position,manual})),
                       ...lecture.exercises.map((exercise) => ({
@@ -350,15 +352,15 @@ function ModuleBranch({
                             number={materialNumbers.get(row.exercise.materialId) ?? row.exercise.position}
                             onSelect={onSelect} selected={displayedMaterialId === row.exercise.materialId} />
                         ) : (
-                          <li key={(row.kind === 'video' ? row.video : row.kind === 'pdf' ? row.doc : row.manual).materialId} className="my-1">
+                          <li key={(row.kind === 'explanation' ? row.explanation : row.kind === 'video' ? row.video : row.kind === 'pdf' ? row.doc : row.manual).materialId} className="my-1">
                             {(() => {
-                              const item = row.kind === 'video' ? row.video : row.kind === 'pdf' ? row.doc : row.manual;
+                              const item = row.kind === 'explanation' ? row.explanation : row.kind === 'video' ? row.video : row.kind === 'pdf' ? row.doc : row.manual;
                               const selected = displayedMaterialId === item.materialId;
                               const busy = busyMaterialId === item.materialId;
                               const href = resourceHref?.(item.materialId);
                               if (href) return <Link href={href} target="_blank" rel="noopener noreferrer"
                                 className="flex min-h-16 w-full items-center gap-2 rounded-xl border border-transparent px-2 py-2.5 hover:border-border hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
-                                <MaterialIdentity compact title={item.title} number={materialNumbers.get(item.materialId)} type={row.kind === 'video' ? 'VIDEO_LESSON' : row.kind === 'pdf' ? 'PDF_DOCUMENT' : row.manual.type} />
+                                <MaterialIdentity compact title={item.title} number={materialNumbers.get(item.materialId)} type={row.kind === 'explanation' ? 'EXPLANATION' : row.kind === 'video' ? 'VIDEO_LESSON' : row.kind === 'pdf' ? 'PDF_DOCUMENT' : row.manual.type} />
                                 {liveMaterialId === item.materialId ? <span className="shrink-0 rounded-full bg-danger/10 px-1.5 py-0.5 text-[9.5px] font-bold uppercase text-danger">{t('navigator.live')}</span> : null}
                                 <ExternalLink aria-hidden className="size-3.5 shrink-0 text-sub" /><span className="sr-only">{t('materials.new_tab')}</span>
                               </Link>;
@@ -366,7 +368,7 @@ function ModuleBranch({
                                 aria-current={selected ? 'page' : undefined} disabled={disabled || busy}
                                 className={`flex min-h-16 w-full items-center gap-2 rounded-xl border px-2 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 ${selected ? 'border-brand/20 bg-brand-soft' : 'border-transparent hover:border-border hover:bg-canvas'}`}
                                 onClick={() => onSelect(item.materialId)}>
-                                <MaterialIdentity compact title={item.title} number={materialNumbers.get(item.materialId)} type={row.kind === 'video' ? 'VIDEO_LESSON' : row.kind === 'pdf' ? 'PDF_DOCUMENT' : row.manual.type} />
+                                <MaterialIdentity compact title={item.title} number={materialNumbers.get(item.materialId)} type={row.kind === 'explanation' ? 'EXPLANATION' : row.kind === 'video' ? 'VIDEO_LESSON' : row.kind === 'pdf' ? 'PDF_DOCUMENT' : row.manual.type} />
                                 {liveMaterialId === item.materialId ? <span className="shrink-0 rounded-full bg-danger/10 px-1.5 py-0.5 text-[9.5px] font-bold uppercase text-danger">{t('navigator.live')}</span> : null}
                                 {busy ? <LoaderCircle aria-hidden className="size-4 shrink-0 animate-spin text-brand" /> : <ChevronRight aria-hidden className="size-3.5 shrink-0 text-sub" />}
                               </button>;
@@ -430,7 +432,7 @@ function Branch({
 }
 
 function containsLiveMaterial(lecture: WorkspaceNavigatorContext['course']['modules'][number]['lectures'][number], id: string | null) {
-  return Boolean(id && [...lecture.exercises, ...(lecture.documents ?? []), ...(lecture.videos ?? []), ...(lecture.manualMaterials ?? [])].some(item => item.materialId === id));
+  return Boolean(id && [...(lecture.explanations ?? []), ...lecture.exercises, ...(lecture.documents ?? []), ...(lecture.videos ?? []), ...(lecture.manualMaterials ?? [])].some(item => item.materialId === id));
 }
 
 function ExerciseRow({

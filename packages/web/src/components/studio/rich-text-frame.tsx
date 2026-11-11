@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { enhanceCodeExamples, codeExampleFrameStyles, type CodeExampleLabels } from '@/components/explanation/code-example-frame';
 
 import { iframePointerMoveEvent } from '@/lib/monitoring/awareness/iframe-pointer-capture';
 import { useTheme } from '@/lib/theme/theme-provider';
@@ -41,12 +42,14 @@ function usePrivateImages(content: string) {
  */
 export function RichTextFrame({
   content,
+  codeExamples,
   fallbackHeight = 288,
   minHeight = 60,
   padding,
   title,
 }: {
   content: string;
+  codeExamples?: CodeExampleLabels;
   minHeight?: number;
   /** Used until the content is measured, and if measuring is unavailable. */
   fallbackHeight?: number;
@@ -65,6 +68,7 @@ export function RichTextFrame({
     if (!frame) return;
 
     let observer: ResizeObserver | undefined;
+    const disposeCode: Array<() => void> = [];
     let cancelled = false;
     let detachPointerBridge: () => void = () => undefined;
 
@@ -108,6 +112,7 @@ export function RichTextFrame({
 
     const attach = () => {
       if (cancelled) return;
+      if (codeExamples && frame.contentDocument) disposeCode.push(enhanceCodeExamples(frame.contentDocument, codeExamples));
       measure();
       bridgePointer();
       const body = frame.contentDocument?.getElementById('cove-rich-text-root');
@@ -135,9 +140,10 @@ export function RichTextFrame({
       retries.forEach(window.clearTimeout);
       frame.removeEventListener('load', attach);
       observer?.disconnect();
+      disposeCode.forEach(dispose => dispose());
       detachPointerBridge();
     };
-  }, [html, minHeight, theme]);
+  }, [html, minHeight, theme, codeExamples]);
 
   return (
     <iframe
@@ -146,7 +152,7 @@ export function RichTextFrame({
       ref={frameRef}
       sandbox="allow-same-origin"
       scrolling="no"
-      srcDoc={previewDocument(html, padding, theme)}
+      srcDoc={previewDocument(html, padding, theme, Boolean(codeExamples))}
       style={{ height: measured ?? fallbackHeight }}
       title={title}
     />
@@ -195,6 +201,7 @@ export function previewDocument(
   content: string,
   padding = 16,
   theme: FrameTheme = 'light',
+  codeExamples = false,
 ) {
   const body = content.trim().length > 0 ? withAnonymousImageCors(content) : '';
   const palette = framePalettes[theme];
@@ -225,5 +232,6 @@ table{border-collapse:collapse;width:100%;margin:0 0 0.75em;font-size:0.95em}
 th,td{border:1px solid ${palette.rule};padding:6px 9px;text-align:left}
 th{background:${palette.tableHeader};font-weight:700}
 hr{border:0;border-top:1px solid ${palette.rule};margin:1.2em 0}
+${codeExamples ? codeExampleFrameStyles : ''}
 </style></head><body><div id="cove-rich-text-root">${body}</div></body></html>`;
 }

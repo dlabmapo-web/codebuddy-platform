@@ -33,3 +33,10 @@ describe('content editor paths', () => {
     );
   });
 });
+
+it.each(['academy', 'console', 'library'] as const)('routes explanation creation and editing in the %s surface', surface => {
+  const paths = createContentPaths('mapo', surface);
+  const base = surface === 'academy' ? '/academy/mapo/content/courses' : surface === 'console' ? '/admin/academies/mapo/courses' : '/admin/content/library';
+  expect(paths.explanation('course/1', 'lecture 1', 'new')).toBe(base + '/course%2F1/lectures/lecture%201/explanations/new');
+  expect(paths.explanation('course', 'lecture', 'material')).toBe(base + '/course/lectures/lecture/explanations/material');
+});

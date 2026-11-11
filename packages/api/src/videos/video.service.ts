@@ -718,7 +718,7 @@ export class VideoService {
           const pdf = material.pdfDocument;
           if (
             material.programmingExercise ||
-            material.manualMaterial ||
+            material.type === "EXPLANATION" || material.manualMaterial ||
             (pdf?.asset.state === "READY" &&
               pdf.placement !== "SUPPLEMENTARY") ||
             (video?.asset.state === "READY" &&

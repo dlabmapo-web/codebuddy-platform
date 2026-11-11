@@ -1,6 +1,7 @@
 import type practice from '@cove/i18n/locales/en/practice.json';
 import type submissionSummary from '@cove/i18n/locales/en/submission-summary.json';
 import type pdfPractice from '@cove/i18n/locales/en/pdf-practice.json';
+import type explanation from '@cove/i18n/locales/en/explanation.json';
 import type editor from '@cove/i18n/locales/en/editor.json';
 import type video from "@cove/i18n/locales/en/video.json";
 import type manual from '@cove/i18n/locales/en/manual.json';
@@ -64,6 +65,7 @@ declare module 'i18next' {
       practice: typeof practice;
       solutions: typeof import("@cove/i18n/locales/en/solutions.json");
       editor: typeof editor;
+      explanation: typeof explanation;
       manual:typeof manual;
       "turtle-trial": typeof import("@cove/i18n/locales/en/turtle-trial.json");
       video:typeof video;

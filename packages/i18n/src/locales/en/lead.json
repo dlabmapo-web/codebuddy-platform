@@ -122,7 +122,12 @@
       "content.pdf.updated": "PDF edited",
       "content.pdf.visibility": "PDF shown or hidden",
       "content.pdf.deleted": "PDF deleted",
-      "content.pdf.moved": "PDF moved"
+      "content.pdf.moved": "PDF moved",
+      "content.explanation.created": "Explanation added",
+      "content.explanation.updated": "Explanation edited",
+      "content.explanation.visibility": "Explanation shown or hidden",
+      "content.explanation.deleted": "Explanation deleted",
+      "content.explanation.moved": "Explanation moved"
     }
   },
   "period": {

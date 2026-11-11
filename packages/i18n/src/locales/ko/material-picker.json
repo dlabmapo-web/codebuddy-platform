@@ -37,6 +37,17 @@
     "video": {
       "title": "동영상 수업",
       "description": "영상이나 녹화 자료로 학습합니다."
+    },
+    "explanation": {
+      "title": "설명 자료",
+      "description": "글과 이미지, 예제로 개념을 설명합니다."
     }
+  },
+  "explanation": {
+    "badge": "설명 자료",
+    "count_one": "설명 자료 {{count}}개",
+    "count_other": "설명 자료 {{count}}개",
+    "delete_title": "설명 자료를 삭제할까요?",
+    "delete_confirm": "설명 자료 삭제"
   }
 }

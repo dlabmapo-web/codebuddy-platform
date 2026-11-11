@@ -20,7 +20,7 @@ import { describe, expect, it } from "vitest";
  * raw dotted code with nothing in the type system able to notice.
  */
 
-const source = ["../content/course.service.ts", "../documents/pdf-document.service.ts"]
+const source = ["../content/course.service.ts", "../documents/pdf-document.service.ts", "../explanations/explanation.service.ts"]
   .map((path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8"))
   .join("\n");
 

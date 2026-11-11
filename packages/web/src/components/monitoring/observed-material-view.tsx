@@ -1,4 +1,5 @@
 'use client';
+import { ExplanationContent } from '@/components/explanation/explanation-content';
 import { useState, useRef, type CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { ObservedMaterial, ObservationWork } from '@cove/shared';
@@ -25,6 +26,7 @@ export function ObservedMaterialView({ academyId, classId, material, work, live,
   work: ObservationWork | null; live: boolean; alignRevision: number; lastSeen?: boolean;
 }) {
   const state = work ?? material.saved ?? (material.type === 'TURTLE_EXERCISE' && material.files ? { files: material.files, entryPoint: material.entryPoint } : null);
+  if (material.type === 'EXPLANATION') return <div className="min-h-0 flex-1 overflow-auto px-4"><ExplanationContent title={material.title} body={material.description} images={material.explanationImages} /></div>;
   if (material.type === 'PDF_DOCUMENT') return <ObservedPdf academyId={academyId} materialId={material.materialId} work={work} alignRevision={alignRevision} lastSeen={lastSeen ?? false} />;
   if (material.type === 'VIDEO_LESSON') return <ObservedVideo academyId={academyId} classId={classId} materialId={material.materialId} work={work} alignRevision={alignRevision} lastSeen={lastSeen ?? false} />;
   // Coding always uses the full LiveWorkspace, including saved previews.

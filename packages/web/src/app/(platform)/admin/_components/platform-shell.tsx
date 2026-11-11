@@ -46,6 +46,7 @@ export async function PlatformShell({
   actions,
   back,
   bleed = false,
+  wide = false,
   namespaces,
   showPageHeading = true,
   children,
@@ -57,6 +58,8 @@ export async function PlatformShell({
   back?: React.ReactNode;
   /** Skip the white content card so a page can lay out its own panels. */
   bleed?: boolean;
+  /** Use the available workspace width for document authoring. */
+  wide?: boolean;
   /**
    * Namespaces this one route needs on top of the console's own.
    *
@@ -98,7 +101,7 @@ export async function PlatformShell({
             <HeaderControls account={viewer} className="ml-auto" />
           </header>
 
-          <div className="mx-auto w-full max-w-6xl flex-1 px-5 py-7">
+          <div className={`mx-auto w-full flex-1 ${wide ? 'px-0 py-0' : 'max-w-6xl px-5 py-7'}`}>
             {back ? <div className="mb-3">{back}</div> : null}
             {showPageHeading ? (
               <div className="mb-6 flex flex-wrap items-end justify-between gap-4">

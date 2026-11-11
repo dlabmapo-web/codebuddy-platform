@@ -106,7 +106,7 @@ export function ModuleSection({
                       : 'border-border'
                   }`}
                 >
-                  {lecture.exercises.length > 0 || (lecture.manualMaterials?.length??0)>0 ||
+                  {(lecture.explanations?.length ?? 0) > 0 || lecture.exercises.length > 0 || (lecture.manualMaterials?.length??0)>0 ||
                   (lecture.documents?.length ?? 0) > 0 || (lecture.videos?.length??0)>0 ? (
                     <header>
                       <Collapsible.Trigger asChild>
@@ -167,13 +167,14 @@ export function ModuleSection({
 
                   <Collapsible.Content className="cove-collapse">
                     {lecture.exercises.length === 0 &&
-                    !lecture.documents?.length && !lecture.manualMaterials?.length && !lecture.videos?.length ? (
+                    !lecture.explanations?.length && !lecture.documents?.length && !lecture.manualMaterials?.length && !lecture.videos?.length ? (
                       <p className="border-t border-dashed border-border px-3 py-4 text-center text-[12.5px] text-sub">
                         {t('outline.lecture_empty')}
                       </p>
                     ) : (
                       <ul className="flex flex-col gap-2 border-t border-border bg-canvas/35 p-2.5">
                         {[
+                          ...(lecture.explanations ?? []).map(explanation => ({ kind: 'explanation' as const, position: explanation.position, explanation })),
                           ...(lecture.videos??[]).map(video=>({kind:'video' as const,position:video.position,video})),
                           ...(lecture.manualMaterials??[]).map(manual=>({kind:'manual' as const,position:manual.position,manual})),
                           ...lecture.exercises.map((exercise) => ({
@@ -191,7 +192,7 @@ export function ModuleSection({
                         ]
                           .sort((a, b) => a.position - b.position)
                           .map((row, index) =>
-                            row.kind === 'video' ? (<li key={row.video.materialId}><MaterialLink title={row.video.title} type="VIDEO_LESSON" href={routes.academyLearnVideo(slug,row.video.materialId,{classId})}>{row.video.status==='SOLVED'?vt('completed'):vt(row.video.video.includeInScore?'include_score':'excluded')}</MaterialLink></li>) : row.kind === 'manual' ? (<li key={row.manual.materialId}><MaterialLink title={row.manual.title} type={row.manual.type} href={routes.academyLearnAssessment(slug,row.manual.materialId,row.manual.type,{classId})}>{row.manual.type === "MULTIPLE_CHOICE" ? `${mt("automatic_graded")} · ` : row.manual.type === "TURTLE_EXERCISE" ? `${mt("teacher_graded")} ` : ""}{row.manual.pending?'Awaiting review':row.manual.status==='SOLVED'?'Completed':row.manual.includeInScore?'Included in score':'Excluded from score'}</MaterialLink></li>) : row.kind === 'exercise' ? (
+                            row.kind === 'explanation' ? <li key={row.explanation.materialId}><MaterialLink title={row.explanation.title} type="EXPLANATION" href={routes.academyLearnMaterial(slug, row.explanation.materialId, 'EXPLANATION', { classId })} /></li> : row.kind === 'video' ? (<li key={row.video.materialId}><MaterialLink title={row.video.title} type="VIDEO_LESSON" href={routes.academyLearnVideo(slug,row.video.materialId,{classId})}>{row.video.status==='SOLVED'?vt('completed'):vt(row.video.video.includeInScore?'include_score':'excluded')}</MaterialLink></li>) : row.kind === 'manual' ? (<li key={row.manual.materialId}><MaterialLink title={row.manual.title} type={row.manual.type} href={routes.academyLearnAssessment(slug,row.manual.materialId,row.manual.type,{classId})}>{row.manual.type === "MULTIPLE_CHOICE" ? `${mt("automatic_graded")} · ` : row.manual.type === "TURTLE_EXERCISE" ? `${mt("teacher_graded")} ` : ""}{row.manual.pending?'Awaiting review':row.manual.status==='SOLVED'?'Completed':row.manual.includeInScore?'Included in score':'Excluded from score'}</MaterialLink></li>) : row.kind === 'exercise' ? (
                               <ExerciseRow
                                 academyId={academyId}
                                 classId={classId}

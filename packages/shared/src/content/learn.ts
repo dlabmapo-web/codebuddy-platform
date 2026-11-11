@@ -80,6 +80,7 @@ export type LearnExerciseSummary = z.infer<typeof learnExerciseSummarySchema>;
 
 export const learnManualSummarySchema=z.object({materialId:z.uuid(),title:titleSchema,position:positionSchema,type:z.enum(['TURTLE_EXERCISE','WRITTEN_RESPONSE','MULTIPLE_CHOICE']),includeInScore:z.boolean(),status:exerciseProgressStatusSchema,pending:z.boolean(),scoreHundredths:z.number().int().nullable(),maximumHundredths:z.number().int().positive()});
 export const learnLectureSchema = z.object({
+  explanations: z.array(z.object({ materialId: z.uuid(), title: titleSchema, position: positionSchema })).optional(),
   id: z.uuid(),
   title: titleSchema,
   description: descriptionSchema,
@@ -124,6 +125,7 @@ export const learnCourseSummarySchema = z.object({
     modules: z.number().int().nonnegative(),
     lectures: z.number().int().nonnegative(),
     exercises: z.number().int().nonnegative(),
+    explanations: z.number().int().nonnegative().optional(),
     documents: z.number().int().nonnegative().optional(),
   }),
   progress: learnCourseProgressSchema,
@@ -338,6 +340,7 @@ export const navigatorLectureSchema = z.object({
   position: positionSchema,
   exercises: z.array(navigatorExerciseSchema),
   videos:learnLectureSchema.shape.videos,
+  explanations: learnLectureSchema.shape.explanations,
   documents: learnLectureSchema.shape.documents,
   manualMaterials:learnLectureSchema.shape.manualMaterials,
 });
@@ -596,6 +599,7 @@ export function toNavigatorContext(
           title: lecture.title,
           position: lecture.position,
           videos:lecture.videos,
+          explanations: lecture.explanations,
           documents: lecture.documents,
           manualMaterials:lecture.manualMaterials,
           exercises: orderedExercises(lecture.exercises).map((exercise) => ({
@@ -651,7 +655,7 @@ export function navigatorPathFor(
   for (const courseModule of outline.modules) {
     for (const lecture of courseModule.lectures) {
       const exercise = [...lecture.exercises, ...(lecture.manualMaterials ?? []), ...(lecture.videos ?? []),
-        ...(lecture.documents ?? [])].find(
+        ...(lecture.explanations ?? []), ...(lecture.documents ?? [])].find(
         (candidate) => candidate.materialId === materialId,
       );
       if (!exercise) continue;
@@ -819,6 +823,7 @@ export function workspaceMaterialSequence(context: WorkspaceNavigatorContext | n
   materialId: string; title: string; position: number; type: string;
 }> {
   return (context?.course?.modules ?? []).flatMap((module) => module.lectures.flatMap((lecture) => [
+    ...(lecture.explanations ?? []).map((item) => ({ ...item, type: "EXPLANATION" })),
     ...lecture.exercises.map((item) => ({ materialId: item.materialId, title: item.title, position: item.position, type: "PROGRAMMING_EXERCISE" })),
     ...(lecture.videos ?? []).map((item) => ({ materialId: item.materialId, title: item.title, position: item.position, type: "VIDEO_LESSON" })),
     ...(lecture.documents ?? []).filter((item) => item.pdf.placement !== "SUPPLEMENTARY").map((item) => ({ materialId: item.materialId, title: item.title, position: item.position, type: "PDF_DOCUMENT" })),

@@ -9,10 +9,11 @@ import { ChevronRight } from 'lucide-react';
 /** The same material vocabulary in course lists, drawers and workspace trees. */
 export function materialAppearance(type: string, hasReferencePdf = false): {
   Icon: LucideIcon;
-  label: 'coding' | 'pdf_coding' | 'pdf' | 'video' | 'quiz' | 'written' | 'turtle' | 'material';
+  label: 'explanation' | 'coding' | 'pdf_coding' | 'pdf' | 'video' | 'quiz' | 'written' | 'turtle' | 'material';
   tone: string;
 } {
   switch (type) {
+    case 'EXPLANATION': return { Icon: BookOpen, label: 'explanation', tone: 'bg-brand-soft text-brand' };
     case 'PROGRAMMING_EXERCISE': return { Icon: Code2, label: hasReferencePdf ? 'pdf_coding' : 'coding', tone: 'bg-brand-soft text-brand' };
     case 'PDF_DOCUMENT': return { Icon: FileText, label: 'pdf', tone: 'bg-danger/10 text-danger' };
     case 'VIDEO_LESSON': return { Icon: Film, label: 'video', tone: 'bg-brand-soft text-brand' };

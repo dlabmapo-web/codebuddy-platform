@@ -284,6 +284,7 @@ export type PreviewAcademyCourseInput = z.infer<
 >;
 export const libraryImportMaterialTypes = [
   "PROGRAMMING_EXERCISE",
+  "EXPLANATION",
   "PDF_DOCUMENT",
   "TURTLE_EXERCISE",
   "WRITTEN_RESPONSE",

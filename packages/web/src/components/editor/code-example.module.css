@@ -1,0 +1,93 @@
+.window {
+  overflow: hidden;
+  margin: 1rem 0;
+  border: 1px solid #3b3d41;
+  border-radius: 12px;
+  background: #1e1e1e;
+  color: #e2e8f0;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+.header {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #3b3d41;
+  background: #2a2a2a;
+  padding: 7px 14px;
+}
+.language {
+  min-width: 0;
+  max-width: 55%;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  padding: 4px;
+  color: #cbd5e1;
+  font: inherit;
+  font-size: 12px;
+}
+.copy {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  padding: 5px 7px;
+  color: #a8b2c1;
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  cursor: pointer;
+}
+.copy:hover {
+  background: #3b3d41;
+  color: white;
+}
+.copy:focus-visible,
+.language:focus-visible {
+  outline: 2px solid #5b93f5;
+  outline-offset: 2px;
+}
+.body {
+  display: flex;
+  min-width: 0;
+}
+.window .body .numbers {
+  flex-shrink: 0;
+  min-width: 3.5em;
+  border-right: 1px solid #ffffff0d;
+  padding: 16px 12px;
+  color: #707987;
+  text-align: right;
+  white-space: pre;
+  font-size: 14px;
+  line-height: 1.75;
+  user-select: none;
+}
+/* Specific enough to override the shared rich editor's ordinary pre/code styles. */
+.window .source {
+  min-width: 0;
+  flex: 1;
+  overflow-x: auto;
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 16px;
+  color: inherit;
+  white-space: pre;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.75;
+  tab-size: 4;
+}
+.window .source code {
+  display: block;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}

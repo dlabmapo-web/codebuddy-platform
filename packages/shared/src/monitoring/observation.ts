@@ -41,6 +41,7 @@ export const observationSnapshotSchema = observationScopeSchema.extend({
 export type ObservationSnapshot = z.infer<typeof observationSnapshotSchema>;
 export const observedMaterialSchema = z.object({
   materialId: z.uuid(), type: materialTypeSchema, title: z.string(), description: z.string(),
+  explanationImages: z.record(z.string(), z.string().nullable()).optional(),
   files: sourceFilesSchema.optional(), hint: z.string().optional(), includeInScore: z.boolean().optional(), automaticallyGraded: z.boolean().optional(), entryPoint: z.string().optional(),
   question: z.string().nullable(), choice: publicChoiceSchema.nullable(),
   saved: observationWorkSchema.nullable(), savedAt: z.iso.datetime().nullable(),

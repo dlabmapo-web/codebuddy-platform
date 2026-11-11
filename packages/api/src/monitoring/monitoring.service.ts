@@ -3,7 +3,9 @@ import type { ExerciseSolutionEntry } from "@cove/shared";
 import { referencePdfMetadata } from "../documents/pdf-reference.js";
 import { publicQuiz } from "@cove/shared";
 import { publicChoiceSchema, sourceFilesSchema, type ObservedMaterial } from '@cove/shared';
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { ManualAssetsService } from "../manual/manual-assets.service.js";
+import { lessonImageIds } from "../content/lesson-images.js";
+import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 import {
   displayableEmail,
   monitoringLimits,
@@ -57,6 +59,7 @@ export class MonitoringService {
     private readonly audit: AuditService,
     /** Signs the roster's avatars, in one batch rather than one per student. */
     private readonly profileMedia: ProfileMediaService,
+    @Optional() private readonly lessonImages?: ManualAssetsService,
   ) {}
 
   /**
@@ -328,8 +331,8 @@ export class MonitoringService {
     const student = await this.access.requireMonitorableStudent(claim, input.membershipId);
     const material = await this.access.requireObservableMaterial(student, input.materialId);
     const row = await this.prisma.material.findUniqueOrThrow({ where: { id: input.materialId },
-      include: { manualMaterial: true, videoLesson: true, programmingExercise: true } });
-    const [navigator, draft, submitted] = await Promise.all([
+      include: { explanationMaterial: true, manualMaterial: true, videoLesson: true, programmingExercise: true } });
+    const [navigator, draft, submitted, explanationImages] = await Promise.all([
       // The checks above are getStudentCurriculum's, plus the live watch.
       this.navigatorFor(material),
       row.manualMaterial && !row.manualMaterial.shortAnswer && !row.manualMaterial.multipleChoice
@@ -339,6 +342,7 @@ export class MonitoringService {
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         select: { answer: true, files: true, createdAt: true },
       }) : null,
+      row.explanationMaterial ? this.lessonImages?.imageDataUrls(lessonImageIds(row.explanationMaterial.body)) : undefined,
     ]);
     const config = row.manualMaterial;
     const choice = config?.multipleChoice ? publicChoiceSchema.parse(config.multipleChoice) : null;
@@ -352,7 +356,8 @@ export class MonitoringService {
     const saved = draft ?? submitted;
     return {
       materialId: row.id, type: row.type, title: row.title,
-      description: config?.description ?? row.videoLesson?.description ?? row.programmingExercise?.description ?? '',
+      explanationImages,
+      description: row.explanationMaterial?.body ?? config?.description ?? row.videoLesson?.description ?? row.programmingExercise?.description ?? '',
       question: config?.shortAnswer && typeof config.shortAnswer === 'object' && 'question' in config.shortAnswer
         ? String(config.shortAnswer.question) : choice?.question ?? null,
       choice, navigator, hint: config?.hint ?? undefined, includeInScore: config?.includeInScore,

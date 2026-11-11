@@ -1,3 +1,5 @@
+import { lessonImageIds } from "../lesson-images.js";
+import { sanitizeExplanation } from "../../explanations/explanation-html.js";
 import { choiceAssetIds } from "../../manual/multiple-choice.service.js";
 import {
   libraryImportMaterialTypes,
@@ -18,6 +20,7 @@ export async function libraryImportBlockers(
   const materials = source.modules.flatMap((module) =>
     module.lectures.flatMap((lecture) => lecture.materials),
   );
+  const explanationImages = new Set<string>();
   const manifests = new Map<string, { name: string; byteSize: number }>();
   const captionIds = new Set<string>();
   const blockers: AcademyCourseImportPreview["blockers"] = [];
@@ -47,6 +50,7 @@ export async function libraryImportBlockers(
     if (
       (material.type === "PROGRAMMING_EXERCISE" &&
         !material.programmingExercise) ||
+      (material.type === "EXPLANATION" && !material.explanationMaterial) ||
       (material.type === "PDF_DOCUMENT" && !material.pdfDocument) ||
       (material.type === "VIDEO_LESSON" && !material.videoLesson) ||
       (["TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE"].includes(
@@ -110,6 +114,10 @@ export async function libraryImportBlockers(
       )
         invalid = true;
     }
+    if (material.explanationMaterial) {
+      try { sanitizeExplanation(material.explanationMaterial.body); } catch { invalid = true; }
+      for (const id of lessonImageIds(material.explanationMaterial.body)) explanationImages.add(id);
+    }
     if (material.videoLesson) {
       const config = videoConfigSchema.safeParse(material.videoLesson);
       if (!config.success) invalid = true;
@@ -143,9 +151,9 @@ export async function libraryImportBlockers(
     for (const asset of assets) manifests.set(asset.assetId, asset);
     for (const caption of captions) captionIds.add(caption.id);
   }
-  const assetRows = manifests.size
+  const assetRows = manifests.size || explanationImages.size
     ? await tx.manualAsset.findMany({
-        where: { id: { in: [...manifests.keys()] } },
+        where: { id: { in: [...new Set([...manifests.keys(), ...explanationImages])] } },
       })
     : [];
   const captionRows = captionIds.size
@@ -155,6 +163,7 @@ export async function libraryImportBlockers(
   const captions = new Map(captionRows.map((caption) => [caption.id, caption]));
   for (const material of materials) {
     const config = valid.get(material.id)!;
+    if (material.explanationMaterial && lessonImageIds(material.explanationMaterial.body).some(id => !assets.get(id)?.mimeType.startsWith("image/"))) blockers.push({ materialId: material.id, materialTitle: material.title, reason: "ASSET_MISSING" });
     if (
       config.assets.some((asset) => {
         const stored = assets.get(asset.assetId);

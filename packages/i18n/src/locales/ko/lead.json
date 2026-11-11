@@ -122,7 +122,12 @@
       "content.pdf.updated": "PDF 수정",
       "content.pdf.visibility": "PDF 공개 또는 숨김",
       "content.pdf.deleted": "PDF 삭제",
-      "content.pdf.moved": "PDF 이동"
+      "content.pdf.moved": "PDF 이동",
+      "content.explanation.created": "설명 자료 추가",
+      "content.explanation.updated": "설명 자료 수정",
+      "content.explanation.visibility": "설명 자료 공개 설정 변경",
+      "content.explanation.deleted": "설명 자료 삭제",
+      "content.explanation.moved": "설명 자료 이동"
     }
   },
   "period": {

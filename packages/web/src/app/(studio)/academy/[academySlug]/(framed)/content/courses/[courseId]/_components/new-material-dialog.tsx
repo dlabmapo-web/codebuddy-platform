@@ -1,4 +1,4 @@
-import { ArrowRight, Braces, Check, ClipboardList, FileCode2, FileText, ListChecks, PenLine, Plus, Turtle, Video, X } from 'lucide-react';
+import { BookOpen, ArrowRight, Braces, Check, ClipboardList, FileCode2, FileText, ListChecks, PenLine, Plus, Turtle, Video, X } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -6,6 +6,7 @@ import { Modal, ModalContent, ModalTrigger } from '@/components/studio/primitive
 import type { MaterialCreationKind } from '../_lib/material-creation';
 
 const icons = {
+  explanation: BookOpen,
   python: Braces,
   pdfPractice: FileCode2,
   pdf: FileText,

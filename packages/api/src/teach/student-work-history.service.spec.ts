@@ -93,6 +93,7 @@ describe("student saved-work boundary", () => {
       OR: [
         { programmingExercise: { isNot: null } },
         { manualMaterial: { isNot: null } },
+        { explanationMaterial: { isNot: null } },
         { pdfDocument: { isNot: null } },
         { videoLesson: { isNot: null } },
       ],

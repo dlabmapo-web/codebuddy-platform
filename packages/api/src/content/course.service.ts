@@ -1165,7 +1165,7 @@ export class CourseService {
       await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
-        action: material.type === "PDF_DOCUMENT" ? "content.pdf.moved" : "content.programming_exercise.moved",
+        action: material.type === "EXPLANATION" ? "content.explanation.moved" : material.type === "PDF_DOCUMENT" ? "content.pdf.moved" : "content.programming_exercise.moved",
         targetType: "Material",
         targetId: material.id,
         requestId: context.requestId,
@@ -2045,17 +2045,20 @@ export function toCourseSummary(course: {
   let exercises = 0;
   let problems = 0;
   let visibleExercises = 0;
+  let explanations = 0;
+  let visibleExplanations = 0;
   let documents = 0;
   let visibleDocuments = 0;
   for (const courseModule of course.modules ?? []) {
     lectures += courseModule.lectures.length;
     for (const lecture of courseModule.lectures) {
       exercises += lecture.materials.filter(
-        (m) => m.type !== "PDF_DOCUMENT",
+        (m) => m.type !== "PDF_DOCUMENT" && m.type !== "EXPLANATION",
       ).length;
       problems += lecture.materials.filter(
         (m) => m.type === "PROGRAMMING_EXERCISE",
       ).length;
+      explanations += lecture.materials.filter(m => m.type === "EXPLANATION").length;
       documents += lecture.materials.filter(
         (m) => m.type === "PDF_DOCUMENT",
       ).length;
@@ -2066,6 +2069,7 @@ export function toCourseSummary(course: {
       for (const material of lecture.materials) {
         if (material.isVisible) {
           if (material.type === "PDF_DOCUMENT") visibleDocuments += 1;
+          else if (material.type === "EXPLANATION") visibleExplanations += 1;
           else visibleExercises += 1;
         }
       }
@@ -2086,6 +2090,7 @@ export function toCourseSummary(course: {
       visibleExercises,
       documents,
       visibleDocuments,
+      explanations, visibleExplanations,
     },
     libraryImportOrigin: course.libraryImport ? {
       sourceAcademyId: course.libraryImport.sourceAcademyId,

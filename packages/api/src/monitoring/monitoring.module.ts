@@ -1,6 +1,7 @@
 import { HelpRequestService } from "./help-request.service.js";
 import { HelpRequestRepository } from "./help-request.repository.js";
 import { HelpRequestBroadcaster } from "./help-request-broadcaster.js";
+import { ManualAssetsService } from "../manual/manual-assets.service.js";
 import { Module } from "@nestjs/common";
 
 import { AuthModule } from "../auth/auth.module.js";
@@ -50,6 +51,7 @@ import { AcademiesModule } from "../academies/academies.module.js";
   providers: [HelpRequestService, HelpRequestRepository, HelpRequestBroadcaster,
     MonitoringAccessService,
     MonitoringService,
+    ManualAssetsService,
     PresenceRegistry,
     CollaborationDocumentService,
     MonitoringFeedbackService,

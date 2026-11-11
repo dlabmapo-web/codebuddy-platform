@@ -161,6 +161,13 @@
       "video": {
         "saved": "Video lesson saved",
         "visibility": "Video lesson shown or hidden"
+      },
+      "explanation": {
+        "created": "Explanation created",
+        "updated": "Explanation updated",
+        "deleted": "Explanation deleted",
+        "moved": "Explanation moved",
+        "visibility": "Explanation shown or hidden"
       }
     },
     "platform": {

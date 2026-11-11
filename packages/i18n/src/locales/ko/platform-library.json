@@ -95,7 +95,8 @@
       "TURTLE_EXERCISE": "터틀",
       "WRITTEN_RESPONSE": "서술형",
       "MULTIPLE_CHOICE": "객관식",
-      "VIDEO_LESSON": "동영상"
+      "VIDEO_LESSON": "동영상",
+      "EXPLANATION": "설명 자료"
     },
     "blockers": {
       "INVALID_DEFINITION": "콘텐츠 설정이 올바르지 않습니다",

@@ -11,7 +11,7 @@ vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('@/lib/config', () => ({ publicConfig: { guiEnabled: false } }));
-vi.mock('@/components/studio/content-base-path-provider', () => ({ useContentSurface: () => 'academy', useContentAcademySlug: () => 'test-academy' }));
+vi.mock('@/components/studio/content-base-path-provider', () => ({ useContentBasePath: () => ({ explanation: (course: string, lecture: string, material: string) => `/academy/test-academy/content/courses/${course}/lectures/${lecture}/explanations/${material}` }), useContentSurface: () => 'academy', useContentAcademySlug: () => 'test-academy' }));
 vi.mock('@/components/manual/manual-author-dialog', () => ({ ManualAuthorDialog: () => null }));
 vi.mock('@/components/video/video-author-dialog', () => ({ VideoAuthorDialog: () => null }));
 vi.mock('@/components/pdf/pdf-author-dialog', () => ({ PdfAuthorDialog: ({ initialPreview, editable, onClose }: { initialPreview: boolean; editable: boolean; onClose: () => void }) => <section data-pdf-mode={initialPreview ? 'preview' : 'edit'} data-editable={String(editable)}><button onClick={onClose}>{'close PDF'}</button></section> }));

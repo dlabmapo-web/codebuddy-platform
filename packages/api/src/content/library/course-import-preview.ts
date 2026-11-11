@@ -30,7 +30,8 @@ export async function readCourseImportPreview(
   const manualIds = ids(["TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE"]);
   const pdfIds = ids(["PDF_DOCUMENT"]);
   const videoIds = ids(["VIDEO_LESSON"]);
-  const [programming, manuals, pdfs, videos] = await Promise.all([
+  const explanationIds = ids(["EXPLANATION"]);
+  const [programming, manuals, pdfs, videos, explanations] = await Promise.all([
     programmingIds.length ? tx.programmingExercise.findMany({
       where: { materialId: { in: programmingIds } }, select: { materialId: true, quiz: true },
     }) : [],
@@ -41,7 +42,9 @@ export async function readCourseImportPreview(
     videoIds.length ? tx.videoLesson.findMany({
       where: { materialId: { in: videoIds } }, ...definitions.videoLesson,
     }) : [],
+    explanationIds.length ? tx.explanationMaterial.findMany({ where: { materialId: { in: explanationIds } } }) : [],
   ]);
+  const explanationById = new Map(explanations.map(row => [row.materialId, row]));
   const programmingById = new Map(programming.map((row) => [row.materialId, row]));
   const manualById = new Map(manuals.map((row) => [row.materialId, row]));
   const pdfById = new Map(pdfs.map((row) => [row.materialId, row]));
@@ -54,6 +57,7 @@ export async function readCourseImportPreview(
         ...lecture,
         materials: lecture.materials.map((material) => ({
           ...material,
+          explanationMaterial: explanationById.get(material.id) ?? null,
           programmingExercise: programmingById.get(material.id) ?? null,
           manualMaterial: manualById.get(material.id) ?? null,
           pdfDocument: pdfById.get(material.id) ?? null,

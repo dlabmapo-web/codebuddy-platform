@@ -4,7 +4,7 @@ import type { PrismaService } from "../database/prisma.service.js";
 
 export const emptyCourseCounts = (): CourseContentCounts => ({
   modules: 0, lectures: 0, exercises: 0, problems: 0, visibleExercises: 0,
-  documents: 0, visibleDocuments: 0,
+  documents: 0, visibleDocuments: 0, explanations: 0, visibleExplanations: 0,
 });
 
 /** One row per course, never one row per material across the API boundary.
@@ -23,10 +23,12 @@ export async function courseCounts(
     SELECT c.id,
       count(DISTINCT cm.id)::integer AS modules,
       count(DISTINCT l.id)::integer AS lectures,
-      count(m.id) FILTER (WHERE m.type <> 'PDF_DOCUMENT')::integer AS exercises,
+      count(m.id) FILTER (WHERE m.type NOT IN ('PDF_DOCUMENT', 'EXPLANATION'))::integer AS exercises,
       count(m.id) FILTER (WHERE m.type = 'PROGRAMMING_EXERCISE')::integer AS problems,
-      count(m.id) FILTER (WHERE m.type <> 'PDF_DOCUMENT'
+      count(m.id) FILTER (WHERE m.type NOT IN ('PDF_DOCUMENT', 'EXPLANATION')
         AND cm.is_visible AND l.is_visible AND m.is_visible)::integer AS "visibleExercises",
+      count(m.id) FILTER (WHERE m.type = 'EXPLANATION')::integer AS explanations,
+      count(m.id) FILTER (WHERE m.type = 'EXPLANATION' AND cm.is_visible AND l.is_visible AND m.is_visible)::integer AS "visibleExplanations",
       count(m.id) FILTER (WHERE m.type = 'PDF_DOCUMENT')::integer AS documents,
       count(m.id) FILTER (WHERE m.type = 'PDF_DOCUMENT'
         AND cm.is_visible AND l.is_visible AND m.is_visible)::integer AS "visibleDocuments"

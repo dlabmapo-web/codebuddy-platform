@@ -271,7 +271,8 @@
       "WRITTEN_RESPONSE": "서술형 답안",
       "MULTIPLE_CHOICE": "객관식",
       "PDF_DOCUMENT": "PDF 문서",
-      "VIDEO_LESSON": "동영상 수업"
+      "VIDEO_LESSON": "동영상 수업",
+      "EXPLANATION": "설명 자료"
     },
     "statuses": {
       "not_started": "시작 전",

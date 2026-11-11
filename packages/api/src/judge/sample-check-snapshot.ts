@@ -73,6 +73,7 @@ export function runSnapshotFor(
   code: string,
   engineVersion: string,
   descriptor: NativeAnyRuntimeDescriptor,
+  endOfInput = false,
 ): SampleSnapshot | null {
   const language = exercise.language;
   if (language !== "C" && language !== "CPP" || descriptor.engine !== "native-gcc") return null;
@@ -89,6 +90,7 @@ export function runSnapshotFor(
     code,
     language,
     run: true,
+    ...(endOfInput ? { endOfInput: true } : {}),
     memoryLimitMb: exercise.memoryLimitMb,
     totalTimeLimitMs: profile.totalTimeLimitMs,
     comparatorTimeLimitMs: profile.comparatorTimeLimitMs,

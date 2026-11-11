@@ -112,6 +112,17 @@ export function createLearnRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) =>
         deps.sampleCheckService.startRun(context.identity, input)
       ),
+    // A staff member's own C/C++ practice: the same checks, with no class.
+    startPracticeSampleCheck: os.learn.startPracticeSampleCheck
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.sampleCheckService.startPractice(context.identity, input)
+      ),
+    startPracticeRunCheck: os.learn.startPracticeRunCheck
+      .use(access.authenticated)
+      .handler(({ context, input }) =>
+        deps.sampleCheckService.startPractice(context.identity, input)
+      ),
     getSampleCheck: os.learn.getSampleCheck
       .use(access.studentAuthenticated)
       .handler(({ context, input }) =>

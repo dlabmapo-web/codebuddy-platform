@@ -188,6 +188,9 @@ export class SampleCheckRunner {
           executionBudgetMs: snapshot.totalTimeLimitMs,
           testCase: snapshot.testCase,
           ...(build ? { build } : {}),
+          // A Run keeps its input open: the terminal asks for more when the
+          // program waits, as Python's does.
+          ...(snapshot.run && build && !snapshot.endOfInput ? { holdStdin: true } : {}),
         },
       );
     } catch (error) {
@@ -230,6 +233,7 @@ export class SampleCheckRunner {
         // Public or student-typed input only, so the ending may be shown.
         ...caseExit(outcome as ExecutionResult["outcome"], run.termination),
         compileDiagnostics: warnings,
+        ...(run.awaitingInput ? { awaitingInput: true } : {}),
       };
       await this.end(record, ["RUNNING"], "COMPLETED", {
         result,

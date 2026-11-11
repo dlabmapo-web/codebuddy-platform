@@ -21,6 +21,8 @@ export type ExecutionRequest = {
   /** A compiled language: the leased artifact this case runs instead of `code`. */
   artifact?: string;
   lease?: string;
+  /** A C/C++ Run: input stays open, and a program waiting for more ends as `awaitingInput`. */
+  holdStdin?: boolean;
 };
 
 export type ExecutionResult = {
@@ -32,6 +34,8 @@ export type ExecutionResult = {
   outputTruncated?: boolean;
   /** A compiled program's runtime error: its exit code or signal. */
   termination?: { exit: number } | { signal: ProgramExitSignal };
+  /** A held Run stopped while its program waited for more input. */
+  awaitingInput?: boolean;
 };
 
 export type CompileRequest = {

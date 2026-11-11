@@ -98,9 +98,26 @@ export const startRunCheckSchema = z
     stdin: z.string().max(runCheckStdinLimit),
     workspaceRevision: z.number().int().positive(),
     clientRequestId: z.uuid(),
+    /**
+     * The terminal's End input (Ctrl+D): `stdin` is all there is, so reading
+     * past it is end of file. Otherwise the program's input stays open and a
+     * program waiting for more comes back `awaitingInput`.
+     */
+    endOfInput: z.boolean().optional(),
   })
   .strict();
 export type StartRunCheckInput = z.infer<typeof startRunCheckSchema>;
+
+/**
+ * A staff member's own C/C++ practice: the same Run and public-case checks,
+ * with no class. Authorized as staff practice is, including an unpublished
+ * preview at the revision the author is editing.
+ */
+const practiceCheck = { preview: z.boolean().optional() };
+export const startPracticeSampleCheckSchema = startSampleCheckSchema.omit({ classId: true }).extend(practiceCheck).strict();
+export type StartPracticeSampleCheckInput = z.infer<typeof startPracticeSampleCheckSchema>;
+export const startPracticeRunCheckSchema = startRunCheckSchema.omit({ classId: true }).extend(practiceCheck).strict();
+export type StartPracticeRunCheckInput = z.infer<typeof startPracticeRunCheckSchema>;
 
 export const sampleCheckInputSchema = z
   .object({ academyId: z.uuid(), checkId: z.uuid() })
@@ -134,6 +151,8 @@ export const sampleCheckResultSchema = z.object({
   exitSignal: programExitSignalSchema.nullable().optional(),
   /** C/C++: GCC's messages, warnings included, or null for Python. */
   compileDiagnostics: z.string().nullable().optional(),
+  /** A C/C++ Run ended while its program waited for more input: the terminal asks for it. */
+  awaitingInput: z.boolean().optional(),
 });
 export type SampleCheckResult = z.infer<typeof sampleCheckResultSchema>;
 

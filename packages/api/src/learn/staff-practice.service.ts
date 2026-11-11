@@ -35,25 +35,8 @@ export class StaffPracticeService {
   }
 
   /** Permission/DLAB/support checks finish before a transaction holds its pool connection. */
-  private async authorizedMaterial(actor: AcademyAccess, input: { academyId: string; materialId: string; preview?: boolean; gradingRevision?: number }, db: Prisma.TransactionClient) {
-    // Platform inspection (and assumed support roles) never confers personal participation.
-    if (actor.via !== "membership" || !rolesHavePermission(actor.roles, "practice.own.create")) {
-      throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
-    }
-    if (input.preview && !rolesHavePermission(actor.roles, "curriculum.review")) throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
-    const scope = learningScopeFor(input.academyId, actor);
-    const material = await db.material.findFirst({
-      where: { id: input.materialId, ...(input.preview ? { AND: [scope.material, { lecture: { courseModule: { course: { academyId: input.academyId } } } }] } : reachableMaterialWhere(input.academyId, scope)) },
-      include: {
-        programmingExercise: { include: { testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] } } },
-        lecture: { include: { courseModule: true } },
-      },
-    });
-    if (!material?.programmingExercise) throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
-    if (input.gradingRevision !== undefined && input.gradingRevision !== material.programmingExercise.gradingRevision) {
-      throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.CONFLICT);
-    }
-    return { actor, material, exercise: material.programmingExercise };
+  private authorizedMaterial(actor: AcademyAccess, input: { academyId: string; materialId: string; preview?: boolean; gradingRevision?: number }, db: Prisma.TransactionClient) {
+    return staffPracticeMaterial(db, actor, input);
   }
 
   async draft(identity: SupabaseIdentity, input: { academyId: string; materialId: string; preview?: boolean; gradingRevision?: number }) {
@@ -193,4 +176,42 @@ export class StaffPracticeService {
       materialMaximumHundredths: maximum, appliedScoreHundredths: applied,
       gradingAborted: Boolean(result?.failureReason) });
   }
+}
+
+/**
+ * The exercise a staff member may practise, as their own work: a membership
+ * with `practice.own.create`, never platform inspection or a support role. A
+ * preview reaches an unpublished revision and needs `curriculum.review`.
+ * Shared by practice Submit and practice Run/Test checks, so both answer the
+ * same question the same way.
+ */
+export async function staffPracticeMaterial(
+  db: Prisma.TransactionClient,
+  actor: AcademyAccess,
+  input: { academyId: string; materialId: string; preview?: boolean; gradingRevision?: number },
+) {
+  if (actor.via !== "membership" || !rolesHavePermission(actor.roles, "practice.own.create")) {
+    throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
+  }
+  if (input.preview && !rolesHavePermission(actor.roles, "curriculum.review")) throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
+  const material = await db.material.findFirst({
+    where: { id: input.materialId, ...staffPracticeMaterialWhere(input.academyId, actor, input.preview) },
+    include: {
+      programmingExercise: { include: { testCases: { orderBy: [{ position: "asc" }, { id: "asc" }] } } },
+      lecture: { include: { courseModule: true } },
+    },
+  });
+  if (!material?.programmingExercise) throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
+  if (input.gradingRevision !== undefined && input.gradingRevision !== material.programmingExercise.gradingRevision) {
+    throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.CONFLICT);
+  }
+  return { actor, material, exercise: material.programmingExercise };
+}
+
+/** Where a staff member's practice may read: reachable, or any of the academy's own in a preview. */
+export function staffPracticeMaterialWhere(academyId: string, actor: AcademyAccess, preview?: boolean): Prisma.MaterialWhereInput {
+  const scope = learningScopeFor(academyId, actor);
+  return preview
+    ? { AND: [scope.material, { lecture: { courseModule: { course: { academyId } } } }] }
+    : reachableMaterialWhere(academyId, scope);
 }

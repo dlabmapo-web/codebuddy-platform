@@ -8,6 +8,8 @@ import {
   isCompiledLanguage,
   isSampleCheckActive,
   type SampleCheckView,
+  type StartPracticeRunCheckInput,
+  type StartPracticeSampleCheckInput,
   type StartRunCheckInput,
   type StartSampleCheckInput,
 } from "@cove/shared";
@@ -29,6 +31,10 @@ import {
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
 import { LearningClassContextService } from "./learning-class-context.service.js";
 import { programExit } from "../judge/program-exit.js";
+import { staffPracticeMaterial, staffPracticeMaterialWhere } from "./staff-practice.service.js";
+
+/** The class a staff member's own practice checks name: they have none. */
+const STAFF_PRACTICE = "staff-practice";
 
 /** Beyond the run's own bounds, before an active check is presumed lost. */
 const LOST_SLACK_MS = 60_000;
@@ -191,16 +197,63 @@ export class SampleCheckService {
     if (descriptor?.engine !== "native-gcc") throw unavailable();
     const snapshot = runSnapshotFor(
       exercise, input.stdin, input.code,
-      this.config.get("PYODIDE_VERSION", { infer: true }), descriptor,
+      this.config.get("PYODIDE_VERSION", { infer: true }), descriptor, input.endOfInput,
     );
     if (!snapshot) throw unavailable();
     const codeHash = sha256(input.code);
     const requestHash = sha256(
-      JSON.stringify(["run", input.materialId, input.classId, input.workspaceRevision, codeHash, sha256(input.stdin)]),
+      JSON.stringify(["run", input.materialId, input.classId, input.workspaceRevision, codeHash, sha256(input.stdin), Boolean(input.endOfInput)]),
     );
     return this.admit(store, queue, {
       kind: "run", userId, input, materialId: material.id, position: 0,
       exerciseRevision: exercise.gradingRevision, codeHash, requestHash, snapshot,
+    });
+  }
+
+  /**
+   * A staff member's own C/C++ practice: a public case, or a Run on their
+   * input. The student checks' rules and limits, authorized as practice Submit
+   * is: their own membership, no class, and an unpublished preview for those
+   * who review curriculum. Python practice runs in the browser.
+   */
+  async startPractice(
+    identity: SupabaseIdentity,
+    input: StartPracticeSampleCheckInput | (StartPracticeRunCheckInput & { stdin: string }),
+  ): Promise<SampleCheckView> {
+    const actor = await this.access.requirePermission(identity.authUserId, input.academyId, "curriculum.read");
+    const store = this.store;
+    const queue = this.queue;
+    if (!store || !queue) throw unavailable();
+    const { material, exercise } = await snapshotTransaction(this.prisma, tx =>
+      staffPracticeMaterial(tx, actor, { academyId: input.academyId, materialId: input.materialId, preview: input.preview }));
+    if (!isCompiledLanguage(exercise.language) || exercise.quiz) throw notFound();
+    if (exercise.gradingRevision !== input.workspaceRevision) {
+      throw new AppException("SAMPLE_CHECK_STALE", HttpStatus.CONFLICT);
+    }
+    const run = "stdin" in input;
+    const testCase = run ? null : exercise.testCases.find(
+      (candidate) => candidate.position === input.position && candidate.visibility === "SAMPLE",
+    );
+    if (!run && !testCase) throw notFound();
+    const descriptor = await this.native().select({
+      academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision,
+      context: input.preview ? "preview" : "live", kind: run ? "run" : "sample",
+    }, exercise);
+    if (descriptor?.engine !== "native-gcc") throw unavailable();
+    const pyodide = this.config.get("PYODIDE_VERSION", { infer: true });
+    const snapshot = run
+      ? runSnapshotFor(exercise, input.stdin, input.code, pyodide, descriptor, input.endOfInput)
+      : sampleSnapshotFor(exercise, testCase!, input.code, pyodide, descriptor);
+    if (!snapshot) throw unavailable();
+    const codeHash = sha256(input.code);
+    const requestHash = sha256(JSON.stringify(run
+      ? ["practice-run", input.materialId, input.workspaceRevision, codeHash, sha256(input.stdin), Boolean(input.endOfInput)]
+      : ["practice", input.materialId, testCase!.position, input.workspaceRevision, codeHash]));
+    return this.admit(store, queue, {
+      kind: run ? "run" : "sample", userId: actor.userId,
+      input: { academyId: input.academyId, classId: STAFF_PRACTICE, clientRequestId: input.clientRequestId },
+      materialId: material.id, position: run ? 0 : testCase!.position,
+      exerciseRevision: exercise.gradingRevision, codeHash, requestHash, snapshot, practice: true,
     });
   }
 
@@ -209,6 +262,7 @@ export class SampleCheckService {
     queue: JudgeQueue,
     check: {
       kind: "sample" | "run";
+      practice?: boolean;
       userId: string;
       input: { academyId: string; classId: string; clientRequestId: string };
       materialId: string;
@@ -228,6 +282,7 @@ export class SampleCheckService {
         userId,
         academyId: input.academyId,
         classId: input.classId,
+        ...(check.practice ? { practice: true as const } : {}),
         materialId: check.materialId,
         position: check.position,
         exerciseRevision: check.exerciseRevision,
@@ -400,7 +455,11 @@ export class SampleCheckService {
     const material = await this.prisma.material.findFirst({
       where: {
         id: record.materialId,
-        ...reachableMaterialWhere(input.academyId, learningScopeFor(input.academyId, actor)),
+        // A staff member's practice reads back under practice's own rules,
+        // which reach the unpublished revision a preview ran.
+        ...(record.practice
+          ? staffPracticeMaterialWhere(input.academyId, actor, true)
+          : reachableMaterialWhere(input.academyId, learningScopeFor(input.academyId, actor))),
       },
       select: {
         programmingExercise: {

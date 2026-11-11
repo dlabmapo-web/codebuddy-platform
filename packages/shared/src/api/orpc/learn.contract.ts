@@ -16,6 +16,8 @@ import {
   sampleCheckViewSchema,
   startSampleCheckSchema,
   startRunCheckSchema,
+  startPracticeSampleCheckSchema,
+  startPracticeRunCheckSchema,
 } from "../../content/sample-check.js";
 import {
   answerRecordsResultSchema,
@@ -156,6 +158,9 @@ export const learnContract = {
   startSampleCheck: oc.input(startSampleCheckSchema).output(sampleCheckViewSchema),
   /** A C/C++ Run on the server: the student's code on the input they typed. */
   startRunCheck: oc.input(startRunCheckSchema).output(sampleCheckViewSchema),
+  /** A staff member's own C/C++ practice: the same checks, with no class. */
+  startPracticeSampleCheck: oc.input(startPracticeSampleCheckSchema).output(sampleCheckViewSchema),
+  startPracticeRunCheck: oc.input(startPracticeRunCheckSchema).output(sampleCheckViewSchema),
   getSampleCheck: oc.input(sampleCheckInputSchema).output(sampleCheckViewSchema),
   cancelSampleCheck: oc.input(sampleCheckInputSchema).output(sampleCheckViewSchema),
 };

@@ -35,6 +35,8 @@ export type SampleSnapshot = {
    * compared. The program's own outcome is the result.
    */
   run?: boolean;
+  /** A Run whose input ends with what was typed (End input): never held open. */
+  endOfInput?: boolean;
   inputPromptPolicy?: InputPromptPolicy;
   gradingSemanticVersion?: string;
   code: string;
@@ -59,6 +61,8 @@ export type StoredSampleResult = {
   exitCode?: number | null;
   exitSignal?: string | null;
   compileDiagnostics?: string | null;
+  /** A C/C++ Run ended while its program waited for more input. */
+  awaitingInput?: boolean;
 };
 
 export type SampleCheckRecord = {
@@ -67,7 +71,10 @@ export type SampleCheckRecord = {
   kind?: "sample" | "run";
   userId: string;
   academyId: string;
+  /** The student's class; `staff-practice` for a staff member's own practice. */
   classId: string;
+  /** A staff member's own practice: read back under the staff practice rules. */
+  practice?: true;
   materialId: string;
   position: number;
   exerciseRevision: number;

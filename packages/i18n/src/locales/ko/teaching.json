@@ -175,7 +175,9 @@
     "empty": "이 필터에 해당하는 학생이 없습니다.",
     "rows_per_page": "페이지당 {{count}}행",
     "seconds_other": "집계된 활동 {{count}}초",
-    "scoped_problems_other": "범위 내 문제 {{count}}개"
+    "scoped_problems_other": "범위 내 문제 {{count}}개",
+    "open_history": "기록 열기",
+    "choose_class": "학습 기록을 열 수업을 선택하세요."
   },
   "empty": {
     "no_classes_title": "아직 담당 학급이 없습니다",

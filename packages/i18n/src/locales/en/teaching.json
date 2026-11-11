@@ -195,7 +195,9 @@
     "seconds_one": "{{count}} second of counted activity",
     "seconds_other": "{{count}} seconds of counted activity",
     "scoped_problems_one": "{{count}} problem in scope",
-    "scoped_problems_other": "{{count}} problems in scope"
+    "scoped_problems_other": "{{count}} problems in scope",
+    "open_history": "Open history",
+    "choose_class": "Choose a class to open this student’s history."
   },
   "empty": {
     "no_classes_title": "No class is assigned to you yet",

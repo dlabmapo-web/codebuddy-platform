@@ -52,12 +52,14 @@ for (const name of ['C', 'CPP'] as const) {
     page.on('request', request => { if (/pyodide.*\.(wasm|js)/.test(request.url())) pyodide.push(request.url()); });
     await page.goto(routes.academyLearnExercise(f.slug, materialId, { classId: f.ids.class }));
     await expect.poll(() => language(page)).toBe(name === 'C' ? 'c' : 'cpp');
-    // Batch input is prefilled; Run must use the value the learner changes it to.
-    const input = page.getByRole('textbox', { name: 'Program input', exact: true });
-    await expect(input).toHaveValue('2 3\n');
-    await input.fill('40 2\n');
+    // As in Python: Run starts the program; when it waits for input the
+    // terminal takes a line, and Enter carries on. No separate input box.
+    await expect(page.getByRole('textbox', { name: 'Program input', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Run', exact: true }).click();
-    await expect(page.locator('#workspace-terminal-panel')).toContainText('The program finished.');
+    const input = page.getByRole('textbox', { name: 'Program input', exact: true });
+    await input.fill('40 2');
+    await input.press('Enter');
+    await expect(page.locator('#workspace-terminal-panel')).toContainText('The program finished.', { timeout: 45_000 });
     await expect(page.locator('#workspace-terminal-panel')).toContainText('42');
     await page.getByRole('button', { name: 'Test run', exact: true }).click();
     await expect(page.locator('#workspace-terminal-panel')).toContainText('Sample 1 passed.');
@@ -151,27 +153,52 @@ test('repeated C++ checks keep every polling response valid', async ({ request }
   expect(invalidResponses).toEqual([]);
 });
 
-test('a course chooses its language, and its new problems are written in it', async ({ browser }) => {
+test('a course is Python or C/C++, and a C/C++ problem chooses C or C++', async ({ browser }) => {
   const f = fixture();
   const context = await browser.newContext({ storageState: f.auth.manager });
   const page = await context.newPage();
-  // A new problem in the C++ course: no language picker, the C++ template.
+  // A new problem in a C/C++ course starts in C, and its author can make it C++.
   await page.goto(`${routes.academyCourse(f.slug, f.ids.courseCpp)}/lectures/${f.ids.lectureCpp}/exercises/new`);
+  await expect.poll(() => language(page)).toBe('c');
+  await page.getByRole('button', { name: 'C++', exact: true }).click();
   await expect.poll(() => language(page)).toBe('cpp');
-  await expect(page.locator('select').filter({ has: page.locator('option[value="CPP"]') })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => (window as any).monaco?.editor.getModels()[0]?.getValue())).toContain('#include <iostream>');
   await page.screenshot({ path: test.info().outputPath('cpp-authoring.png'), fullPage: true });
 
-  // Creating a course offers Python, C and C++, with no academy switch.
+  // Creating a course offers Python or C / C++, with no academy switch.
   await page.goto(routes.academyCourses(f.slug));
   await page.getByRole('button', { name: 'New course' }).click();
   await page.getByLabel('Course title').fill('Pointers in C');
-  const field = page.getByLabel('Programming language');
-  await expect(field.locator('option')).toHaveText(['Python', 'C', 'C++']);
-  await field.selectOption('C');
+  const choices = page.getByRole('radio');
+  await expect(choices).toHaveCount(2);
+  await expect(page.getByRole('radio', { name: /Python/ })).toBeChecked();
+  await page.getByRole('radio', { name: /C \/ C\+\+/ }).check();
   await page.screenshot({ path: test.info().outputPath('course-language.png'), fullPage: true });
   await page.getByRole('button', { name: 'Create and open' }).click();
   await expect.poll(async () =>
-    (await db.query('SELECT language FROM courses WHERE academy_id=$1 AND title=$2', [f.ids.academy, 'Pointers in C'])).rows[0]?.language,
-  ).toBe('C');
+    (await db.query('SELECT language::text FROM courses WHERE academy_id=$1 AND title=$2', [f.ids.academy, 'Pointers in C'])).rows[0]?.language,
+  ).toBe('C_CPP');
+  await context.close();
+});
+
+test('staff practice runs and tests C and C++ on the server, as the staff member\'s own', async ({ browser }) => {
+  const f = fixture();
+  const context = await browser.newContext({ storageState: f.auth.manager });
+  const page = await context.newPage();
+  // A manager opens a problem in staff practice: no class, their own copy.
+  await page.goto(routes.academyLearnExercise(f.slug, f.ids.CPP));
+  await expect(page.getByText('Your practice does not affect student grades or points.')).toBeVisible();
+  await expect.poll(() => language(page)).toBe('cpp');
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  const input = page.getByRole('textbox', { name: 'Program input', exact: true });
+  await input.fill('40 2');
+  await input.press('Enter');
+  await expect(page.locator('#workspace-terminal-panel')).toContainText('The program finished.', { timeout: 45_000 });
+  await expect(page.locator('#workspace-terminal-panel')).toContainText('42');
+  await page.getByRole('button', { name: 'Test run', exact: true }).click();
+  await expect(page.locator('#workspace-terminal-panel')).toContainText('Sample 1 passed.', { timeout: 45_000 });
+  // Practice checks are never submissions.
+  expect((await db.query('SELECT count(*)::int AS n FROM submissions WHERE material_id=$1 AND user_id=$2', [f.ids.CPP, f.ids.manager])).rows[0].n).toBe(0);
+  await page.screenshot({ path: test.info().outputPath('cpp-staff-practice.png'), fullPage: true });
   await context.close();
 });

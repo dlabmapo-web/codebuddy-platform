@@ -161,6 +161,13 @@ separate execution host, never higher limits.
   the service leaf exceeds its overhead.
 - **Compile staging** (192 MiB tmpfs) is charged to each compile and freed
   before its cgroup is removed.
+- **Check limits.** A student may start `SAMPLE_CHECK_PER_MINUTE` (default 6)
+  Runs and Tests a minute. The input lines of a Run that waits for them are
+  charged to `SAMPLE_CHECK_CONTINUATIONS_PER_MINUTE` (default 60) instead, and
+  a student still holds one check at a time.
+- **Deploy the API before the web.** The workspace now asks the API to hold a
+  check's read until it changes (`waitWhile`) and names the Run an input line
+  continues (`continues`); an older API refuses both fields.
 
 ## Authoring guidance for teachers
 
@@ -176,11 +183,13 @@ separate execution host, never higher limits.
 - Visual Studio–only code does not compile: `scanf_s`, `<conio.h>`,
   `<windows.h>`. `#define _CRT_SECURE_NO_WARNINGS` is harmless.
 - Run works as Python's does: the program starts at once, and when it waits for
-  input the terminal takes a line (Enter). Each line re-runs the compiled
-  program with all the input so far, so a program using random numbers or the
-  clock can print different output after each line. Ctrl+D ends the input, for
-  programs that read until the end of it. C's `printf` prompts without a
-  newline appear once the program finishes; C++ `cout` prompts appear at once.
+  input the terminal takes a line (Enter). Prompts are on screen before the
+  terminal asks, C's `printf("Enter: ")` included: a Run's input and output are
+  line-buffered, as a terminal's are. Each line re-runs the compiled program
+  with all the input so far and the terminal adds only what is new, so a
+  program using random numbers or the clock can print different output after
+  each line. Ctrl+D ends the input, for programs that read until the end of
+  it; a line still in the field goes with it.
 - Programs may write and read files in their working directory; author-supplied
   input files are not supported yet.
 

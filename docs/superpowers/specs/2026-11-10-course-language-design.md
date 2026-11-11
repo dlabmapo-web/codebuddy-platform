@@ -311,3 +311,46 @@ program waits for input the terminal shows its prompt, and Enter carries on.
 - Known differences from a live terminal: each line re-runs the program, so
   random or clock-based output can differ between lines; C `printf` prompts
   without a newline are buffered and appear when the program finishes.
+
+### 10.5 Run and Test answer at once; input lines are one Run (2026-11-11)
+
+A check on the real grader found Run broken after its first input line and
+slow everywhere. On the local grader the program itself was never the slow
+part: C compiles in about 0.2 s, C++ in 0.4–1.1 s, a run takes 7–60 ms, and a
+held step about 220 ms. The waiting was in the browser and in admission.
+
+- **Conflict after the first line (fixed).** The student workspace passed its
+  run id to every step as the request id, so the second step reused the first
+  step's id with different input and was refused as a conflicting request.
+  Every step is now a request of its own; the run id names the transcript only.
+- **Rate limit on input lines (fixed).** Each line was charged as a new check
+  against six a minute, so the seventh line of one Run was refused. A step
+  names the Run it continues (`continues`); the server confirms the claim in
+  Redis (same student, problem and code, that Run ended waiting, the new input
+  extends its input) and charges it to `SAMPLE_CHECK_CONTINUATIONS_PER_MINUTE`
+  (default 60). A claim that does not hold is a new Run, charged as one. A
+  student still holds one check at a time, so this cannot occupy more of the
+  judge. Admission stays at 11 statements for a student Run, 8 for staff.
+- **Held reads instead of one-second polls.** `getSampleCheck` takes
+  `waitWhile`: the server authorizes once, then watches the check in Redis
+  every 50 ms for up to 5 s and answers as soon as it leaves that status. A
+  check that has just started running gets 400 ms to finish first, so a short
+  program needs one held read, not two. The database reads per request are
+  unchanged (permission and the material's visibility); the request's signal
+  ends the wait when the browser leaves. A server that answers at once with
+  nothing new is asked again a second later, as before.
+- **One transcript.** A later step no longer restarts the transcript: the
+  terminal keeps the typed lines where they were typed and adds only the output
+  past what it already shows. GCC's warnings print once, when the Run begins.
+  A line still in the field when Ctrl+D is pressed travels with the end of
+  input in one step.
+- **Prompts before input.** A Run's source gets a few lines after the
+  student's last one: when `<stdio.h>` is present, a constructor makes stdin
+  and stdout line-buffered, as a terminal does, so glibc flushes stdout before
+  each read and `printf("Enter a: "); scanf(...)` shows its prompt at once.
+  Line numbers in GCC's messages are unchanged. Test and Submit compile exactly
+  what was written, so a Run's first compile is its own cache entry.
+- Known difference that remains: each line re-runs the program, so random or
+  clock-based output can differ between lines. Keeping one process alive
+  between lines would hold a sandbox slot while a student thinks; re-running
+  holds it only while the program runs.

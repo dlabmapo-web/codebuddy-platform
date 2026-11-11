@@ -1,6 +1,6 @@
 import { courseCounts, emptyCourseCounts } from "./course-counts.js";
 import type { CourseContentCounts } from "@cove/shared";
-import { defaultExerciseLanguage, exerciseLanguagesFor, inferSubmissionPolicy, isCompiledLanguage, type CourseLanguage, type ExerciseLanguage, type SubmissionPolicy } from "@cove/shared";
+import { defaultExerciseLanguage, defaultExerciseTimeLimitMs, exerciseLanguagesFor, inferSubmissionPolicy, isCompiledLanguage, type CourseLanguage, type ExerciseLanguage, type SubmissionPolicy } from "@cove/shared";
 import { rolesHavePermission } from "@cove/shared";
 import { taughtMaterialWhere } from "../classes/assigned-course-access.js";
 import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
@@ -1764,7 +1764,7 @@ export class CourseService {
 }
 
 /** The time limit a newly authored exercise runs at. */
-const CREATED_EXERCISE_TIME_LIMIT_MS = 3000;
+const CREATED_EXERCISE_TIME_LIMIT_MS = defaultExerciseTimeLimitMs;
 
 /**
  * Refuses a profile the judge could not honour, before anything is written.

@@ -410,10 +410,13 @@ export const moveLectureSchema = courseIdInputSchema.extend({
 });
 
 /**
- * The per-case limit every authored exercise runs at. Exercise-level limits
- * are not editable yet; a case override is the only way to change one.
+ * The per-case limit every newly authored exercise runs at, Python and C/C++
+ * alike. Exercise-level limits are not editable yet; a case override is the
+ * only way to change one. Ten seconds leaves room for large test cases; the
+ * enhanced profile's total budget still bounds a whole submission, and legacy
+ * grading stops at the first case that runs out of time.
  */
-export const defaultExerciseTimeLimitMs = 3_000;
+export const defaultExerciseTimeLimitMs = 10_000;
 
 /**
  * Server-enforced ceilings on an enhanced profile.

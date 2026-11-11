@@ -5,6 +5,7 @@ import {
   courseHasNoVisibleContent,
   createCourseSchema,
   defaultEliceGradingProfile,
+  defaultExerciseTimeLimitMs,
   hasSampleTestCase,
   createProgrammingExerciseSchema,
   legacyCaseGrading,
@@ -309,7 +310,7 @@ describe("grading profile on the exercise contract", () => {
   });
 
   it("refuses a soft limit at or above the default hard limit", () => {
-    expect(messages(weighted([{ softTimeLimitMs: 3_000, softPenalty: 5 }]))).toEqual([
+    expect(messages(weighted([{ softTimeLimitMs: defaultExerciseTimeLimitMs, softPenalty: 5 }]))).toEqual([
       "testCases.0.softTimeLimitMs",
     ]);
   });
@@ -317,9 +318,9 @@ describe("grading profile on the exercise contract", () => {
   it("refuses a case limit longer than the whole run's", () => {
     expect(
       messages(
-        weighted([{ timeLimitMsOverride: 5_000 }], {
+        weighted([{ timeLimitMsOverride: 15_000 }], {
           ...defaultEliceGradingProfile,
-          totalTimeLimitMs: 4_000,
+          totalTimeLimitMs: 12_000,
         }),
       ),
     ).toEqual(["testCases.0.timeLimitMsOverride"]);

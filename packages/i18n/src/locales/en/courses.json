@@ -8,7 +8,7 @@
   "new_course": "New course",
   "create": {
     "heading": "Name the course",
-    "body": "The new course starts hidden. You can build and edit it freely, then show it to students when ready.",
+    "body": "The new course is visible: students see it once it is assigned to their class. You can hide it while you build it.",
     "title_label": "Course title",
     "title_placeholder": "Python Foundations",
     "description_label": "What students learn",

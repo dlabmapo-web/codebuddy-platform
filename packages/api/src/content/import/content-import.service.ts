@@ -793,9 +793,9 @@ export class ContentImportService {
             input.courseId,
             planned.order,
           ),
-          // §12 — new content arrives hidden at every level. The team lead
-          // reviews it in the builder and reveals it deliberately.
-          isVisible: false,
+          // New content arrives visible at every level, as content made in
+          // the builder does; the team lead can hide any of it.
+          isVisible: true,
         },
       });
       await this.audit.write(tx, {
@@ -808,7 +808,7 @@ export class ContentImportService {
         after: {
           title: created.title,
           externalKey: planned.key,
-          isVisible: false,
+          isVisible: true,
         },
       });
       return created.id;
@@ -863,7 +863,7 @@ export class ContentImportService {
             input.moduleId,
             planned.order,
           ),
-          isVisible: false,
+          isVisible: true,
         },
       });
       await this.audit.write(tx, {
@@ -876,7 +876,7 @@ export class ContentImportService {
         after: {
           title: created.title,
           externalKey: planned.key,
-          isVisible: false,
+          isVisible: true,
         },
       });
       return created.id;
@@ -964,7 +964,7 @@ export class ContentImportService {
           // §5.4 — the manual defaults, verbatim. An importer with its own
           // opinion about time limits is a second content system.
           isRequired: true,
-          isVisible: false,
+          isVisible: true,
           programmingExercise: {
             create: {
               externalKey: planned.key,
@@ -998,7 +998,7 @@ export class ContentImportService {
           externalKey: planned.key,
           difficulty: planned.difficulty,
           submissionPolicy: exerciseFields.submissionPolicy,
-          isVisible: false,
+          isVisible: true,
           testCaseCount: planned.testCases.length,
           hintCount: planned.hints.length,
           solutionCount: planned.solutions.length,

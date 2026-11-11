@@ -12,7 +12,7 @@
   "already_have": "You already have a copy: {{title}}",
   "title_label": "Name it in your academy",
   "title_hint": "Change it if you already have a course by this name.",
-  "adopted": "Copied. It is hidden until you publish it.",
+  "adopted": "Copied. It is visible: students see it once it is assigned to their class.",
   "from": "From library · {{title}}",
   "sync_up_to_date": "Up to date",
   "sync_update_available": "Update available",

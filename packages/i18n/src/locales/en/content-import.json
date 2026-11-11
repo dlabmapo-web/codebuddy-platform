@@ -19,7 +19,7 @@
     "too_large": "This course has {{total}} problems, more than the {{limit}} one import can carry. Export a module at a time from the course builder.",
     "rule_keys": "Keep a row's key to update it. Give a new key to create something.",
     "rule_no_delete": "Deleting a row changes nothing. Delete content in the course builder.",
-    "rule_hidden": "New modules, lectures, and problems arrive hidden from students.",
+    "rule_hidden": "New modules, lectures, and problems arrive visible to students.",
     "rule_collections": "A problem's test and hint rows replace its whole set."
   },
   "upload": {
@@ -73,7 +73,7 @@
     "empty_body": "Clear the search or choose a different filter.",
     "confirm_title": "Before you confirm",
     "promise_no_delete": "No module, lecture, or problem will be deleted.",
-    "promise_hidden": "New content arrives hidden from students.",
+    "promise_hidden": "New content arrives visible to students.",
     "promise_visibility": "Existing content keeps the visibility it has now.",
     "promise_atomic": "The import either finishes completely or changes nothing.",
     "blocked_title_one": "{{count}} conflict to resolve",

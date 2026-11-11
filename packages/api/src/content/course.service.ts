@@ -261,7 +261,9 @@ export class CourseService {
           academyId: input.academyId,
           title,
           description: input.description.trim(),
-          isVisible: false,
+          // Visible from the start: students see a course only once it is
+          // assigned to their class, and an author can still hide it.
+          isVisible: true,
           language: input.language ?? "PYTHON",
           createdByUserId: actor.userId,
         },
@@ -274,7 +276,7 @@ export class CourseService {
         targetType: "Course",
         targetId: created.id,
         requestId: context.requestId,
-        after: { title: created.title, isVisible: false, language: created.language },
+        after: { title: created.title, isVisible: true, language: created.language },
       });
       return created;
     });
@@ -530,7 +532,7 @@ export class CourseService {
           title: input.title.trim(),
           description: input.description.trim(),
           position,
-          isVisible: false,
+          isVisible: true,
         },
       });
       await this.audit.write(tx, {
@@ -540,7 +542,7 @@ export class CourseService {
         targetType: "CourseModule",
         targetId: created.id,
         requestId: context.requestId,
-        after: { title: created.title, position, isVisible: false },
+        after: { title: created.title, position, isVisible: true },
       });
       // §9.2 — the course's content moved, so any import preview taken
       // against the old revision is now stale and will be refused.
@@ -790,7 +792,7 @@ export class CourseService {
           title: input.title.trim(),
           description: input.description.trim(),
           position,
-          isVisible: false,
+          isVisible: true,
         },
       });
       await this.audit.write(tx, {
@@ -800,7 +802,7 @@ export class CourseService {
         targetType: "Lecture",
         targetId: created.id,
         requestId: context.requestId,
-        after: { title: created.title, position, isVisible: false },
+        after: { title: created.title, position, isVisible: true },
       });
       // §9.2 — the course's content moved, so any import preview taken
       // against the old revision is now stale and will be refused.
@@ -1291,7 +1293,9 @@ export class CourseService {
       const courseLanguage = await lockCourse(tx, input.courseId);
       const language = input.quiz ? "PYTHON" : exerciseLanguageIn(courseLanguage, input.language);
       assertLanguageGrading(input, language);
-      await validatePdfReference(tx, input, input.referencePdfMaterialId);
+      // Created as the author set it, visible by default; a visible problem
+      // needs a visible reference PDF, exactly as when it is edited.
+      await validatePdfReference(tx, input, input.referencePdfMaterialId, input.isVisible);
       await assertLessonImages(tx, { academyId: input.academyId, courseId: input.courseId, html: input.description });
       const position = await nextMaterialPosition(tx, input.lectureId);
       const material = await tx.material.create({
@@ -1301,7 +1305,7 @@ export class CourseService {
           title: input.title.trim(),
           position,
           isRequired: true,
-          isVisible: false,
+          isVisible: input.isVisible,
           programmingExercise: {
             create: {
               // §9.1 — the same canonical form imported keys use, so a
@@ -1342,7 +1346,7 @@ export class CourseService {
         targetType: "Material",
         targetId: material.id,
         requestId: context.requestId,
-        after: exerciseAuditFromInput(input, position, false, 1, language),
+        after: exerciseAuditFromInput(input, position, input.isVisible, 1, language),
       });
       // §9.2 — the course's content moved, so any import preview taken
       // against the old revision is now stale and will be refused.

@@ -28,7 +28,7 @@
   "caption_invalid": "Select a valid VTT file up to 2 MB.",
   "remove": "Remove",
   "preview": "Preview video",
-  "hidden_notice": "New videos start hidden. Make visible when ready.",
+  "hidden_notice": "New videos are visible to students once processed. Hide one if it isn't ready.",
   "cancel": "Cancel",
   "save": "Save video",
   "discard": "Discard unsaved video changes?",

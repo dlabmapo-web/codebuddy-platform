@@ -491,7 +491,8 @@ export class VideoService {
               lectureId: input.lectureId,
               position: await nextMaterialPosition(tx, input.lectureId),
               isRequired: false,
-              isVisible: false,
+              // Visible by default; students only see a video once it is ready.
+              isVisible: true,
               videoLesson: {
                 create: { ...data, requestKey: input.requestKey },
               },

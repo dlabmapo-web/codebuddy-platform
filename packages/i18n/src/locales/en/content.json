@@ -248,7 +248,7 @@
   "pdf": {
     "add": "Add PDF",
     "edit": "PDF material",
-    "description": "Upload one PDF and choose where students can find it. New materials start hidden.",
+    "description": "Upload one PDF and choose where students can find it. New materials are visible to students.",
     "title": "Title",
     "placement": "Show in",
     "placements": {

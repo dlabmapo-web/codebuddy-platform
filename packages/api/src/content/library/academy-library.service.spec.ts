@@ -271,7 +271,7 @@ describe('AcademyLibraryService.adopt', () => {
     expect(created.programmingExercise).toEqual([expect.objectContaining({ language: 'CPP' })]);
   });
 
-  it('lands hidden, stamped with the revision it was taken at', async () => {
+  it('lands visible, stamped with the revision it was taken at', async () => {
     const { service, courseValue } = build();
     await service.adopt(identity, {
       academyId: branchId,
@@ -281,7 +281,7 @@ describe('AcademyLibraryService.adopt', () => {
     expect(courseValue()).toMatchObject({
       academyId: branchId,
       title: 'Gangnam Python 1',
-      isVisible: false,
+      isVisible: true,
       contentRevision: 1,
       baselineRevision: 1,
       sourceCourseId: masterId,

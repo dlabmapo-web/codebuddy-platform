@@ -343,6 +343,7 @@ export class ManualService {
             type,
             title,
             isRequired: input.includeInScore,
+            isVisible: true,
             position: await nextMaterialPosition(tx, lectureId),
             manualMaterial: { create: data },
           },

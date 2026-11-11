@@ -108,7 +108,8 @@ export function contextToDraft(
       language: 'PYTHON',
       solutions: solutions.length ? solutions : [{ title: null, code: '' }],
       aiFeedbackEnabled: false,
-      isVisible: false,
+      // Visible by default, as every new course, module and material is.
+      isVisible: true,
       testCases: [newTestCaseDraft('new-sample', 'SAMPLE')],
       grading: legacyGradingProfile,
       hints: [],

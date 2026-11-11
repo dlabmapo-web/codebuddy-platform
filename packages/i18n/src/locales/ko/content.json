@@ -245,7 +245,7 @@
   "pdf": {
     "add": "PDF 추가",
     "edit": "PDF 자료",
-    "description": "PDF 한 개를 업로드하고 표시 위치를 선택하세요. 새 자료는 비공개로 시작합니다.",
+    "description": "PDF 한 개를 업로드하고 표시 위치를 선택하세요. 새 자료는 학생에게 공개됩니다.",
     "title": "제목",
     "placement": "표시 위치",
     "placements": {

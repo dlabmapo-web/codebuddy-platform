@@ -232,11 +232,9 @@ export class AcademyLibraryService {
           // The copy is written in the master's language, and so are its
           // exercises (each keeps its own, copied by `copyCourseTree`).
           language: source.language,
-          // The one gate, and the only one the branch needs: while this is
-          // false no descendant flag can reach a student, whatever it says. The
-          // branch publishes deliberately, from the editor it is already in,
-          // and that single switch is now the whole of the decision.
-          isVisible: false,
+          // Visible on arrival, with its whole tree: students see it once it is
+          // assigned to their class. Hiding it stays one switch away.
+          isVisible: true,
           contentRevision: 1,
           baselineRevision: 1,
           sourceCourseId: source.id,

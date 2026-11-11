@@ -99,7 +99,7 @@ function createService(options?: { duplicate?: boolean }) {
 }
 
 describe("CourseService", () => {
-  it("creates a hidden live course that can be edited immediately", async () => {
+  it("creates a visible course that can be edited immediately", async () => {
     const { access, audit, service, transaction } = createService();
 
     const result = await service.create(identity, {
@@ -119,7 +119,7 @@ describe("CourseService", () => {
           academyId,
           title: "Python Foundations",
           description: "Learn Python",
-          isVisible: false,
+          isVisible: true,
           createdByUserId: actorUserId,
         }),
       }),
@@ -132,7 +132,7 @@ describe("CourseService", () => {
         actorUserId,
       }),
     );
-    expect(result).toMatchObject({ isVisible: false });
+    expect(result.id).toBe("40000000-0000-4000-8000-000000000001");
   });
 
   it("creates a course in its chosen language, Python when none is chosen", async () => {

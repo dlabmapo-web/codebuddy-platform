@@ -210,7 +210,8 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
               lectureId: input.lectureId,
               title: input.title,
               type: "PDF_DOCUMENT",
-              isVisible: false,
+              // Visible by default; students only see a PDF once it is ready.
+              isVisible: true,
               isRequired: false,
               position: await nextMaterialPosition(tx, input.lectureId),
               pdfDocument: { create: { assetId, placement: input.placement } },

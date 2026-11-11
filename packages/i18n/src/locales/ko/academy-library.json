@@ -12,7 +12,7 @@
   "already_have": "이미 복사한 과목이 있습니다: {{title}}",
   "title_label": "우리 학원에서 사용할 이름",
   "title_hint": "같은 이름의 과목이 이미 있다면 이름을 바꾸세요.",
-  "adopted": "복사했습니다. 공개하기 전까지는 숨김 상태입니다.",
+  "adopted": "복사했습니다. 공개 상태이며, 반에 배정하면 학생이 볼 수 있습니다.",
   "from": "라이브러리 · {{title}}",
   "sync_up_to_date": "최신",
   "sync_update_available": "업데이트 있음",

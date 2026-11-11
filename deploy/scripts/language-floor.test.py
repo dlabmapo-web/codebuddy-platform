@@ -63,6 +63,15 @@ elif args[0] == 'run':
     def test_a_target_that_reads_cpp_is_allowed(self):
         self.assertEqual(self.floor(ROWS='3', HAS_CPP='1').returncode, 0)
 
+    def test_the_floor_counts_c_cpp_courses_and_needs_the_course_language_release(self):
+        self.floor(ROWS='1', HAS_CPP='1')
+        count = next(e for e in self.events() if 'exec' in e)
+        # A C/C++ course with no problems yet still counts, on any schema.
+        self.assertTrue(any("to_jsonb(c) ->> \\x27language\\x27 = \\x27C_CPP\\x27" in arg for arg in count))
+        run = next(e for e in self.events() if e[0] == 'run')
+        # CPP alone is an exercise language; the floor is the client that knows C_CPP courses.
+        self.assertIn("C_CPP: 'C_CPP'", run)
+
     def test_an_unreadable_count_refuses_unless_the_operator_checked(self):
         refused = self.floor(EXEC_FAIL='1')
         self.assertEqual(refused.returncode, 1); self.assertIn('yes-I-checked', refused.stderr)

@@ -45,8 +45,41 @@ export async function qualifyGcc({ runtime, config }) {
         started = performance.now();
         const iostream = await build('CPP', '#include <iostream>\n#include <vector>\n#include <algorithm>\nint main() { int n; std::cin >> n; std::vector<int> v(n); for (auto &x : v) std::cin >> x; std::sort(v.begin(), v.end()); for (int x : v) std::cout << x << " "; std::cout << "\\n"; }\n');
         timings.cppIostreamMs = performance.now() - started;
+        // <iostream> first uses its precompiled header: no -Winvalid-pch warning.
+        assert.equal(iostream.status, 'COMPILED'); assert.equal(iostream.diagnostics, '', 'precompiled <iostream> rejected: ' + iostream.diagnostics);
         assert.equal((await run(iostream, '3\n3 1 2\n')).stdout, '1 2 3 \n');
         await client.release(iostream.lease);
+        passed++;
+        // Both precompiled headers are found and valid. A macro that makes one
+        // unusable gets a warning naming that header's .gch, which proves GCC
+        // finds it; the same program without the macro compiles silently,
+        // which proves GCC uses it (-Winvalid-pch names an invalid one).
+        for (const header of ['iostream', 'bits/stdc++.h']) {
+            const body = `#include <${header}>\nint main() { std::cout << 1 << "\\n"; }\n`;
+            const used = await build('CPP', body);
+            assert.deepEqual([used.status, used.diagnostics], ['COMPILED', ''], `<${header}> with its precompiled header`);
+            const skipped = await build('CPP', `#define _GLIBCXX_DEBUG 1\n${body}`);
+            assert.equal(skipped.status, 'COMPILED', `<${header}> without its precompiled header`);
+            const gch = `/opt/cove/pch/${header}.gch`.replace(/[+.]/g, '\\$&');
+            assert.match(skipped.diagnostics, new RegExp(`${gch}: not used because .?_GLIBCXX_DEBUG.? is defined`), skipped.diagnostics);
+            await client.release(used.lease); await client.release(skipped.lease);
+        }
+        passed++;
+        // Messages are the program's own, precompiled header or not: they name
+        // main.c / main.cpp and the line, and nothing about the headers.
+        const warned = await build('CPP', '#include <iostream>\nint main() {\n  int unused;\n  std::cout << 1;\n}\n');
+        assert.equal(warned.status, 'COMPILED');
+        assert.match(warned.diagnostics, /^main\.cpp:3:7: warning: unused variable .unused. \[-Wunused-variable\]/m);
+        assert.doesNotMatch(warned.diagnostics, /\.gch|invalid-pch/);
+        await client.release(warned.lease);
+        const templated = await build('CPP', '#include <iostream>\n#include <vector>\nint main() { std::vector<int> v; std::cout << v; }\n');
+        assert.equal(templated.status, 'COMPILE_ERROR');
+        assert.match(templated.diagnostics, /^main\.cpp:3:\d+: error: no match for .operator<<./m);
+        assert.doesNotMatch(templated.diagnostics, /\.gch|invalid-pch/);
+        const cWarned = await build('C', '#include <stdio.h>\nint main(void) {\n  int unused;\n  return 0;\n}\n');
+        assert.equal(cWarned.status, 'COMPILED');
+        assert.match(cWarned.diagnostics, /^main\.c:3:7: warning: unused variable .unused. \[-Wunused-variable\]/m);
+        await client.release(cWarned.lease);
         passed++;
         // The precompiled header is valid: no -Winvalid-pch warning, and fast.
         const bits = '#include <bits/stdc++.h>\nusing namespace std;\nint main() { map<string, int> m; string w; while (cin >> w) m[w]++; for (auto &[k, v] : m) cout << k << " " << v << "\\n"; }\n';
@@ -153,9 +186,41 @@ export async function qualifyGcc({ runtime, config }) {
         assert.deepEqual([done.outcome, done.awaitingInput, done.stdout], ['PASSED', undefined, 'a? b? 42\n']);
         await client.release(twice.lease);
         passed++;
+        timings.heldInputMs = waiting.runtimeMs;
         // Working is not waiting: a program using CPU is never taken for one.
         const busy = await program('C', C('volatile unsigned long i = 0; while (i < 400000000UL) i++; puts("done"); return 0;'), '', { holdStdin: true, timeLimitMs: 5000 });
         assert.deepEqual([busy.outcome, busy.awaitingInput, busy.stdout], ['PASSED', undefined, 'done\n'], JSON.stringify(busy));
+        passed++;
+        // Nor is sleeping: only a read of the held input ends a Run early, which
+        // needs the launcher to see the program's system call (SYS_PTRACE).
+        const nap = await program('C', C('puts("start"); fflush(stdout); usleep(500000); puts("done"); return 0;'), '', { holdStdin: true, timeLimitMs: 3000 });
+        assert.deepEqual([nap.outcome, nap.awaitingInput, nap.stdout], ['PASSED', undefined, 'start\ndone\n'], 'a sleeping program was taken for one waiting: ' + JSON.stringify(nap));
+        const napThenRead = await program('C', C('usleep(300000); int a; printf("a? "); fflush(stdout); if (scanf("%d", &a) != 1) return 4; return 0;'), '', { holdStdin: true, timeLimitMs: 3000 });
+        assert.deepEqual([napThenRead.outcome, napThenRead.awaitingInput, napThenRead.stdout], ['PASSED', true, 'a? '], JSON.stringify(napThenRead));
+        passed++;
+        // A held Run ending while it is sampled ends normally: NsJail removes its
+        // group a moment before the launcher sees the exit, which once failed the
+        // case and stopped the launcher answering.
+        const ending = await build('C', C('unsigned long n; if (scanf("%lu", &n) != 1) return 1; volatile unsigned long i = 0; while (i < n) i++; puts("done"); return 0;'));
+        for (let k = 1; k <= 20; k++) {
+            const ended = await run(ending, `${k * 1000000}\n`, { holdStdin: true, timeLimitMs: 3000 });
+            assert.deepEqual([ended.outcome, ended.awaitingInput, ended.stdout], ['PASSED', undefined, 'done\n'], `held Run ${k} ending mid-sample: ` + JSON.stringify(ended));
+        }
+        await client.release(ending.lease);
+        passed++;
+        // Waiting is a blocked read of the held input through any copy of it,
+        // by read or readv. A read of the program's own pipe can never be
+        // answered by a typed line: it runs to its limit, as it would in Test.
+        for (const [label, body] of [
+            ['read of dup(0)', 'int fd = dup(0); char c; if (read(fd, &c, 1) != 0) return 3; return 0;'],
+            ['read of dup2(0, 7)', 'if (dup2(0, 7) != 7) return 4; char c; if (read(7, &c, 1) != 0) return 3; return 0;'],
+            ['readv of stdin', 'char b[8]; struct iovec v = { b, sizeof b }; if (readv(0, &v, 1) != 0) return 3; return 0;'],
+        ]) {
+            const held = await program('C', C('puts("ready"); fflush(stdout);\n' + body, '#include <sys/uio.h>'), '', { holdStdin: true, timeLimitMs: 3000 });
+            assert.deepEqual([held.outcome, held.awaitingInput, held.stdout], ['PASSED', true, 'ready\n'], label + ': ' + JSON.stringify(held));
+        }
+        const ownPipe = await program('C', C('int p[2]; if (pipe(p)) return 5; char c; if (read(p[0], &c, 1) < 0) return 6; return 0;'), '', { holdStdin: true, timeLimitMs: 400 });
+        assert.deepEqual([ownPipe.outcome, ownPipe.awaitingInput], ['TIME_LIMIT', undefined], 'own pipe: ' + JSON.stringify(ownPipe));
         passed++;
         // A lapsed or unknown lease is refused without running anything.
         await assert.rejects(client.run({ code: '', artifact: 'sha256:' + '0'.repeat(64), lease: crypto.randomUUID(), stdin: '', memoryLimitMb: 64, timeLimitMs: 100 }), /INVALID_REQUEST/);

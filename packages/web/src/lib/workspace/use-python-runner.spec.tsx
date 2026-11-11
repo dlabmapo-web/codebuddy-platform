@@ -128,10 +128,17 @@ it('sends a pasted block of lines to the program together', async () => {
   await act(async () => { runner.releaseInput(); });
 });
 
+it('sends a line still in the field with the Ctrl+D that follows it, in one step', async () => {
+  const settled = await awaitServerInput();
+  await act(async () => { runner.submitInput('1 2 3'); runner.endInput(); });
+  expect(settled()).toEqual({ lines: ['1 2 3'], end: true });
+  await act(async () => { runner.releaseInput(); });
+});
+
 it('ends a C/C++ program\'s input with Ctrl+D, and Stop ends the wait', async () => {
   const ended = await awaitServerInput();
   await act(async () => { runner.endInput(); });
-  expect(ended()).toEqual({ end: true });
+  expect(ended()).toEqual({ lines: [], end: true });
   const stopped = await awaitServerInput();
   await act(async () => { runner.stop(); });
   expect(stopped()).toBeNull();

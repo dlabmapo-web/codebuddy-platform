@@ -23,8 +23,14 @@ import {
 import type { PythonRunnerState, RunOutcome } from './use-python-runner';
 import type { TerminalLifecycle } from './terminal-transcript';
 
-/** How often a server check is asked for news while it runs. */
+/**
+ * How long to pause before asking again when the server answered at once
+ * with nothing new. A server read is held until the check moves on
+ * (`waitWhile`), so this only paces a server that did not wait.
+ */
 const POLL_INTERVAL_MS = 1_000;
+/** Faster than this, with the status unchanged, the server did not wait. */
+const UNHELD_ANSWER_MS = 250;
 
 /** The server check in flight, and what has been asked of it. */
 type ServerCheckHandle = {
@@ -40,6 +46,8 @@ type ServerCheckHandle = {
 export type SampleRun = {
   /** A C/C++ Run whose program waits for more input; its transcript stays open. */
   awaitingInput?: boolean;
+  /** The server check that ended waiting, which the next input step continues. */
+  checkId?: string;
   /** Null when the runner was already busy and the request was dropped. */
   outcome: RunOutcome | null;
   verdict: SampleVerdict | null;
@@ -143,8 +151,13 @@ export function useSampleRunner(runner: PythonRunnerState) {
             kind: 'run'; stdin: string; command: string;
             /** Ctrl+D was pressed: `stdin` is all of it. */
             endOfInput?: boolean;
-            /** A later step of one interactive Run: no queue narration. */
-            continued?: boolean;
+            /**
+             * A later step of one interactive Run: the step it follows, and
+             * what the terminal already shows of the program's output. The
+             * transcript carries on rather than starting over, and only the
+             * output past that point is added.
+             */
+            continues?: { checkId: string; printed: string };
           },
       target: ServerSampleTarget,
       options: { clientRunId?: string; sampleCount?: number },
@@ -162,9 +175,12 @@ export function useSampleRunner(runner: PythonRunnerState) {
       setActive(true);
       setStopping(false);
       const number = check.kind === 'sample' ? check.index + 1 : 0;
+      // One per request: a retried or doubled request starts one check, and
+      // each input step of a Run is a request of its own.
       const clientRunId = options.clientRunId ?? crypto.randomUUID();
+      const continues = check.kind === 'run' ? check.continues : undefined;
 
-      runner.beginExternalRun({
+      if (!continues) runner.beginExternalRun({
         clientRunId,
         sampleCount: options.sampleCount ?? 0,
         banner: [
@@ -177,7 +193,7 @@ export function useSampleRunner(runner: PythonRunnerState) {
             : []),
         ],
       });
-      const quiet = check.kind === 'run' && check.continued;
+      const quiet = Boolean(continues);
       if (!quiet) runner.appendLine(`${tc('workspace.sample_check_queued')}\n`, 'info');
 
       const finish = (
@@ -203,9 +219,15 @@ export function useSampleRunner(runner: PythonRunnerState) {
           materialId: target.materialId,
           code,
           workspaceRevision: target.workspaceRevision,
-          // One per click: a retried or doubled request starts one check.
           clientRequestId: clientRunId,
         };
+        const run = check.kind === 'run'
+          ? {
+              stdin: check.stdin,
+              ...(check.endOfInput ? { endOfInput: true } : {}),
+              ...(continues ? { continues: continues.checkId } : {}),
+            }
+          : null;
         if (target.practice) {
           const practice = {
             academyId: address.academyId,
@@ -217,11 +239,11 @@ export function useSampleRunner(runner: PythonRunnerState) {
           };
           view = check.kind === 'sample'
             ? await orpc.learn.startPracticeSampleCheck({ ...practice, position: check.sample.position })
-            : await orpc.learn.startPracticeRunCheck({ ...practice, stdin: check.stdin, ...(check.endOfInput ? { endOfInput: true } : {}) });
+            : await orpc.learn.startPracticeRunCheck({ ...practice, ...run! });
         } else {
           view = check.kind === 'sample'
             ? await orpc.learn.startSampleCheck({ ...address, position: check.sample.position })
-            : await orpc.learn.startRunCheck({ ...address, stdin: check.stdin, ...(check.endOfInput ? { endOfInput: true } : {}) });
+            : await orpc.learn.startRunCheck({ ...address, ...run! });
         }
       } catch (error) {
         if (abort.signal.aborted) return abandoned();
@@ -243,27 +265,38 @@ export function useSampleRunner(runner: PythonRunnerState) {
           announcedRunning = true;
           runner.appendLine(`${tc('workspace.sample_check_running')}\n`, 'info');
         }
-        if (!(await wait(POLL_INTERVAL_MS, abort.signal))) return abandoned();
+        // Held by the server until the check moves on, so the answer comes
+        // back the moment it exists rather than at the next poll.
+        const seen = view.status;
+        const askedAt = Date.now();
         try {
-          view = await orpc.learn.getSampleCheck({
-            academyId: target.academyId,
-            checkId: view.checkId,
-          });
+          view = await orpc.learn.getSampleCheck(
+            { academyId: target.academyId, checkId: view.checkId, waitWhile: seen },
+            { signal: abort.signal },
+          );
         } catch (error) {
           if (abort.signal.aborted) return abandoned();
           runner.appendLine(`${errorText(error)}\n`, 'err');
           return finish({ outcome: null, verdict: { kind: 'unchecked' } }, 'CANCELLED', 0);
         }
         if (abort.signal.aborted) return abandoned();
+        if (view.status === seen && Date.now() - askedAt < UNHELD_ANSWER_MS) {
+          if (!(await wait(POLL_INTERVAL_MS, abort.signal))) return abandoned();
+        }
       }
 
       const narration = narrateSampleCheck(view, {
         codeChanged: target.currentCode() !== code,
       });
+      // A continued step ran the program again from the start: the terminal
+      // already shows the output up to the last input, so only the rest is new.
+      const printed = continues?.printed.length ?? 0;
       if (narration.awaitingInput) {
         // The program waits for input: its output so far, and the transcript
-        // stays open for the next line.
-        if (narration.stdout) runner.appendLine(narration.stdout, 'out');
+        // stays open for the next line. GCC's warnings come first, once.
+        if (!continues && narration.compileDiagnostics) runner.appendLine(narration.compileDiagnostics, 'info');
+        const fresh = narration.stdout?.slice(printed);
+        if (fresh) runner.appendLine(fresh, 'out');
         if (currentRef.current === current) {
           currentRef.current = null;
           setActive(false);
@@ -274,10 +307,18 @@ export function useSampleRunner(runner: PythonRunnerState) {
           verdict: null,
           compileDiagnostics: narration.compileDiagnostics,
           awaitingInput: true,
+          checkId: view.checkId,
         };
       }
       for (const line of narration.lines) {
         if ('text' in line) {
+          if (continues && line.kind === 'out') {
+            const fresh = line.text.slice(printed);
+            if (fresh) runner.appendLine(fresh, 'out');
+            continue;
+          }
+          // GCC's warnings were shown when the Run began.
+          if (continues && line.kind === 'info' && line.text === narration.compileDiagnostics) continue;
           runner.appendLine(line.text, line.kind);
         } else if ('rule' in line) {
           const label =
@@ -478,8 +519,9 @@ export function useSampleRunner(runner: PythonRunnerState) {
    * A C/C++ Run that behaves like Python's: it starts at once, and whenever
    * the program waits for input the terminal takes the next line. Each Enter
    * (or a pasted block) runs the compiled program again with every line so
-   * far; Ctrl+D runs it once more with its input closed. Resolves
-   * with the final run, or a cancelled one when stopped.
+   * far, and the terminal adds only what it printed after the last input;
+   * Ctrl+D runs it once more with its input closed. Resolves with the final
+   * run, or a cancelled one when stopped.
    */
   const runInteractive = React.useCallback(
     async (
@@ -490,23 +532,27 @@ export function useSampleRunner(runner: PythonRunnerState) {
     ): Promise<SampleRun> => {
       const lines: string[] = [];
       let endOfInput = false;
+      let previous: { checkId: string; printed: string } | undefined;
       try {
         for (;;) {
           const stdin = lines.length ? `${lines.join('\n')}\n` : '';
           const result = await runServer(
             code,
-            { kind: 'run', stdin, command, endOfInput, continued: lines.length > 0 || endOfInput },
+            { kind: 'run', stdin, command, endOfInput, ...(previous ? { continues: previous } : {}) },
             target,
-            { ...options, sampleCount: 0 },
+            // The caller's run id names the transcript, which the first step
+            // opens; every later step is a new request with its own id.
+            previous ? { sampleCount: 0 } : { ...options, sampleCount: 0 },
           );
-          if (!result.awaitingInput) return result;
+          if (!result.awaitingInput || !result.checkId) return result;
+          previous = { checkId: result.checkId, printed: result.outcome?.stdout ?? '' };
           const next = await runner.awaitInput();
           if (next === null) {
             runner.finishExternalRun('CANCELLED', 0);
             return { outcome: null, verdict: null, report: { lifecycle: 'CANCELLED', passedCount: 0 } };
           }
-          if ('end' in next) endOfInput = true;
-          else lines.push(...next.lines);
+          lines.push(...next.lines);
+          if (next.end) endOfInput = true;
         }
       } finally {
         runner.releaseInput();

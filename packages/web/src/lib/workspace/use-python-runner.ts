@@ -26,7 +26,11 @@ import {
 
 export type { TerminalKind, TerminalLine };
 /** What a C/C++ program waiting on the server receives next. */
-export type AwaitedInput = { lines: string[] } | { end: true } | null;
+/**
+ * What a C/C++ Run's next step is given: the lines typed since the last one,
+ * and whether Ctrl+D closed the input after them. Null when stopped.
+ */
+export type AwaitedInput = { lines: string[]; end?: true } | null;
 
 export type RunOutcome = {
   stdout: string;
@@ -445,7 +449,9 @@ export function usePythonRunner(options?: {
           session.waiter = null;
           setWaiting(false);
           setServerInputWaiting(false);
-          queueMicrotask(() => waiter({ lines: session.queue.splice(0) }));
+          // Settled a microtask later, so the rest of a paste — and a Ctrl+D
+          // pressed with a line still in the field — go in this same step.
+          queueMicrotask(() => waiter(takeServerInput(session)));
         }
         return;
       }
@@ -482,7 +488,8 @@ export function usePythonRunner(options?: {
       session.waiter = null;
       setWaiting(false);
       setServerInputWaiting(false);
-      waiter(session.queue.length ? { lines: session.queue.splice(0) } : { end: true });
+      session.end = true;
+      waiter(takeServerInput(session));
       return;
     }
     const waiting = transcriptRef.current.awaitingInput;
@@ -587,11 +594,7 @@ export function usePythonRunner(options?: {
    */
   const awaitInput = React.useCallback((): Promise<AwaitedInput> => {
     const session = (serverInputRef.current ??= { queue: [], end: false, waiter: null });
-    if (session.queue.length) return Promise.resolve({ lines: session.queue.splice(0) });
-    if (session.end) {
-      session.end = false;
-      return Promise.resolve({ end: true });
-    }
+    if (session.queue.length || session.end) return Promise.resolve(takeServerInput(session));
     return new Promise((resolve) => {
       session.waiter = resolve;
       setServerInputWaiting(true);
@@ -694,3 +697,11 @@ export function usePythonRunner(options?: {
 }
 
 export type PythonRunnerState = ReturnType<typeof usePythonRunner>;
+
+/** Everything typed for a C/C++ Run since its last step, and Ctrl+D if pressed. */
+function takeServerInput(session: { queue: string[]; end: boolean }): { lines: string[]; end?: true } {
+  const lines = session.queue.splice(0);
+  if (!session.end) return { lines };
+  session.end = false;
+  return { lines, end: true };
+}

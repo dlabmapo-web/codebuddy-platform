@@ -17,7 +17,7 @@
   "hidden": "Hidden",
   "visible": "Visible to students",
   "visibility": "Show to students",
-  "new_hidden": "New explanations start hidden. Publish when you are ready.",
+  "new_visible": "New explanations are visible to students once saved. You can hide one after saving.",
   "reading": "Read & explore",
   "ungraded": "Reading material",
   "images_hint": "Add pictures from the toolbar, paste them, or drop them into the page.",

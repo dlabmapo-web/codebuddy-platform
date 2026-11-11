@@ -13,6 +13,7 @@ import { CurriculumOutlineService } from "../learn/curriculum-outline.service.js
 import { courseCounts } from "../content/course-counts.js";
 import { readCurricula } from "../learn/curriculum-read.js";
 import { copyCourseTree, courseCopyInclude } from "../content/library/course-tree-copy.js";
+import { saveExplanationSchema } from "@cove/shared";
 import { ExplanationService } from "./explanation.service.js";
 
 const databaseUrl = process.env.COVE_INTEGRATION_DATABASE_URL;
@@ -50,7 +51,8 @@ describe.skipIf(!databaseUrl)("explanation materials against disposable PostgreS
     const lecture = await client.lecture.create({ data: { courseModuleId: module.id, title: 'Loops', externalKey: randomUUID(), position: 1, isVisible: true } }); lectureId = lecture.id;
     await client.class.create({ data: { id: classId, academyId, name: 'Reading class', createdByUserId: userId, courseAssignments: { create: { courseId, assignedByUserId: userId } }, enrollments: { create: { membershipId: member.id, enrolledByUserId: userId } } } });
     await client.manualAsset.createMany({ data: imageIds.map(id => ({ id, academyId, courseId, objectKey: `fixture/${id}`, name: 'diagram.png', byteSize: 8, mimeType: 'image/png', sha256: createHash('sha256').update(id).digest('hex') })) });
-    const saved = await service.save(identity, { academyId, courseId, lectureId, title: 'Loops', body: imageBody(1), isVisible: true }); materialId = saved.materialId;
+    // Saved hidden on purpose, so the guards below meet unpublished content.
+    const saved = await service.save(identity, { academyId, courseId, lectureId, title: 'Loops', body: imageBody(1), isVisible: false }); materialId = saved.materialId;
   }, 60_000);
   afterAll(async () => {
     if (!client) return;
@@ -79,7 +81,15 @@ describe.skipIf(!databaseUrl)("explanation materials against disposable PostgreS
     expect(read.body).toBe(source);
     await client.material.delete({ where: { id: saved.materialId } });
   });
-  it("creates hidden ungraded reading content and guards preview and coding inputs", async () => {
+  it("starts a new explanation visible unless its author hides it", async () => {
+    // The request's default, as the router parses it: new content is visible.
+    const input = saveExplanationSchema.parse({ academyId, courseId, lectureId, title: 'Visible by default', body: '<p>Shown.</p>' });
+    expect(input.isVisible).toBe(true);
+    const saved = await service.save(identity, input);
+    expect(await client.material.findUniqueOrThrow({ where: { id: saved.materialId }, select: { isVisible: true } })).toEqual({ isVisible: true });
+    await client.material.delete({ where: { id: saved.materialId } });
+  });
+  it("creates the author's hidden ungraded reading content and guards preview and coding inputs", async () => {
     const material = await client.material.findUniqueOrThrow({ where: { id: materialId }, include: { programmingExercise: true, manualMaterial: true } });
     expect(material).toMatchObject({ type: 'EXPLANATION', isVisible: false, isRequired: false, programmingExercise: null, manualMaterial: null });
     await expect(service.read(student, { academyId, materialId, classId })).rejects.toMatchObject({ status: 404 });

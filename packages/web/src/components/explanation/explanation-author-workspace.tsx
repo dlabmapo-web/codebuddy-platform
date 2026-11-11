@@ -52,14 +52,15 @@ export function ExplanationAuthorWorkspace({
   const cache = useQueryClient();
   const [title, setTitle] = useState(initial?.title ?? '');
   const [body, setBody] = useState(initial?.body ?? '');
-  const [isVisible, setVisible] = useState(initial?.isVisible ?? false);
+  // New explanations start visible, as all new content does.
+  const [isVisible, setVisible] = useState(initial?.isVisible ?? true);
   const [revision, setRevision] = useState(initial?.revision);
   const [savedId, setSavedId] = useState(initial?.materialId);
   const [baseline, setBaseline] = useState(
     JSON.stringify([
       initial?.title ?? '',
       initial?.body ?? '',
-      initial?.isVisible ?? false,
+      initial?.isVisible ?? true,
     ]),
   );
   const [preview, setPreview] = useState(!editable);
@@ -424,7 +425,7 @@ export function ExplanationAuthorWorkspace({
             </label>
           ) : (
             <span>
-              {t(initial ? (isVisible ? 'visible' : 'hidden') : 'new_hidden')}
+              {t(initial ? (isVisible ? 'visible' : 'hidden') : 'new_visible')}
             </span>
           )}
           <span className="inline-flex items-center gap-1.5">

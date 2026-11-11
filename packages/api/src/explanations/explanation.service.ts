@@ -95,7 +95,7 @@ export class ExplanationService {
       const material = previous ? await tx.material.update({ where: { id: previous.materialId }, data: {
         title: input.title, isVisible: input.isVisible, explanationMaterial: { update: { body, revision: { increment: 1 } } },
       }, select: { id: true } }) : await tx.material.create({ data: {
-        lectureId: input.lectureId, type: "EXPLANATION", title: input.title, isVisible: false, isRequired: false,
+        lectureId: input.lectureId, type: "EXPLANATION", title: input.title, isVisible: input.isVisible, isRequired: false,
         position: await nextMaterialPosition(tx, input.lectureId), explanationMaterial: { create: { body } },
       }, select: { id: true } });
       await bumpContentRevision(tx, input.courseId);

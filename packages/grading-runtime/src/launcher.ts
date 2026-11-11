@@ -105,6 +105,8 @@ type CaseFacts = {
   oom: number;
   timedOut: boolean;
   record: string;
+  /** An interactive Run's program sat idle, waiting for input, and was ended. */
+  awaitingInput: boolean;
 };
 const MiB = 1024 * 1024;
 type TerminationSignal = (typeof terminationSignals)[number];
@@ -139,6 +141,14 @@ export const standbyBackstopMs = (startupTimeoutMs = 10000, cleanupTimeoutMs = 5
 const STANDBY_PER_SLOT = 4;
 /** Shortest wait between CPU-time samples once a case nears its limit. */
 const CPU_SAMPLE_MIN_MS = 5;
+/**
+ * An interactive Run's program is waiting for input once it is alive and has
+ * used no CPU for this long. Reading stdin is the only thing a jailed program
+ * can wait on (no network, no other processes, files in tmpfs); a `sleep` reads
+ * the same, and its student sends End input.
+ */
+const HOLD_IDLE_MS = 150;
+const HOLD_SAMPLE_MS = 30;
 const NAMESPACES = ["mnt", "pid", "ipc", "net", "uts", "user", "cgroup"] as const;
 export class NsJailBackend implements NativeBackend {
   private prepared = false;
@@ -994,16 +1004,19 @@ export class NsJailBackend implements NativeBackend {
     return this.runCase(
       {
         claim: async () => ({ jail: await this.startJail(profile, signal), prewarmed: false }),
-        bytes: gateRequest(Buffer.from(request.stdin, "utf8"), request.timeLimitMs),
+        bytes: gateRequest(Buffer.from(request.stdin, "utf8"), request.timeLimitMs, request.holdStdin),
         memoryLimitMb: request.memoryLimitMb,
         timeLimitMs: request.timeLimitMs,
         wallLimitMs: request.timeLimitMs,
         outputLimitBytes: request.outputLimitBytes ?? gradingDataLimits.stdoutBytes,
         record: true,
+        ...(request.holdStdin ? { idleIsAwaitingInput: true } : {}),
       },
-      ({ exit, oom, timedOut, record }) => {
+      ({ exit, oom, timedOut, record, awaitingInput }) => {
         // Host decisions outrank the record: the whole cgroup was killed.
         if (oom > 0) return { outcome: "MEMORY_LIMIT" };
+        // Ended by the host while waiting for input: what it printed stands.
+        if (awaitingInput) return { outcome: "PASSED" };
         if (timedOut) return { outcome: "TIME_LIMIT" };
         const ending = /^([XS]) (\d{1,3})\n$/.exec(record);
         if (exit.signal || exit.code !== 0 || !ending)
@@ -1174,6 +1187,8 @@ export class NsJailBackend implements NativeBackend {
       outputLimitBytes: number;
       /** Read the exec gate's status record from FD 3 after GO. */
       record?: boolean;
+      /** An interactive Run: a live program idle for HOLD_IDLE_MS is waiting for input. */
+      idleIsAwaitingInput?: boolean;
       /** Runs after the case is killed and before its cgroup is removed. */
       beforeDispose?: () => void;
     },
@@ -1186,6 +1201,8 @@ export class NsJailBackend implements NativeBackend {
     let cleanupStarted: number | undefined;
     let completedResult: NativeExecutionResult | undefined;
     let timedOut = false,
+      awaitingInput = false,
+      idleWatch: ReturnType<typeof setTimeout> | undefined,
       started: number | undefined,
       cpuStart = 0,
       monitor: ReturnType<typeof setTimeout> | undefined,
@@ -1262,11 +1279,37 @@ export class NsJailBackend implements NativeBackend {
         }, afterMs);
       };
       watch(options.timeLimitMs);
+      let idleSample: Promise<void> | undefined;
+      if (options.idleIsAwaitingInput) {
+        // Alive with flat CPU: blocked on the held input, so ended here.
+        let last = cpuStart, flatSince = performance.now();
+        const idle = () => {
+          if (!watching) return;
+          idleWatch = setTimeout(() => {
+            idleSample = cpuUsec(cgroup).then(
+              (usage) => {
+                const now = performance.now();
+                if (usage !== last) { last = usage; flatSince = now; }
+                else if (now - flatSince >= HOLD_IDLE_MS && !timedOut) {
+                  awaitingInput = true;
+                  abort();
+                  return;
+                }
+                idle();
+              },
+              (error) => { fault = error; abort(); },
+            );
+          }, HOLD_SAMPLE_MS);
+        };
+        idle();
+      }
       const exit = await jail.processClosed!;
       clearTimeout(wall);
       watching = false;
       clearTimeout(monitor);
+      clearTimeout(idleWatch);
       await sample;
+      await idleSample;
       const runtimeMs = Math.max(0, performance.now() - started);
       cleanupStarted = performance.now();
       if (fault) throw fault;
@@ -1274,7 +1317,7 @@ export class NsJailBackend implements NativeBackend {
       if (signal.aborted)
         throw new NativeInfrastructureError("Native execution cancelled");
       const decided = finish(
-        { exit, oom, timedOut, record: record.truncated ? "" : record.text() },
+        { exit, oom, timedOut, record: record.truncated ? "" : record.text(), awaitingInput },
         stderr.text(),
       );
       completedResult = {
@@ -1282,6 +1325,7 @@ export class NsJailBackend implements NativeBackend {
         stderr: stderr.text(),
         outcome: decided.outcome,
         runtimeMs,
+        ...(awaitingInput ? { awaitingInput: true as const } : {}),
         ...(stdout.truncated ? { outputTruncated: true } : {}),
         ...(decided.termination ? { termination: decided.termination } : {}),
       };
@@ -1296,6 +1340,7 @@ export class NsJailBackend implements NativeBackend {
       clearTimeout(wall);
       watching = false;
       clearTimeout(monitor);
+      clearTimeout(idleWatch);
       if (completedResult) {
         // The supervisor has exited and every output pipe has closed, and policy
         // forbids process creation: nothing further can change this verdict.
@@ -1335,10 +1380,13 @@ export class NsJailBackend implements NativeBackend {
     }
   }
 }
-/** The exec gate's request: one header line, then exactly the stdin bytes. */
-export function gateRequest(stdin: Buffer, timeLimitMs: number): Buffer {
+/**
+ * The exec gate's request: one header line, then exactly the stdin bytes.
+ * `hold` keeps the program's input open after them (an interactive Run).
+ */
+export function gateRequest(stdin: Buffer, timeLimitMs: number, hold = false): Buffer {
   return Buffer.concat([
-    Buffer.from(`cove-gate-1 ${stdin.length} ${timeLimitMs}\n`),
+    Buffer.from(`cove-gate-1 ${stdin.length} ${timeLimitMs}${hold ? " hold" : ""}\n`),
     stdin,
   ]);
 }

@@ -6,7 +6,7 @@ import {
   sameNativeRuntime,
   type NativeGccDescriptor,
 } from "@cove/shared";
-import { nativeRuntimeVersion, terminationSchema, wireRequestSchema } from "../src/contract.js";
+import { nativeRuntimeVersion, resultSchema, terminationSchema, wireRequestSchema } from "../src/contract.js";
 import { gateRequest } from "../src/launcher.js";
 import { binaryJailConfig, compileJailConfig, GCC_COMPILE_ARGV, NSJAIL_REVISION } from "../src/policy.js";
 import { manifest, request } from "./fixtures.js";
@@ -78,6 +78,13 @@ test("the gate's request is a header counting exactly the stdin bytes", () => {
   const bytes = gateRequest(Buffer.from("한 2\n"), 1500);
   assert.equal(bytes.toString(), "cove-gate-1 6 1500\n한 2\n");
   assert.equal(gateRequest(Buffer.alloc(0), 10_000).toString(), "cove-gate-1 0 10000\n");
+});
+
+test("an interactive Run holds its input open, and its result may say it was waiting", () => {
+  assert.equal(gateRequest(Buffer.from("40 2\n"), 1000, true).toString(), "cove-gate-1 5 1000 hold\n40 2\n");
+  assert.equal(wire({ descriptor: gcc, operation: "run", binary: { ...binary, holdStdin: true } }), true);
+  assert.equal(resultSchema.safeParse({ stdout: "Enter n: ", stderr: "", outcome: "PASSED", runtimeMs: 3, awaitingInput: true }).success, true);
+  assert.equal(resultSchema.safeParse({ stdout: "", stderr: "", outcome: "PASSED", runtimeMs: 3, awaitingInput: false }).success, false);
 });
 
 test("compile and run jails expose only what each stage needs", () => {

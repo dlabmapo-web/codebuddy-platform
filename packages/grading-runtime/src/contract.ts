@@ -48,6 +48,11 @@ export const binaryRequestSchema = z
       .min(1)
       .max(gradingDataLimits.stdoutBytes)
       .optional(),
+    /**
+     * An interactive Run: the input stays open after `stdin`, and a program
+     * that waits for more ends as `awaitingInput` instead of reading EOF.
+     */
+    holdStdin: z.boolean().optional(),
   })
   .strict();
 export type NativeBinaryRequest = z.infer<typeof binaryRequestSchema> & {
@@ -105,6 +110,8 @@ export type NativeExecutionResult = {
   outputTruncated?: boolean;
   termination?: NativeTermination;
   timings?: NativeTimings;
+  /** An interactive Run stopped while its program waited for more input. */
+  awaitingInput?: true;
 };
 export const resultSchema = z
   .object({
@@ -127,6 +134,7 @@ export const resultSchema = z
     outputTruncated: z.boolean().optional(),
     termination: terminationSchema.optional(),
     timings: nativeTimingsSchema.optional(),
+    awaitingInput: z.literal(true).optional(),
   })
   .strict();
 const diagnosticsSchema = z

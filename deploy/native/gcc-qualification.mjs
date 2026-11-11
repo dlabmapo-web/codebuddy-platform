@@ -142,6 +142,21 @@ export async function qualifyGcc({ runtime, config }) {
         const unbounded = await program('C', C('return f(1 << 30);', deep));
         assert.ok(unbounded.outcome === 'MEMORY_LIMIT' || unbounded.termination?.signal === 'SIGSEGV', JSON.stringify(unbounded));
         passed++;
+        // An interactive Run holds its input open: a program waiting for more is
+        // ended and reported as waiting, never as a reader of end-of-file.
+        const twice = await build('CPP', '#include <iostream>\nint main() { int a, b; std::cout << "a? " << std::flush; std::cin >> a; std::cout << "b? "; std::cin >> b; std::cout << a + b << "\\n"; }\n');
+        assert.equal(twice.status, 'COMPILED');
+        const waiting = await run(twice, '40\n', { holdStdin: true });
+        assert.equal(waiting.awaitingInput, true, 'waiting for b: ' + JSON.stringify(waiting));
+        assert.equal(waiting.stdout, 'a? b? ', 'cin flushes cout before it blocks');
+        const done = await run(twice, '40\n2\n', { holdStdin: true });
+        assert.deepEqual([done.outcome, done.awaitingInput, done.stdout], ['PASSED', undefined, 'a? b? 42\n']);
+        await client.release(twice.lease);
+        passed++;
+        // Working is not waiting: a program using CPU is never taken for one.
+        const busy = await program('C', C('volatile unsigned long i = 0; while (i < 400000000UL) i++; puts("done"); return 0;'), '', { holdStdin: true, timeLimitMs: 5000 });
+        assert.deepEqual([busy.outcome, busy.awaitingInput, busy.stdout], ['PASSED', undefined, 'done\n'], JSON.stringify(busy));
+        passed++;
         // A lapsed or unknown lease is refused without running anything.
         await assert.rejects(client.run({ code: '', artifact: 'sha256:' + '0'.repeat(64), lease: crypto.randomUUID(), stdin: '', memoryLimitMb: 64, timeLimitMs: 100 }), /INVALID_REQUEST/);
         passed++;

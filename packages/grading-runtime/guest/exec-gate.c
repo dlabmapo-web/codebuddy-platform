@@ -5,7 +5,7 @@
  * GO exactly as it does for Python:
  *
  *   gate -> host  "R"   ready, before any request exists
- *   host -> gate  stdin: "cove-gate-1 <stdin bytes> <time limit ms>\n" + bytes
+ *   host -> gate  stdin: "cove-gate-1 <stdin bytes> <time limit ms>[ hold]\n" + bytes
  *   gate -> host  "A"   CPU-time rlimit lowered to this case
  *   host -> gate  "G"   go
  *
@@ -20,9 +20,15 @@
  * reach it, and the jail filter keeps the program from naming it otherwise.
  * Every argument comes from the launcher's jail configuration; only the
  * request on stdin is data. Any protocol fault exits 125 without a record.
+ *
+ * `hold` (run only) is an interactive Run: the program reads its input from a
+ * pipe whose write end the gate keeps open, so a read past the input blocks
+ * instead of meeting end of file. The launcher sees a live program that has
+ * stopped using CPU, which is a program waiting for input, and ends the case.
  */
 #define _GNU_SOURCE
 #include <errno.h>
+#include <fcntl.h>
 #include <linux/audit.h>
 #include <linux/filter.h>
 #include <linux/seccomp.h>
@@ -41,6 +47,8 @@
 /* The shared stdin limit (gradingDataLimits.testTextChars) in UTF-8 bytes. */
 #define MAX_STDIN_BYTES (4ULL * 8 * 1024 * 1024)
 #define MAX_TIME_LIMIT_MS 120000ULL
+/* An interactive Run's typed input, held in one pipe buffer. */
+#define MAX_HELD_STDIN_BYTES (1024ULL * 1024)
 
 #if defined(__x86_64__)
 #define GATE_AUDIT_ARCH AUDIT_ARCH_X86_64
@@ -78,7 +86,7 @@ static const char *decimal(const char *cursor, unsigned long long max,
   return cursor;
 }
 
-static void read_header(unsigned long long *bytes, unsigned long long *limit) {
+static void read_header(unsigned long long *bytes, unsigned long long *limit, int *hold) {
   char header[64];
   size_t length = 0;
   for (;;) {
@@ -94,7 +102,9 @@ static void read_header(unsigned long long *bytes, unsigned long long *limit) {
   const char *cursor = decimal(header + sizeof prefix - 1, MAX_STDIN_BYTES, bytes);
   if (*cursor++ != ' ') fail();
   cursor = decimal(cursor, MAX_TIME_LIMIT_MS, limit);
-  if (*cursor != '\0' || *limit == 0) fail();
+  *hold = strcmp(cursor, " hold") == 0;
+  if ((*cursor != '\0' && !*hold) || *limit == 0) fail();
+  if (*hold && *bytes > MAX_HELD_STDIN_BYTES) fail();
 }
 
 /* Copies exactly `bytes` of stdin into a sealed-size memory file, then EOF. */
@@ -113,6 +123,29 @@ static int stdin_file(unsigned long long bytes) {
   if (read(0, &extra, 1) != 0) fail();
   if (lseek(file, 0, SEEK_SET) != 0) fail();
   return file;
+}
+
+/*
+ * Copies exactly `bytes` of stdin into a pipe the gate keeps writing open:
+ * the program reads them, then blocks rather than meeting end of file.
+ * Returns the read end; the write end stays in `*held`.
+ */
+static int stdin_held(unsigned long long bytes, int *held) {
+  int ends[2];
+  if (pipe2(ends, O_CLOEXEC) != 0) fail();
+  if (fcntl(ends[1], F_SETPIPE_SZ, (int)MAX_HELD_STDIN_BYTES) < (int)bytes) fail();
+  char chunk[65536];
+  while (bytes > 0) {
+    size_t want = bytes < sizeof chunk ? (size_t)bytes : sizeof chunk;
+    ssize_t got = read(0, chunk, want);
+    if (got <= 0) fail();
+    put(ends[1], chunk, (size_t)got);
+    bytes -= (unsigned long long)got;
+  }
+  char extra;
+  if (read(0, &extra, 1) != 0) fail();
+  *held = ends[1];
+  return ends[0];
 }
 
 #define DENY(nr)                                       \
@@ -200,9 +233,11 @@ int main(int argc, char **argv) {
   if (!run && !exec) fail();
   put(CONTROL, "R", 1);
   unsigned long long bytes, limit;
-  read_header(&bytes, &limit);
-  if (exec && bytes != 0) fail();
-  int input = stdin_file(bytes);
+  int hold, held = -1;
+  read_header(&bytes, &limit, &hold);
+  if (exec && (bytes != 0 || hold)) fail();
+  /* The held write end is closed in the child by close_range, kept here. */
+  int input = hold ? stdin_held(bytes, &held) : stdin_file(bytes);
   /* Whole seconds above the case, as the CPython bootstrap sets them. */
   rlim_t seconds = (rlim_t)((limit + 999) / 1000 + 1);
   struct rlimit cpu = {seconds, seconds};
@@ -212,5 +247,6 @@ int main(int argc, char **argv) {
   if (read(CONTROL, &go, 1) != 1 || go != 'G') fail();
   if (exec) exec_compiler(argv + 2, input);
   run_program(argv[2], input);
+  (void)held;
   return 125;
 }

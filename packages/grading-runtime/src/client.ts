@@ -30,6 +30,8 @@ type Body = Pick<WireRequest, "request" | "binary" | "compile" | "release">;
 export type NativeRunRequest = NativeExecutionRequest & {
   artifact?: string;
   lease?: string;
+  /** An interactive C/C++ Run: see `binaryRequestSchema.holdStdin`. */
+  holdStdin?: boolean;
 };
 export class NativeExecutionClient {
   readonly version: string;
@@ -237,7 +239,7 @@ export class NativeExecutionClient {
     };
     const body: Body =
       this.descriptor.engine === "native-gcc"
-        ? { binary: binaryRequestSchema.parse({ ...limits, artifact: request.artifact, lease: request.lease }) }
+        ? { binary: binaryRequestSchema.parse({ ...limits, artifact: request.artifact, lease: request.lease, ...(request.holdStdin ? { holdStdin: true } : {}) }) }
         : {
             request: requestSchema.parse({
               ...limits,

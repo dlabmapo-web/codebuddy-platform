@@ -160,36 +160,48 @@ checked) it:
 Evidence is the artifact `native-linux-<commit>`: build log, candidate
 identity, kernel and application evidence, browser logs and `timings.json`.
 
-**2. The production host, with the release image, before switching.** Release
-builds (`release-v2.yml`) produce their own image from the same Dockerfiles,
-with a different identity, and the host's kernel and AppArmor are not
-GitHub's. On the Lightsail host, beside the running node (a separate
-envelope):
+**2. The production host, with the release image, before it is deployed.**
+Release builds (`release-v2.yml`) produce their own images from the same
+Dockerfiles, with a different identity, and the host's kernel and AppArmor are
+not GitHub's. A `v2.*.*` tag builds and publishes the images (`publish`,
+`publish-native`), then the `deploy` job waits for approval: the `production`
+environment requires a reviewer (`jurabek10`). Qualify in that window:
 
-```bash
-cd /opt/cove
-NATIVE_IMAGE=ghcr.io/dlabmapo-web/cove-native:sha-<40-hex commit> \
-  docker compose --project-directory /opt/cove --env-file deployment.env \
-  -f compose.production.yml --profile native run --rm native-grader qualify
-```
+1. Push the release tag and wait until `publish-native` has finished and
+   `deploy` shows *Waiting for review*. The native image is
+   `ghcr.io/dlabmapo-web/cove-native:sha-<the tagged commit>`.
+2. On the Lightsail host, beside the running node (a separate envelope):
 
-It must print `"gate":"standby-behaviour","status":"PASS"`,
-`"gate":"cold-start","status":"PASS"`,
-`"gate":"actual-linux-gcc","status":"PASS","passed":52,...` and
-`"gate":"actual-linux-containment","status":"PASS"`. Anything else: do not
-deploy a release that admits C/C++; remove `C` and `CPP` from the eligibility
-first (Rollback). The grader does not run these checks when it starts.
+   ```bash
+   cd /opt/cove
+   NATIVE_IMAGE=ghcr.io/dlabmapo-web/cove-native:sha-<40-hex commit> \
+     docker compose --project-directory /opt/cove --env-file deployment.env \
+     -f compose.production.yml --profile native run --rm native-grader qualify
+   ```
+
+   It must print `"gate":"standby-behaviour","status":"PASS"`,
+   `"gate":"cold-start","status":"PASS"`,
+   `"gate":"actual-linux-gcc","status":"PASS","passed":53,...` (53 on amd64:
+   one check runs only there) and `"gate":"actual-linux-containment","status":"PASS"`.
+3. All PASS: approve the deployment. Anything else: reject it, and do not
+   deploy a release that admits C/C++; remove `C` and `CPP` from the
+   eligibility first (Rollback).
+
+The grader does not run these checks when it starts.
 
 **3. Capacity on the production host** (below), before classes use C/C++.
 
-Local evidence so far (2026-11-11, arm64, Docker Desktop, production container
-flags): 39 CPython checks and 52 GCC checks pass, and the browser acceptance
-passes. **amd64 has not been qualified yet**: its seccomp lists
-(`gcc-run.amd64.policy`, `gcc-compile.amd64.policy`) carry the x86 legacy
-syscalls by reasoning, and the x86 numbers by which the launcher recognizes a
-waiting Run's `read` are covered only by unit tests; stages 1 and 2 prove them.
-Fails closed: a missing syscall kills the program or the compiler, and a wrong
-`read` number cuts a sleeping Run short; both fail the GCC gate.
+**Evidence so far.** Stage 1 passed on native amd64, 2026-11-11: run
+[42976662105](https://github.com/dlabmapo-web/codebuddy-platform/actions/runs/42976662105),
+commit `f88d1d1c`, image `sha256:44832b5a…`, `ubuntu-24.04`, kernel
+7.0.0-1017-azure, 4 vCPU Intel Xeon 6973P-C. Every gate passed: standby,
+cold start, CPython containment, 53 GCC checks (a held Run waits 24 ms),
+crash recovery, the twelve 1–10-client application cohorts, the Python
+production-build browser cohorts (1 client 0.98 s, 2 clients p95 1.39 s,
+80 ms emulated latency) and the nine C/C++ browser tests. The amd64 seccomp
+lists and the x86 `read` numbers are therefore proven on that kernel; stage 2
+proves them on the production host. arm64 (Docker Desktop) passes 52 GCC
+checks.
 
 Then check readiness on the running node:
 

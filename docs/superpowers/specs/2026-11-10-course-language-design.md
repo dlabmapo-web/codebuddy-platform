@@ -449,9 +449,26 @@ Page load is measured apart (1.5–3.7 s under `next dev`). The grader alone
 compiles these programs in 30–130 ms, so most of a cold submission's server
 time is elsewhere in the submission path; that has not been broken down yet.
 
+**amd64 qualification in GitHub Actions passed** (run 42976662105, commit
+`f88d1d1c`, 4 vCPU Xeon 6973P-C, kernel 7.0.0-1017-azure): every kernel gate
+with 53 GCC checks, crash recovery, the application cohorts, the Python
+browser cohorts and the nine C/C++ browser tests. Two runs before it failed
+and were fixed: the identity step counted the workflow's own untracked files
+as a dirty tree, and the browser cohort ran the Next server and Chromium in
+the grader's service leaf, which the GCC work holds to `serviceOverheadMb` on
+every health probe; the node withdrew itself and the submission was never
+graded. The fixture now runs them in a sibling group, as production's web is
+another container; no limit changed.
+
+On that runner (one student, `next dev`, idle fixture), Submit click to
+visible verdict: C 0.40–0.94 s cold and 0.35–0.39 s cached (server 0.15–0.19
+and 0.07–0.08 s); C++ `<iostream>` with 10 cases 0.92–1.0 s cold and 0.93 s
+cached (server 0.42–0.43 and 0.22–0.25 s). On amd64 the server time is close
+to compile plus cases; the Mac's larger gap was Docker Desktop.
+
 Open, for the production host:
 
-- The amd64 qualification (Actions, then the release image on the host).
+- The release image on the host, in the approval window (operations guide).
 - Capacity (§8 gates): Actions proves function on one runner, not classrooms.
 - After a grader fault the node withdraws GCC until restarted; the client
   treats the resulting `UNAVAILABLE` as busy and retries for 30 s, so each

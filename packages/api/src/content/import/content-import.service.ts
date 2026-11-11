@@ -25,6 +25,7 @@ import {
   type PlannedProblem,
   type WorkbookLocale,
   compiledStarterTemplates,
+  defaultExerciseLanguage,
   defaultEliceGradingProfile,
   isCompiledLanguage,
   type ExerciseLanguage,
@@ -671,7 +672,7 @@ export class ContentImportService {
             academyId: input.academyId,
             actorUserId: input.actorUserId,
             requestId: input.requestId,
-            language: input.course.language,
+            language: defaultExerciseLanguage(input.course.language),
           });
           materialIdsByKey.set(problem.key, materialId);
           entities.push({
@@ -919,7 +920,7 @@ export class ContentImportService {
       academyId: string;
       actorUserId: string;
       requestId?: string;
-      /** The course's language, which a new problem takes. */
+      /** A new problem's language: the course's default (C in a C/C++ course). */
       language: ExerciseLanguage;
     },
   ): Promise<string> {

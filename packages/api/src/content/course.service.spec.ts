@@ -137,9 +137,9 @@ describe("CourseService", () => {
 
   it("creates a course in its chosen language, Python when none is chosen", async () => {
     const { service, transaction } = createService();
-    await service.create(identity, { academyId, title: "C Basics", description: "", language: "C" });
+    await service.create(identity, { academyId, title: "C Basics", description: "", language: "C_CPP" });
     expect(transaction.course.create).toHaveBeenLastCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ language: "C" }) }),
+      expect.objectContaining({ data: expect.objectContaining({ language: "C_CPP" }) }),
     );
     await service.create(identity, { academyId, title: "Python Basics", description: "" });
     expect(transaction.course.create).toHaveBeenLastCalledWith(

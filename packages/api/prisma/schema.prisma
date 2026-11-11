@@ -249,6 +249,12 @@ enum SubmissionPolicy {
   AUTOMATIC
 }
 
+/// A course's programming language: Python, or C/C++ (each problem C or C++).
+enum CourseLanguage {
+  PYTHON
+  C_CPP
+}
+
 enum GradingProfileMode {
   LEGACY_STDIO
   ELICE_STDIO
@@ -1343,10 +1349,10 @@ model Course {
   title           String
   description     String  @default("")
   isVisible       Boolean @default(false) @map("is_visible")
-  /// The language of every coding exercise in this course. Chosen when the
-  /// course is created; fixed once it holds a coding exercise. Each exercise
-  /// keeps its own copy, which admission and grading read.
-  language        ExerciseLanguage @default(PYTHON)
+  /// Python or C/C++, chosen when the course is created and fixed once it
+  /// holds a problem. A C/C++ course's problems are each C or C++; every
+  /// exercise keeps its own language, which admission and grading read.
+  language        CourseLanguage   @default(PYTHON)
   /// Bumped by every mutation anywhere in this course's content, in the same
   /// transaction as the mutation itself.
   ///

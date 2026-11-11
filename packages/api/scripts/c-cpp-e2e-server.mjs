@@ -41,12 +41,13 @@ for (const [role, user] of Object.entries(identities)) {
   ids[role + 'Membership'] = membership.id;
 }
 await db.academyFeatureFlag.createMany({ data: [{ academyId: ids.academy, feature: 'TEACHER_LIVE_MONITORING', isEnabled: true }] });
-// One course per language: a course's language is every coding problem's.
-for (const [course, module, lecture, language, title] of [
-  [ids.course, ids.module, ids.lecture, 'C', playground ? 'C Practice' : 'C browser acceptance'],
-  [ids.courseCpp, ids.moduleCpp, ids.lectureCpp, 'CPP', playground ? 'C++ Practice' : 'C++ browser acceptance'],
+// Two C/C++ courses: one holding the C problem, one the C++ ones. A C/C++
+// course may mix both; each problem below chooses C or C++.
+for (const [course, module, lecture, title] of [
+  [ids.course, ids.module, ids.lecture, playground ? 'C Practice' : 'C browser acceptance'],
+  [ids.courseCpp, ids.moduleCpp, ids.lectureCpp, playground ? 'C++ Practice' : 'C++ browser acceptance'],
 ]) {
-  await db.course.create({ data: { id: course, academyId: ids.academy, createdByUserId: ids.manager, title, language, isVisible: true } });
+  await db.course.create({ data: { id: course, academyId: ids.academy, createdByUserId: ids.manager, title, language: 'C_CPP', isVisible: true } });
   await db.courseModule.create({ data: { id: module, courseId: course, externalKey: randomUUID(), title: 'Native languages', position: 1, isVisible: true } });
   await db.lecture.create({ data: { id: lecture, courseModuleId: module, externalKey: randomUUID(), title: 'Addition', position: 1, isVisible: true } });
 }

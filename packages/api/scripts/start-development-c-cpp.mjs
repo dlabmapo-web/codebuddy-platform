@@ -69,7 +69,7 @@ try {
   if (existing.some((course) => course.academyId !== academyId)) throw Error('Practice course ID belongs to another academy');
   if (klass && klass.academyId !== academyId) throw Error('Practice class ID belongs to another academy');
   for (const entry of courses) if (!existing.some((course) => course.id === entry.course)) await db.course.create({ data: {
-    id: entry.course, academyId, createdByUserId: managerId, title: entry.title, language: entry.language, description: 'Try native ' + entry.title.split(' ')[0] + ': Run with input, Test, and Submit.', isVisible: true,
+    id: entry.course, academyId, createdByUserId: managerId, title: entry.title, language: 'C_CPP', description: 'Try native ' + entry.title.split(' ')[0] + ': Run with input, Test, and Submit.', isVisible: true,
     modules: { create: { id: entry.module, externalKey: 'local-' + entry.language.toLowerCase(), title: entry.title.split(' ')[0] + ' Basics', position: 1, isVisible: true,
       lectures: { create: { id: entry.lecture, externalKey: 'local-' + entry.language.toLowerCase() + '-addition', title: 'Add two numbers', position: 1, isVisible: true,
         materials: { create: entry.problems.map(([id, count, title], index) => ({

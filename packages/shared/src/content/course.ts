@@ -6,7 +6,7 @@ import { pdfMetadataSchema } from "./pdf.js";
 import { gradingDataLimits } from "../grading-limits.js";
 
 import { libraryImportOriginSchema, courseProvenanceSchema } from "../platform/library.js";
-import { exerciseLanguageSchema } from "./language.js";
+import { courseLanguageSchema, exerciseLanguageSchema } from "./language.js";
 
 export const materialTypes = ["PROGRAMMING_EXERCISE", "PDF_DOCUMENT", "TURTLE_EXERCISE", "WRITTEN_RESPONSE", "MULTIPLE_CHOICE", "VIDEO_LESSON"] as const;
 export const materialTypeSchema = z.enum(materialTypes);
@@ -18,9 +18,14 @@ export type ExerciseDifficulty = z.infer<typeof exerciseDifficultySchema>;
 
 export {
   compiledStarterTemplates,
+  courseLanguages,
+  courseLanguageSchema,
+  defaultExerciseLanguage,
   exerciseLanguages,
   exerciseLanguageSchema,
+  exerciseLanguagesFor,
   isCompiledLanguage,
+  type CourseLanguage,
   type ExerciseLanguage,
 } from "./language.js";
 
@@ -155,8 +160,8 @@ export const courseSummarySchema = z.object({
   title: titleSchema,
   description: descriptionSchema,
   isVisible: z.boolean(),
-  /** Every coding exercise in the course is written in this language. */
-  language: exerciseLanguageSchema.default("PYTHON"),
+  /** Python, or C/C++: what the course's coding exercises are written in. */
+  language: courseLanguageSchema.default("PYTHON"),
   content: courseContentCountsSchema,
   /**
    * Where this course came from, when it came from the content library.
@@ -291,7 +296,7 @@ export const createCourseSchema = z.object({
   title: titleSchema,
   description: descriptionSchema.default(""),
   /** Chosen once, for every coding exercise the course will hold. */
-  language: exerciseLanguageSchema.default("PYTHON"),
+  language: courseLanguageSchema.default("PYTHON"),
 });
 
 export const updateCourseSchema = z.object({
@@ -300,7 +305,7 @@ export const updateCourseSchema = z.object({
   title: titleSchema.optional(),
   description: descriptionSchema.optional(),
   /** Accepted only while the course has no problems. */
-  language: exerciseLanguageSchema.optional(),
+  language: courseLanguageSchema.optional(),
 });
 
 export const setCourseVisibilitySchema = z.object({
@@ -707,6 +712,12 @@ export const exerciseDraftFieldsSchema = z.object({
   outputFormat: z.string().max(10_000),
   constraints: z.string().max(10_000),
   starterCode: z.string().max(100_000),
+  /**
+   * C or C++, in a C/C++ course; absent keeps the stored one, and a new
+   * problem starts in the course's default. A Python course's problems are
+   * Python. The server checks it against the course.
+   */
+  language: exerciseLanguageSchema.optional(),
   solutions: exerciseSolutionsSchema,
   aiFeedbackEnabled: z.boolean(),
   isVisible: z.boolean(),
@@ -856,7 +867,7 @@ export const moveExerciseSchema = courseIdInputSchema.extend({
 });
 
 export const exerciseAuthoringContextSchema = z.object({
-  course: z.object({ id: z.uuid(), title: titleSchema, language: exerciseLanguageSchema.default("PYTHON") }),
+  course: z.object({ id: z.uuid(), title: titleSchema, language: courseLanguageSchema.default("PYTHON") }),
   module: z.object({ id: z.uuid(), title: titleSchema }),
   lecture: z.object({ id: z.uuid(), title: titleSchema }),
   material: materialSchema.nullable(),

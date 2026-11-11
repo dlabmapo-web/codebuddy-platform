@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { exerciseLanguageSchema } from "../content/language.js";
+import { courseLanguageSchema } from "../content/language.js";
 
 /**
  * The content library: what head office publishes, and what a branch takes.
@@ -33,8 +33,8 @@ export const libraryCourseSchema = z.object({
   isVisible: z.boolean(),
   /** Withdrawn from the library. Wins over `isVisible` in every display. */
   retiredAt: z.iso.datetime().nullable(),
-  /** The language of every coding exercise in the course. */
-  language: exerciseLanguageSchema.default("PYTHON"),
+  /** Python, or C/C++: what the course's coding exercises are written in. */
+  language: courseLanguageSchema.default("PYTHON"),
   contentRevision: z.number().int().positive(),
   moduleCount: z.number().int().nonnegative(),
   lectureCount: z.number().int().nonnegative(),
@@ -99,7 +99,7 @@ export const availableLibraryCourseSchema = z.object({
   title: z.string().min(1),
   description: z.string(),
   /** Kept by the copy an academy adopts. */
-  language: exerciseLanguageSchema.default("PYTHON"),
+  language: courseLanguageSchema.default("PYTHON"),
   contentRevision: z.number().int().positive(),
   moduleCount: z.number().int().nonnegative(),
   lectureCount: z.number().int().nonnegative(),
@@ -207,7 +207,7 @@ export type ListLibraryCoursesInput = z.infer<typeof listLibraryCoursesSchema>;
 export const createLibraryCourseSchema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(10_000).default(""),
-  language: exerciseLanguageSchema.default("PYTHON"),
+  language: courseLanguageSchema.default("PYTHON"),
 });
 
 export const retireLibraryCourseSchema = z.object({

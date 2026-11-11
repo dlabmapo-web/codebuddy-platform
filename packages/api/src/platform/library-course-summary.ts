@@ -1,4 +1,4 @@
-import type { ExerciseLanguage, LibraryCourse } from "@cove/shared";
+import type { CourseLanguage, LibraryCourse } from "@cove/shared";
 import {
   courseTreeCountSelect,
   courseTreeCounts,
@@ -23,7 +23,7 @@ export function toLibraryCourse(record: {
   description: string;
   isVisible: boolean;
   retiredAt: Date | null;
-  language: ExerciseLanguage;
+  language: CourseLanguage;
   contentRevision: number;
   updatedAt: Date;
   modules: {

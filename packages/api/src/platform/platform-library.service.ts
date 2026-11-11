@@ -12,7 +12,7 @@ import {
   type LibraryCopy,
   type PreviewAcademyCourseInput,
   type ImportAcademyCourseInput,
-  type ExerciseLanguage,
+  type CourseLanguage,
   type LibraryCourse,
   type ListLibraryCoursesInput,
 } from "@cove/shared";
@@ -165,7 +165,7 @@ export class PlatformLibraryService {
    */
   async create(
     identity: SupabaseIdentity,
-    input: { title: string; description: string; language?: ExerciseLanguage },
+    input: { title: string; description: string; language?: CourseLanguage },
   ): Promise<LibraryCourse> {
     const actor = await this.access.requirePermission(
       identity.authUserId,

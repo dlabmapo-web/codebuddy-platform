@@ -1,6 +1,6 @@
 import { courseCounts, emptyCourseCounts } from "./course-counts.js";
 import type { CourseContentCounts } from "@cove/shared";
-import { inferSubmissionPolicy, isCompiledLanguage, type ExerciseLanguage, type SubmissionPolicy } from "@cove/shared";
+import { defaultExerciseLanguage, exerciseLanguagesFor, inferSubmissionPolicy, isCompiledLanguage, type CourseLanguage, type ExerciseLanguage, type SubmissionPolicy } from "@cove/shared";
 import { rolesHavePermission } from "@cove/shared";
 import { taughtMaterialWhere } from "../classes/assigned-course-access.js";
 import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
@@ -193,6 +193,8 @@ type ExerciseRecord = Prisma.MaterialGetPayload<{
 
 type ExerciseWriteInput = {
   submissionPolicy?: SubmissionPolicy;
+  /** C or C++ in a C/C++ course; checked against the course. */
+  language?: ExerciseLanguage;
   referencePdfMaterialId?: string | null;
   quiz?: QuizDefinition | null;
   academyId: string;
@@ -241,7 +243,7 @@ export class CourseService {
 
   async create(
     identity: SupabaseIdentity,
-    input: { academyId: string; title: string; description: string; language?: ExerciseLanguage },
+    input: { academyId: string; title: string; description: string; language?: CourseLanguage },
     context: ContentRequestContext = {},
   ) {
     const actor = await this.requireCurriculumManager(
@@ -286,7 +288,7 @@ export class CourseService {
       courseId: string;
       title?: string;
       description?: string;
-      language?: ExerciseLanguage;
+      language?: CourseLanguage;
     },
     context: ContentRequestContext = {},
   ) {
@@ -1287,7 +1289,7 @@ export class CourseService {
       // change cannot slip between the read and this exercise. A quiz has no
       // code and stays Python.
       const courseLanguage = await lockCourse(tx, input.courseId);
-      const language = input.quiz ? "PYTHON" : courseLanguage;
+      const language = input.quiz ? "PYTHON" : exerciseLanguageIn(courseLanguage, input.language);
       assertLanguageGrading(input, language);
       await validatePdfReference(tx, input, input.referencePdfMaterialId);
       await assertLessonImages(tx, { academyId: input.academyId, courseId: input.courseId, html: input.description });
@@ -1373,15 +1375,20 @@ export class CourseService {
     // Checked against the limit this exercise actually has, which an imported
     // or migrated problem may not share with the authoring default.
     assertGradingSupported(input, exercise.timeLimitMs);
-    // An exercise keeps the language it was created in, its course's.
-    assertLanguageGrading(input, exercise.language);
+    // Absent keeps the stored language. A C/C++ problem may move between C
+    // and C++, which is a different program for every case; nothing leaves
+    // its course's family.
+    const language = input.quiz || input.language === undefined
+      ? exercise.language
+      : exerciseLanguageIn(current.lecture.courseModule.course.language, input.language);
+    assertLanguageGrading(input, language);
     const profileColumns = exerciseProfileColumns(input.grading);
     const submissionPolicy = input.submissionPolicy ?? exercise.submissionPolicy ?? "AUTOMATIC";
     const definitionChanged =
       !sameQuizGrading(exercise.quiz, input.quiz) ||
       !sameGradingDefinition(exercise.testCases, input.testCases) ||
       !sameGradingProfile(exercise, profileColumns);
-    const gradingChanged = definitionChanged ||
+    const gradingChanged = definitionChanged || language !== exercise.language ||
       submissionPolicy !== (exercise.submissionPolicy ?? "AUTOMATIC");
     const nextRevision = exercise.gradingRevision + (gradingChanged ? 1 : 0);
     const record = await this.prisma.$transaction(async (tx) => {
@@ -1404,7 +1411,7 @@ export class CourseService {
           outputFormat: input.outputFormat,
           constraints: input.constraints,
           starterCode: input.starterCode,
-
+          language,
           aiFeedbackEnabled: input.aiFeedbackEnabled,
           ...(gradingChanged
             ? {
@@ -1999,7 +2006,7 @@ export function toCourseSummary(course: {
   title: string;
   description: string;
   isVisible: boolean;
-  language: ExerciseLanguage;
+  language: CourseLanguage;
   createdAt: Date;
   updatedAt: Date;
   libraryImport?: {
@@ -2208,9 +2215,24 @@ function toExerciseAuthoringContext(record: ExerciseRecord) {
  * position.
  */
 /** Locks the course row for this transaction and returns its language. */
-async function lockCourse(tx: Prisma.TransactionClient, courseId: string): Promise<ExerciseLanguage> {
-  const rows = await tx.$queryRaw<Array<{ language: ExerciseLanguage }>>`SELECT language::text AS language FROM courses WHERE id = ${courseId}::uuid FOR UPDATE`;
+async function lockCourse(tx: Prisma.TransactionClient, courseId: string): Promise<CourseLanguage> {
+  const rows = await tx.$queryRaw<Array<{ language: CourseLanguage }>>`SELECT language::text AS language FROM courses WHERE id = ${courseId}::uuid FOR UPDATE`;
   return rows?.[0]?.language ?? "PYTHON";
+}
+
+/**
+ * A coding problem's language within its course: Python in a Python course;
+ * C or C++ in a C/C++ course, the course's default when none is chosen.
+ */
+function exerciseLanguageIn(course: CourseLanguage, requested: ExerciseLanguage | undefined): ExerciseLanguage {
+  if (requested === undefined) return defaultExerciseLanguage(course);
+  if (!exerciseLanguagesFor(course).includes(requested))
+    throw new AppException(
+      "EXERCISE_VALIDATION_FAILED",
+      HttpStatus.BAD_REQUEST,
+      "language: a problem is written in its course's language.",
+    );
+  return requested;
 }
 
 /**

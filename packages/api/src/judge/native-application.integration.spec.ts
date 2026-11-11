@@ -118,7 +118,7 @@ describe.skipIf(!databaseUrl || !redisUrl)("native application launcher-contract
     }
     await db.academyFeatureFlag.createMany({ data: ["STUDENT_POINTS", "SERVER_SAMPLE_CHECKS"].map(feature => ({ academyId: ids.academy, feature: feature as "STUDENT_POINTS" | "SERVER_SAMPLE_CHECKS", isEnabled: true })) });
     Object.assign(settings, { NATIVE_GRADING_ENABLED: false, NATIVE_GRADING_BRIDGE_ACK: "filtered-compatibility-workers-v1", NATIVE_GRADING_MANIFEST: manifestPath,
-      PYODIDE_VERSION: "0.27.5", SUBMISSION_RATE_LIMIT: 100, SAMPLE_CHECK_PER_MINUTE: 60, SAMPLE_CHECK_ACADEMY_OUTSTANDING: 50, REDIS_URL: redisUrl });
+      PYODIDE_VERSION: "0.27.5", SUBMISSION_RATE_LIMIT: 100, SAMPLE_CHECK_PER_MINUTE: 60, SAMPLE_CHECK_CONTINUATIONS_PER_MINUTE: 60, SAMPLE_CHECK_ACADEMY_OUTSTANDING: 50, REDIS_URL: redisUrl });
     config = new ConfigService(settings);
     const access = new AcademyAccessService(db, new SupportGrantResolver(db));
     submissions = new SubmissionService(db, access, config as never, new LearningClassContextService(db), queue);

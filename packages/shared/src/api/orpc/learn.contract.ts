@@ -13,6 +13,7 @@ import {
 } from "../../content/submission.js";
 import {
   sampleCheckInputSchema,
+  getSampleCheckInputSchema,
   sampleCheckViewSchema,
   startSampleCheckSchema,
   startRunCheckSchema,
@@ -161,6 +162,6 @@ export const learnContract = {
   /** A staff member's own C/C++ practice: the same checks, with no class. */
   startPracticeSampleCheck: oc.input(startPracticeSampleCheckSchema).output(sampleCheckViewSchema),
   startPracticeRunCheck: oc.input(startPracticeRunCheckSchema).output(sampleCheckViewSchema),
-  getSampleCheck: oc.input(sampleCheckInputSchema).output(sampleCheckViewSchema),
+  getSampleCheck: oc.input(getSampleCheckInputSchema).output(sampleCheckViewSchema),
   cancelSampleCheck: oc.input(sampleCheckInputSchema).output(sampleCheckViewSchema),
 };

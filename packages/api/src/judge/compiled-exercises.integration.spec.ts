@@ -33,7 +33,7 @@ import type { CompileResult, ExecutionEngine, ExecutionResult } from "./executio
 import { GradingService } from "./grading.service.js";
 import { JudgeQueue } from "./judge.queue.js";
 import { NATIVE_READINESS_HEARTBEAT, nativeReadinessKey } from "./native-admission.js";
-import { SampleCheckRunner } from "./sample-check.runner.js";
+import { SampleCheckRunner, terminalStreams } from "./sample-check.runner.js";
 import { SampleCheckStore } from "./sample-check.store.js";
 
 /**
@@ -122,14 +122,16 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
   const gccEngine = (script: {
     compile?: CompileResult;
     run?: (stdin: string) => ExecutionResult;
-  }): ExecutionEngine & { compiled: number; released: string[]; held: boolean[] } => {
+  }): ExecutionEngine & { compiled: number; sources: string[]; released: string[]; held: boolean[] } => {
     const engine = {
       version: nativeRuntimeVersion(gcc),
       compiled: 0,
+      sources: [] as string[],
       released: [] as string[],
       held: [] as boolean[],
-      compile: async () => {
+      compile: async (request: { code: string }) => {
         engine.compiled += 1;
+        engine.sources.push(request.code);
         return script.compile ?? { status: "COMPILED" as const, artifact, lease: randomUUID(), diagnostics: "", compileMs: 30, cached: false };
       },
       release: async (lease: string) => { engine.released.push(lease); },
@@ -178,6 +180,7 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
       PYODIDE_VERSION: "0.27.5",
       SUBMISSION_RATE_LIMIT: 100,
       SAMPLE_CHECK_PER_MINUTE: 100,
+      SAMPLE_CHECK_CONTINUATIONS_PER_MINUTE: 60,
       SAMPLE_CHECK_ACADEMY_OUTSTANDING: 50,
       NATIVE_GRADING_ENABLED: true,
       NATIVE_GRADING_BRIDGE_ACK: "filtered-compatibility-workers-v1",
@@ -395,6 +398,9 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
     expect(view).toMatchObject({ kind: "run", status: "COMPLETED", position: null });
     expect(view.result).toMatchObject({ outcome: "PASSED", outputMatched: null, stdout: "42\nanything at all\n", rule: null, compileDiagnostics: "" });
     expect(engine.compiled).toBe(1);
+    // A Run's streams are line-buffered, as a terminal's are, by a few lines
+    // after the student's own, so GCC's line numbers stay theirs.
+    expect(engine.sources).toEqual([`${doubling}${terminalStreams}`]);
     expect(engine.released).toHaveLength(1);
     // Practice only: never a submission.
     expect(await prisma.submission.count({ where: { userId: ids.student } })).toBe(submitted);
@@ -449,6 +455,43 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
     const tester = gccEngine({});
     await new SampleCheckRunner(new SampleCheckStore(() => queue.redis()), tester, comparator, new ExecutionCapacity(2)).run(test.checkId);
     expect(tester.held).toEqual([false]);
+    // and compiles exactly what Submit will.
+    expect(tester.sources).toEqual([doubling]);
+  });
+
+  it("continues a waiting Run on its next line in the same statements, charged to its own budget", async () => {
+    const store = new SampleCheckStore(() => queue.redis());
+    const redis = await queue.redis();
+    const waiting = gccEngine({ run: () => ({ stdout: "n? ", stderr: "", outcome: "PASSED", runtimeMs: 150, awaitingInput: true }) });
+    const first = await checks.startRun(student, {
+      academyId: ids.academy, classId: ids.klass, materialId, code: doubling, stdin: "",
+      workspaceRevision: revision, clientRequestId: randomUUID(),
+    });
+    await new SampleCheckRunner(store, waiting, comparator, new ExecutionCapacity(2)).run(first.checkId);
+    const userId = (await store.get(first.checkId))!.userId;
+    const tokens = async () => redis.hget(`cove:sample-check:rate:${userId}`, "tokens");
+    const before = await tokens();
+
+    // The next line: a request of its own, naming the Run it continues. The
+    // claim is checked in Redis, so admission reads what a new Run does.
+    statements = 0;
+    const next = await countedChecks.startRun(student, {
+      academyId: ids.academy, classId: ids.klass, materialId, code: doubling, stdin: "21\n",
+      workspaceRevision: revision, clientRequestId: randomUUID(), continues: first.checkId,
+    });
+    expect(statements).toBe(11);
+    expect(next).toMatchObject({ kind: "run", status: "QUEUED" });
+    expect(await tokens()).toBe(before);
+    expect(await redis.exists(`cove:sample-check:rate:continue:${userId}`)).toBe(1);
+    await new SampleCheckRunner(store, gccEngine({}), comparator, new ExecutionCapacity(2)).run(next.checkId);
+
+    // A claim that does not hold — other code — is a new Run, charged as one.
+    const forged = await checks.startRun(student, {
+      academyId: ids.academy, classId: ids.klass, materialId, code: `${doubling}\n`, stdin: "21\n",
+      workspaceRevision: revision, clientRequestId: randomUUID(), continues: first.checkId,
+    });
+    expect(Number(await tokens())).toBeLessThan(Number(before));
+    await new SampleCheckRunner(store, gccEngine({}), comparator, new ExecutionCapacity(2)).run(forged.checkId);
   });
 
   it("reports a Run that did not compile with GCC's messages", async () => {

@@ -146,6 +146,7 @@ describe.skipIf(!databaseUrl || !redisUrl)("public sample checks, end to end", (
       DATABASE_URL: databaseUrl,
       PYODIDE_VERSION: "0.27.5",
       SAMPLE_CHECK_PER_MINUTE: 60,
+      SAMPLE_CHECK_CONTINUATIONS_PER_MINUTE: 60,
       SAMPLE_CHECK_ACADEMY_OUTSTANDING: 50,
     });
     prisma = new PrismaService(config as never);

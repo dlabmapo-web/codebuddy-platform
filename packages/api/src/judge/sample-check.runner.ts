@@ -142,7 +142,7 @@ export class SampleCheckRunner {
       try {
         built = await this.engine.compile!({
           language: snapshot.language!,
-          code: snapshot.code,
+          code: snapshot.run ? `${snapshot.code}${terminalStreams}` : snapshot.code,
           leaseMs: Math.min(30 * 60_000, Math.max(1000, deadlineAt - Date.now() + GRADING_OVERHEAD_MS)),
         });
       } catch (error) {
@@ -278,6 +278,21 @@ export class SampleCheckRunner {
     });
   }
 }
+
+/**
+ * Appended to a Run's source: stdin and stdout line-buffered, as a terminal
+ * makes them. Through a pipe both are fully buffered, so C's
+ * `printf("Enter a: "); scanf(...)` kept its prompt until the program ended;
+ * line-buffered, glibc flushes stdout before each read, and the prompt is on
+ * screen when the terminal asks for input. Python's `input()` and C++'s
+ * `cin` (tied to `cout`) already behave so. Only when the program has
+ * `<stdio.h>` (glibc defines `stdout` as a macro), and after the student's
+ * last line so GCC's line numbers are theirs. A Run only: Test and Submit
+ * compile exactly what was written.
+ */
+export const terminalStreams =
+  "\n#ifdef stdout\n__attribute__((constructor)) static void __cove_terminal_streams(void) " +
+  "{ setvbuf(stdin, 0, _IOLBF, 0); setvbuf(stdout, 0, _IOLBF, 0); }\n#endif\n";
 
 /** A display cap; comparison already used the whole output. */
 function cap(value: string): { text: string; truncated: boolean } {

@@ -123,10 +123,12 @@ export function createLearnRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) =>
         deps.sampleCheckService.startPractice(context.identity, input)
       ),
+    // `waitWhile` holds the read until the check moves on; the request's
+    // signal releases it when the browser stops listening.
     getSampleCheck: os.learn.getSampleCheck
       .use(access.studentAuthenticated)
-      .handler(({ context, input }) =>
-        deps.sampleCheckService.get(context.identity, input)
+      .handler(({ context, input, signal }) =>
+        deps.sampleCheckService.get(context.identity, input, signal)
       ),
     cancelSampleCheck: os.learn.cancelSampleCheck
       .use(access.studentAuthenticated)

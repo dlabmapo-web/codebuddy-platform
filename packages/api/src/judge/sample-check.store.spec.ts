@@ -147,6 +147,19 @@ describe.skipIf(!redisUrl)("SampleCheckStore", () => {
       expect(await store.get(over.checkId)).toBeNull();
     });
 
+    it("charges a waiting Run's next input lines to their own bucket, not the student's checks", async () => {
+      // Each input line of a C/C++ Run runs the program again. Charged to the
+      // student's checks, the seventh line of one Run was refused.
+      const continuing = { ...limits, perMinute: 60, bucket: "continue" as const };
+      for (let line = 0; line < limits.perMinute + 4; line += 1) {
+        const next = record({ kind: "run" });
+        expect(await store.admit(next, continuing)).toEqual({ kind: "accepted" });
+        await store.finish(next, ["QUEUED"], { status: "COMPLETED", finishedAt: Date.now() });
+      }
+      expect(await tokensLeft()).toBe(limits.perMinute);
+      expect(await store.admit(record(), limits)).toEqual({ kind: "accepted" });
+    });
+
     it("refuses a second outstanding check for the same student", async () => {
       const first = record();
       expect(await store.admit(first, limits)).toEqual({ kind: "accepted" });

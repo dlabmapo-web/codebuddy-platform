@@ -30,7 +30,9 @@ function fixture() {
     { requirePermission } as unknown as AcademyAccessService, new ConfigService(),
     {} as LearningClassContextService, { redis: vi.fn() } as unknown as JudgeQueue);
   const read = () => service.get({ authUserId: "auth-student" } as SupabaseIdentity, { academyId: "academy", checkId: "check" });
-  return { findFirst, requirePermission, read };
+  const hold = (waitWhile: SampleCheckRecord["status"], signal?: AbortSignal) =>
+    service.get({ authUserId: "auth-student" } as SupabaseIdentity, { academyId: "academy", checkId: "check", waitWhile }, signal);
+  return { findFirst, requirePermission, read, hold };
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -82,5 +84,50 @@ describe("sample-check status read", () => {
     expect(findFirst).not.toHaveBeenCalled();
     findFirst.mockResolvedValue(null);
     await expect(read()).rejects.toThrow();
+  });
+});
+
+describe("sample-check held read", () => {
+  const active = (status: SampleCheckRecord["status"]): SampleCheckRecord =>
+    ({ ...structuredClone(record), status, result: null, finishedAt: null, lostAfter: Date.now() + 60_000, acceptedAt: Date.now() });
+
+  it("answers the moment the check finishes, authorizing once and reading only Redis while it waits", async () => {
+    const { hold, findFirst, requirePermission } = fixture();
+    const get = vi.mocked(SampleCheckStore.prototype.get);
+    get.mockResolvedValueOnce(active("RUNNING")).mockResolvedValueOnce(active("RUNNING")).mockResolvedValue(structuredClone(record));
+    const started = Date.now();
+    const result = await hold("RUNNING");
+    expect(result.status).toBe("COMPLETED");
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(requirePermission).toHaveBeenCalledTimes(1);
+    expect(findFirst).toHaveBeenCalledTimes(1);
+    expect(get.mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("answers a finished check at once", async () => {
+    const { hold } = fixture();
+    const get = vi.mocked(SampleCheckStore.prototype.get);
+    const result = await hold("QUEUED");
+    expect(result.status).toBe("COMPLETED");
+    expect(get).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives a check that has just started running a moment to finish, then reports it running", async () => {
+    const { hold } = fixture();
+    vi.mocked(SampleCheckStore.prototype.get).mockResolvedValueOnce(active("QUEUED")).mockResolvedValue(active("RUNNING"));
+    const started = Date.now();
+    expect((await hold("QUEUED")).status).toBe("RUNNING");
+    expect(Date.now() - started).toBeGreaterThanOrEqual(350);
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+
+  it("stops waiting when the browser goes away", async () => {
+    const { hold } = fixture();
+    vi.mocked(SampleCheckStore.prototype.get).mockResolvedValue(active("RUNNING"));
+    const abort = new AbortController();
+    setTimeout(() => abort.abort(), 120);
+    const started = Date.now();
+    expect((await hold("RUNNING", abort.signal)).status).toBe("RUNNING");
+    expect(Date.now() - started).toBeLessThan(1_000);
   });
 });

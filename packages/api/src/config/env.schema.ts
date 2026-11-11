@@ -183,6 +183,13 @@ export const apiEnvironmentSchema = z.object({
    * checks an academy may have outstanding at once.
    */
   SAMPLE_CHECK_PER_MINUTE: z.coerce.number().int().min(1).max(60).default(6),
+  /**
+   * Input lines a student may send per minute to a C/C++ Run that is waiting
+   * for them. Each line runs the program again, but it is one Run to the
+   * student, so it is not charged to the limit above. A student still holds
+   * at most one check at a time, so this cannot occupy more of the judge.
+   */
+  SAMPLE_CHECK_CONTINUATIONS_PER_MINUTE: z.coerce.number().int().min(1).max(600).default(60),
   SAMPLE_CHECK_ACADEMY_OUTSTANDING: z.coerce.number().int().min(1).max(1_000).default(50),
   /**
    * Sample checks the judge runs at once. Background work — sample checks and

@@ -104,6 +104,12 @@ export const startRunCheckSchema = z
      * program waiting for more comes back `awaitingInput`.
      */
     endOfInput: z.boolean().optional(),
+    /**
+     * The Run whose program was waiting for this input. A continued Run is
+     * the same Run to the student, so it spends its own, larger budget
+     * rather than one of their checks; the server confirms the claim.
+     */
+    continues: z.uuid().optional(),
   })
   .strict();
 export type StartRunCheckInput = z.infer<typeof startRunCheckSchema>;
@@ -122,6 +128,20 @@ export type StartPracticeRunCheckInput = z.infer<typeof startPracticeRunCheckSch
 export const sampleCheckInputSchema = z
   .object({ academyId: z.uuid(), checkId: z.uuid() })
   .strict();
+
+/**
+ * Reading a check back. With `waitWhile`, the server holds the read until
+ * the check leaves that status (or a few seconds pass), so a result reaches
+ * the terminal the moment it exists instead of at the next poll.
+ */
+export const getSampleCheckInputSchema = z
+  .object({
+    academyId: z.uuid(),
+    checkId: z.uuid(),
+    waitWhile: sampleCheckStatusSchema.optional(),
+  })
+  .strict();
+export type GetSampleCheckInput = z.infer<typeof getSampleCheckInputSchema>;
 
 export const sampleCheckResultSchema = z.object({
   outcome: sampleCheckOutcomeSchema,

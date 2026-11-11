@@ -7,6 +7,8 @@ import { ConfigService } from "@nestjs/config";
 import {
   isCompiledLanguage,
   isSampleCheckActive,
+  type GetSampleCheckInput,
+  type SampleCheckStatus,
   type SampleCheckView,
   type StartPracticeRunCheckInput,
   type StartPracticeSampleCheckInput,
@@ -38,6 +40,17 @@ const STAFF_PRACTICE = "staff-practice";
 
 /** Beyond the run's own bounds, before an active check is presumed lost. */
 const LOST_SLACK_MS = 60_000;
+
+/** The longest one read is held open waiting for a check to move on. */
+export const SAMPLE_CHECK_WAIT_MS = 5_000;
+/** How often a held read looks at the check again: Redis only, no database. */
+const WAIT_STEP_MS = 50;
+/**
+ * A check that has just started running is usually finished a moment later.
+ * Waiting this long for its result saves the browser a second read and the
+ * terminal a "Running" line that would vanish at once.
+ */
+const RUNNING_GRACE_MS = 400;
 
 const exerciseInclude = {
   programmingExercise: {
@@ -204,9 +217,13 @@ export class SampleCheckService {
     const requestHash = sha256(
       JSON.stringify(["run", input.materialId, input.classId, input.workspaceRevision, codeHash, sha256(input.stdin), Boolean(input.endOfInput)]),
     );
+    const continued = await this.continues(store, {
+      checkId: input.continues, userId, materialId: material.id, codeHash, practice: false,
+      stdin: input.stdin, endOfInput: input.endOfInput,
+    });
     return this.admit(store, queue, {
       kind: "run", userId, input, materialId: material.id, position: 0,
-      exerciseRevision: exercise.gradingRevision, codeHash, requestHash, snapshot,
+      exerciseRevision: exercise.gradingRevision, codeHash, requestHash, snapshot, continued,
     });
   }
 
@@ -249,12 +266,40 @@ export class SampleCheckService {
     const requestHash = sha256(JSON.stringify(run
       ? ["practice-run", input.materialId, input.workspaceRevision, codeHash, sha256(input.stdin), Boolean(input.endOfInput)]
       : ["practice", input.materialId, testCase!.position, input.workspaceRevision, codeHash]));
+    const continued = run && await this.continues(store, {
+      checkId: input.continues, userId: actor.userId, materialId: material.id, codeHash, practice: true,
+      stdin: input.stdin, endOfInput: input.endOfInput,
+    });
     return this.admit(store, queue, {
       kind: run ? "run" : "sample", userId: actor.userId,
       input: { academyId: input.academyId, classId: STAFF_PRACTICE, clientRequestId: input.clientRequestId },
       materialId: material.id, position: run ? 0 : testCase!.position,
-      exerciseRevision: exercise.gradingRevision, codeHash, requestHash, snapshot, practice: true,
+      exerciseRevision: exercise.gradingRevision, codeHash, requestHash, snapshot, practice: true, continued,
     });
+  }
+
+  /**
+   * Whether a Run is the next step of one whose program was waiting for
+   * input: the same student, problem and code, a Run that ended waiting, and
+   * everything it was given before plus more. Anything else is a new Run and
+   * is charged as one. One Redis read, and only when the browser claims it.
+   */
+  private async continues(
+    store: SampleCheckStore,
+    claim: {
+      checkId: string | undefined; userId: string; materialId: string; codeHash: string;
+      practice: boolean; stdin: string; endOfInput: boolean | undefined;
+    },
+  ): Promise<boolean> {
+    if (!claim.checkId) return false;
+    const previous = await store.get(claim.checkId).catch(() => null);
+    if (!previous || previous.kind !== "run" || previous.status !== "COMPLETED" || !previous.result?.awaitingInput) {
+      return false;
+    }
+    const before = previous.snapshot.testCase.input;
+    return previous.userId === claim.userId && previous.materialId === claim.materialId &&
+      previous.codeHash === claim.codeHash && Boolean(previous.practice) === claim.practice &&
+      claim.stdin.startsWith(before) && (claim.stdin.length > before.length || Boolean(claim.endOfInput));
   }
 
   private async admit(
@@ -271,6 +316,8 @@ export class SampleCheckService {
       codeHash: string;
       requestHash: string;
       snapshot: SampleCheckRecord["snapshot"];
+      /** The next input line of a waiting Run: charged to its own budget. */
+      continued?: boolean;
     },
   ): Promise<SampleCheckView> {
     const { input, userId, snapshot, codeHash, requestHash } = check;
@@ -307,7 +354,12 @@ export class SampleCheckService {
         academyOutstanding: this.config.get("SAMPLE_CHECK_ACADEMY_OUTSTANDING", {
           infer: true,
         }),
-        perMinute: this.config.get("SAMPLE_CHECK_PER_MINUTE", { infer: true }),
+        ...(check.continued
+          ? {
+              perMinute: this.config.get("SAMPLE_CHECK_CONTINUATIONS_PER_MINUTE", { infer: true }),
+              bucket: "continue" as const,
+            }
+          : { perMinute: this.config.get("SAMPLE_CHECK_PER_MINUTE", { infer: true }) }),
       });
       if (admission.kind === "duplicate") {
         return this.replay(store, admission.checkId, requestHash);
@@ -343,11 +395,55 @@ export class SampleCheckService {
    */
   async get(
     identity: SupabaseIdentity,
-    input: { academyId: string; checkId: string },
+    input: GetSampleCheckInput,
+    signal?: AbortSignal,
   ): Promise<SampleCheckView> {
     const { store, record, visible } = await this.readOwned(identity, input);
     if (!record) return expiredView(input.checkId);
-    return toView((await this.endIfOverdue(store, record)) ?? record, visible);
+    const current = (await this.endIfOverdue(store, record)) ?? record;
+    if (!input.waitWhile || !isSampleCheckActive(input.waitWhile)) return toView(current, visible);
+    return toView(await this.waitWhile(store, current, input.waitWhile, signal), visible);
+  }
+
+  /**
+   * Holds a read until the check leaves the status the browser last saw.
+   *
+   * The browser used to ask once a second, so even a program that ran in ten
+   * milliseconds reached the terminal a second later, and every input line of
+   * a C/C++ Run paid that second again. Held here instead, the answer leaves
+   * as soon as the worker writes it. Access was checked once, above; the loop
+   * reads only Redis, so a held read costs the database what one poll did.
+   * Bounded by `SAMPLE_CHECK_WAIT_MS`, after which the browser simply asks
+   * again, and released at once when the browser goes away.
+   */
+  private async waitWhile(
+    store: SampleCheckStore,
+    record: SampleCheckRecord,
+    seen: SampleCheckStatus,
+    signal?: AbortSignal,
+  ): Promise<SampleCheckRecord> {
+    const deadline = Date.now() + SAMPLE_CHECK_WAIT_MS;
+    let current = record;
+    let movedAt: number | null = null;
+    while (isSampleCheckActive(current.status) && !signal?.aborted) {
+      const now = Date.now();
+      if (now >= deadline) break;
+      if (current.status !== seen) {
+        movedAt ??= now;
+        // Running now: give a short program the moment it needs to finish.
+        if (current.status !== "RUNNING" || now - movedAt >= RUNNING_GRACE_MS) break;
+      }
+      await pause(WAIT_STEP_MS, signal);
+      try {
+        const next = await store.get(current.checkId);
+        if (!next) break;
+        current = (await this.endIfOverdue(store, next)) ?? next;
+      } catch {
+        // Redis faltered mid-wait: answer with what is known; the browser asks again.
+        break;
+      }
+    }
+    return current;
   }
 
   /**
@@ -510,6 +606,20 @@ export class SampleCheckService {
     });
     return flag?.isEnabled ?? false;
   }
+}
+
+/** Resolves after `ms`, or at once when the request goes away. */
+function pause(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve();
+    const timer = setTimeout(done, ms);
+    signal?.addEventListener("abort", done, { once: true });
+    function done() {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", done);
+      resolve();
+    }
+  });
 }
 
 /** The public projection. The snapshot's code never leaves; its case only if still public. */

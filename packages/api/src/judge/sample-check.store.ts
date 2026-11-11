@@ -104,6 +104,11 @@ export type AdmissionLimits = {
   academyOutstanding: number;
   /** New checks a student may start per minute. A replay costs nothing. */
   perMinute: number;
+  /**
+   * The budget this check is charged to: a fresh check, or the next input
+   * line of a C/C++ Run that was waiting for it, which has its own bucket.
+   */
+  bucket?: "start" | "continue";
 };
 
 export type Admission =
@@ -120,6 +125,7 @@ const key = {
   user: (userId: string) => `cove:sample-check:outstanding:user:${userId}`,
   academy: (academyId: string) => `cove:sample-check:outstanding:academy:${academyId}`,
   rate: (userId: string) => `cove:sample-check:rate:${userId}`,
+  continueRate: (userId: string) => `cove:sample-check:rate:continue:${userId}`,
 };
 
 /**
@@ -260,7 +266,7 @@ export class SampleCheckStore {
       key.user(record.userId),
       key.academy(record.academyId),
       key.record(record.checkId),
-      key.rate(record.userId),
+      limits.bucket === "continue" ? key.continueRate(record.userId) : key.rate(record.userId),
       record.checkId,
       JSON.stringify(record),
       String(SAMPLE_ACTIVE_TTL_MS),

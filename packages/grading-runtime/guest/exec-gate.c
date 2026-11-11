@@ -23,8 +23,8 @@
  *
  * `hold` (run only) is an interactive Run: the program reads its input from a
  * pipe whose write end the gate keeps open, so a read past the input blocks
- * instead of meeting end of file. The launcher sees a live program that has
- * stopped using CPU, which is a program waiting for input, and ends the case.
+ * instead of meeting end of file. The launcher sees the program parked in a
+ * read of that pipe, which is a program waiting for input, and ends the case.
  */
 #define _GNU_SOURCE
 #include <errno.h>

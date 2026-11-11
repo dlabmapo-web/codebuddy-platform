@@ -142,13 +142,20 @@ const STANDBY_PER_SLOT = 4;
 /** Shortest wait between CPU-time samples once a case nears its limit. */
 const CPU_SAMPLE_MIN_MS = 5;
 /**
- * An interactive Run's program is waiting for input once it is alive and has
- * used no CPU for this long. Reading stdin is the only thing a jailed program
- * can wait on (no network, no other processes, files in tmpfs); a `sleep` reads
- * the same, and its student sends End input.
+ * An interactive Run's program is waiting for input once the kernel shows it
+ * parked in a read of its held stdin (`heldReadBlocked`) on two samples this
+ * far apart, with no CPU used between them. A program that is computing or
+ * sleeping runs on to its limits.
+ */
+const HOLD_SAMPLE_MS = 10;
+/**
+ * Where the kernel will not say (no SYS_PTRACE over the jail), a program alive
+ * with flat CPU for this long is taken as waiting instead, and a `sleep` is
+ * then mistaken for one. The GCC qualification fails on such a host.
  */
 const HOLD_IDLE_MS = 150;
-const HOLD_SAMPLE_MS = 30;
+/** read and readv, the calls a program parks in on an empty pipe, by architecture. */
+const READ_SYSCALLS: Partial<Record<string, readonly number[]>> = { x64: [0, 19], arm64: [63, 65] };
 const NAMESPACES = ["mnt", "pid", "ipc", "net", "uts", "user", "cgroup"] as const;
 export class NsJailBackend implements NativeBackend {
   private prepared = false;
@@ -1010,7 +1017,7 @@ export class NsJailBackend implements NativeBackend {
         wallLimitMs: request.timeLimitMs,
         outputLimitBytes: request.outputLimitBytes ?? gradingDataLimits.stdoutBytes,
         record: true,
-        ...(request.holdStdin ? { idleIsAwaitingInput: true } : {}),
+        ...(request.holdStdin ? { heldInput: true } : {}),
       },
       ({ exit, oom, timedOut, record, awaitingInput }) => {
         // Host decisions outrank the record: the whole cgroup was killed.
@@ -1187,8 +1194,8 @@ export class NsJailBackend implements NativeBackend {
       outputLimitBytes: number;
       /** Read the exec gate's status record from FD 3 after GO. */
       record?: boolean;
-      /** An interactive Run: a live program idle for HOLD_IDLE_MS is waiting for input. */
-      idleIsAwaitingInput?: boolean;
+      /** An interactive Run: a program parked reading its held input is waiting for input. */
+      heldInput?: boolean;
       /** Runs after the case is killed and before its cgroup is removed. */
       beforeDispose?: () => void;
     },
@@ -1280,25 +1287,30 @@ export class NsJailBackend implements NativeBackend {
       };
       watch(options.timeLimitMs);
       let idleSample: Promise<void> | undefined;
-      if (options.idleIsAwaitingInput) {
-        // Alive with flat CPU: blocked on the held input, so ended here.
-        let last = cpuStart, flatSince = performance.now();
+      if (options.heldInput) {
+        // Parked in a read of the held input on two samples, with no CPU
+        // between them: waiting for input, so ended here.
+        const held = jail;
+        let last = cpuStart, flatSince = performance.now(), parked = false;
         const idle = () => {
           if (!watching) return;
           idleWatch = setTimeout(() => {
-            idleSample = cpuUsec(cgroup).then(
-              (usage) => {
-                const now = performance.now();
-                if (usage !== last) { last = usage; flatSince = now; }
-                else if (now - flatSince >= HOLD_IDLE_MS && !timedOut) {
-                  awaitingInput = true;
-                  abort();
-                  return;
-                }
-                idle();
-              },
-              (error) => { fault = error; abort(); },
-            );
+            idleSample = (async () => {
+              const usage = await cpuUsec(cgroup);
+              const now = performance.now(), flat = usage === last;
+              if (!flat) { last = usage; flatSince = now; }
+              const blocked = heldReadBlocked(held);
+              const waiting = blocked === undefined
+                ? flat && now - flatSince >= HOLD_IDLE_MS
+                : blocked && parked && flat;
+              parked = blocked === true;
+              if (waiting && !timedOut) {
+                awaitingInput = true;
+                abort();
+                return;
+              }
+              idle();
+            })().catch((error) => { fault = error; abort(); });
           }, HOLD_SAMPLE_MS);
         };
         idle();
@@ -1389,6 +1401,44 @@ export function gateRequest(stdin: Buffer, timeLimitMs: number, hold = false): B
     Buffer.from(`cove-gate-1 ${stdin.length} ${timeLimitMs}${hold ? " hold" : ""}\n`),
     stdin,
   ]);
+}
+/**
+ * The file descriptor a `/proc/<pid>/syscall` line shows its task blocked
+ * reading, or null when the task is running or in any other call.
+ */
+export function blockedReadFd(line: string, architecture: string = arch()): number | null {
+  const [call, fd] = line.trim().split(" ");
+  const reads = READ_SYSCALLS[architecture];
+  if (!reads || !call || !fd || !/^\d+$/.test(call) || !/^0x[0-9a-f]+$/.test(fd)) return null;
+  return reads.includes(Number(call)) ? Number(fd) : null;
+}
+/**
+ * Whether an interactive Run's program is parked in a read of its held stdin.
+ * The program is the gate's one child (its filter refuses fork, clone and so
+ * threads), and every byte of its input is in the pipe before GO, so such a
+ * read cannot return: the program is waiting for input. Undefined when the
+ * kernel will not say (`/proc/<pid>/syscall` needs SYS_PTRACE over the jail),
+ * so the caller's CPU rule decides and a Run never fails over this check.
+ */
+function heldReadBlocked(jail: Jail): boolean | undefined {
+  if (!READ_SYSCALLS[arch()] || !jail.inner) return undefined;
+  try {
+    const pids = readFileSync(join(jail.inner, "cgroup.procs"), "utf8")
+      .split(/\s+/)
+      .filter((pid) => pid && pid !== jail.pid);
+    // Before the gate forks it, or once it has ended.
+    if (pids.length !== 1) return false;
+    const proc = `/proc/${pids[0]}`;
+    const fd = blockedReadFd(readFileSync(`${proc}/syscall`, "utf8"));
+    if (fd === null) return false;
+    return fd === 0 || readlinkSync(`${proc}/fd/${fd}`) === readlinkSync(`${proc}/fd/0`);
+  } catch (error) {
+    // Gone between the reads: NsJail removes its group as the jail ends, a
+    // moment before the launcher sees the exit; or the program closed stdin.
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ESRCH") return false;
+    return undefined;
+  }
 }
 /** GCC's messages within their byte bound, cut at a character boundary. */
 function boundedDiagnostics(text: string): string {

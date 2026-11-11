@@ -7,7 +7,7 @@ import {
   type NativeGccDescriptor,
 } from "@cove/shared";
 import { nativeRuntimeVersion, resultSchema, terminationSchema, wireRequestSchema } from "../src/contract.js";
-import { gateRequest } from "../src/launcher.js";
+import { blockedReadFd, gateRequest } from "../src/launcher.js";
 import { binaryJailConfig, compileJailConfig, GCC_COMPILE_ARGV, NSJAIL_REVISION } from "../src/policy.js";
 import { manifest, request } from "./fixtures.js";
 
@@ -85,6 +85,21 @@ test("an interactive Run holds its input open, and its result may say it was wai
   assert.equal(wire({ descriptor: gcc, operation: "run", binary: { ...binary, holdStdin: true } }), true);
   assert.equal(resultSchema.safeParse({ stdout: "Enter n: ", stderr: "", outcome: "PASSED", runtimeMs: 3, awaitingInput: true }).success, true);
   assert.equal(resultSchema.safeParse({ stdout: "", stderr: "", outcome: "PASSED", runtimeMs: 3, awaitingInput: false }).success, false);
+});
+
+test("a held Run's program is waiting only when the kernel shows it parked in a read", () => {
+  // read(0, …) on x86-64 and arm64, and readv on a copy of stdin.
+  assert.equal(blockedReadFd("0 0x0 0x55d1c0a2b2a0 0x1000 0x0 0x0 0x0 0x7ffd5e8 0x7f1a2\n", "x64"), 0);
+  assert.equal(blockedReadFd("63 0x0 0xaaaad5e0 0x1000 0x0 0x0 0x0 0xffffe2a0 0xffff9a10\n", "arm64"), 0);
+  assert.equal(blockedReadFd("19 0x3 0x7ffd5e8 0x1 0x0 0x0 0x0 0x7ffd5e8 0x7f1a2\n", "x64"), 3);
+  // Sleeping (clock_nanosleep), running, or outside any call is not waiting.
+  assert.equal(blockedReadFd("230 0x0 0x0 0x7ffd5e8 0x0 0x0 0x0 0x7ffd5e8 0x7f1a2\n", "x64"), null);
+  assert.equal(blockedReadFd("115 0x0 0x0 0xffffe2a0 0x0 0x0 0x0 0xffffe2a0 0xffff9a10\n", "arm64"), null);
+  assert.equal(blockedReadFd("running\n", "x64"), null);
+  assert.equal(blockedReadFd("-1 0x7ffd5e8 0x7f1a2\n", "x64"), null);
+  // Numbers are per architecture: x86-64's read is arm64's io_setup.
+  assert.equal(blockedReadFd("0 0x0 0x1 0x2 0x0 0x0 0x0 0xffffe2a0 0xffff9a10\n", "arm64"), null);
+  assert.equal(blockedReadFd("0 0x0 0x1 0x2 0x0 0x0 0x0 0x1 0x1\n", "ia32"), null);
 });
 
 test("compile and run jails expose only what each stage needs", () => {

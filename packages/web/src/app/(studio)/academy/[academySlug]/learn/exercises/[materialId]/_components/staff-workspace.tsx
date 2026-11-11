@@ -15,7 +15,7 @@ import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-
 import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
 import { ProblemStatement } from '@/components/workspace/problem-statement';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
-import { sourceFileName } from '@/lib/workspace/exercise-language';
+import { runCommandFor, sourceFileName } from '@/lib/workspace/exercise-language';
 import { useSampleRunner, type SampleRun } from '@/lib/workspace/use-sample-runner';
 import { useSplitPane } from '@/lib/workspace/use-split-pane';
 import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
@@ -35,7 +35,6 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   academyId: string; bootstrap: LearnExerciseBootstrap; userId: string;
 }) {
   const { t } = useTranslation('practice');
-  const { t: tc } = useTranslation('sample-check');
   const slug = useAcademySlug();
   const router = useRouter();
   const { workspace, access } = bootstrap;
@@ -57,6 +56,13 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   const formatError = usePythonErrorLines();
   const runner = usePythonRunner({ browserRuntime: !compiled, formatError });
   const sampleRunner = useSampleRunner(runner);
+  // C/C++ practice compiles on the server, as the student's does: the same
+  // checks, as the staff member's own, with no class.
+  const serverTarget = compiled ? {
+    academyId, classId: 'staff-practice', materialId: exercise.materialId,
+    workspaceRevision: exercise.gradingRevision, currentCode: () => latestCode.current,
+    practice: { preview },
+  } : undefined;
   const { open: panelOpen, toggle: togglePanel, close: closePanel, panelId, triggerRef } = useNavigatorPanel('staff-practice-curriculum');
   const { size, containerRef, dividerProps } = useSplitPane({
     axis: 'horizontal', initial: exercise.hasReferencePdf ? 45 : 40, min: 25, max: 65,
@@ -68,7 +74,10 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
     starterCode: exercise.quiz ? '' : exercise.starterCode, practice: true, preview, gradingRevision: exercise.gradingRevision,
   });
   const submission = usePracticeSubmission(academyId, exercise.materialId, preview, exercise.gradingRevision, access?.canSubmit, userId);
-  const busy = runner.running || submission.submitting || testing || navigating;
+  // The editor's code now, to label a server result that belongs to earlier code.
+  const latestCode = React.useRef(draft.code);
+  React.useEffect(() => { latestCode.current = draft.code; }, [draft.code]);
+  const busy = runner.running || submission.submitting || testing || navigating || sampleRunner.serverCheck.active || runner.serverInputWaiting;
   const coursePath = `${routes.academy(slug)}/learn/courses/${breadcrumb.course.id}`;
   const editPath = `${routes.academy(slug)}/content/courses/${breadcrumb.course.id}/lectures/${breadcrumb.lecture.id}/exercises/${exercise.materialId}${preview ? "?practicePreview=true" : "?practice=true"}`;
   const ordered = workspaceMaterialSequence(bootstrap.navigator);
@@ -97,7 +106,6 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
     router.push(routes.academyLearnMaterial(slug, id, destination?.type ?? 'PROGRAMMING_EXERCISE', preview ? { preview: true } : undefined));
   }
   async function runSample(index: number) {
-    if (compiled) return;
     const sample = exercise.sampleTestCases[index];
     if (!sample) return;
     setTab('terminal'); setSample(index);
@@ -105,11 +113,12 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
       return await sampleRunner.runSample(draft.code, sample, index, {
         sampleCount: exercise.sampleTestCases.length,
         gradingMode: exercise.gradingMode, inputPromptPolicy: exercise.inputPromptPolicy,
+        server: serverTarget,
       });
     } finally { setSample(null); }
   }
   async function runAll() {
-    if (busy || compiled) return;
+    if (busy) return;
     setTesting(true); setSamples([]); runningBatch.current = true;
     try {
       for (let i = 0; i < exercise.sampleTestCases.length && runningBatch.current; i++) {
@@ -117,6 +126,10 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
         if (result) setSamples((current) => [...current, result]);
       }
     } finally { setTesting(false); runningBatch.current = false; }
+  }
+  /** C/C++ Run on the server, as Python's behaves: input is typed when the program waits. */
+  async function runCompiled(target: NonNullable<typeof serverTarget>) {
+    await sampleRunner.runInteractive(draft.code, runCommandFor(exercise.language), target);
   }
   function submit() { draft.flushNow(); setTab('result'); void submission.submit(draft.code); }
   React.useEffect(() => () => { runningBatch.current = false; }, []);
@@ -140,7 +153,6 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
         const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([draft.code], { type: 'text/plain' })); link.download = sourceFileName(exercise.language); link.click(); URL.revokeObjectURL(link.href);
       }}>{t('download')}</button> : null}
     </div>
-    {compiled ? <p role="note" className="border-b border-border bg-card px-4 py-2 text-xs text-sub">{tc('workspace.staff_run_notice')}</p> : null}
     {workspace.draft?.gradingRevision !== undefined && workspace.draft.gradingRevision !== exercise.gradingRevision ? <p role="status" className="border-b border-warning/25 bg-warning/5 px-4 py-2 text-xs text-warning">{t('revision_changed')}</p> : null}
     {preview ? <p role="status" className="border-b border-warning/25 bg-warning/5 px-4 py-2 text-xs font-semibold text-warning">{t('preview')}</p> : null}
     {historyOpen ? <section className="max-h-44 shrink-0 overflow-auto border-b border-border bg-card px-4 py-3" aria-label={t('history')}>
@@ -171,12 +183,19 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
         </section>
         <div aria-hidden className="hidden w-1 shrink-0 cursor-col-resize bg-border hover:bg-brand/40 md:block" {...dividerProps} />
         <section className={`min-w-0 flex-1 flex-col ${mobile === 'code' ? 'flex' : 'hidden'} md:flex`}>
-          <div className={selectedStudent ? "hidden" : "flex min-h-0 flex-1 flex-col"}><EditorPane code={draft.code} onCodeChange={draft.setCode} runner={runner} submission={submission} language={exercise.language} canRun={!compiled}
+          <div className={selectedStudent ? "hidden" : "flex min-h-0 flex-1 flex-col"}><EditorPane code={draft.code} onCodeChange={draft.setCode} runner={runner} submission={submission} language={exercise.language}
             sampleTestCases={exercise.sampleTestCases} activeSample={activeSample} testingSamples={testing} sampleResults={samples} sampleRunFailed={false}
-            onReset={() => { if (draft.code !== exercise.starterCode && window.confirm(t('reset_confirm'))) { draft.resetTo(exercise.starterCode); runner.clear(); submission.reset(); } }}
-            onSubmit={submit} practiceOnly={isPdfRunOnly(exercise)} canSubmit={Boolean(access?.canSubmit) && !isPdfRunOnly(exercise) && exercise.submissionAvailability !== "INVALID_GRADING"} onRun={() => { if (compiled) return; setTab('terminal'); setSamples([]); void runner.run(draft.code); }}
+            onReset={() => {
+              // Confirmed in the editor pane's dialog. The output always clears;
+              // the code goes back to the starter when it changed.
+              runningBatch.current = false;
+              runner.clear(); submission.reset(); setSamples([]); setTab('terminal');
+              if (draft.code !== exercise.starterCode) draft.resetTo(exercise.starterCode);
+            }}
+            onSubmit={submit} practiceOnly={isPdfRunOnly(exercise)} canSubmit={Boolean(access?.canSubmit) && !isPdfRunOnly(exercise) && exercise.submissionAvailability !== "INVALID_GRADING"} onRun={() => { setTab('terminal'); setSamples([]); if (serverTarget) void runCompiled(serverTarget); else void runner.run(draft.code); }}
             onRunSample={(index) => { void runSample(index); }} onRunAll={() => { void runAll(); }}
-            onStop={() => { runningBatch.current = false; runner.stop(); }} tab={tab} /></div>
+            onStop={() => { runningBatch.current = false; if (sampleRunner.serverCheck.active) sampleRunner.serverCheck.stop(); else runner.stop(); }} tab={tab}
+            serverCheck={{ ...sampleRunner.serverCheck, active: sampleRunner.serverCheck.active || runner.serverInputWaiting }} /></div>
           {selectedStudent ? <StaffStudentPane key={`${selectedStudent.classId}:${selectedStudent.membershipId}`} academyId={academyId} materialId={exercise.materialId} userId={userId} starterCode={exercise.starterCode} student={selectedStudent} beforeChangeRef={beforeStudentChange} close={() => selectStudent(null)} /> : null}
         </section>
       </div>}

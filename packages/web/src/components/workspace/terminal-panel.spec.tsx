@@ -79,3 +79,13 @@ it('waits for Enter after pasting an example copied with its final line break', 
   expect(onSubmitInput).toHaveBeenLastCalledWith('1 1 0 1 1 1');
   expect(field()!.value).toBe('');
 });
+
+it('has no End input button: Ctrl+D ends the input', async () => {
+  const onEndInput = vi.fn();
+  const { host, field } = await render({ onEndInput });
+  expect(host.querySelector('button')).toBeNull();
+  await act(async () => {
+    field()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', ctrlKey: true, bubbles: true, cancelable: true }));
+  });
+  expect(onEndInput).toHaveBeenCalledTimes(1);
+});

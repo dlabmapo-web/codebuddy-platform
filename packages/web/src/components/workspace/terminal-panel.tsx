@@ -189,16 +189,6 @@ export function TerminalPanel({
               ref={inputRef}
               value={value}
             />
-            {onEndInput ? (
-              <button
-                className="shrink-0 rounded border border-white/15 px-1.5 py-0.5 font-sans text-[11px] font-semibold text-[#a5a5a5] transition-colors hover:bg-white/10 hover:text-white"
-                onClick={endInput}
-                title={t('workspace.end_input_hint')}
-                type="button"
-              >
-                {t('workspace.end_input')}
-              </button>
-            ) : null}
           </div>
         ) : null}
 

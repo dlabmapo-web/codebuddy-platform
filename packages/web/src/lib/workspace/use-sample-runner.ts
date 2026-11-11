@@ -38,6 +38,8 @@ type ServerCheckHandle = {
 };
 
 export type SampleRun = {
+  /** A C/C++ Run whose program waits for more input; its transcript stays open. */
+  awaitingInput?: boolean;
   /** Null when the runner was already busy and the request was dropped. */
   outcome: RunOutcome | null;
   verdict: SampleVerdict | null;
@@ -63,6 +65,11 @@ export type ServerSampleTarget = {
   workspaceRevision: number;
   /** The editor's code now, to label a result that belongs to earlier code. */
   currentCode: () => string;
+  /**
+   * A staff member's own C/C++ practice: the same checks, with no class. A
+   * preview runs the unpublished revision being edited.
+   */
+  practice?: { preview: boolean };
 };
 
 /**
@@ -132,7 +139,13 @@ export function useSampleRunner(runner: PythonRunnerState) {
       /** A public sample's check, or a C/C++ Run on the student's own input. */
       check:
         | { kind: 'sample'; sample: LearnSampleTestCase; index: number }
-        | { kind: 'run'; stdin: string; command: string },
+        | {
+            kind: 'run'; stdin: string; command: string;
+            /** Ctrl+D was pressed: `stdin` is all of it. */
+            endOfInput?: boolean;
+            /** A later step of one interactive Run: no queue narration. */
+            continued?: boolean;
+          },
       target: ServerSampleTarget,
       options: { clientRunId?: string; sampleCount?: number },
     ): Promise<SampleRun> => {
@@ -164,7 +177,8 @@ export function useSampleRunner(runner: PythonRunnerState) {
             : []),
         ],
       });
-      runner.appendLine(`${tc('workspace.sample_check_queued')}\n`, 'info');
+      const quiet = check.kind === 'run' && check.continued;
+      if (!quiet) runner.appendLine(`${tc('workspace.sample_check_queued')}\n`, 'info');
 
       const finish = (
         run: SampleRun,
@@ -192,9 +206,23 @@ export function useSampleRunner(runner: PythonRunnerState) {
           // One per click: a retried or doubled request starts one check.
           clientRequestId: clientRunId,
         };
-        view = check.kind === 'sample'
-          ? await orpc.learn.startSampleCheck({ ...address, position: check.sample.position })
-          : await orpc.learn.startRunCheck({ ...address, stdin: check.stdin });
+        if (target.practice) {
+          const practice = {
+            academyId: address.academyId,
+            materialId: address.materialId,
+            code: address.code,
+            workspaceRevision: address.workspaceRevision,
+            clientRequestId: address.clientRequestId,
+            preview: target.practice.preview,
+          };
+          view = check.kind === 'sample'
+            ? await orpc.learn.startPracticeSampleCheck({ ...practice, position: check.sample.position })
+            : await orpc.learn.startPracticeRunCheck({ ...practice, stdin: check.stdin, ...(check.endOfInput ? { endOfInput: true } : {}) });
+        } else {
+          view = check.kind === 'sample'
+            ? await orpc.learn.startSampleCheck({ ...address, position: check.sample.position })
+            : await orpc.learn.startRunCheck({ ...address, stdin: check.stdin, ...(check.endOfInput ? { endOfInput: true } : {}) });
+        }
       } catch (error) {
         if (abort.signal.aborted) return abandoned();
         runner.appendLine(`${errorText(error)}\n`, 'err');
@@ -211,7 +239,7 @@ export function useSampleRunner(runner: PythonRunnerState) {
 
       let announcedRunning = false;
       while (isSampleCheckActive(view.status)) {
-        if (view.status === 'RUNNING' && !announcedRunning) {
+        if (view.status === 'RUNNING' && !announcedRunning && !quiet) {
           announcedRunning = true;
           runner.appendLine(`${tc('workspace.sample_check_running')}\n`, 'info');
         }
@@ -232,6 +260,22 @@ export function useSampleRunner(runner: PythonRunnerState) {
       const narration = narrateSampleCheck(view, {
         codeChanged: target.currentCode() !== code,
       });
+      if (narration.awaitingInput) {
+        // The program waits for input: its output so far, and the transcript
+        // stays open for the next line.
+        if (narration.stdout) runner.appendLine(narration.stdout, 'out');
+        if (currentRef.current === current) {
+          currentRef.current = null;
+          setActive(false);
+          setStopping(false);
+        }
+        return {
+          outcome: { stdout: narration.stdout ?? '', stopped: false, failed: false, error: null },
+          verdict: null,
+          compileDiagnostics: narration.compileDiagnostics,
+          awaitingInput: true,
+        };
+      }
       for (const line of narration.lines) {
         if ('text' in line) {
           runner.appendLine(line.text, line.kind);
@@ -430,9 +474,51 @@ export function useSampleRunner(runner: PythonRunnerState) {
     [runServer],
   );
 
+  /**
+   * A C/C++ Run that behaves like Python's: it starts at once, and whenever
+   * the program waits for input the terminal takes the next line. Each Enter
+   * (or a pasted block) runs the compiled program again with every line so
+   * far; Ctrl+D runs it once more with its input closed. Resolves
+   * with the final run, or a cancelled one when stopped.
+   */
+  const runInteractive = React.useCallback(
+    async (
+      code: string,
+      command: string,
+      target: ServerSampleTarget,
+      options: { clientRunId?: string } = {},
+    ): Promise<SampleRun> => {
+      const lines: string[] = [];
+      let endOfInput = false;
+      try {
+        for (;;) {
+          const stdin = lines.length ? `${lines.join('\n')}\n` : '';
+          const result = await runServer(
+            code,
+            { kind: 'run', stdin, command, endOfInput, continued: lines.length > 0 || endOfInput },
+            target,
+            { ...options, sampleCount: 0 },
+          );
+          if (!result.awaitingInput) return result;
+          const next = await runner.awaitInput();
+          if (next === null) {
+            runner.finishExternalRun('CANCELLED', 0);
+            return { outcome: null, verdict: null, report: { lifecycle: 'CANCELLED', passedCount: 0 } };
+          }
+          if ('end' in next) endOfInput = true;
+          else lines.push(...next.lines);
+        }
+      } finally {
+        runner.releaseInput();
+      }
+    },
+    [runServer, runner],
+  );
+
   return {
     runSample,
     runOnServer,
+    runInteractive,
     serverCheck: { active, stopping, stop: stopServerCheck, abandon: abandonServerCheck },
   };
 }

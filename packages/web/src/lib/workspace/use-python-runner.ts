@@ -25,6 +25,8 @@ import {
 } from './terminal-transcript';
 
 export type { TerminalKind, TerminalLine };
+/** What a C/C++ program waiting on the server receives next. */
+export type AwaitedInput = { lines: string[] } | { end: true } | null;
 
 export type RunOutcome = {
   stdout: string;
@@ -125,6 +127,12 @@ export function usePythonRunner(options?: {
    * next one without prompting, as a terminal's type-ahead does.
    */
   const typeAheadRef = React.useRef<string[]>([]);
+  /**
+   * A C/C++ Run on the server, between its steps: lines typed while its
+   * program waits, Ctrl+D once pressed, and the step waiting for either.
+   */
+  const serverInputRef = React.useRef<{ queue: string[]; end: boolean; waiter: ((input: AwaitedInput) => void) | null } | null>(null);
+  const [serverInputWaiting, setServerInputWaiting] = React.useState(false);
   const bufferRef = React.useRef<TerminalLine[]>([]);
   const flushTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   // The transcript as the last commit left it. Socket handlers and worker
@@ -386,6 +394,14 @@ export function usePythonRunner(options?: {
   );
 
   const stop = React.useCallback(() => {
+    const waiter = serverInputRef.current?.waiter;
+    if (waiter) {
+      serverInputRef.current!.waiter = null;
+      setAwaitingInput(false);
+      setServerInputWaiting(false);
+      waiter(null);
+      return;
+    }
     const runner = runnerRef.current;
     if (!runner) return;
     runner.stop();
@@ -418,6 +434,21 @@ export function usePythonRunner(options?: {
       // Only after the student presses Enter. A draft in the field is theirs
       // alone, and there is no event that could carry one.
       append(`${value}\n`, 'in');
+      // A C/C++ Run on the server: the line goes to its next step. A pasted
+      // block's lines arrive in one go, so they travel together.
+      const session = serverInputRef.current;
+      if (session) {
+        flush();
+        session.queue.push(value);
+        const waiter = session.waiter;
+        if (waiter) {
+          session.waiter = null;
+          setWaiting(false);
+          setServerInputWaiting(false);
+          queueMicrotask(() => waiter({ lines: session.queue.splice(0) }));
+        }
+        return;
+      }
       // A line sent while the program is busy — a paste's second line onward —
       // waits for its next read.
       if (!transcriptRef.current.awaitingInput) {
@@ -429,7 +460,7 @@ export function usePythonRunner(options?: {
       publish({ type: 'waiting', awaitingInput: false });
       runnerRef.current?.provideInput(value);
     },
-    [append, commit, publish],
+    [append, commit, flush, publish, setWaiting],
   );
 
   /**
@@ -439,6 +470,21 @@ export function usePythonRunner(options?: {
    * `for line in sys.stdin` — could never finish a plain run.
    */
   const endInput = React.useCallback(() => {
+    const session = serverInputRef.current;
+    if (session) {
+      append('^D\n', 'in');
+      flush();
+      const waiter = session.waiter;
+      if (!waiter) {
+        session.end = true;
+        return;
+      }
+      session.waiter = null;
+      setWaiting(false);
+      setServerInputWaiting(false);
+      waiter(session.queue.length ? { lines: session.queue.splice(0) } : { end: true });
+      return;
+    }
     const waiting = transcriptRef.current.awaitingInput;
     append('^D\n', 'in');
     if (!waiting) {
@@ -449,7 +495,7 @@ export function usePythonRunner(options?: {
     commit({ ...transcriptRef.current, awaitingInput: false });
     publish({ type: 'waiting', awaitingInput: false });
     runnerRef.current?.sendEOF();
-  }, [append, commit, publish]);
+  }, [append, commit, flush, publish, setWaiting]);
 
   const appendLine = React.useCallback(
     (text: string, kind: TerminalKind) => {
@@ -533,6 +579,36 @@ export function usePythonRunner(options?: {
     [commit, publish],
   );
 
+  /**
+   * The next input for a C/C++ program waiting on the server, typed into this
+   * terminal as Python's would be: the terminal shows its prompt, and the
+   * promise settles with the line(s) entered, with Ctrl+D, or with `null`
+   * when stopped. `releaseInput` ends the session when the Run is over.
+   */
+  const awaitInput = React.useCallback((): Promise<AwaitedInput> => {
+    const session = (serverInputRef.current ??= { queue: [], end: false, waiter: null });
+    if (session.queue.length) return Promise.resolve({ lines: session.queue.splice(0) });
+    if (session.end) {
+      session.end = false;
+      return Promise.resolve({ end: true });
+    }
+    return new Promise((resolve) => {
+      session.waiter = resolve;
+      setServerInputWaiting(true);
+      setWaiting(true);
+    });
+  }, [setWaiting]);
+
+  const releaseInput = React.useCallback(() => {
+    const session = serverInputRef.current;
+    serverInputRef.current = null;
+    setServerInputWaiting(false);
+    if (session?.waiter) {
+      setAwaitingInput(false);
+      session.waiter(null);
+    }
+  }, []);
+
   const finishExternalRun = React.useCallback(
     (lifecycle: Exclude<TerminalLifecycle, 'STARTED'>, passedCount: number) => {
       const run = runRef.current;
@@ -552,6 +628,14 @@ export function usePythonRunner(options?: {
   );
 
   const clear = React.useCallback(() => {
+    // A C/C++ Run waiting for input goes with the transcript.
+    const waiter = serverInputRef.current?.waiter;
+    serverInputRef.current = null;
+    setServerInputWaiting(false);
+    if (waiter) {
+      setAwaitingInput(false);
+      waiter(null);
+    }
     bufferRef.current = [];
     runRef.current = null;
     // The error goes with the transcript it belongs to. Navigating to another
@@ -598,6 +682,10 @@ export function usePythonRunner(options?: {
     appendLine,
     settleRun,
     beginExternalRun,
+    awaitInput,
+    releaseInput,
+    /** A C/C++ Run on the server is waiting for the next input line. */
+    serverInputWaiting,
     finishExternalRun,
     subscribeTerminal,
     readTranscript,

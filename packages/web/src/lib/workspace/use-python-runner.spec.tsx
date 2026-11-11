@@ -76,7 +76,7 @@ it('feeds a pasted example to successive input() calls without asking again', as
   expect(echoed()).toBe('4 6\n101111\n101010\n');
 });
 
-it('ends input after the pasted lines when the person presses End input', async () => {
+it('ends input after the pasted lines when the person presses Ctrl+D', async () => {
   await start();
   act(() => { runner.submitInput('1'); runner.submitInput('2'); runner.endInput(); });
   await read();
@@ -98,4 +98,43 @@ it('still answers a test run from its sample alone', async () => {
   await read();
   expect(program().stdin).toEqual(['5', '<EOF>']);
   expect(runner.awaitingInput).toBe(false);
+});
+
+/** A C/C++ program on the server, waiting for its next input. */
+async function awaitServerInput() {
+  let settled: unknown = 'pending';
+  await act(async () => {
+    runner.beginExternalRun({ clientRunId: 'cpp-run', banner: [{ text: '$ g++ main.cpp -o main && ./main\n', kind: 'meta' }], sampleCount: 0 });
+    void runner.awaitInput().then((input) => { settled = input; });
+  });
+  return () => settled;
+}
+
+it('takes a C/C++ program\'s next line on Enter, as Python\'s input() does', async () => {
+  const settled = await awaitServerInput();
+  expect(runner.awaitingInput).toBe(true);
+  expect(runner.serverInputWaiting).toBe(true);
+  await act(async () => { runner.submitInput('40 2'); });
+  expect(settled()).toEqual({ lines: ['40 2'] });
+  expect(echoed()).toBe('40 2\n');
+  expect(runner.awaitingInput).toBe(false);
+  await act(async () => { runner.releaseInput(); });
+});
+
+it('sends a pasted block of lines to the program together', async () => {
+  const settled = await awaitServerInput();
+  await act(async () => { runner.submitInput('3'); runner.submitInput('1 2 3'); });
+  expect(settled()).toEqual({ lines: ['3', '1 2 3'] });
+  await act(async () => { runner.releaseInput(); });
+});
+
+it('ends a C/C++ program\'s input with Ctrl+D, and Stop ends the wait', async () => {
+  const ended = await awaitServerInput();
+  await act(async () => { runner.endInput(); });
+  expect(ended()).toEqual({ end: true });
+  const stopped = await awaitServerInput();
+  await act(async () => { runner.stop(); });
+  expect(stopped()).toBeNull();
+  expect(runner.awaitingInput).toBe(false);
+  await act(async () => { runner.releaseInput(); });
 });

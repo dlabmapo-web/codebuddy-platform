@@ -48,6 +48,8 @@ export type SampleCheckNarration = {
   /** The program's own stdout, when it ran. */
   stdout: string | null;
   failed: boolean;
+  /** A C/C++ Run whose program is waiting for more input: nothing ended. */
+  awaitingInput?: boolean;
   /** C/C++: GCC's messages, for marking the editor, or null. */
   compileDiagnostics: string | null;
 };
@@ -128,6 +130,14 @@ export function narrateSampleCheck(
   let lifecycle: Exclude<TerminalLifecycle, 'STARTED'> = 'FAILED';
   let passedCount = 0;
   const ending = result.outcome === 'RUNTIME_ERROR' ? exitExplanation(result) : null;
+  if (run && result.awaitingInput) {
+    // Still reading: what it printed so far, and the terminal asks for more.
+    return {
+      lines, verdict: { kind: 'unchecked' }, lifecycle: 'COMPLETED', passedCount: 0,
+      stdout: result.stdout, failed: false, compileDiagnostics: result.compileDiagnostics ?? null,
+      awaitingInput: true,
+    };
+  }
   if (run) {
     // A Run judges nothing: it says how the program ended and stops there.
     if (result.outcome === 'PASSED' || result.outcome === 'PASSED_WITH_WARNING') {

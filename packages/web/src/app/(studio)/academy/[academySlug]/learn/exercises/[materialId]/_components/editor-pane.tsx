@@ -9,9 +9,10 @@ import { useLayoutTranslation } from '@/i18n';
 import { SubmissionSummary } from '@/components/workspace/submission-summary';
 import { FontSizeControls } from '@/components/workspace/font-size-controls';
 import { RunControls } from '@/components/workspace/run-controls';
-import { StdinPanel } from '@/components/workspace/stdin-panel';
 import { TerminalPanel } from '@/components/workspace/terminal-panel';
+import { ResetConfirmDialog } from '@/components/workspace/reset-confirm-dialog';
 import { languageLabelKey, monacoLanguageFor } from '@/lib/workspace/exercise-language';
+import { LanguageTag } from '@/components/workspace/language-tag';
 import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import { useEditorPreferences } from '@/lib/workspace/use-editor-preferences';
 import type { SampleRun } from '@/lib/workspace/use-sample-runner';
@@ -52,7 +53,6 @@ export function EditorPane({
   onFocusLine,
   serverCheck,
   language = 'PYTHON',
-  runInput,
 }: {
   onRunAll: () => void;
   onStop: () => void;
@@ -83,10 +83,9 @@ export function EditorPane({
   serverCheck?: { active: boolean; stopping: boolean; stop: () => void };
   language?: ExerciseLanguage;
   /** C/C++ only: the input a server Run sends, owned by the workspace. */
-  runInput?: { value: string; onChange: (value: string) => void; onReset?: () => void };
 }) {
   const compiled = isCompiledLanguage(language);
-  const { t } = useLayoutTranslation('learn');
+  const { t } = useLayoutTranslation(['learn', 'common']);
   const { t: tc } = useTranslation('sample-check');
   const preferences = useEditorPreferences();
   const {
@@ -102,15 +101,18 @@ export function EditorPane({
    * the wrong program, so a run takes it away again.
    */
   const coached = runner.running ? null : runner.lastError;
+  // Reset asks in Cove's dialog, not the browser's; in a fullscreen workspace
+  // the dialog has to render inside it to be seen.
+  const [resetDialog, setResetDialog] = React.useState<{ container: HTMLElement | null } | null>(null);
+  // A C/C++ program waiting for input does no work: Reset may end it.
+  const serverBusy = Boolean(serverCheck?.active) && !runner.serverInputWaiting;
   return (
     <section
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
       ref={containerRef}
     >
       <header className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#2d2d2d] px-3 py-1.5">
-        <span className="font-mono text-[11.5px] text-[#a5a5a5]">
-          {t(`workspace.${languageLabelKey(language)}`)}
-        </span>
+        <LanguageTag language={language} label={t(`workspace.${languageLabelKey(language)}`)} />
         <div className="ml-auto">
           <FontSizeControls {...preferences} />
         </div>
@@ -144,7 +146,7 @@ export function EditorPane({
         {...surfaceProps('terminal')}
       >
         <div className="@container flex shrink-0 flex-wrap items-center gap-2 py-1 border-b border-white/10 bg-[#2d2d2d] px-2">
-          <button type="button" disabled={testingSamples || runner.running || submission.submitting} onClick={onReset} className="inline-flex shrink-0 items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[12px] text-white disabled:opacity-50"><RotateCcw className="size-3" />{t('workspace.reset')}</button>
+          <button type="button" disabled={testingSamples || runner.running || serverBusy || submission.submitting} onClick={() => setResetDialog({ container: document.fullscreenElement as HTMLElement | null })} className="inline-flex shrink-0 items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[12px] text-white disabled:opacity-50"><RotateCcw className="size-3" />{t('workspace.reset')}</button>
           {canRun ? <RunControls
             activeSample={activeSample}
             onRun={onRun}
@@ -159,15 +161,6 @@ export function EditorPane({
           {!practiceOnly ? <button type="button" disabled={!canSubmit || testingSamples || runner.running || submission.submitting} onClick={onSubmit} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/20 px-2 py-1 text-[12px] text-white disabled:opacity-50"><Send className="size-3" />{t('workspace.submit')}</button> : null}
           {!practiceOnly ? <SubmissionSummary latest={submission.latestSubmission} loading={submission.summaryLoading} failed={submission.summaryError} onRefresh={submission.refreshSummary} refreshing={submission.summaryRefreshing} dark /> : null}
         </div>
-        {compiled && runInput && tab !== 'result' ? (
-          <StdinPanel
-            disabled={runner.running || testingSamples || Boolean(serverCheck?.active)}
-            onChange={runInput.onChange}
-            onReset={runInput.onReset}
-            value={runInput.value}
-          />
-        ) : null}
-
         <div
           aria-label={t('workspace.tab_result')}
           className="min-h-0 flex-1 overflow-y-auto"
@@ -227,6 +220,18 @@ export function EditorPane({
           )}
         </div>
       </div>
+      <ResetConfirmDialog
+        copy={{
+          title: t('workspace.reset'),
+          body: t('workspace.reset_confirm'),
+          cancel: t('common:action.cancel'),
+          confirm: t('workspace.reset'),
+        }}
+        onCancel={() => setResetDialog(null)}
+        onConfirm={() => { setResetDialog(null); onReset(); }}
+        open={resetDialog !== null}
+        portalContainer={resetDialog?.container}
+      />
     </section>
   );
 }

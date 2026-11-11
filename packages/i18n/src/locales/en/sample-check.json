@@ -38,10 +38,6 @@
       "code": "The program ended with exit code {{code}}. main should return 0.",
       "hidden": "The program crashed or ended with a nonzero exit code on a hidden test. Check array bounds, division by zero, and that main returns 0."
     },
-    "staff_run_notice": "C/C++ Run and Test are available in the student workspace. Submit here to grade your own staff practice.",
-    "stdin_label": "Program input",
-    "stdin_hint": "What the program reads when you press Run. Typing into a running program is coming later.",
-    "stdin_reset": "Use example 1",
     "compile_error_title": "Compile error",
     "compile_error_result": "This submission did not compile, so no test ran. It counts as an attempt with 0 points."
   }

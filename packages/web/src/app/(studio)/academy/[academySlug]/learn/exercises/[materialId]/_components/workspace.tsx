@@ -134,7 +134,7 @@ function ProgrammingWorkspace({
     formatError,
     browserRuntime: !isCompiledLanguage(bootstrap.workspace.exercise.language),
   });
-  const { runSample, runOnServer, serverCheck } = useSampleRunner(runner);
+  const { runSample, runInteractive, serverCheck } = useSampleRunner(runner);
   const navigation = useExerciseNavigation({
     academyId,
     bootstrap,
@@ -155,13 +155,6 @@ function ProgrammingWorkspace({
 
   const { exercise } = workspace;
   const compiled = isCompiledLanguage(exercise.language);
-  /**
-   * What a C/C++ Run sends as stdin. Starts as the first example's input and
-   * belongs to the problem on screen: moving to another problem starts over.
-   */
-  const firstInput = exercise.sampleTestCases[0]?.input ?? '';
-  const [runInputState, setRunInputState] = React.useState<{ materialId: string; value: string } | null>(null);
-  const runInput = runInputState?.materialId === exercise.materialId ? runInputState.value : firstInput;
   /** GCC's messages from the latest C/C++ Run or Test, marked in the editor. */
   const [compileMarks, setCompileMarks] = React.useState<{ materialId: string; diagnostics: string | null } | null>(null);
   // A transition inside the workspace leaves the reviewed attempt behind: it
@@ -397,12 +390,13 @@ function ProgrammingWorkspace({
     });
 
     if (compiled) {
-      // Compiled and run on the server with the Input panel's text as stdin;
-      // the terminal narrates it, and teachers mirror it, as for a sample.
+      // Compiled and run on the server, as Python's Run behaves: it starts at
+      // once, and when the program waits for input the terminal takes it
+      // (Enter). The terminal narrates the run, and teachers mirror it.
       setCompileMarks(null);
-      const result = await runOnServer(
+      const result = await runInteractive(
         draft.code,
-        { stdin: runInput, command: runCommandFor(exercise.language) },
+        runCommandFor(exercise.language),
         {
           academyId,
           classId,
@@ -458,7 +452,7 @@ function ProgrammingWorkspace({
             .join('')
         : outcome.stdout,
     });
-  }, [academyId, classId, compiled, draft.code, exercise.gradingRevision, exercise.language, exercise.materialId, formatError, monitoring, runInput, runOnServer, runner]);
+  }, [academyId, classId, compiled, draft.code, exercise.gradingRevision, exercise.language, exercise.materialId, formatError, monitoring, runInteractive, runner]);
 
   /**
    * The mark lives exactly as long as the error does: a new run clears
@@ -734,14 +728,15 @@ function ProgrammingWorkspace({
             )}
             <EditorPane
               onReset={() => {
+                // Confirmed in the editor pane's dialog. The output always
+                // clears; the code goes back to the starter when it changed.
                 const starter = toSharedDocumentText(exercise.starterCode);
-                if (draft.code === starter) return;
-                if (!window.confirm(t('workspace.reset_confirm'))) return;
                 setSampleResults([]);
-    setSampleRunFailed(false);
+                setSampleRunFailed(false);
                 runner.clear();
                 submission.reset();
                 setOutputTab('terminal');
+                if (draft.code === starter) return;
                 // The one whole-buffer replacement a bound editor is allowed. It
                 // goes through the shared document rather than around it, so a
                 // watching teacher's editor follows instead of diverging — and
@@ -772,13 +767,9 @@ function ProgrammingWorkspace({
               onFocusLine={handleFocusLine}
               onRun={() => void handleRun()}
               onRunSample={(index) => void handleRunSample(index)}
-              serverCheck={serverCheck}
+              // A C/C++ program waiting for input is still running, as in Python.
+              serverCheck={{ ...serverCheck, active: serverCheck.active || runner.serverInputWaiting }}
               language={exercise.language}
-              runInput={compiled ? {
-                value: runInput,
-                onChange: (value) => setRunInputState({ materialId: exercise.materialId, value }),
-                onReset: firstInput ? () => setRunInputState({ materialId: exercise.materialId, value: firstInput }) : undefined,
-              } : undefined}
               runner={runner}
               practiceOnly={isPdfRunOnly(exercise)} canSubmit={!isPdfRunOnly(exercise) && exercise.submissionAvailability !== "INVALID_GRADING"}
               sampleTestCases={exercise.sampleTestCases}

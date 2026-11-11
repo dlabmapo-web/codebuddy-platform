@@ -25,7 +25,8 @@
     "lectures": "강의",
     "exercises": "문제",
     "actions": "작업",
-    "visibility": "공개 여부"
+    "visibility": "공개 여부",
+    "language": "언어"
   },
   "no_description": "아직 설명이 없습니다.",
   "empty": "아직 코스가 없습니다. 가장 자주 가르치는 과정부터 만들어 보세요.",

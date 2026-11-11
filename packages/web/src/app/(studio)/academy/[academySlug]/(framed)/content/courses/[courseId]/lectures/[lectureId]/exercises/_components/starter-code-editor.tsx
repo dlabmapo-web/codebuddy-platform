@@ -7,6 +7,7 @@ import type { ExerciseLanguage } from '@cove/shared';
 
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 import { languageLabelKey, monacoLanguageFor } from '@/lib/workspace/exercise-language';
+import { LanguageTag } from '@/components/workspace/language-tag';
 
 import { SectionCard } from './authoring-fields';
 
@@ -35,8 +36,8 @@ export function StarterCodeEditor({
       title={t('exercise.field.starter_code')}
     >
       <div className="overflow-hidden rounded-xl border border-[#2d2d2d] bg-[#1e1e1e]">
-        <div className="border-b border-white/10 bg-[#2d2d2d] px-3 py-2 font-mono text-[12px] text-[#a5a5a5]">
-          {t(`exercise.${languageLabelKey(language)}`)}
+        <div className="border-b border-white/10 bg-[#2d2d2d] px-3 py-1.5">
+          <LanguageTag language={language} label={t(`exercise.${languageLabelKey(language)}`)} />
         </div>
         <MonacoEditor
           beforeMount={registerPaircodeTheme}

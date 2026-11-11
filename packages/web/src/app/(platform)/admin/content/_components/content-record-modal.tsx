@@ -1,6 +1,6 @@
 'use client';
 
-import type { ContentLens, ExerciseLanguage } from '@cove/shared';
+import type { ContentLens, CourseLanguage } from '@cove/shared';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -107,7 +107,7 @@ export function ContentRecordModal({
   const [description, setDescription] = React.useState('');
   // Chosen when a course is created here; changed from the academy's own
   // course settings, which know whether the course already holds problems.
-  const [language, setLanguage] = React.useState<ExerciseLanguage>('PYTHON');
+  const [language, setLanguage] = React.useState<CourseLanguage>('PYTHON');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<unknown>(null);
 
@@ -221,12 +221,13 @@ export function ContentRecordModal({
         )}
       >
         <form
+          className="flex min-h-0 flex-1 flex-col"
           onSubmit={(event) => {
             event.preventDefault();
             void submit();
           }}
         >
-          <div className="space-y-4 px-6 py-5">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
             <div className="grid gap-1.5">
               <span className="text-[14px] font-bold">
                 {t('academy_field.label')}
@@ -280,8 +281,11 @@ export function ContentRecordModal({
               <CourseLanguageField
                 copy={{
                   label: library('language.label'),
-                  hint: library('language.hint'),
                   locked: library('language.locked'),
+                  options: {
+                    PYTHON: { title: library('language.options.PYTHON.title'), description: library('language.options.PYTHON.description') },
+                    C_CPP: { title: library('language.options.C_CPP.title'), description: library('language.options.C_CPP.description') },
+                  },
                 }}
                 onChange={setLanguage}
                 value={language}
@@ -304,7 +308,7 @@ export function ContentRecordModal({
             ) : null}
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
+          <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
             <button
               className="h-11 rounded-lg border border-border bg-card px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas"
               onClick={close}

@@ -368,23 +368,26 @@ describe('withLanguage', () => {
     expect(next.grading).toEqual({ ...weighted.grading, inputPromptPolicy: 'INCLUDE' });
   });
 
-  it('never sends a language: the course decides it', () => {
-    expect(draftToPayload(withLanguage(draft(), 'C'))).not.toHaveProperty('language');
+  it("sends a coding problem's language for the server to check, and none for a quiz", () => {
+    expect(draftToPayload(withLanguage(draft(), 'CPP')).language).toBe('CPP');
+    expect(draftToPayload(draft({ quiz: { choices: [], correctChoiceId: '', explanation: '' } }))).not.toHaveProperty('language');
   });
 });
 
 describe('a new problem', () => {
-  const context = (language: 'PYTHON' | 'C' | 'CPP') => ({
+  const context = (language: 'PYTHON' | 'C_CPP') => ({
     course: { id: '10000000-0000-4000-8000-000000000001', title: 'Course', language },
     module: { id: '20000000-0000-4000-8000-000000000001', title: 'Module' },
     lecture: { id: '30000000-0000-4000-8000-000000000001', title: 'Lecture' },
     material: null,
   });
 
-  it("starts in its C++ course's language, template and weighted grading", () => {
-    const fresh = contextToDraft(context('CPP'));
-    expect(fresh).toMatchObject({ language: 'CPP', grading: { mode: 'ELICE_STDIO', inputPromptPolicy: 'INCLUDE' } });
-    expect(fresh.starterCode).toContain('#include <iostream>');
+  it("starts a C/C++ course's problem in C, with its template and weighted grading", () => {
+    const fresh = contextToDraft(context('C_CPP'));
+    expect(fresh).toMatchObject({ language: 'C', grading: { mode: 'ELICE_STDIO', inputPromptPolicy: 'INCLUDE' } });
+    expect(fresh.starterCode).toContain('#include <stdio.h>');
+    // Switching the problem to C++ swaps the untouched template.
+    expect(withLanguage(fresh, 'CPP').starterCode).toContain('#include <iostream>');
   });
 
   it('starts a Python course\'s problem exactly as before', () => {

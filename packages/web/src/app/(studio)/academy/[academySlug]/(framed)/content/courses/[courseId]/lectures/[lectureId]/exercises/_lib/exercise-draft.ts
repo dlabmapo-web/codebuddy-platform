@@ -1,4 +1,4 @@
-import { defaultEliceGradingProfile, inferSubmissionPolicy, isCompiledLanguage, type ExerciseLanguage, type SubmissionPolicy } from "@cove/shared";
+import { defaultEliceGradingProfile, defaultExerciseLanguage, inferSubmissionPolicy, isCompiledLanguage, type ExerciseLanguage, type SubmissionPolicy } from "@cove/shared";
 
 import { starterAfterLanguageChange } from '@/lib/workspace/exercise-language';
 
@@ -112,7 +112,7 @@ export function contextToDraft(
       testCases: [newTestCaseDraft('new-sample', 'SAMPLE')],
       grading: legacyGradingProfile,
       hints: [],
-    }, context.course.language ?? 'PYTHON');
+    }, defaultExerciseLanguage(context.course.language ?? 'PYTHON'));
   }
 
   return {
@@ -196,6 +196,8 @@ export function draftToPayload(draft: ExerciseDraft) {
     outputFormat: draft.outputFormat,
     constraints: draft.constraints,
     starterCode: draft.starterCode,
+    // Checked by the server against the course: C or C++ in a C/C++ course.
+    ...(draft.quiz ? {} : { language: draft.language }),
     solutions: draft.quiz ? [] : draft.referencePdfMaterialId ? draft.solutions.filter(solution => solution.code.trim() || solution.title?.trim()) : draft.solutions,
     aiFeedbackEnabled: draft.aiFeedbackEnabled,
     isVisible: draft.isVisible,

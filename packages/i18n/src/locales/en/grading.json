@@ -65,7 +65,18 @@
   },
   "language": {
     "label": "Programming language",
-    "hint": "Every coding problem in this course is written and graded in this language.",
-    "locked": "The language is fixed once the course has problems."
+    "locked": "The language is fixed once the course has problems.",
+    "options": {
+      "PYTHON": {
+        "title": "Python",
+        "description": "Python 3. Run and Test in the browser; Submit is graded on the server."
+      },
+      "C_CPP": {
+        "title": "C / C++",
+        "description": "GCC 12. Each problem is C or C++; Run, Test and Submit compile on the server."
+      }
+    },
+    "problem_label": "Problem language",
+    "problem_hint": "A C/C++ course can mix both. Changing it later starts a new grading revision."
   }
 }

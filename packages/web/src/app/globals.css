@@ -192,6 +192,22 @@
      near-black. Same split as `--on-brand` and its siblings. */
   --on-course: #FFFFFF;
 
+  /* Programming languages: Python blue, C teal, C++ violet. A text colour
+     clears 4.5:1 on `card` and its `-soft` tints a badge behind it. The
+     `-on-editor` shades read on the editor chrome, which is dark in both
+     themes, so `.dark` repeats them unchanged. */
+  --lang-python: #1D6FA8;
+  --lang-python-soft: #E7F1FA;
+  --lang-c: #0F766E;
+  --lang-c-soft: #E2F4F1;
+  --lang-cpp: #6D28D9;
+  --lang-cpp-soft: #F1EBFD;
+  --lang-python-on-editor: #8CC8F7;
+  --lang-c-on-editor: #5EEAD4;
+  --lang-cpp-on-editor: #C4B5FD;
+  /* An error on the editor's dark output panes, in both themes. */
+  --editor-danger: #FB7185;
+
   --ring: #1B64DA;
   --sidebar: #FFFFFF;
   --sidebar-border: #E9EDF3;
@@ -296,6 +312,17 @@
   --course-d-soft: #33162A;
   --on-course: #0B1017;
 
+  --lang-python: #7CC0F5;
+  --lang-python-soft: #10263A;
+  --lang-c: #2DD4BF;
+  --lang-c-soft: #0B2B28;
+  --lang-cpp: #B794F6;
+  --lang-cpp-soft: #231A3A;
+  --lang-python-on-editor: #8CC8F7;
+  --lang-c-on-editor: #5EEAD4;
+  --lang-cpp-on-editor: #C4B5FD;
+  --editor-danger: #FB7185;
+
   --ring: #5B93F5;
   --sidebar: #12161F;
   --sidebar-border: #222937;
@@ -372,6 +399,17 @@
   --color-course-d: var(--course-d);
   --color-course-d-soft: var(--course-d-soft);
   --color-on-course: var(--on-course);
+
+  --color-lang-python: var(--lang-python);
+  --color-lang-python-soft: var(--lang-python-soft);
+  --color-lang-c: var(--lang-c);
+  --color-lang-c-soft: var(--lang-c-soft);
+  --color-lang-cpp: var(--lang-cpp);
+  --color-lang-cpp-soft: var(--lang-cpp-soft);
+  --color-lang-python-on-editor: var(--lang-python-on-editor);
+  --color-lang-c-on-editor: var(--lang-c-on-editor);
+  --color-lang-cpp-on-editor: var(--lang-cpp-on-editor);
+  --color-editor-danger: var(--editor-danger);
 
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);

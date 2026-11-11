@@ -67,7 +67,8 @@
     "problems": "콘텐츠",
     "copies": "학원",
     "updated": "수정일",
-    "actions": "작업"
+    "actions": "작업",
+    "language": "언어"
   },
   "edit": {
     "heading": "라이브러리 과목 이름 변경",
@@ -112,7 +113,16 @@
   },
   "language": {
     "label": "프로그래밍 언어",
-    "hint": "이 과목의 모든 코딩 문제는 이 언어로 작성하고 채점합니다.",
-    "locked": "문제가 있는 과목은 언어를 바꿀 수 없습니다."
+    "locked": "문제가 있는 과목은 언어를 바꿀 수 없습니다.",
+    "options": {
+      "PYTHON": {
+        "title": "Python",
+        "description": "Python 3. 실행과 테스트는 브라우저에서, 제출은 채점 서버에서 채점합니다."
+      },
+      "C_CPP": {
+        "title": "C / C++",
+        "description": "GCC 12. 문제마다 C 또는 C++를 고르며, 실행·테스트·제출 모두 채점 서버에서 컴파일합니다."
+      }
+    }
   }
 }

@@ -2,7 +2,7 @@
 
 import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
-import type { CourseSummary, ExerciseLanguage } from '@cove/shared';
+import type { CourseLanguage, CourseSummary } from '@cove/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
@@ -25,7 +25,7 @@ export function useCoursesManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [language, setLanguage] = useState<ExerciseLanguage>('PYTHON');
+  const [language, setLanguage] = useState<CourseLanguage>('PYTHON');
   const queryKey = academyCoursesQueryKey(academyId);
 
   const coursesQuery = useQuery({

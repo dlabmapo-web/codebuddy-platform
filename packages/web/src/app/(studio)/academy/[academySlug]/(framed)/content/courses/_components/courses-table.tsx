@@ -37,7 +37,7 @@ import type { CoursesManagerState } from '../_hooks/use-courses-manager';
 import { useContentDate } from '../../_components/content-date';
 import { VisibilityConfirmModal } from '../../_components/visibility-confirm-modal';
 import { VisibilityToggle } from '../../_components/visibility-toggle';
-import { CourseLanguageBadge } from '@/components/studio/course-language-field';
+import { CourseLanguageBadge, courseLanguageFacetOptions } from '@/components/studio/course-language-field';
 
 function VisibilityIndicator({ isVisible }: { isVisible: boolean }) {
   const { t } = useLayoutTranslation('courses');
@@ -123,7 +123,6 @@ export function CoursesTable({
           return (
             <div className="min-w-0 max-w-md">
               <span className="text-[15px] font-bold">{course.title}</span>
-              <CourseLanguageBadge language={course.language} />
               <p className="mt-0.5 line-clamp-1 text-[13.5px] text-sub">
                 {course.description || t('no_description')}
               </p>
@@ -175,6 +174,15 @@ export function CoursesTable({
             {courseHasNoVisibleContent(row.original) ? <NoContentChip /> : null}
           </div>
         ),
+      },
+      {
+        // In Modules' place: Modules is hidden by default (Columns brings it
+        // back), so the table is no wider for it.
+        id: 'language',
+        accessorFn: (course) => course.language,
+        header: t('column.language'),
+        filterFn: 'arrIncludesSome',
+        cell: ({ row }) => <CourseLanguageBadge className="" language={row.original.language} />,
       },
       {
         id: 'modules',
@@ -277,7 +285,9 @@ export function CoursesTable({
               { label: t('hidden'), value: 'false', icon: EyeOff },
             ],
           },
+          { columnId: 'language', title: t('column.language'), options: courseLanguageFacetOptions },
         ]}
+        initialColumnVisibility={{ modules: false }}
         pageSize={15}
         searchPlaceholder={t('search_placeholder')}
         toolbarActions={toolbarActions}

@@ -46,7 +46,7 @@ import { LibraryStateChip } from './library-state-chip';
 import { LibraryCourseModal } from './library-course-modal';
 import { LibraryCopiesPanel } from './library-copies-panel';
 import { AcademyCoursePicker } from './academy-course-picker';
-import { CourseLanguageBadge } from '@/components/studio/course-language-field';
+import { CourseLanguageBadge, courseLanguageFacetOptions } from '@/components/studio/course-language-field';
 
 export type LibraryPage = {
   courses: LibraryCourse[];
@@ -168,7 +168,6 @@ export function LibraryTable({
         cell: ({ row }) => (
           <div className="min-w-0 max-w-md">
             <span className="text-[15px] font-bold">{row.original.title}</span>
-            <CourseLanguageBadge language={row.original.language} />
             <p className="mt-0.5 line-clamp-1 text-[13.5px] text-sub">
               {row.original.description || t('no_description')}
             </p>
@@ -186,6 +185,15 @@ export function LibraryTable({
             <LibraryStateChip label={t(stateLabels[state])} state={state} />
           );
         },
+      },
+      {
+        // In Modules' place: Modules is hidden by default (Columns brings it
+        // back), so the table is no wider for it.
+        id: 'language',
+        accessorFn: (course) => course.language,
+        header: t('column.language'),
+        filterFn: 'arrIncludesSome',
+        cell: ({ row }) => <CourseLanguageBadge className="" language={row.original.language} />,
       },
       {
         id: 'modules',
@@ -398,7 +406,9 @@ export function LibraryTable({
               { label: t('state.retired'), value: 'RETIRED', icon: Archive },
             ],
           },
+          { columnId: 'language', title: t('column.language'), options: courseLanguageFacetOptions },
         ]}
+        initialColumnVisibility={{ modules: false }}
         pageSize={10}
         searchPlaceholder={t('search.placeholder')}
         toolbarActions={

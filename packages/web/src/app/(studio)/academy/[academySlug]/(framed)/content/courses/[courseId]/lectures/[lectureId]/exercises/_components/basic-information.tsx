@@ -1,4 +1,5 @@
-import type { ExerciseDifficulty } from '@cove/shared';
+import type { CourseLanguage, ExerciseDifficulty } from '@cove/shared';
+import { ProblemLanguageToggle } from '@/components/studio/course-language-field';
 import { BookOpen } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -32,15 +33,20 @@ export function BasicInformation({
   editable,
   onImageUpload,
   update,
+  courseLanguage = 'PYTHON',
+  onLanguageChange,
 }: {
   authoring: ExerciseAuthoring;
   draft: ExerciseDraft;
   editable: boolean;
+  /** A C/C++ course's problems each choose C or C++. */
+  courseLanguage?: CourseLanguage;
+  onLanguageChange?: (language: 'C' | 'CPP') => void;
   /** Stores a picture privately for this course and returns its `cove-asset:` source. */
   onImageUpload?: (file: File) => Promise<string>;
   update: ExerciseDraftUpdate;
 }) {
-  const { t } = useTranslation(['content', 'pdf-practice']);
+  const { t } = useTranslation(['content', 'pdf-practice', 'grading']);
   const titleError = authoring.errorFor('title');
   const descriptionError = authoring.errorFor('description');
 
@@ -129,6 +135,17 @@ export function BasicInformation({
           value={draft.title}
         />
       </Field>
+      {courseLanguage === 'C_CPP' && !draft.quiz ? (
+        <Field as="group" label={t('grading:language.problem_label')}>
+          <ProblemLanguageToggle
+            disabled={!editable}
+            labels={{ C: 'C', CPP: 'C++' }}
+            onChange={(language) => onLanguageChange?.(language)}
+            value={draft.language}
+          />
+          <p className="mt-1 text-xs text-sub">{t('grading:language.problem_hint')}</p>
+        </Field>
+      ) : null}
       <Field as="group" label={t('exercise.field.difficulty')} required>
         <DifficultyPicker
           disabled={!editable}

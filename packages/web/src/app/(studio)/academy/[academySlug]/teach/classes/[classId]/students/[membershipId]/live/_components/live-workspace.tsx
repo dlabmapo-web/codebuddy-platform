@@ -36,6 +36,7 @@ import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
 import { useEditorPreferences } from '@/lib/workspace/use-editor-preferences';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
 import { languageLabelKey } from '@/lib/workspace/exercise-language';
+import { LanguageTag } from '@/components/workspace/language-tag';
 import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
 import {
   STATEMENT_CANVAS_MIN_WIDTH,
@@ -600,10 +601,7 @@ export function LiveWorkspace({
             ) : <div className="flex min-h-0 flex-1 flex-col" ref={editorContainerRef}>
               {/* theme-lint-ignore — editor chrome, dark in both themes */}
               <header className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#2d2d2d] px-3 py-1.5">
-                {/* theme-lint-ignore */}
-                <span className="font-mono text-[11.5px] text-[#a5a5a5]">
-                  {tl(`workspace.${languageLabelKey(shownLanguage)}`)}
-                </span>
+                <LanguageTag language={shownLanguage ?? 'PYTHON'} label={tl(`workspace.${languageLabelKey(shownLanguage)}`)} />
                 <div className="ml-auto">
                   <FontSizeControls {...preferences} />
                 </div>

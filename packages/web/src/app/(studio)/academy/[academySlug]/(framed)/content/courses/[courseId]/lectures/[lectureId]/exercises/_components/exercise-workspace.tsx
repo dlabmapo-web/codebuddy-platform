@@ -14,6 +14,7 @@ import { QuizEditor } from './quiz-editor';
 import type { ExerciseAuthoringContext } from '@cove/shared';
 
 import { useExerciseAuthoring } from '../_hooks/use-exercise-authoring';
+import { withLanguage } from '../_lib/exercise-draft';
 import { SubmissionPolicyEditor } from './submission-policy-editor';
 import { AnswersEditor } from './answers-editor';
 import { BasicInformation } from './basic-information';
@@ -103,6 +104,13 @@ export function ExerciseWorkspace({
           editable={editable}
           onImageUpload={uploadImage}
           update={update}
+          courseLanguage={initialContext.course.language}
+          onLanguageChange={(language) => {
+            const next = withLanguage(draft, language);
+            update('language', next.language);
+            update('starterCode', next.starterCode);
+            update('grading', next.grading);
+          }}
         />
         {draft.quiz ? <QuizEditor value={draft.quiz} disabled={!editable} onChange={(quiz) => update('quiz', quiz)} /> : <>
         <StarterCodeEditor

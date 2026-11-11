@@ -32,13 +32,14 @@ export function CourseModal({ manager }: { manager: CoursesManagerState }) {
         title={editing ? t('edit_modal.heading') : t('create.heading')}
       >
         <form
+          className="flex min-h-0 flex-1 flex-col"
           onSubmit={(event) => {
             event.preventDefault();
             if (!ready || manager.submitPending) return;
             manager.submit();
           }}
         >
-          <div className="space-y-4 px-6 py-5">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
             <label className="grid gap-1.5">
               <span className="text-[14px] font-bold">
                 {t('create.title_label')}
@@ -75,8 +76,11 @@ export function CourseModal({ manager }: { manager: CoursesManagerState }) {
             <CourseLanguageField
               copy={{
                 label: grading('language.label'),
-                hint: grading('language.hint'),
                 locked: grading('language.locked'),
+                options: {
+                  PYTHON: { title: grading('language.options.PYTHON.title'), description: grading('language.options.PYTHON.description') },
+                  C_CPP: { title: grading('language.options.C_CPP.title'), description: grading('language.options.C_CPP.description') },
+                },
               }}
               locked={editing && manager.languageLocked}
               onChange={manager.setLanguage}
@@ -102,7 +106,7 @@ export function CourseModal({ manager }: { manager: CoursesManagerState }) {
             ) : null}
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
+          <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
             <button
               className="h-11 rounded-lg border border-border bg-card px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas"
               onClick={manager.closeForm}

@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { type ExerciseDraft } from '../_lib/exercise-draft';
 import { languageLabelKey } from '@/lib/workspace/exercise-language';
+import { ExerciseLanguageBadge } from '@/components/studio/course-language-field';
 import { RichTextFrame } from '@/components/studio/rich-text-frame';
 
 /** Same green → amber → red scale the course builder uses for difficulty. */
@@ -104,9 +105,7 @@ export function PreviewModal({
               >
                 {t(`courses:exercise.difficulty.${draft.difficulty}`)}
               </span>
-              <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-bold text-sub">
-                {t(`exercise.${languageLabelKey(draft.language)}`)}
-              </span>
+              <ExerciseLanguageBadge language={draft.language} label={t(`exercise.${languageLabelKey(draft.language)}`)} />
               {draft.isVisible ? null : (
                 <span className="inline-flex items-center gap-1 rounded-full bg-retired-soft px-2 py-0.5 text-[11px] font-bold text-retired">
                   <EyeOff className="size-2.5" />

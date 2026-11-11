@@ -26,7 +26,8 @@
     "lectures": "Lectures",
     "exercises": "Problems",
     "actions": "Actions",
-    "visibility": "Visibility"
+    "visibility": "Visibility",
+    "language": "Language"
   },
   "no_description": "No description yet.",
   "empty": "No courses yet. Start with the one you teach most often.",

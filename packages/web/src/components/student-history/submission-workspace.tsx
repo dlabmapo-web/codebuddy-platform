@@ -51,6 +51,7 @@ import { ExerciseImageProvider, ManualImageProvider } from "@/components/studio/
 import { routes } from "@/lib/routes";
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from "@/lib/monaco/theme";
 import { languageLabelKey, monacoLanguageFor } from "@/lib/workspace/exercise-language";
+import { LanguageTag } from "@/components/workspace/language-tag";
 import {
   historyAction,
   historyPrimaryAction,
@@ -788,8 +789,11 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                 className={`${turtle ? manualStyles.files : ""} flex shrink-0 overflow-auto border-b border-white/10 bg-editor-bg`}
               >
                 {coding ? (
-                  <span className="self-center px-3 py-2 font-mono text-xs text-white/60">
-                    {tl(`workspace.${languageLabelKey(data.review.language)}`)}
+                  <span className="self-center px-3 py-1.5">
+                    <LanguageTag
+                      language={monacoLanguageFor(data.review.language) === "c" ? "C" : monacoLanguageFor(data.review.language) === "cpp" ? "CPP" : "PYTHON"}
+                      label={tl(`workspace.${languageLabelKey(data.review.language)}`)}
+                    />
                   </span>
                 ) : null}
                 {!coding &&
@@ -1047,7 +1051,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                         {score ?? "—"} / {maximum}
                       </p>
                       {data.review.compileFailed ? (
-                        <pre className="mt-3 whitespace-pre-wrap text-[#fb7185]">
+                        <pre className="mt-3 whitespace-pre-wrap text-editor-danger">
                           {ts("workspace.compile_error_title")}
                           {data.review.compileDiagnostics
                             ? `\n${data.review.compileDiagnostics}`

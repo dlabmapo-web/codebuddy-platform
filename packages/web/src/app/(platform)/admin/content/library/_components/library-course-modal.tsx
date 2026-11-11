@@ -1,6 +1,6 @@
 'use client';
 
-import type { ExerciseLanguage, LibraryCourse } from '@cove/shared';
+import type { CourseLanguage, LibraryCourse } from '@cove/shared';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -49,7 +49,7 @@ export function LibraryCourseModal({
   const errorText = useErrorText();
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
-  const [language, setLanguage] = React.useState<ExerciseLanguage>('PYTHON');
+  const [language, setLanguage] = React.useState<CourseLanguage>('PYTHON');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<unknown>(null);
 
@@ -90,6 +90,7 @@ export function LibraryCourseModal({
         title={editing ? t('edit.heading') : t('create.heading')}
       >
         <form
+          className="flex min-h-0 flex-1 flex-col"
           onSubmit={async (event) => {
             event.preventDefault();
             if (!ready || busy) return;
@@ -120,7 +121,7 @@ export function LibraryCourseModal({
             }
           }}
         >
-          <div className="space-y-4 px-6 py-5">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
             <label className="grid gap-1.5">
               <span className="text-[14px] font-bold">
                 {t('create.title_label')}
@@ -155,8 +156,11 @@ export function LibraryCourseModal({
             <CourseLanguageField
               copy={{
                 label: t('language.label'),
-                hint: t('language.hint'),
                 locked: t('language.locked'),
+                options: {
+                  PYTHON: { title: t('language.options.PYTHON.title'), description: t('language.options.PYTHON.description') },
+                  C_CPP: { title: t('language.options.C_CPP.title'), description: t('language.options.C_CPP.description') },
+                },
               }}
               locked={languageLocked}
               onChange={setLanguage}
@@ -185,7 +189,7 @@ export function LibraryCourseModal({
             ) : null}
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
+          <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
             <Button disabled={busy} onClick={close} type="button" variant="ghost">
               {t('create.cancel')}
             </Button>

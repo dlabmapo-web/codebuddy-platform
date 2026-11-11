@@ -1,9 +1,9 @@
 """Build the native-gcc toolchain and run roots from the pinned Debian packages.
 
 The toolchain root holds GCC 12, binutils' assembler and linker, the C and C++
-headers, the link-time libraries and the precompiled bits/stdc++.h. The run
-root holds only the dynamic loader, the four libraries a program links, and the
-exec gate. Both are measured like the CPython rootfs; every file comes from the
+headers, the link-time libraries and the precompiled bits/stdc++.h and
+iostream. The run root holds only the dynamic loader, the four libraries a
+program links, and the exec gate. Both are measured like the CPython rootfs; every file comes from the
 packages listed here or from the ELF closure of those files.
 """
 import json
@@ -157,6 +157,22 @@ header = pathlib.Path(f"/usr/include/{TRIPLET}/c++/12/bits/stdc++.h")
 shutil.copy2(header, pch / "stdc++.h")
 subprocess.check_call(["g++-12", *PCH_FLAGS, "-x", "c++-header",
                        "-o", str(pch / "stdc++.h.gch"), str(pch / "stdc++.h")])
+# <iostream>, the first include of most short C++ programs, precompiled from
+# the system header itself, so its messages name the same files. GCC looks for
+# iostream.gch in -I/opt/cove/pch before the system headers, and reads the
+# system header instead when a program's own macros make the PCH unusable
+# (only macros that break <iostream> anyway). Built as the main file, the
+# header's `#pragma GCC system_header` draws a harmless warning here.
+iostream_pch = TOOLCHAIN / "opt/cove/pch/iostream.gch"
+subprocess.check_call(["g++-12", *PCH_FLAGS, "-x", "c++-header",
+                       "-o", str(iostream_pch), "/usr/include/c++/12/iostream"])
+probe = subprocess.run(["g++-12", *PCH_FLAGS, "-Winvalid-pch", "-H",
+                        "-I", str(iostream_pch.parent), "-x", "c++", "-c",
+                        "-o", "/dev/null", "-"],
+                       input="#include <iostream>\nint main() { std::cout << 1; }\n",
+                       text=True, capture_output=True, check=True)
+if f"! {iostream_pch}\n" not in probe.stderr:
+    sys.exit("the precompiled <iostream> is not used:\n" + probe.stderr)
 
 # Run root: the loader, libc, libm, libstdc++ and libgcc_s with their closure.
 for package in ["libc6", "libstdc++6", "libgcc-s1"]:

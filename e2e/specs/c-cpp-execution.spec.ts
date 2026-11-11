@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { routes } from '../../packages/web/src/lib/routes';
@@ -24,6 +24,9 @@ async function setCode(page: Page, code: string) {
 }
 async function language(page: Page) {
   return page.evaluate(() => (window as any).monaco?.editor.getModels()[0]?.getLanguageId());
+}
+async function starterCode(materialId: string): Promise<string> {
+  return (await db.query('SELECT starter_code FROM programming_exercises WHERE material_id=$1', [materialId])).rows[0].starter_code;
 }
 async function latest(materialId: string) {
   return (await db.query('SELECT id,status,score,compile_failed,compile_diagnostics,graded_at FROM submissions WHERE material_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1', [materialId])).rows[0];
@@ -52,6 +55,9 @@ for (const name of ['C', 'CPP'] as const) {
     page.on('request', request => { if (/pyodide.*\.(wasm|js)/.test(request.url())) pyodide.push(request.url()); });
     await page.goto(routes.academyLearnExercise(f.slug, materialId, { classId: f.ids.class }));
     await expect.poll(() => language(page)).toBe(name === 'C' ? 'c' : 'cpp');
+    // The problem's own program, whatever an earlier test saved as this
+    // student's code (the line-by-line Run test uses the same C problem).
+    await setCode(page, await starterCode(materialId));
     // As in Python: Run starts the program; when it waits for input the
     // terminal takes a line, and Enter carries on. No separate input box.
     await expect(page.getByRole('textbox', { name: 'Program input', exact: true })).toHaveCount(0);
@@ -99,8 +105,10 @@ for (const name of ['C', 'CPP'] as const) {
     await teacher.goto(review(crash.id));
     await expect(teacher.locator('main')).toContainText('exit code 3');
     await teacher.goto(`${routes.academyTeachProgress(f.slug, f.ids.class)}?view=students&student=${f.ids.studentMembership}&reviewMaterial=${materialId}&attempt=${failure.id}`);
-    await expect(teacher.getByTestId('student-history-workspace')).toBeVisible();
+    // A bookmark of the old in-dashboard review opens the student-work page.
+    await teacher.waitForURL((url) => url.pathname.endsWith(`/students/${f.ids.studentMembership}/work/${materialId}`));
     await teacher.getByRole('tab', { name: 'Saved submission result', exact: true }).click();
+    await expect(teacher.getByRole('tab', { name: 'Saved submission result', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(teacher.locator('pre:visible').filter({ hasText: 'Compile error' })).toContainText('error:');
     await expect.poll(() => language(teacher)).toBe(name === 'C' ? 'c' : 'cpp');
     await teacher.screenshot({ path: test.info().outputPath(name + '-compile-history.png'), fullPage: true });
@@ -258,4 +266,107 @@ test('staff practice runs and tests C and C++ on the server, as the staff member
   expect((await db.query('SELECT count(*)::int AS n FROM submissions WHERE material_id=$1 AND user_id=$2', [f.ids.CPP, f.ids.manager])).rows[0].n).toBe(0);
   await page.screenshot({ path: test.info().outputPath('cpp-staff-practice.png'), fullPage: true });
   await context.close();
+});
+
+test('the teacher\'s pointer reaches the student on a C/C++ problem', async ({ browser }) => {
+  const f = fixture();
+  // Unequal screens, as in monitoring-pointer-parity.spec.ts: the arrow must
+  // land on the same content, not at the same fraction of a pane.
+  const studentContext = await browser.newContext({ storageState: f.auth.student, viewport: { width: 1280, height: 640 } });
+  const teacherContext = await browser.newContext({ storageState: f.auth.teacher, viewport: { width: 1600, height: 900 } });
+  const student = await studentContext.newPage();
+  const teacher = await teacherContext.newPage();
+  await student.goto(routes.academyLearnExercise(f.slug, f.ids.C, { classId: f.ids.class }));
+  await expect(student.locator('[data-collab-surface="statement"]')).toBeVisible();
+  await teacher.goto(routes.academyTeachStudentLive(f.slug, f.ids.class, f.ids.studentMembership));
+  await expect(teacher.locator('[data-collab-surface="statement"]')).toBeVisible();
+  // The shared coordinate space exists only once both share the document.
+  for (const page of [student, teacher])
+    await expect(page.locator('[data-collab-canvas="statement"]')).toHaveCount(1);
+  const material = (page: Page) => page.locator('[data-collab-canvas="statement"]').getAttribute('data-collab-material');
+  expect(await material(student)).toBe(await material(teacher));
+  // The description is in a sandboxed frame; the examples are in the page.
+  const target = (page: Page) => page.getByTestId('problem-statement').getByText('Example 1', { exact: true }).first();
+  const aim = (await target(teacher).boundingBox())!;
+  const peer = student.getByTestId('peer-pointer');
+  await expect.poll(async () => {
+    // Re-moved every poll: the arrow fades after three seconds of stillness.
+    await teacher.mouse.move(aim.x + aim.width / 2, aim.y + aim.height / 2);
+    return peer.count();
+  }, { timeout: 30_000, intervals: [250] }).toBeGreaterThan(0);
+  const arrow = (await peer.boundingBox())!;
+  const there = (await target(student).boundingBox())!;
+  expect(arrow.x).toBeGreaterThanOrEqual(there.x - 4);
+  expect(arrow.x).toBeLessThanOrEqual(there.x + there.width + 4);
+  expect(arrow.y).toBeGreaterThanOrEqual(there.y - 4);
+  expect(arrow.y).toBeLessThanOrEqual(there.y + there.height + 4);
+  await teacherContext.close();
+  await studentContext.close();
+});
+
+/**
+ * Submit-click-to-visible-result, apart from page loading, for a cold compile
+ * and for resubmitting the same code (the compiled program is reused). Each
+ * measured submission flips the visible result between a wrong program
+ * (0 / N) and the right one (N / N), so the clock stops on the new result and
+ * never on the previous one. A functional smoke on one machine, not capacity.
+ */
+test('Submit timings: cold compile and cached resubmission, apart from page load', async ({ browser }) => {
+  test.setTimeout(240_000);
+  const f = fixture();
+  const salt = `${Date.now()}`;
+  const programs = {
+    C: {
+      material: f.ids.C, cases: 2,
+      right: `#include <stdio.h>\nint main(void) { int a, b; if (scanf("%d %d", &a, &b) != 2) return 1; printf("%d\\n", a + b); return 0; } // ${salt}\n`,
+      wrong: `#include <stdio.h>\nint main(void) { int a, b; if (scanf("%d %d", &a, &b) != 2) return 1; printf("%d\\n", a + b + 1); return 0; } // ${salt}\n`,
+    },
+    'C++ <iostream>': {
+      material: f.ids.CPP10, cases: 10,
+      right: `#include <iostream>\nint main() { long long a, b; if (!(std::cin >> a >> b)) return 1; std::cout << a + b << "\\n"; } // ${salt}\n`,
+      wrong: `#include <iostream>\nint main() { long long a, b; if (!(std::cin >> a >> b)) return 1; std::cout << a + b + 1 << "\\n"; } // ${salt}\n`,
+    },
+  };
+  const report: Record<string, unknown> = {
+    conditions: { host: process.platform + '/' + process.arch, cpus: (await import('node:os')).cpus().length, runner: process.env.GITHUB_ACTIONS ? 'github-actions' : 'local', note: 'one student, idle disposable fixture; not classroom capacity' },
+  };
+  for (const [label, p] of Object.entries(programs)) {
+    const context = await browser.newContext({ storageState: f.auth.student });
+    const page = await context.newPage();
+    const loadStarted = Date.now();
+    await page.goto(routes.academyLearnExercise(f.slug, p.material, { classId: f.ids.class }));
+    await expect(page.locator('.monaco-editor').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Submit', exact: true })).toBeEnabled();
+    const pageLoadMs = Date.now() - loadStarted;
+    const measure = async (code: string, passed: number, kind: 'cold' | 'cached') => {
+      const before = (await latest(p.material))?.id;
+      await setCode(page, code);
+      const clicked = Date.now();
+      await page.getByRole('button', { name: 'Submit', exact: true }).click();
+      // While grading the header says "Judge running" and the count climbs
+      // from 0, so the clock stops only on the final verdict with its count.
+      // Alternating wrong and right programs makes that verdict new each time.
+      await expect(page.getByTestId('result-hero')).toContainText(passed === p.cases ? 'Accepted' : 'Not accepted', { timeout: 60_000 });
+      await expect(page.getByTestId('result-passed')).toContainText(`${passed} / ${p.cases}`, { timeout: 1_000 });
+      const clickToVisibleMs = Date.now() - clicked;
+      const row = (await db.query('SELECT id, created_at, started_at, graded_at FROM submissions WHERE material_id=$1 ORDER BY created_at DESC, id DESC LIMIT 1', [p.material])).rows[0];
+      expect(row.id).not.toBe(before);
+      expect(row.graded_at).not.toBeNull();
+      const at = (value: Date) => new Date(value).getTime();
+      // Admission to commit, split into the queue and the grading itself.
+      return { kind, passed, clickToVisibleMs, serverMs: at(row.graded_at) - at(row.created_at),
+        queueMs: at(row.started_at) - at(row.created_at), gradingMs: at(row.graded_at) - at(row.started_at) };
+    };
+    const runs = [
+      await measure(p.wrong, 0, 'cold'),
+      await measure(p.right, p.cases, 'cold'),
+      await measure(p.wrong, 0, 'cached'),
+      await measure(p.right, p.cases, 'cached'),
+    ];
+    report[label] = { cases: p.cases, pageLoadMs, runs };
+    await context.close();
+  }
+  console.log('SUBMIT_TIMINGS ' + JSON.stringify(report));
+  mkdirSync(resolve('test-results/c-cpp-browser'), { recursive: true });
+  writeFileSync(resolve('test-results/c-cpp-browser/timings.json'), JSON.stringify(report, null, 2));
 });

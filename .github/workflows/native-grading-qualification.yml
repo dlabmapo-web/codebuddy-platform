@@ -55,7 +55,8 @@ jobs:
           test "$(uname -m)" = x86_64 || { echo "::error::Not a native amd64 runner: $(uname -m)"; exit 1; }
           test "$(docker info --format '{{.Architecture}}')" = x86_64
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test -z "$(git status --porcelain)"
+          # Tracked files only: the workflow writes its own untracked outputs here.
+          test -z "$(git status --porcelain --untracked-files=no)"
           { echo "kernel=$(uname -r)"; echo "cpus=$(nproc)"; grep -m1 'model name' /proc/cpuinfo; free -m | sed -n 2p; } > native-runner.txt
       - uses: actions/setup-node@v4
         with: {node-version: '22.22.0'}
@@ -79,8 +80,9 @@ jobs:
           guest="$(docker image inspect -f '{{.Id}}' cove-native-guest:qualification)"
           arch="$(docker image inspect -f '{{.Architecture}}' cove-native-node:qualification)"
           test "$arch" = amd64 || { echo "::error::Candidate image is $arch, not amd64"; exit 1; }
-          # The build must not have touched the checkout it was built from.
-          test -z "$(git status --porcelain)"
+          # The build must not have changed a tracked file of the commit it built.
+          git status --porcelain --untracked-files=no > native-tracked-changes.txt
+          test ! -s native-tracked-changes.txt || { echo "::error::The build changed tracked files"; cat native-tracked-changes.txt; exit 1; }
           jq -n --arg commit "$GITHUB_SHA" --arg ref "$GITHUB_REF" --arg image "$image" --arg guest "$guest" --arg arch "$arch" \
             --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             '{commit: $commit, ref: $ref, image: $image, guestImage: $guest, architecture: $arch, run: $run}' > native-candidate.json

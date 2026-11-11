@@ -292,9 +292,10 @@ program waits for input the terminal shows its prompt, and Enter carries on.
 - The exec gate gains a `hold` request (`cove-gate-1 <bytes> <ms> hold`): the
   program reads its input from a pipe whose write end the gate keeps open, so
   reading past the input blocks instead of meeting end of file.
-- The launcher ends a held Run whose program is alive but has used no CPU for
-  150 ms: reading stdin is the only thing a jailed program can wait on. The
-  result is `awaitingInput: true` with the output printed so far.
+- The launcher ends a held Run whose program the kernel shows parked in a
+  read of its held stdin (§10.6; it first used 150 ms without CPU, which took
+  a `sleep` for waiting). The result is `awaitingInput: true` with the output
+  printed so far.
 - A Run check holds its input unless `endOfInput` is set (Ctrl+D; the terminal
   has no End input button, for Python or C/C++).
   The browser re-runs the compiled program, from the artifact cache, with every
@@ -354,3 +355,108 @@ held step about 220 ms. The waiting was in the browser and in admission.
   clock-based output can differ between lines. Keeping one process alive
   between lines would hold a sandbox slot while a student thinks; re-running
   holds it only while the program runs.
+
+### 10.6 Waiting means a blocked read; `<iostream>` is precompiled (2026-11-11)
+
+Two grader changes, measured side by side on the local grader (same image
+apart from them, same container limits, medians of 5–7):
+
+| | Before | After |
+| --- | --- | --- |
+| Run shows a prompt and waits | 243 ms | 45 ms |
+| Each Enter that waits for the next line | 253 ms | 54 ms |
+| A Run that sleeps 0.5 s | cut at 216 ms, reported waiting | runs to the end |
+| C++ compile, `<iostream>` first | 176 ms | 81 ms |
+| C++ compile, `<iostream>`, `<vector>`, `<algorithm>` | 184 ms | 110 ms |
+| C++ compile, `<bits/stdc++.h>` (unchanged) | 156 ms | 158 ms |
+
+- **Waiting is a blocked read.** The launcher used to end a held Run once its
+  program had used no CPU for 150 ms, so a `sleep` was taken for waiting and
+  every prompt cost at least 150 ms. It now reads the program's
+  `/proc/<pid>/syscall` every 10 ms and ends the case when two samples show it
+  parked in `read`/`readv` of its stdin with no CPU used between them. That is
+  exact here: the program is the gate's one child (its filter refuses fork,
+  clone and so threads), and every byte of its input is in the pipe before GO,
+  so such a read can never return. A program that computes or sleeps runs on
+  to its limits. Reading another process's system call needs SYS_PTRACE over
+  the jail, which the grader container has; where the kernel refuses, the old
+  150 ms rule applies, and the GCC qualification fails on that host because a
+  sleeping program is then cut short. A program that ends between samples
+  ends normally: NsJail removes its group as the jail ends, a moment before
+  the launcher sees the exit, so a missing group or process reads as ended,
+  and any other failure of the check falls back to the CPU rule instead of
+  failing the Run. The browser acceptance caught a first version failing such
+  a Run (the launcher then stopped answering), so qualification now runs
+  twenty held Runs that end mid-sample.
+- **`<iostream>` is precompiled.** `/opt/cove/pch/iostream.gch` is built from
+  the system header with the compile's own flags, beside `bits/stdc++.h.gch`.
+  GCC uses it when `<iostream>` is the first include. Messages are the same as
+  without it; in a template error's include chain, the line naming the
+  student's file is dropped, as it already was for `<bits/stdc++.h>`. When a
+  macro defined before the include makes it unusable, GCC reads the system
+  header and `-Winvalid-pch` says so. Every such macro found (`endl`, `size`,
+  `int`) breaks `<iostream>` anyway. The image build fails if the header is
+  not used, and qualification checks that it raises no warning. 28 MB.
+- Known: `#define N 100` before `#include <bits/stdc++.h>` compiles but shows
+  the `-Winvalid-pch` warning, because `N` appears in that header. This
+  predates this change.
+
+### 10.7 Qualification before production (2026-11-11)
+
+- **GitHub Actions.** `native-grading-qualification.yml` now runs for
+  `feat/c-cpp-execution` (push, path-filtered) and for any ref by hand. It
+  refuses a non-x86_64 runner or a dirty tree, builds the guest and grader
+  images from the commit, records commit, image IDs and architecture, runs
+  the runtime and fixture unit tests, `qualify-linux.sh`, then the C/C++
+  browser acceptance on that image. A step requires every kernel gate,
+  `actual-linux-gcc` included, to report PASS; a `verdict` job fails the
+  workflow whenever `qualify` did not succeed, skipped included.
+- **Fixture.** `qualify-linux.sh` mounts the two native-gcc stores the
+  launcher requires and production Compose provides: their own tmpfs each,
+  owned by the unit's UID, under the 0711 assets directory (NsJail resolves
+  bind sources inside the jail's user namespace), 256 MiB executable for
+  compiled programs and 128 MiB `noexec` for staging, writable in the unit
+  through `ReadWritePaths` and unmounted on cleanup. Without them the GCC gate
+  could not start. Checked on Ubuntu 24.04's systemd in a disposable
+  container: ownership, 0711, exec in the store, `noexec` staging, read-only
+  assets otherwise. `test-c-cpp-local.sh` now runs on Linux (GNU `mktemp`).
+- **New GCC checks** (52 in all, arm64): waiting is detected through `dup(0)`,
+  `dup2(0, 7)` and `readv`; a read of the program's own pipe runs to its limit
+  instead; both precompiled headers are found (a `_GLIBCXX_DEBUG` program is
+  told each `.gch` is not used) and used (the plain program compiles
+  silently); warnings and errors name `main.c`/`main.cpp` and the line, with
+  or without a precompiled header.
+- **Browser.** The teacher's pointer on a C/C++ problem lands on the same
+  content on unequal screens. The history bookmark race is fixed (the page
+  shows a status while it redirects and reads nothing). Submit timings
+  separate page load from Submit-click-to-visible-result and a cold compile
+  from a cached resubmission, ending each measurement on a new final verdict.
+- **Rollback floor.** C/C++ courses now count, through
+  `to_jsonb(c) ->> 'language'` (works before and after the column exists),
+  and the target API must know `C_CPP`, not only `CPP`.
+
+Local timings (arm64 Mac, Docker Desktop, grader limited to 2 CPUs, `next
+dev`, one student, two runs; they vary two to three times between runs):
+
+| | Cold compile | Cached resubmission |
+| --- | --- | --- |
+| C, 2 cases: Submit click to visible verdict | 0.95–2.5 s | 0.36–0.86 s |
+| C, server (admission to commit) | 0.40–1.9 s | 0.11–0.32 s |
+| C++ `<iostream>`, 10 cases: click to visible | 0.84–2.5 s | 0.84–0.90 s |
+| C++, server | 0.63–1.9 s | 0.36–0.57 s |
+
+Page load is measured apart (1.5–3.7 s under `next dev`). The grader alone
+compiles these programs in 30–130 ms, so most of a cold submission's server
+time is elsewhere in the submission path; that has not been broken down yet.
+
+Open, for the production host:
+
+- The amd64 qualification (Actions, then the release image on the host).
+- Capacity (§8 gates): Actions proves function on one runner, not classrooms.
+- After a grader fault the node withdraws GCC until restarted; the client
+  treats the resulting `UNAVAILABLE` as busy and retries for 30 s, so each
+  C/C++ job then waits 30 s before failing. Distinguishing "withdrawn" from
+  "busy" needs a protocol change.
+- A submission still queued for a grader identity that no longer runs (the
+  five-minute drain on stop did not finish it) stays QUEUED; nothing fails or
+  moves it.

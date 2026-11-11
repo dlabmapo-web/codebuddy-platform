@@ -109,27 +109,87 @@ pnpm test:c-cpp:local
 It uses new local PostgreSQL and Redis containers, a synthetic identity
 provider, and the real API, Next application and native grader. It checks C/C++
 Run, Test and Submit, diagnostics, hidden-case redaction, teacher review/history,
-choosing a course's language, and a ten-case C++ submission. It does not create
+choosing a course's language, a ten-case C++ submission, the teacher's pointer
+on a C/C++ problem, and Submit timings (`test-results/c-cpp-browser/timings.json`:
+page load apart from Submit-click-to-visible-result, cold compile apart from a
+cached resubmission). It works on Linux as on macOS. It does not create
 content in an existing academy. Ports 3317, 4317 and 4327 must be free. The image
 can be overridden with `COVE_CPP_NATIVE_IMAGE`; logs are saved under
 `test-results/c-cpp-local` and browser artifacts under `test-results/c-cpp-browser`.
 To repeat just the local kernel containment checks on an immutable image, use
 `bash deploy/native/qualify-local-container.sh sha256:<local-image-id>`.
 
-The arm64 qualification passed locally (2026-11-10, Docker Desktop, production
-container flags): 39 CPython containment checks and 45 GCC checks. **amd64 has
-not been qualified**: its seccomp lists (`gcc-run.amd64.policy`,
-`gcc-compile.amd64.policy`) carry the x86 legacy syscalls by reasoning, and only
-the real host can prove them. Fails closed: a missing syscall kills the program
-or the compiler, which the qualification reports.
+### Qualify before deployment
+
+Three stages, in order, for the exact commit you deploy. The first two are
+functional: they prove containment and correctness, not classroom capacity.
+
+**1. GitHub Actions, native amd64.** Workflow *Native grading disposable Linux
+qualification* (`.github/workflows/native-grading-qualification.yml`). It runs
+by itself on a push to `feat/c-cpp-execution` (or
+`feat/native-grading-classroom-capacity`) that touches the grader, judge,
+learn, shared, workspace, monitoring or history code. Run it by hand for any
+branch, `main` included, before a deployment:
+
+- GitHub → **Actions** → *Native grading disposable Linux qualification* →
+  **Run workflow** → choose the branch → **Run workflow**; or
+- `gh workflow run native-grading-qualification.yml --ref <branch>`, then
+  `gh run watch`.
+
+It passes only when both jobs are green, `qualify` and `verdict`; `verdict`
+fails whenever `qualify` was skipped or cancelled. On `ubuntu-24.04` (x86_64,
+checked) it:
+
+1. checks out the commit and refuses a dirty tree or a non-amd64 runner;
+2. runs the runtime and fixture unit tests;
+3. builds the guest and grader images from that commit and records the commit,
+   image IDs and architecture (`native-candidate.json`, the run summary);
+4. runs `deploy/native/qualify-linux.sh`: a bounded systemd unit with the
+   production GCC stores (an executable 256 MiB tmpfs for compiled programs, a
+   `noexec` 128 MiB one for staging, both owned by the unit), all CPython and
+   GCC kernel checks, the private application cohorts, and crash recovery. The
+   step after it requires each gate to report PASS, `actual-linux-gcc`
+   included, so a GCC-less image cannot pass;
+5. runs the C/C++ browser acceptance (`packages/api/scripts/test-c-cpp-local.sh`)
+   on the candidate image: authoring a C/C++ course and problem, Run with
+   prompts, line-by-line input, a pasted block and Ctrl+D, Test, Submit and
+   grades, compile errors and crashes with hidden cases withheld, teacher
+   review and history, staff practice, the teacher's pointer on a C/C++
+   problem, and Submit timings.
+
+Evidence is the artifact `native-linux-<commit>`: build log, candidate
+identity, kernel and application evidence, browser logs and `timings.json`.
+
+**2. The production host, with the release image, before switching.** Release
+builds (`release-v2.yml`) produce their own image from the same Dockerfiles,
+with a different identity, and the host's kernel and AppArmor are not
+GitHub's. On the Lightsail host, beside the running node (a separate
+envelope):
 
 ```bash
-docker compose run --rm native-grader qualify
+cd /opt/cove
+NATIVE_IMAGE=ghcr.io/dlabmapo-web/cove-native:sha-<40-hex commit> \
+  docker compose --project-directory /opt/cove --env-file deployment.env \
+  -f compose.production.yml --profile native run --rm native-grader qualify
 ```
 
-It must print `{"gate":"actual-linux-gcc","status":"PASS",...}` with its
-compile timings, then the CPython gate. Anything else: do not deploy a release
-that admits C/C++; remove `C` and `CPP` from the eligibility first (Rollback).
+It must print `"gate":"standby-behaviour","status":"PASS"`,
+`"gate":"cold-start","status":"PASS"`,
+`"gate":"actual-linux-gcc","status":"PASS","passed":52,...` and
+`"gate":"actual-linux-containment","status":"PASS"`. Anything else: do not
+deploy a release that admits C/C++; remove `C` and `CPP` from the eligibility
+first (Rollback). The grader does not run these checks when it starts.
+
+**3. Capacity on the production host** (below), before classes use C/C++.
+
+Local evidence so far (2026-11-11, arm64, Docker Desktop, production container
+flags): 39 CPython checks and 52 GCC checks pass, and the browser acceptance
+passes. **amd64 has not been qualified yet**: its seccomp lists
+(`gcc-run.amd64.policy`, `gcc-compile.amd64.policy`) carry the x86 legacy
+syscalls by reasoning, and the x86 numbers by which the launcher recognizes a
+waiting Run's `read` are covered only by unit tests; stages 1 and 2 prove them.
+Fails closed: a missing syscall kills the program or the compiler, and a wrong
+`read` number cuts a sleeping Run short; both fail the GCC gate.
 
 Then check readiness on the running node:
 
@@ -168,6 +228,11 @@ separate execution host, never higher limits.
 - **Deploy the API before the web.** The workspace now asks the API to hold a
   check's read until it changes (`waitWhile`) and names the Run an input line
   continues (`continues`); an older API refuses both fields.
+- **The grader needs SYS_PTRACE.** It reads a Run's program's system call to
+  tell waiting for input from sleeping. Production Compose already grants it.
+  Where it is missing, Runs fall back to the 150 ms rule, and
+  `docker compose run --rm native-grader qualify` fails; the grader's own
+  startup does not check it.
 
 ## Authoring guidance for teachers
 
@@ -189,7 +254,9 @@ separate execution host, never higher limits.
   with all the input so far and the terminal adds only what is new, so a
   program using random numbers or the clock can print different output after
   each line. Ctrl+D ends the input, for programs that read until the end of
-  it; a line still in the field goes with it.
+  it; a line still in the field goes with it. A program that sleeps or
+  computes keeps running; only a read of more input than was typed ends it to
+  ask for a line.
 - Programs may write and read files in their working directory; author-supplied
   input files are not supported yet.
 
@@ -199,8 +266,16 @@ separate execution host, never higher limits.
   deploy. Run, Test and Submit then answer "temporarily unavailable" in C and
   C++ courses, and Python is untouched. This is the supported rollback.
 - **Application rollback** below the C/C++ release is refused by
-  `deploy/scripts/rollback.sh` once any C/C++ exercise or submission exists,
-  because an older API cannot read those rows (submissions keep their language
-  even after an exercise is deleted). The check
-  (`deploy/scripts/check-language-floor.sh`) looks for `CPP` in the target API
-  image's Prisma client. Roll forward instead.
+  `deploy/scripts/rollback.sh` once any C/C++ course, exercise or submission
+  exists, because an older API cannot read those rows (submissions keep their
+  language even after an exercise is deleted), and would let Python problems
+  into a C/C++ course. The check (`deploy/scripts/check-language-floor.sh`)
+  looks for `C_CPP` in the target API image's Prisma client. Roll forward
+  instead.
+- **The grader image** is replaced like any release: on stop the node
+  withdraws readiness and finishes queued native work for up to five minutes,
+  and the API admits native work only while a node reports ready, so queued
+  work is not stranded. Work admitted for one grader identity runs only on that
+  identity; a submission still queued for an image that no longer runs stays
+  QUEUED until that image runs again. After a grader fault the node withdraws
+  C/C++ until it restarts (Python continues); restart `native-grader`.

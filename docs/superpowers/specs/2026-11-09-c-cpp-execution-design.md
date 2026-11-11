@@ -222,10 +222,11 @@ identity; graded submissions keep theirs.
 - Programs are linked **dynamically**. The run root contains only the loader,
   `libc`, `libm`, `libstdc++` and `libgcc_s`. Static linking was rejected:
   binaries are 30 times larger and linking is slower (§2.2).
-- `/opt/cove/pch/bits/stdc++.h.gch` is built when the image is built, with
-  exactly the C++ flags above. GCC uses a precompiled header only when the
-  flags match; `-Winvalid-pch` makes a mismatch visible, and qualification
-  checks that the header is used (§6).
+- `/opt/cove/pch/bits/stdc++.h.gch` and `/opt/cove/pch/iostream.gch` are
+  built when the image is built, with exactly the C++ flags above. GCC uses a
+  precompiled header only when the flags match and the program's first include
+  names it; `-Winvalid-pch` makes a mismatch visible, the image build fails if
+  `<iostream>`'s is not used, and qualification checks both (§6).
 - Warnings are shown on Run and never affect grading.
 
 | Limit | Compile | Run, per case |

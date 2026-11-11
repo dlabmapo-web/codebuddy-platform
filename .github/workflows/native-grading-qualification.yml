@@ -1,8 +1,29 @@
 name: Native grading disposable Linux qualification
+# Functional qualification of the native grader (CPython and GCC) on a real
+# amd64 Linux kernel, with a disposable database, Redis and browser fixture.
+# It proves containment and correctness for one exact commit and image. It is
+# not a classroom capacity test: GitHub's runner is not the production host.
 on:
   push:
-    branches: [feat/native-grading-classroom-capacity]
-    paths: ['packages/grading-runtime/**', 'packages/api/src/judge/**', 'packages/api/scripts/*native*', 'deploy/native/**', 'deploy/docker/native-grading.Dockerfile', '.github/workflows/native-grading-qualification.yml']
+    branches: [feat/native-grading-classroom-capacity, feat/c-cpp-execution]
+    paths:
+      - 'packages/grading-runtime/**'
+      - 'packages/api/src/judge/**'
+      - 'packages/api/src/learn/**'
+      - 'packages/api/scripts/*native*'
+      - 'packages/api/scripts/*c-cpp*'
+      - 'packages/shared/src/**'
+      - 'packages/web/src/lib/workspace/**'
+      - 'packages/web/src/lib/monitoring/**'
+      - 'packages/web/src/components/workspace/**'
+      - 'packages/web/src/components/monitoring/**'
+      - 'packages/web/src/components/student-history/**'
+      - 'e2e/specs/c-cpp-execution.spec.ts'
+      - 'e2e/c-cpp.playwright.config.ts'
+      - 'deploy/native/**'
+      - 'deploy/docker/native-grading.Dockerfile'
+      - '.github/workflows/native-grading-qualification.yml'
+  # Manual runs qualify any ref, e.g. main before a deployment.
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,9 +32,14 @@ concurrency:
   cancel-in-progress: true
 jobs:
   qualify:
-    if: github.ref == 'refs/heads/feat/native-grading-classroom-capacity'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.ref == 'refs/heads/feat/native-grading-classroom-capacity' ||
+      github.ref == 'refs/heads/feat/c-cpp-execution'
+    # GitHub's standard Ubuntu runner is native x86_64, the production
+    # architecture; the first step refuses anything else.
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 60
     env:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.native-fixture-browsers
       DOTENV_CONFIG_PATH: /dev/null
@@ -22,29 +48,79 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: {persist-credentials: false}
+      - name: Native amd64 runner and the exact source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64 || { echo "::error::Not a native amd64 runner: $(uname -m)"; exit 1; }
+          test "$(docker info --format '{{.Architecture}}')" = x86_64
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain)"
+          { echo "kernel=$(uname -r)"; echo "cpus=$(nproc)"; grep -m1 'model name' /proc/cpuinfo; free -m | sed -n 2p; } > native-runner.txt
       - uses: actions/setup-node@v4
         with: {node-version: '22.22.0'}
       - run: corepack enable && corepack prepare pnpm@9.15.9 --activate
       - run: pnpm install --frozen-lockfile
       - run: node --test packages/api/scripts/benchmark-native-classroom.test.mjs deploy/native/*.test.mjs
+      # The runtime's unit tests consume @cove/shared as built, as in ci.yml.
+      - run: pnpm --filter @cove/shared build && pnpm --filter @cove/grading-runtime test
       - name: Verify disposable database host connectivity
         run: bash deploy/native/fixture-services-smoke.sh
       - name: Validate systemd delegation arguments
         run: sudo systemd-run --wait --pipe --collect --property='Delegate=cpu memory pids' /usr/bin/true
       - run: pnpm exec playwright install --with-deps chromium
-      - run: bash deploy/native/build-image.sh > native-image-build.log 2>&1
+      - name: Build the candidate grader image from this commit
+        run: bash deploy/native/build-image.sh > native-image-build.log 2>&1
+      - name: Record the candidate's identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$(docker image inspect -f '{{.Id}}' cove-native-node:qualification)"
+          guest="$(docker image inspect -f '{{.Id}}' cove-native-guest:qualification)"
+          arch="$(docker image inspect -f '{{.Architecture}}' cove-native-node:qualification)"
+          test "$arch" = amd64 || { echo "::error::Candidate image is $arch, not amd64"; exit 1; }
+          # The build must not have touched the checkout it was built from.
+          test -z "$(git status --porcelain)"
+          jq -n --arg commit "$GITHUB_SHA" --arg ref "$GITHUB_REF" --arg image "$image" --arg guest "$guest" --arg arch "$arch" \
+            --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{commit: $commit, ref: $ref, image: $image, guestImage: $guest, architecture: $arch, run: $run}' > native-candidate.json
+          cat native-candidate.json
+          { echo '### Candidate'; echo '```json'; cat native-candidate.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Actual kernel and private full application qualification
         shell: bash
         run: |
           image="$(docker image inspect -f '{{.Id}}' cove-native-node:qualification)"
           sudo env PATH="$PATH" HOME=/root PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" bash deploy/native/qualify-linux.sh --isolated-host "$image" "$PWD/native-linux-evidence"
       # No continue-on-error: unsupported namespaces/cgroups/proc access fails this gate.
-      - name: Restore runner ownership of private qualification evidence
+      - name: Restore runner ownership of the checkout and private evidence
         if: always()
         shell: bash
         run: |
-          if sudo test -d "$PWD/native-linux-evidence"; then
-            sudo chown -R --no-dereference -- "$(id -u):$(id -g)" "$PWD/native-linux-evidence"
+          # The qualification builds shared packages as root; later steps build as the runner.
+          sudo chown -R --no-dereference -- "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
+      - name: Every kernel gate passed, GCC's included
+        shell: bash
+        run: |
+          set -euo pipefail
+          kernel=native-linux-evidence/kernel.jsonl
+          # Each gate must report PASS; a GCC-less manifest would skip GCC silently.
+          for gate in standby-behaviour cold-start actual-linux-gcc actual-linux-containment; do
+            grep -q "\"gate\":\"$gate\",\"status\":\"PASS\"" "$kernel" || { echo "::error::Kernel gate $gate did not pass"; cat "$kernel"; exit 1; }
+          done
+          grep -q '"gate":"actual-linux-crash","status":"PASS"' native-linux-evidence/crash.jsonl || { echo "::error::Crash recovery gate did not pass"; cat native-linux-evidence/crash.jsonl; exit 1; }
+          if grep -q '"status":"UNSUPPORTED_OR_FAILED"' "$kernel" native-linux-evidence/crash.jsonl; then echo "::error::A kernel gate failed"; exit 1; fi
+          { echo '### Kernel gates'; echo '```'; grep -o '"gate":"[^"]*","status":"[^"]*"\(,"passed":[0-9]*,"timings":{[^}]*}\)\?' "$kernel"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: C and C++ browser acceptance on the candidate image
+        shell: bash
+        env:
+          COVE_CPP_NATIVE_IMAGE: cove-native-node:qualification
+        run: bash packages/api/scripts/test-c-cpp-local.sh
+      - name: Record Submit timings
+        if: always()
+        shell: bash
+        run: |
+          if [ -f test-results/c-cpp-browser/timings.json ]; then
+            { echo '### Submit timings (functional smoke on a GitHub runner, not capacity)'; echo '```json'; cat test-results/c-cpp-browser/timings.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Preserve failures and exact image identity
         if: always()
@@ -52,6 +128,20 @@ jobs:
         with:
           name: native-linux-${{ github.sha }}
           path: |
+            native-runner.txt
+            native-candidate.json
             native-image-build.log
             native-linux-evidence
+            test-results/c-cpp-local
+            test-results/c-cpp-browser
           retention-days: 14
+  # A skipped or cancelled qualification must never read as a green workflow.
+  verdict:
+    needs: qualify
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Qualification ran and passed
+        run: |
+          echo "qualify: ${{ needs.qualify.result }}"
+          test "${{ needs.qualify.result }}" = success

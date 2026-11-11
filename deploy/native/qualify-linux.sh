@@ -23,9 +23,16 @@ chmod 0711 "$native_assets"
 native_artifact="$native_assets/artifact"
 native_container=''
 compose() { docker compose -p "$native_project" -f "$native_repo/deploy/native/fixture.compose.yml" "$@"; }
+# Under the traversable assets directory: NsJail resolves a bind source inside the
+# jail's user namespace, so every path component must be traversable (0711).
+native_gcc_artifacts="$native_assets/gcc-artifacts"; native_gcc_staging="$native_assets/gcc-staging"
 cleanup() {
  systemctl stop "$native_unit.service" >/dev/null 2>&1 || true
  journalctl -u "$native_unit.service" --no-pager > "$native_evidence/journal.log" || true
+ # The unit is stopped, so nothing holds the GCC stores; unmount before removal.
+ for native_mount in "$native_gcc_artifacts" "$native_gcc_staging"; do
+  if mountpoint -q "$native_mount"; then umount "$native_mount" || true; fi
+ done
  # Compose ownership and unique project label are both required before deleting fixture resources.
  for native_c in $(compose ps -aq); do
   if [ "$(docker inspect -f '{{index .Config.Labels "cove.native.qualification"}}' "$native_c")" != "$COVE_NATIVE_FIXTURE_ID" ]; then echo 'Refusing foreign fixture cleanup' >&2; return; fi
@@ -45,6 +52,17 @@ docker cp "$native_container:/opt/cove" "$native_artifact"
 setpriv --reuid=65534 --regid=65534 --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs \
  /usr/bin/test -r "$native_artifact/rootfs/opt/cove/bootstrap.py"
 mkdir -m 700 "$native_work/evidence"
+# The native-gcc stores, as deploy/compose.production.yml gives the container:
+# each its own bounded tmpfs owned by the launcher's UID. Compiled programs run
+# from the store, so it alone is executable; compile staging is noexec. The
+# store's size is the manifest's artifactStoreMb (default 256 MiB) and staging
+# holds 64 MiB per CPU slot (two here), both charged to this unit.
+if [ -d "$native_artifact/gcc-root" ]; then
+ install -d -m 700 "$native_gcc_artifacts" "$native_gcc_staging"
+ mount -t tmpfs -o "rw,nosuid,nodev,exec,size=256m,mode=0700,uid=$native_service_uid,gid=$native_service_gid" cove-gcc-artifacts "$native_gcc_artifacts"
+ mount -t tmpfs -o "rw,nosuid,nodev,noexec,size=128m,mode=0700,uid=$native_service_uid,gid=$native_service_gid" cove-gcc-staging "$native_gcc_staging"
+ for native_mount in "$native_gcc_artifacts" "$native_gcc_staging"; do findmnt -n -o TARGET,FSTYPE,OPTIONS --mountpoint "$native_mount"; done > "$native_work/evidence/gcc-mounts.txt"
+fi
 # Prove the real kernel boundary before preparing DB/browser resources. Both
 # phases use this same protected unit configuration and resource envelope.
 run_native_unit() {
@@ -59,9 +77,10 @@ systemd-run --unit="$native_unit" --wait --pipe --collect \
  --property=CapabilityBoundingSet='CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_SETUID CAP_SETGID CAP_SYS_RESOURCE CAP_DAC_OVERRIDE CAP_CHOWN CAP_SETPCAP' \
  --property=AmbientCapabilities='CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_SETUID CAP_SETGID CAP_SYS_RESOURCE CAP_DAC_OVERRIDE CAP_CHOWN CAP_SETPCAP' \
  --property=ProtectSystem=strict --property="ReadOnlyPaths=$native_artifact $native_repo" \
- --property="ReadWritePaths=$native_work /sys/fs/cgroup/system.slice/$native_unit.service" \
+ --property="ReadWritePaths=$native_work -$native_gcc_artifacts -$native_gcc_staging /sys/fs/cgroup/system.slice/$native_unit.service" \
  --property=NoNewPrivileges=yes --property=PrivateTmp=yes \
  /usr/bin/env -i PATH="$PATH" HOME=/nonexistent DOTENV_CONFIG_PATH=/dev/null \
+ "NATIVE_GCC_ARTIFACTS=$native_gcc_artifacts" "NATIVE_GCC_STAGING=$native_gcc_staging" \
  "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:?Explicit fixture browser installation path required}" "COVE_NATIVE_AUTH_PORT=${native_auth_port:-}" "COVE_NATIVE_API_PORT=${native_api_port:-}" "COVE_NATIVE_NEXT_ORIGIN=${native_web_origin:-}" "COVE_NATIVE_NEXT_BUILD_ID=${native_next_id:-}" "COVE_NATIVE_FIXTURE_ID=$COVE_NATIVE_FIXTURE_ID" "DATABASE_URL=${native_db:-}" "REDIS_URL=${native_redis_url:-}" \
  /bin/bash "$native_repo/deploy/native/qualify-unit.sh" "$native_work" "$native_repo" "$native_artifact" "$1" \
  2>&1 | tee "$native_evidence/unit-$1.log"

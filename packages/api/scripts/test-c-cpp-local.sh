@@ -25,7 +25,8 @@ for cpp_port in 3317 4317 4327; do
   if lsof -nP -iTCP:"$cpp_port" -sTCP:LISTEN >/dev/null 2>&1; then echo "Test port $cpp_port is in use" >&2; exit 2; fi
 done
 cpp_owner="native-cpp-$(date +%s)-$$"
-cpp_work="$(mktemp -d -t cove-cpp-browser)"
+# A template, not BSD's `-t prefix`: GNU mktemp (Linux CI) needs the X's.
+cpp_work="$(mktemp -d "${TMPDIR:-/tmp}/cove-cpp-browser.XXXXXXXX")"
 cpp_pg="$cpp_owner-pg"; cpp_redis="$cpp_owner-redis"; cpp_native="$cpp_owner-grader"
 cpp_playground_pid=''
 mkdir -p "$cpp_evidence" "$cpp_work/shared"

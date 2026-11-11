@@ -42,7 +42,11 @@ sudo env PATH="$PATH" HOME=/root PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_
 
 This uses private owner-labelled Compose DB/Redis, synthetic loopback URLs and
 fixture sentinels, all migrations, a bounded delegated systemd unit, actual
-NsJail containment probes, actual authorized admission/queues/comparator/atomic
+NsJail containment probes (CPython and, when the image carries GCC, the GCC
+gate: the unit gets the two native-gcc stores production gets, each its own
+tmpfs owned by the unit's UID under the 0711 assets directory, 256 MiB
+executable for compiled programs and 128 MiB `noexec` for compile staging,
+unmounted on cleanup), actual authorized admission/queues/comparator/atomic
 commit, bounded 1/2/4-client application cohorts with 1/5/10 cases, then a running
 case launcher-SIGKILL test. It stops growth at the first failure. Cleanup stops
 only the generated unit and verifies labels before removing fixture containers.

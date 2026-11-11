@@ -33,9 +33,8 @@ C++ problem. Both are assigned to **C/C++ Practice Class**, including the
 existing development student (`cove-student`). An earlier version of this
 command seeded one **C and C++ Practice** course mixing both languages
 (`c1000000-0000-4000-8000-000000000001`); delete it from the course list. Sign in with that student to
-use **Program input**, **Run**, **Test run**, and **Submit**. Staff can inspect
-and author the course and submit their own graded practice; C/C++ Run/Test in
-their private staff copy is deferred.
+use **Run**, **Test run**, and **Submit**. Staff can inspect
+and author the course, and Run, Test and Submit their own staff practice.
 
 This command deliberately uses the configured **shared development database**.
 It does not replace existing course content or student drafts when rerun. Docker runs
@@ -62,7 +61,7 @@ problem to sign in as the local student; no password is required. **C
 Practice** contains C addition; **C++ Practice** contains C++ addition and a C++
 exercise with ten grading cases. All three have working starter code.
 
-1. Type `40 2` into **Program input** and click **Run**; it prints `42`.
+1. Click **Run**, type `40 2` in the terminal and press Enter; it prints `42`.
 2. Click **Test run** to check the public example.
 3. Click **Submit** to check all grading cases.
 4. Remove a semicolon to see GCC's compile diagnostics, or use
@@ -165,6 +164,8 @@ separate execution host, never higher limits.
 
 ## Authoring guidance for teachers
 
+- A course is **Python** or **C / C++**. In a C/C++ course each problem
+  chooses C or C++ in the exercise editor, so one course can mix both.
 - Choose the course's **Programming language** when creating it. Every coding
   problem in the course uses it; quiz-style problems, Turtle exercises and
   other materials are unaffected. It can be changed only while the course has
@@ -174,8 +175,12 @@ separate execution host, never higher limits.
   C++ uses `g++ -O2 -std=gnu++17`. `ONLINE_JUDGE` is defined.
 - Visual Studio–only code does not compile: `scanf_s`, `<conio.h>`,
   `<windows.h>`. `#define _CRT_SECURE_NO_WARNINGS` is harmless.
-- Run takes its input from the **Program input** box (prefilled with example 1).
-  Typing into a running program is not available yet.
+- Run works as Python's does: the program starts at once, and when it waits for
+  input the terminal takes a line (Enter). Each line re-runs the compiled
+  program with all the input so far, so a program using random numbers or the
+  clock can print different output after each line. Ctrl+D ends the input, for
+  programs that read until the end of it. C's `printf` prompts without a
+  newline appear once the program finishes; C++ `cout` prompts appear at once.
 - Programs may write and read files in their working directory; author-supplied
   input files are not supported yet.
 

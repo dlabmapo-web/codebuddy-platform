@@ -18,6 +18,7 @@ Compiling, running and grading C and C++ are unchanged.
 | --- | --- |
 | Where the language is chosen | When a course is created, in the library and in an academy. |
 | What follows it | Every coding exercise in the course: starter code, solutions, test cases, Run, Test and Submit. |
+| Course languages (revised 2026-11-11, §10) | **Python** or **C / C++**. A C/C++ course mixes the two: each problem chooses C or C++. |
 | Can students switch language? | No. The editor has no language selector. It shows the language as a label. |
 | Which academies offer C and C++ | All of them. No per-academy switch. |
 | Existing courses | Python, and they stay Python. |
@@ -233,3 +234,80 @@ the UI never offers a refused action.
   course in another language, create a new course in that language.
 - Per-language starter code within one exercise.
 - C or C++ for Turtle exercises and code-file written responses.
+
+## 10. Revision 2026-11-11: Python or C/C++
+
+After trying the first version on localhost, the owner asked for three changes.
+
+### 10.1 C and C++ share one course language
+
+Some courses mix C and C++, so a course is **Python** or **C / C++**:
+
+- `CourseLanguage { PYTHON, C_CPP }` replaces the three-valued course
+  language. Migration `20261111090000_course_language_family` converts
+  `courses.language` in place: C and CPP become `C_CPP`, everything else
+  `PYTHON`.
+- In a C/C++ course each coding problem chooses **C or C++**; it starts in C.
+  The exercise editor shows a C / C++ toggle there and nowhere else. Switching
+  a problem between them swaps an untouched template and is a grading change
+  (a new grading revision), as any change of program is.
+- The exercise authoring input carries `language` again. The server checks it
+  against the course: Python in a Python course; C or C++ in a C/C++ course;
+  anything else is `EXERCISE_VALIDATION_FAILED`. Quiz-style problems stay
+  Python. The spreadsheet import gives a C/C++ course's new problems C.
+- The lock is unchanged: the course language is fixed once it holds a problem.
+- The course forms (academy, library, admin console) use a card selector, a
+  radio group of two cards with a coloured mark, title and one-line
+  description, instead of a dropdown. Course lists show a coloured
+  "Python" or "C / C++" badge.
+
+### 10.2 Run and Test run in staff practice
+
+Staff practice now has **Run** (with Program input) and **Test run** for C and
+C++, as students have:
+
+- `learn.startPracticeSampleCheck` and `learn.startPracticeRunCheck` start the
+  same sample-check records with no class. They are authorized as staff
+  practice Submit is (`staffPracticeMaterial`): a membership with
+  `practice.own.create`, and `curriculum.review` for an unpublished preview,
+  which runs in the `preview` native context.
+- A practice record is marked `practice: true`; reading it back
+  (`getSampleCheck`, `cancelSampleCheck`) uses the staff practice material
+  rule, so a preview's check reads back too. It is never a submission.
+- Admission is **8 statements**: the student Run's 11 less its class context.
+- Python staff practice keeps running in the browser.
+
+### 10.3 The language is easy to see
+
+The editor header's language label is a coloured, bold tag: Python blue, C
+teal, C++ violet. It appears in the student and staff workspaces, authoring,
+the live view and history. The colours are theme tokens (`--lang-*`), with
+`-on-editor` shades for the editor chrome, which is dark in both themes.
+
+### 10.4 Run takes input in the terminal, as Python's does (2026-11-11)
+
+The separate Program input box is gone. A C/C++ Run starts at once; when the
+program waits for input the terminal shows its prompt, and Enter carries on.
+
+- The exec gate gains a `hold` request (`cove-gate-1 <bytes> <ms> hold`): the
+  program reads its input from a pipe whose write end the gate keeps open, so
+  reading past the input blocks instead of meeting end of file.
+- The launcher ends a held Run whose program is alive but has used no CPU for
+  150 ms: reading stdin is the only thing a jailed program can wait on. The
+  result is `awaitingInput: true` with the output printed so far.
+- A Run check holds its input unless `endOfInput` is set (Ctrl+D; the terminal
+  has no End input button, for Python or C/C++).
+  The browser re-runs the compiled program, from the artifact cache, with every
+  line typed so far; a pasted block travels together. Test and Submit never
+  hold their input.
+- While the program waits, Stop ends it. Reset stays available then (the
+  program does no work), and asks in Cove's own dialog, as every coding
+  workspace's Reset now does instead of the browser's confirm: confirming
+  clears the output and restores the starter code when it changed.
+- Qualified on the real kernel (arm64): GCC 47 checks, adding a C++ program
+  waiting for its second number (reported waiting, prompts already flushed by
+  `cin`), the same program with complete input, and a busy program never taken
+  for a waiting one; CPython 39.
+- Known differences from a live terminal: each line re-runs the program, so
+  random or clock-based output can differ between lines; C `printf` prompts
+  without a newline are buffered and appear when the program finishes.

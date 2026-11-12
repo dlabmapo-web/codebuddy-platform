@@ -56,6 +56,7 @@ import { StudentSwitcher } from '@/components/monitoring/student-switcher';
 import { FeedbackDock } from './live-feedback';
 import { LiveHeader } from './live-header';
 import { LiveOutput, type LiveOutputTab } from './live-output';
+import { ProgrammingGradingDrawer } from '@/components/programming-review/grading-drawer';
 import { useLiveSubmissionResult } from '../_hooks/use-live-submission-result';
 import { PreviewEditor } from './preview-editor';
 import { AnswerCodeModal } from './answer-code-modal';
@@ -123,6 +124,7 @@ export function LiveWorkspace({
   const { runSample } = useSampleRunner(runner);
   const preferences = useEditorPreferences();
 
+  const [gradingOpen, setGradingOpen] = React.useState(false);
   const [outputTab, setOutputTab] = React.useState<LiveOutputTab>('you');
   const [activeSample, setActiveSample] = React.useState<number | null>(null);
   const [readRunId, setReadRunId] = React.useState<string | null>(null);
@@ -271,7 +273,8 @@ export function LiveWorkspace({
   // exactly; what differs is where the payload came from and what may be done
   // with it.
   const shown = previewed ?? liveExercise ?? (lastExercise?.exercise.materialId === selectedMaterialId ? lastExercise : null);
-  const setHistoryMaterial = React.useContext(HistoryPresentationContext)?.setMaterial;
+  const historyPresentation = React.useContext(HistoryPresentationContext);
+  const setHistoryMaterial = historyPresentation?.setMaterial;
   React.useEffect(() => {setHistoryMaterial?.(selectedMaterialId ?? materialId ?? context.exercise?.exercise.materialId ?? null,
     shown?.breadcrumb.course.id, 'PROGRAMMING_EXERCISE', shown?.exercise.title);},
     [selectedMaterialId,materialId,context.exercise?.exercise.materialId,shown?.breadcrumb.course.id,shown?.exercise.title,setHistoryMaterial]);
@@ -374,7 +377,7 @@ export function LiveWorkspace({
 
   const note = useFeedbackDraft(feedbackScope(teacherMembershipRef, academyId, classId, membershipId, selectedMaterialId ?? materialId ?? null));
   return (
-    <div className="flex h-dvh flex-col bg-canvas">
+    <div className={`flex h-dvh flex-col bg-canvas ${gradingOpen ? "xl:pr-[440px]" : ""}`}>
       {/* The student's mouse, drawn wherever this teacher's layout puts the
           pane it is over. */}
       <ObservationPresence awareness={observationAwareness ?? null} materialId={selectedMaterialId ?? materialId ?? null} name={student} />
@@ -383,7 +386,10 @@ export function LiveWorkspace({
       <div className="shrink-0" {...surfaceProps('header')}>
         <LiveHeader
           canEditProblem={canEditProblem}
-          helpQueue={<LiveHelpQueue academyId={academyId} classId={classId} currentMembershipId={membershipId} prepare={live.prepareStudentSwitch} cancel={live.cancelStudentSwitch} />}
+          gradingAction={<ProgrammingGradingDrawer academyId={academyId} classId={classId}
+            review={submissionResult.review ?? null} active={display.isLive && !historyPresentation?.covered}
+            onRegisterGuard={historyPresentation?.setGradingGuard} onOpenStateChange={setGradingOpen} />}
+          helpQueue={<LiveHelpQueue academyId={academyId} classId={classId} currentMembershipId={membershipId} prepare={historyPresentation?.beforeNavigate ?? live.prepareStudentSwitch} cancel={live.cancelStudentSwitch} />}
           studentSwitcher={<StudentSwitcher academyId={academyId} classId={classId} membershipId={membershipId} name={context.student.displayName ?? context.student.email ?? membershipId} className={context.class.name} prepare={live.prepareStudentSwitch} cancel={live.cancelStudentSwitch} />}
           answer={<>
             {observation?.materialId && observation.materialId !== (selectedMaterialId ?? materialId) && onReturnToObserved

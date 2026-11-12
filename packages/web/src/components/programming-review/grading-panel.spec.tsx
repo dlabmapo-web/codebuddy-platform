@@ -14,7 +14,7 @@ vi.stubGlobal('React',React);vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
 const initial:ProgrammingAssessment={version:1,messageVersion:1,maximumHundredths:10000,includeInScore:false,
   state:'GRADED',reviewVersion:1,scoreHundredths:8000,completed:true,feedback:'Original feedback',reviewerName:'Teacher',reviewedAt:'2026-11-12T00:00:00.000Z'};
 describe('teacher grading refresh',()=>{
-  it.each(['card','terminal'] as const)('reloads the current grade while preserving an unsaved correction (%s)',async(variant)=>{
+  it.each(['card','sidebar'] as const)('reloads the current grade while preserving an unsaved correction (%s)',async(variant)=>{
     const host=document.createElement('div');document.body.append(host);const root=createRoot(host), dirty=vi.fn();
     mocks.get.mockResolvedValue({canPublishReview:true,assessment:{...initial,reviewVersion:2,scoreHundredths:9000},reviews:[]});
     try{
@@ -29,7 +29,7 @@ describe('teacher grading refresh',()=>{
       expect(host.querySelector('[data-testid="programming-assessment"]')?.textContent).toContain('90 / 100');
       expect(input.value).toBe('80');
       expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Original feedback');
-      if(variant==='terminal') {
+      if(variant==='sidebar') {
         const history=[...host.querySelectorAll('button')].find(b=>b.textContent==='history')!;
         await act(async()=>history.click());
         expect(host.querySelector('form')?.style.display).toBe('none');

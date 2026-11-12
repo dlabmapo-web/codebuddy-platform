@@ -1,6 +1,6 @@
 'use client';
 
-import type { ResultChangedEvent, SubmissionResult, SubmissionStatus } from '@cove/shared';
+import type { ResultChangedEvent, SubmissionResult, SubmissionStatus, TeacherSubmissionReview } from '@cove/shared';
 import { useQuery } from '@tanstack/react-query';
 import * as React from 'react';
 
@@ -20,6 +20,8 @@ import {
 
 export type LiveSubmissionResult = {
   view: LiveResultView;
+  /** Authorized immutable receipt used by the grading sidebar; never live draft code. */
+  review?: TeacherSubmissionReview | null;
   submissionId: string | null;
   /** The verdict in the student's own result shape, once the review is read. */
   result: SubmissionResult | null;
@@ -82,7 +84,7 @@ export function useLiveSubmissionResult({
         submissionId: submissionId!,
       }),
     enabled: readsReview(current),
-    // A graded submission never changes.
+    // Automatic verdicts are final; manual assessments refresh through assessment events.
     staleTime: Infinity,
     retry: 1,
   });
@@ -91,7 +93,7 @@ export function useLiveSubmissionResult({
   React.useEffect(() => {
     const refresh = (event: Event) => {
       const detail = (event as CustomEvent).detail;
-      if (!detail || (detail.academyId === academyId && detail.submissionId === submissionId)) void refreshReview();
+      if (submissionId && (!detail || (detail.academyId === academyId && detail.submissionId === submissionId))) void refreshReview();
     };
     window.addEventListener('cove:assessment-changed', refresh);
     return () => window.removeEventListener('cove:assessment-changed', refresh);
@@ -105,6 +107,7 @@ export function useLiveSubmissionResult({
 
   return {
     view,
+    review: loaded ? review.data ?? null : null,
     submissionId,
     result:
       loaded && current && review.data

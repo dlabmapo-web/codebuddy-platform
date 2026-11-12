@@ -22,7 +22,7 @@ export function Providers({
   // Floating debug controls otherwise cover actions in fullscreen workspaces.
   const fullscreenWorkspace =
     pathname === routes.turtle || /\/learn\/(?:exercises|documents|turtle|quizzes|videos)\//.test(pathname) ||
-    /\/teach\/classes\/[^/]+\/students\/[^/]+\/(?:work|submissions)\//.test(pathname);
+    /\/teach\/classes\/[^/]+\/students\/[^/]+\/(?:work|submissions|live)(?:\/|$)/.test(pathname);
   const [queryClient] = useState(() => getQueryClient());
   useEffect(() => {
     const refresh = (event: Event) => {

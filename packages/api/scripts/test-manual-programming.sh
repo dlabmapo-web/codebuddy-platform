@@ -44,4 +44,4 @@ pnpm --filter @cove/api db:generate
 pnpm --filter @cove/api db:migrate:deploy
 pnpm --filter @cove/api exec vitest run src/learn/programming-review.integration.spec.ts src/content/navigation-performance.integration.spec.ts src/learn/curriculum-read.integration.spec.ts src/classes/manager-academy-access.integration.spec.ts --maxWorkers=1
 pnpm --filter @cove/api exec tsc -p tsconfig.build.json --outDir "$manual_build" --incremental false --declaration false --sourceMap false
-pnpm exec playwright test --config e2e/manual-programming.playwright.config.ts
+pnpm exec playwright test --config e2e/manual-programming.playwright.config.ts "$@"

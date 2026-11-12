@@ -17,6 +17,7 @@ export const HistoryPresentationContext = createContext<{
   selectedStudent?: { membershipId: string; name: string } | null;
   selectStudent?: (student: { membershipId: string; name: string }) => void;
   registerOutlet?: (element: HTMLDivElement | null) => void;
+  setGradingGuard?: (guard: (() => boolean) | null) => void;
   setLeaveGuard?: (prepare: (() => Promise<boolean>) | null) => void;
   beforeNavigate?: () => Promise<boolean>;
   prepareMaterialChange?: () => boolean;

@@ -49,6 +49,8 @@ export function MonitorHistoryHost({
     title?: string;
   }>({ id: null });
   const [outlet, registerOutlet] = React.useState<HTMLDivElement | null>(null);
+  const gradingGuard = React.useRef<(() => boolean) | null>(null);
+  const setGradingGuard = React.useCallback((next: (() => boolean) | null) => {gradingGuard.current = next;}, []);
   const guard = React.useRef<(() => boolean) | null>(null);
   const leave = React.useRef<(() => Promise<boolean>) | null>(null);
   const [nonce] = React.useState(() => crypto.randomUUID());
@@ -80,7 +82,7 @@ export function MonitorHistoryHost({
     guard.current = next;
   }, []);
   const close = React.useCallback(() => {
-    if (guard.current?.() === false) return false;
+    if (guard.current?.() === false || gradingGuard.current?.() === false) return false;
     setStudent(null);
     setDrawer(false);
     return true;
@@ -98,18 +100,17 @@ export function MonitorHistoryHost({
   }, [drawer, student, close]);
   const selectStudent = React.useCallback(
     (next: Student) => {
-      if (!material.id || guard.current?.() === false) return;
+      if (!material.id || guard.current?.() === false || gradingGuard.current?.() === false) return;
       setStudent(next);
       setDrawer(false);
     },
     [material.id],
   );
   const beforeNavigate = React.useCallback(async () => {
-    if (guard.current?.() === false) return false;
+    if (guard.current?.() === false || gradingGuard.current?.() === false) return false;
     return leave.current ? leave.current() : true;
   }, []);
   React.useEffect(() => {
-    if (!student) return;
     const leaving = (event: MouseEvent) => {
       if (
         event.button !== 0 ||
@@ -130,7 +131,7 @@ export function MonitorHistoryHost({
         link.href === location.href
       )
         return;
-      if (guard.current?.() === false) {
+      if (guard.current?.() === false || gradingGuard.current?.() === false) {
         event.preventDefault();
         event.stopPropagation();
       }
@@ -141,6 +142,7 @@ export function MonitorHistoryHost({
   const open = React.useCallback(
     (mode: "student" | "material") => {
       if (mode === "material") {
+        if (gradingGuard.current?.() === false) return;
         if (material.id) setDrawer((value) => !value);
         return;
       }
@@ -182,6 +184,7 @@ export function MonitorHistoryHost({
       selectStudent,
       registerOutlet,
       setLeaveGuard,
+      setGradingGuard,
       beforeNavigate,
       prepareMaterialChange: close,
     }),
@@ -195,6 +198,7 @@ export function MonitorHistoryHost({
       material.id,
       selectStudent,
       setLeaveGuard,
+      setGradingGuard,
       beforeNavigate,
       close,
     ],

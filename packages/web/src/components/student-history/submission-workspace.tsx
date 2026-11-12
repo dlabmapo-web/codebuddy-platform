@@ -1,6 +1,7 @@
 "use client";
 import { useReviewTranslation } from "@/components/programming-review/use-review-translation";
-import { ProgrammingGradingPanel } from "@/components/programming-review/grading-panel";
+import { ProgrammingGradingDrawer } from "@/components/programming-review/grading-drawer";
+import { ProgrammingAssessmentResult } from "@/components/programming-review/assessment-result";
 import * as React from "react";
 import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
@@ -239,7 +240,9 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
   const rt = useReviewTranslation();
   const manualAssessment = data.kind === "programming" && !data.draft ? data.review.manualAssessment : undefined;
   const manualReview = Boolean(manualAssessment && props.submissionId);
-  const [gradingDirty, setGradingDirty] = React.useState(false);
+  const [gradingOpen, setGradingOpen] = React.useState(false);
+  const gradingGuard = React.useRef<(() => boolean) | null>(null);
+  const registerGradingGuard = React.useCallback((next: (() => boolean) | null) => {gradingGuard.current = next;}, []);
   const [scratchEditing, setScratchEditing] = React.useState(false);
   const [mobilePane, setMobilePane] = React.useState<"problem" | "code">("code");
   const [session, setSession] = React.useState<ManualSession | null>(null),
@@ -265,7 +268,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
     min: 25,
     max: 70,
   });
-  const [outputTab, setOutputTab] = React.useState<"run" | "result" | "grade">(manualReview ? "grade" : "run");
+  const [outputTab, setOutputTab] = React.useState<"run" | "result">("run");
   const [drawingLayout, setDrawingLayout] = React.useState("below");
   const [drawingShare, setDrawingShare] = React.useState(45);
   const [turtleTab, setTurtleTab] = React.useState("code");
@@ -274,7 +277,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
     size: outputHeight,
     resizeBy: resizeOutput,
     dividerProps: outputDivider,
-  } = useSplitPane({ axis: "vertical", initial: manualReview ? 320 : 250, min: 150, max: 700 });
+  } = useSplitPane({ axis: "vertical", initial: 250, min: 150, max: 700 });
   const [panelOpen, setPanelOpen] = React.useState(true);
   const panelId = React.useId();
   React.useEffect(() => {
@@ -326,6 +329,10 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
   const completed =
     manualAssessment ? manualAssessment.completed : data.kind === "programming" ? data.review.accepted : data.completed;
   const maximum = manualAssessment ? manualAssessment.maximumHundredths / 100 : data.kind === "programming" ? 100 : (data.maximum ?? 100);
+  const gradingAction = manualReview && data.kind === "programming" && props.submissionId ? <ProgrammingGradingDrawer
+              academyId={props.academyId} classId={props.classId} onRegisterGuard={registerGradingGuard} onOpenStateChange={setGradingOpen}
+              review={{submissionId:props.submissionId, materialId:props.materialId, membershipId:props.membershipId, studentName:student, problemTitle:title, code:data.review.code,
+                createdAt:data.review.createdAt ?? null, manualAssessment, canPublishManualReview:data.review.canPublishManualReview}} /> : null;
   const stopPython = runner.stop;
   const stop = React.useCallback(() => {
     generation.current++;
@@ -340,18 +347,21 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
   }, [stopPython]);
   const onRegisterGuard = props.onRegisterGuard;
   React.useEffect(() => {
-    onRegisterGuard(() => !(dirty || gradingDirty) || window.confirm(gradingDirty ? rt("unsaved_grade") : t("history.discard")));
+    onRegisterGuard(() => {
+      if (dirty && !window.confirm(t("history.discard"))) return false;
+      return gradingGuard.current?.() ?? true;
+    });
     return () => onRegisterGuard(null);
-  }, [dirty, gradingDirty, onRegisterGuard, rt, t]);
+  }, [dirty, onRegisterGuard, t]);
   React.useEffect(() => {
-    if (!(dirty || gradingDirty)) return;
+    if (!dirty) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty, gradingDirty]);
+  }, [dirty]);
   React.useEffect(() => {
     if (!props.active) {
       generation.current++;
@@ -456,7 +466,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
     : runner.running;
   return (
     <section
-      className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
+      className={`flex h-full min-h-0 flex-1 flex-col overflow-hidden ${gradingOpen ? "xl:pr-[440px]" : ""}`}
       data-testid="historical-submission"
     >
       <header className="shrink-0 border-b border-border bg-card px-3 py-2.5">
@@ -515,6 +525,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                 {manualReview ? rt("submitted_code") : t("history.private_badge")}
               </span>
             )}
+            {gradingAction}
             {props.headerActions}
           </div>
         ) : (
@@ -613,12 +624,13 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                   ) : null}
                 </div>
               </div>
-              {props.headerActions}
+              {gradingAction}
+            {props.headerActions}
             </div>
           </>
         )}
       </header>
-      {manualReview ? <div role="tablist" aria-label={rt("tab_code_grading")} className="flex shrink-0 gap-1 border-b border-border bg-card px-3 py-1.5 lg:hidden" onKeyDown={event => {
+      {manualReview ? <div role="tablist" aria-label={rt("tab_code")} className="flex shrink-0 gap-1 border-b border-border bg-card px-3 py-1.5 lg:hidden" onKeyDown={event => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
         event.preventDefault();
         const next = event.key === "Home" ? "problem" : event.key === "End" ? "code" : mobilePane === "code" ? "problem" : "code";
@@ -627,7 +639,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
       }}>
         {(["problem", "code"] as const).map(pane => <button key={pane} type="button" role="tab" data-pane={pane} tabIndex={mobilePane === pane ? 0 : -1} aria-selected={mobilePane === pane}
           onClick={() => {setMobilePane(pane); setPanelOpen(false);}} className="rounded-md px-3 py-1.5 text-xs font-semibold text-sub aria-selected:bg-brand-soft aria-selected:text-brand">
-          {pane === "problem" ? tl("workspace.tab_problem") : rt("tab_code_grading")}
+          {pane === "problem" ? tl("workspace.tab_problem") : rt("tab_code")}
         </button>)}
       </div> : null}
       {data.kind === "manual" && data.explanation ? (
@@ -892,7 +904,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
               {!turtle ? (
                 <div
                   role="separator"
-                  aria-label={rt("resize_grading")}
+                  aria-label={rt("resize_output")}
                   aria-orientation="horizontal"
                   aria-valuemin={150} aria-valuemax={700} aria-valuenow={Math.round(outputHeight)}
                   tabIndex={manualReview ? 0 : undefined}
@@ -915,12 +927,11 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                     const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowLeft" ? tabs.length - 1 : 1)) % tabs.length;
                     tabs[next]?.click(); tabs[next]?.focus();
                   }}>
-                    {(manualReview ? ["grade", "run"] as const : data.draft ? ["run"] as const : ["run", "result"] as const).map(tab => <button
+                    {(data.draft ? ["run"] as const : ["run", "result"] as const).map(tab => <button
                       key={tab} type="button" role="tab" aria-selected={outputTab === tab} tabIndex={outputTab === tab ? 0 : -1}
                       aria-controls={`${panelId}-output-${tab}`} id={`${panelId}-tab-${tab}`} onClick={() => setOutputTab(tab)}
                       className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent py-1 text-xs font-semibold text-white/50 focus-visible:outline-2 focus-visible:outline-brand aria-selected:border-brand aria-selected:text-white">
-                      {tab === "grade" ? <ListChecks aria-hidden className="size-3.5"/> : null}
-                      {tab === "grade" ? rt("tab_grading") : t(tab === "run" ? "history.your_run" : "history.saved_result")}
+                      {t(tab === "run" ? "history.your_run" : "history.saved_result")}
                     </button>)}
                   </div>
                 ) : null}
@@ -1094,18 +1105,12 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                   data-testid="review-output-pane"
                   style={{ height: outputHeight, ...(manualReview ? {maxHeight: "56%"} : {}) }}
                 >
-                  {manualReview && manualAssessment && props.submissionId ? <div role="tabpanel" id={`${panelId}-output-grade`} aria-labelledby={`${panelId}-tab-grade`}
-                    style={{display:outputTab === "grade" ? "flex" : "none"}} className="min-h-0 flex-1 flex-col">
-                    {scratchEditing ? <p className="shrink-0 border-b border-white/10 px-4 py-2 text-xs text-amber-200">{rt("teacher_hint")}</p> : null}
-                    <ProgrammingGradingPanel key={props.submissionId} variant="terminal" academyId={props.academyId} classId={props.classId}
-                      submissionId={props.submissionId} initial={manualAssessment} canPublish={data.kind === "programming" && (data.review.canPublishManualReview ?? false)} onDirtyChange={setGradingDirty}/>
-                  </div> : null}
-                  <div role="tabpanel" id={`${panelId}-output-${outputTab === "result" ? "result" : "run"}`} aria-labelledby={`${panelId}-tab-${outputTab === "result" ? "result" : "run"}`}
-                    style={{display:outputTab === "grade" ? "none" : "flex"}} className="min-h-0 flex-1 flex-col">
+                  <div role="tabpanel" id={`${panelId}-output-${outputTab}`} aria-labelledby={`${panelId}-tab-${outputTab}`}
+                    className="flex min-h-0 flex-1 flex-col">
                   <p className="shrink-0 border-b border-white/10 px-3 py-2 font-mono text-[11px] text-white/45">
                     {manualReview && scratchEditing ? rt("editing_private") : t("history.private_hint")}
                   </p>
-                  {outputTab === "result" && data.kind === "programming" ? (
+                  {outputTab === "result" && manualAssessment ? <div className="min-h-0 flex-1 overflow-auto p-4"><ProgrammingAssessmentResult assessment={manualAssessment} dark /></div> : outputTab === "result" && data.kind === "programming" ? (
                     <div className="min-h-0 flex-1 overflow-auto p-4 text-xs text-white/80">
                       <p>
                         {score ?? "—"} / {maximum}

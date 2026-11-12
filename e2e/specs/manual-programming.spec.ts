@@ -4,8 +4,8 @@ const provider=`http://127.0.0.1:${process.env.COVE_DLAB_TEST_PROVIDER_PORT??432
 const api=`http://127.0.0.1:${process.env.COVE_DLAB_TEST_API_PORT??4319}/api/rpc`;
 const studio=`http://127.0.0.1:${process.env.COVE_DLAB_TEST_WEB_PORT??3309}`;
 type Fixture={id:string;academy:{id:string;slug:string}};
-async function fixture(request:APIRequestContext,role:string,parentFixtureId?:string):Promise<Fixture>{
-  const response=await request.post(provider+'/fixtures',{data:{role,parentFixtureId}});
+async function fixture(request:APIRequestContext,role:string,parentFixtureId?:string,name?:string):Promise<Fixture>{
+  const response=await request.post(provider+'/fixtures',{data:{role,parentFixtureId,name}});
   expect(response.ok(),await response.text()).toBe(true);return response.json();
 }
 async function enter(page:Page,value:Fixture){
@@ -24,12 +24,14 @@ async function rpc(page:Page,path:string,input:unknown){
 }
 test('student submits; assigned Teacher, Team Lead and Manager publish/correct with visible results',async({page,browser,request},info)=>{
   const manager=await fixture(request,'lab_head'),studentFixture=await fixture(request,'student',manager.id),
-    leadFixture=await fixture(request,'edu_manager',manager.id),teacherFixture=await fixture(request,'tutor',manager.id);
+    leadFixture=await fixture(request,'edu_manager',manager.id),teacherFixture=await fixture(request,'tutor',manager.id),
+    offlineFixture=await fixture(request,'student',manager.id,'Offline review student');
   const studentContext=await browser.newContext({baseURL:studio}),leadContext=await browser.newContext({baseURL:studio}),teacherContext=await browser.newContext({baseURL:studio});
   const student=await studentContext.newPage(),lead=await leadContext.newPage(),teacher=await teacherContext.newPage();
+  const offlineContext=await browser.newContext({baseURL:studio}),offline=await offlineContext.newPage();
   try{
-    await enter(page,manager);await enter(student,studentFixture);await enter(lead,leadFixture);await enter(teacher,teacherFixture);
-    const seeded=await request.post(`${provider}/fixtures/${manager.id}/classroom`,{data:{studentFixtureId:studentFixture.id,teacherFixtureId:teacherFixture.id,emptyWork:true}});
+    await enter(page,manager);await enter(student,studentFixture);await enter(lead,leadFixture);await enter(teacher,teacherFixture);await enter(offline,offlineFixture);
+    const seeded=await request.post(`${provider}/fixtures/${manager.id}/classroom`,{data:{studentFixtureId:studentFixture.id,teacherFixtureId:teacherFixture.id,reviewStudentFixtureId:offlineFixture.id,emptyWork:true}});
     expect(seeded.ok(),await seeded.text()).toBe(true);const room=await seeded.json();
     const academyId=manager.academy.id,classId=room.classes[0].id;
     const created=await rpc(page,'academyCourses/createExercise',{academyId,courseId:room.courseId,lectureId:room.lectureId,
@@ -38,6 +40,8 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
       testCases:[],hints:[],submissionPolicy:'MANUAL_REVIEW',manualAssessment:{maximumHundredths:10000,includeInScore:false},
       grading:{mode:'LEGACY_STDIO',inputPromptPolicy:'INCLUDE',totalTimeLimitMs:null,comparatorTimeLimitMs:null,materialMaximumHundredths:null,materialScorePolicy:null}});
     const materialId=created.material.id;
+    await rpc(offline,'learn/submit',{academyId,classId,materialId,code:'print("OFFLINE MANUAL SNAPSHOT")',requestId:crypto.randomUUID(),manualAssessmentVersion:1});
+    await offlineContext.close();
     const authorRoute=routes.academyCourse(manager.academy.slug,room.courseId)+`/lectures/${room.lectureId}/exercises/${materialId}`;
     await page.goto(authorRoute);
     const manualMode=page.getByRole('radio',{name:/Teacher grading|수동 채점/});
@@ -71,67 +75,46 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
     expect(streams).toEqual([]);
     const latest=await rpc(student,'learn/getLatestSubmission',{academyId,materialId,classId,mode:'student'});
     const reviewRoute=routes.academyTeachStudentWork(manager.academy.slug,classId,room.studentMembershipId,materialId)+'?attempt='+latest.submissionId;
-    await teacher.goto(reviewRoute);const panel=teacher.getByTestId('programming-grading-panel');
-    await expect(panel).toBeVisible();
-    await expect(teacher.getByText('Submitted code',{exact:true}).first()).toBeVisible();
-    await expect(teacher.getByRole('button',{name:'Try changes',exact:true})).toBeVisible();
+    await teacher.goto(reviewRoute);
+    await expect(teacher.getByTestId('programming-grading-drawer')).toHaveCount(0);
+    await expect(teacher.getByRole('tab',{name:'Teacher grading',exact:true})).toHaveCount(0);
     for (const viewport of [{width:1440,height:1000},{width:1280,height:800}]) {
       await teacher.setViewportSize(viewport);
-      const editor=teacher.locator('.monaco-editor').first();
-      await expect(editor).toBeVisible();
-      const code=await editor.boundingBox(), grading=await panel.boundingBox();
-      expect(code!.height).toBeGreaterThanOrEqual(140);
-      expect(grading!.y).toBeGreaterThan(code!.y);
-      expect(grading!.y+grading!.height).toBeLessThanOrEqual(viewport.height+1);
+      await expect(teacher.locator('.monaco-editor').first()).toBeVisible();
       await expect(teacher.getByTestId('review-problem-description')).toBeVisible();
-      expect(await panel.evaluate(node=>Boolean(node.closest('[data-testid="review-output-pane"]')))).toBe(true);
       expect(await teacher.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1)).toBe(true);
-      await teacher.screenshot({path:info.outputPath(`teacher-workspace-${viewport.width}.png`)});
+      await teacher.screenshot({path:info.outputPath(`teacher-history-${viewport.width}.png`)});
     }
-    const divider=teacher.getByRole('separator',{name:'Resize editor and grading panel'});
-    const before=(await teacher.getByTestId('review-output-pane').boundingBox())!.height;
-    await divider.focus(); await teacher.keyboard.press('ArrowDown');
-    await expect.poll(async()=>(await teacher.getByTestId('review-output-pane').boundingBox())!.height).toBeLessThan(before);
+    await teacher.getByRole('button',{name:'Grade submission',exact:true}).click();
+    const drawer=teacher.getByTestId('programming-grading-drawer'),panel=drawer.getByTestId('programming-grading-panel');
+    await expect(drawer).toBeVisible();
+    expect(await panel.evaluate(node=>Boolean(node.closest('[data-testid="review-output-pane"]')))).toBe(false);
+    await expect.poll(async()=>{const box=(await drawer.boundingBox())!;return Math.round(box.x+box.width);}).toBe(1280);
     await panel.getByRole('textbox',{name:/Final score|최종 점수/}).fill('101');
     await expect(panel.getByRole('textbox',{name:/Final score|최종 점수/})).toHaveAttribute('aria-invalid','true');
     await expect(panel.getByRole('button',{name:'Publish grade',exact:true})).toBeDisabled();
     await panel.getByRole('textbox',{name:/Final score|최종 점수/}).fill('80');
     await panel.getByRole('textbox',{name:/Feedback|피드백/}).fill('Good loop. Check the stopping condition.');
-    const stay=teacher.waitForEvent('dialog');
-    const leave=teacher.getByRole('button',{name:'Back to student history',exact:true}).click();
-    const confirmation=await stay; expect(confirmation.message()).toContain('grading changes'); await confirmation.dismiss(); await leave;
-    await expect(teacher).toHaveURL(new URL(reviewRoute,studio).href);
-    await teacher.getByRole('tab',{name:'Your run',exact:true}).click();
-    await teacher.getByRole('tab',{name:'Teacher grading',exact:true}).click();
+    const confirmation=teacher.waitForEvent('dialog');
+    const close=drawer.getByRole('button',{name:'Close grading',exact:true}).click();
+    const dialog=await confirmation;expect(dialog.message()).toContain('grading changes');await dialog.dismiss();await close;
+    await expect(drawer).toBeVisible();
     await expect(panel.getByRole('textbox',{name:/Final score|최종 점수/})).toHaveValue('80');
-    await expect(panel.getByRole('textbox',{name:/Feedback|피드백/})).toHaveValue('Good loop. Check the stopping condition.');
+    await teacher.screenshot({path:info.outputPath('teacher-history-grading-sidebar.png')});
     await teacher.setViewportSize({width:390,height:844});
-    await teacher.keyboard.press('Escape');
-    await expect(teacher.getByRole('tab',{name:'Code & grading',exact:true})).toBeVisible();
-    await expect(teacher.getByRole('complementary')).toHaveCount(0);
-    await teacher.getByRole('button',{name:'Materials',exact:true}).click();
-    await expect(teacher.getByRole('complementary')).toBeVisible();
-    await teacher.keyboard.press('Escape');
-    await expect(teacher.getByRole('complementary')).toHaveCount(0);
-    await expect(teacher.getByRole('button',{name:'Materials',exact:true})).toBeFocused();
-    await expect(teacher.locator('.monaco-editor').first()).toBeInViewport();
     await expect(panel.getByRole('button',{name:'Publish grade',exact:true})).toBeInViewport();
     for (const field of await panel.locator('input[inputmode="decimal"], textarea').all()) {
-      const bounds=(await field.boundingBox())!;
-      expect(bounds.x+bounds.width).toBeLessThanOrEqual(390);
+      const bounds=(await field.boundingBox())!;expect(bounds.x+bounds.width).toBeLessThanOrEqual(390);
     }
-    await teacher.screenshot({path:info.outputPath('teacher-workspace-mobile.png')});
+    await teacher.screenshot({path:info.outputPath('teacher-grading-sidebar-mobile.png')});
     expect(await teacher.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    await teacher.getByRole('tab',{name:'Problem',exact:true}).click();
-    await expect(teacher.getByTestId('review-problem-description')).toBeVisible();
-    await teacher.getByRole('tab',{name:'Code & grading',exact:true}).click();
     await panel.getByRole('checkbox',{name:/Learning complete|학습 완료/}).check();
     await panel.getByRole('button',{name:/^Publish grade$|^Update grade$|^채점 결과 등록$|^채점 결과 수정$/}).click();
     await expect(panel).toContainText('80 / 100');
     await expect(student.getByTestId('programming-assessment')).toContainText('80 / 100');
     await expect(student.getByTestId('programming-assessment')).toContainText('Good loop.');
     for(const [staff,score] of [[lead,'85.25'],[page,'90']] as const){
-      await staff.goto(reviewRoute);const grading=staff.getByTestId('programming-grading-panel');
+      await staff.goto(reviewRoute);await staff.getByRole('button',{name:'Edit grade',exact:true}).click();const grading=staff.getByTestId('programming-grading-panel');
       await expect(grading.getByRole('button',{name:/^Publish grade$|^Update grade$|^채점 결과 등록$|^채점 결과 수정$/})).toBeVisible();
       await grading.getByRole('textbox',{name:/Final score|최종 점수/}).fill(score);
       await expect(grading.getByText('→ '+score+' / 100',{exact:false})).toBeVisible();
@@ -160,10 +143,87 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
     await student.screenshot({path:info.outputPath('student-manual-result-ko-dark-mobile.png'),fullPage:true});
     await page.context().addCookies([{name:'i18next',value:'ko',url:studio},{name:'cove-theme',value:'dark',url:studio}]);
     await page.goto(reviewRoute);
+    await page.getByRole('button',{name:'채점 수정',exact:true}).click();
     await expect(page.getByRole('textbox',{name:'최종 점수',exact:true})).toHaveValue('90');
     await page.getByRole('button',{name:'채점 기록',exact:true}).click();
     await expect(page.getByTestId('programming-grading-panel')).toContainText('3차');
     await page.evaluate(()=>window.scrollTo(0,0));
     await page.screenshot({path:info.outputPath('manager-grading-history-ko-dark.png'),fullPage:true});
-  }finally{await studentContext.close();await leadContext.close();await teacherContext.close();}
+    // The same saved receipt is gradeable without leaving the live monitor.
+    await student.setViewportSize({width:1440,height:1000});
+    await page.context().addCookies([{name:'i18next',value:'en',url:studio},{name:'cove-theme',value:'light',url:studio}]);
+    const liveRoute=routes.academyTeachStudentLive(manager.academy.slug,classId,room.studentMembershipId);
+    await page.goto(liveRoute);
+    await expect(page.getByTestId('observation-connection')).toContainText('Live');
+    await page.getByRole('button',{name:'Edit grade',exact:true}).click();
+    const liveDrawer=page.getByTestId('programming-grading-drawer');
+    await expect(liveDrawer.getByRole('textbox',{name:'Final score',exact:true})).toHaveValue('90');
+    // A new receipt arrives over the existing live channel; the open grade remains pinned.
+    await expect.poll(()=>student.evaluate(()=>{
+      const editor=(window as any).monaco?.editor.getEditors().find((item:any)=>item.getDomNode()?.getBoundingClientRect().width);
+      if(!editor?.getModel())return false;editor.focus();editor.setSelection(editor.getModel().getFullModelRange());return true;
+    })).toBe(true);
+    await student.keyboard.insertText('print("SECOND SAVED SUBMISSION")');
+    await student.getByRole('button',{name:/^Submit$|^제출$/}).click();
+    await expect(liveDrawer).toContainText('A newer submission is available.');
+    await liveDrawer.getByText('View submitted code',{exact:true}).click();
+    await expect(liveDrawer.getByTestId('grading-submitted-code')).toHaveText('print("teacher review")');
+    await liveDrawer.getByRole('button',{name:'Review newer submission',exact:true}).click();
+    await expect(liveDrawer.getByRole('textbox',{name:'Final score',exact:true})).toHaveValue('');
+    await liveDrawer.getByText('View submitted code',{exact:true}).click();
+    await expect(liveDrawer.getByTestId('grading-submitted-code')).toHaveText('print("SECOND SAVED SUBMISSION")');
+    await liveDrawer.getByRole('textbox',{name:'Final score',exact:true}).fill('95');
+    await liveDrawer.getByRole('textbox',{name:'Feedback (optional)',exact:true}).fill('Graded during live monitoring.');
+    await liveDrawer.getByRole('button',{name:'Publish grade',exact:true}).click();
+    await expect(liveDrawer.getByTestId('programming-assessment')).toContainText('95 / 100');
+    await expect(student.getByTestId('programming-assessment')).toContainText('95 / 100');
+    await page.screenshot({path:info.outputPath('live-grading-sidebar.png')});
+    await liveDrawer.getByRole('button',{name:'Close grading',exact:true}).click();
+    await expect(liveDrawer).toHaveCount(0);
+    await expect(page.getByTestId('observation-connection')).toContainText('Live');
+    await student.getByTestId('student-help-request').getByRole('button',{name:/Request help|도움 요청/}).click();
+    await expect(page.getByRole('button',{name:/Help requests.*1 waiting/})).toBeVisible();
+    // Tutoring opens the chosen student's saved work inside the still-mounted live session.
+    await page.getByRole('button',{name:'Tutoring',exact:true}).click();
+    await page.getByTestId('inline-tutoring').getByRole('button').filter({hasText:'Browser student'}).click();
+    await expect(page.getByTestId('tutor-student-work')).toBeVisible();
+    await page.getByRole('button',{name:'Edit grade',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Edit grade',exact:true})).toHaveCount(1);
+    const tutoringDrawer=page.getByTestId('programming-grading-drawer');
+    await tutoringDrawer.getByRole('textbox',{name:'Final score',exact:true}).fill('97');
+    await tutoringDrawer.getByRole('textbox',{name:'Correction reason',exact:true}).fill('Reviewed together during tutoring.');
+    await tutoringDrawer.getByRole('button',{name:'Update grade',exact:true}).click();
+    await expect(student.getByTestId('programming-assessment')).toContainText('97 / 100');
+    await page.screenshot({path:info.outputPath('tutoring-grading-sidebar.png')});
+    await tutoringDrawer.getByRole('button',{name:'Close grading',exact:true}).click();
+    await expect(tutoringDrawer).toHaveCount(0);
+    // The selector can open an offline student's work for the displayed problem, with its own grade target.
+    await page.getByRole('button',{name:/Switch student, current student/}).click();
+    await page.getByRole('button').filter({hasText:'Offline review student'}).click();
+    await page.getByRole('button',{name:'Grade submission',exact:true}).click();
+    const offlineDrawer=page.getByTestId('programming-grading-drawer');
+    await expect(offlineDrawer).toContainText('Offline review student');
+    await offlineDrawer.getByText('View submitted code',{exact:true}).click();
+    await expect(offlineDrawer.getByTestId('grading-submitted-code')).toHaveText('print("OFFLINE MANUAL SNAPSHOT")');
+    await offlineDrawer.getByRole('textbox',{name:'Final score',exact:true}).fill('40');
+    await offlineDrawer.getByRole('button',{name:'Publish grade',exact:true}).click();
+    await expect(offlineDrawer.getByTestId('programming-assessment')).toContainText('40 / 100');
+    await expect(student.getByTestId('programming-assessment')).toContainText('97 / 100');
+    await page.screenshot({path:info.outputPath('selector-grading-sidebar.png')});
+    await offlineDrawer.getByRole('button',{name:'Close grading',exact:true}).click();
+    await expect(offlineDrawer).toHaveCount(0);
+    await page.getByRole('button',{name:'Return to monitoring',exact:true}).click();
+    await expect(page.getByTestId('inline-tutoring')).toHaveCount(0);
+    await expect(page.getByTestId('observation-connection')).toContainText('Live');
+    for (const [staff,score] of [[teacher,'98'],[lead,'99']] as const) {
+      await staff.setViewportSize({width:1440,height:1000});await staff.goto(liveRoute);
+      await staff.getByRole('button',{name:'Edit grade',exact:true}).click();
+      const grading=staff.getByTestId('programming-grading-drawer');
+      await grading.getByRole('textbox',{name:'Final score',exact:true}).fill(score);
+      await grading.getByRole('textbox',{name:'Correction reason',exact:true}).fill('Staff review from live monitoring.');
+      await grading.getByRole('button',{name:'Update grade',exact:true}).click();
+      await expect(student.getByTestId('programming-assessment')).toContainText(score+' / 100');
+      await expect(staff.getByTestId('observation-connection')).toContainText('Live');
+    }
+  }finally{await offlineContext.close();await studentContext.close();await leadContext.close();await teacherContext.close();}
 });

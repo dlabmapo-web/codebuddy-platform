@@ -50,5 +50,15 @@
   "editing_private": "개인 사본으로 테스트 중입니다. 학생의 제출 코드는 변경되지 않습니다.",
   "readonly_hint": "권한이 있는 선생님만 채점 결과를 등록할 수 있습니다.",
   "unsaved_grade": "아직 저장하지 않은 채점 내용이 있습니다. 이 제출에서 나가시겠습니까?",
-  "loading_history": "채점 기록을 불러오는 중…"
+  "loading_history": "채점 기록을 불러오는 중…",
+  "grade_submission": "채점하기",
+  "edit_grade": "채점 수정",
+  "close_grading": "채점 닫기",
+  "saved_submission": "저장된 제출물 채점",
+  "saved_submission_hint": "실시간으로 코드를 수정해도 이 제출 코드는 변경되지 않습니다.",
+  "newer_submission": "새로운 제출물이 있습니다. 현재 표시된 제출물을 채점하고 있습니다.",
+  "grade_latest": "새 제출물 확인",
+  "view_submitted_code": "제출 코드 보기",
+  "tab_code": "코드",
+  "resize_output": "편집기와 실행 결과 창 크기 조절"
 }

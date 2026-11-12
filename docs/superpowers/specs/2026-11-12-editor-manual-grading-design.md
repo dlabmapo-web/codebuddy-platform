@@ -1,7 +1,7 @@
 # Manual grading inside the editor workspace
 
 Date: 2026-11-12
-Status: implemented and verified. Evidence: [verification report](../../research/2026-11-12-editor-manual-grading-verification.md).
+Status: superseded by [the requested grading sidebar](2026-11-12-manual-grading-sidebar-design.md). Originally implemented and verified. Evidence: [verification report](../../research/2026-11-12-editor-manual-grading-verification.md).
 
 ## Problem and chosen layout
 

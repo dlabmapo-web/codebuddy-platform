@@ -50,5 +50,15 @@
   "editing_private": "You are testing a private copy. The student’s submitted code is unchanged.",
   "readonly_hint": "Only authorized teaching staff can publish a grade.",
   "unsaved_grade": "Your grading changes have not been saved. Leave this submission?",
-  "loading_history": "Loading review history…"
+  "loading_history": "Loading review history…",
+  "grade_submission": "Grade submission",
+  "edit_grade": "Edit grade",
+  "close_grading": "Close grading",
+  "saved_submission": "Grading the saved submission",
+  "saved_submission_hint": "Live edits do not change this submitted code.",
+  "newer_submission": "A newer submission is available. You are grading the submission shown here.",
+  "grade_latest": "Review newer submission",
+  "view_submitted_code": "View submitted code",
+  "tab_code": "Code",
+  "resize_output": "Resize editor and output"
 }

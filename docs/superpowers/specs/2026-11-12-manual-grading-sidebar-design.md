@@ -1,9 +1,9 @@
 # Manual grading from history and live monitoring
 
 Date: 2026-11-12
-Status: requested for implementation by the user; replaces the terminal-grading layout.
+Status: implemented and verified; replaces the terminal-grading layout. See [verification evidence](../../research/2026-11-12-manual-grading-sidebar-verification.md).
 
-Keep the existing history problem list, description, editor and Run/Saved result tabs. A **Grade submission** / **Edit grade** button opens a shared, non-modal right sidebar using Cove's Sheet primitive. Use the existing application typography, card/background/border tokens, blue actions and monospace score values. On phones the sidebar uses the viewport width. The form scrolls independently; completion and publication stay at the bottom.
+Keep the existing history problem list, description, editor and Run/Saved result tabs. A **Grade submission** / **Edit grade** button opens a shared, non-modal right sidebar using Cove's Sheet primitive. Use the existing application typography, card/background/border tokens, blue actions and monospace score values. At 1280px and wider the workspace reserves the sidebar width so the code stays visible beside grading. At narrower widths the sidebar overlays from the right; on phones it uses the viewport width. The form scrolls independently; completion and publication stay at the bottom.
 
 The sidebar names the student, problem and submission time and provides the immutable submitted code for inspection. It grades a pinned saved submission, even if the student changes live code or submits again. Show a newer-submission notice when applicable. Never grade a live draft or turn a help request into an invented submission.
 

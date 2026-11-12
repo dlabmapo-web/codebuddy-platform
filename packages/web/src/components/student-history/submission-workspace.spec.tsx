@@ -16,8 +16,12 @@ const setup = vi.hoisted(() => ({
   onChange: null as null | ((s: string) => void),
 }));
 vi.mock("@/components/programming-review/use-review-translation", () => ({useReviewTranslation: () => (key: string) => key}));
-vi.mock("@/components/programming-review/grading-panel", () => ({
-  ProgrammingGradingPanel: ({onDirtyChange}: {onDirtyChange: (dirty: boolean) => void}) => <button data-testid="grading-form" onClick={() => onDirtyChange(true)}>Edit grade</button>,
+vi.mock("@/components/programming-review/grading-drawer", () => ({
+  ProgrammingGradingDrawer: ({onRegisterGuard}: {onRegisterGuard: (guard: (() => boolean) | null) => void}) => {
+    const dirty = React.useRef(false);
+    React.useEffect(() => {onRegisterGuard(() => !dirty.current || window.confirm('unsaved_grade')); return () => onRegisterGuard(null);}, [onRegisterGuard]);
+    return <button data-testid="grading-action" onClick={() => {dirty.current = true;}}>Edit grade</button>;
+  },
 }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (s: string) => s }),
@@ -202,9 +206,9 @@ it.each([false, true])("preserves saved code, private runs and discard guards (m
       expect(setup.readOnly).toBe(true);
       await act(() => setup.onChange?.('print("must not edit saved code")'));
       expect(host.querySelector('[data-testid="scratch"]')?.textContent).toBe('print("original")');
-      const grading = host.querySelector('[data-testid="grading-form"]')!;
-      expect(grading.closest('[data-testid="review-output-pane"]')).not.toBeNull();
-      expect(host.querySelectorAll('[data-testid="grading-form"]')).toHaveLength(1);
+      const grading = host.querySelector('[data-testid="grading-action"]')!;
+      expect(grading.closest('[data-testid="review-output-pane"]')).toBeNull();
+      expect(host.querySelectorAll('[data-testid="grading-action"]')).toHaveLength(1);
       vi.stubGlobal("confirm", vi.fn().mockReturnValue(false));
       await act(() => (grading as HTMLButtonElement).click());
       expect(guard.current?.()).toBe(false);

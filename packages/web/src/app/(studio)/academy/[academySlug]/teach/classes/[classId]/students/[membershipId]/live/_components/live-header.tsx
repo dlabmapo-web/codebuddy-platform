@@ -45,6 +45,7 @@ export function LiveHeader({
   answer,
   helpMode,
   helpQueue,
+  gradingAction,
   materialTitle,
   saveStatus,
   canEditProblem = false,
@@ -75,6 +76,7 @@ export function LiveHeader({
    */
   helpMode?: React.ReactNode;
   helpQueue?: React.ReactNode;
+  gradingAction?: React.ReactNode;
   materialTitle?: string;
   saveStatus?: string;
   canEditProblem?: boolean;
@@ -105,7 +107,7 @@ export function LiveHeader({
             {exercise ? <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${difficultyStyles[exercise.exercise.difficulty]}`}>{tc(`exercise.difficulty.${exercise.exercise.difficulty}`)}</span> : null}
           </div>
         </div>
-        <div className="flex max-w-full flex-wrap items-center gap-2">{helpQueue}{helpMode}<MonitoringHistoryActions /><MonitoringProblemEditLink canEdit={canEditProblem} exercise={exercise} />{answer}</div>
+        <div className="flex max-w-full flex-wrap items-center gap-2">{helpQueue}{helpMode}{gradingAction}<MonitoringHistoryActions /><MonitoringProblemEditLink canEdit={canEditProblem} exercise={exercise} />{answer}</div>
       </div>
     </header>
   );

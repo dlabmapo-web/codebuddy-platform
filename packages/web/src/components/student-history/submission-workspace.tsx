@@ -1,4 +1,5 @@
 "use client";
+import { useReviewTranslation } from "@/components/programming-review/use-review-translation";
 import { ProgrammingGradingPanel } from "@/components/programming-review/grading-panel";
 import * as React from "react";
 import dynamic from "next/dynamic";
@@ -235,6 +236,12 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
       data.kind === "programming" ? "main.py" : data.entryPoint,
     );
   const runner = usePythonRunner();
+  const rt = useReviewTranslation();
+  const manualAssessment = data.kind === "programming" && !data.draft ? data.review.manualAssessment : undefined;
+  const manualReview = Boolean(manualAssessment && props.submissionId);
+  const [gradingDirty, setGradingDirty] = React.useState(false);
+  const [scratchEditing, setScratchEditing] = React.useState(false);
+  const [mobilePane, setMobilePane] = React.useState<"problem" | "code">("code");
   const [session, setSession] = React.useState<ManualSession | null>(null),
     [busy, setBusy] = React.useState(false),
     [error, setError] = React.useState(""),
@@ -250,6 +257,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
   const {
     containerRef: paneRef,
     size: statementWidth,
+    resizeBy: resizeStatement,
     dividerProps,
   } = useSplitPane({
     axis: "horizontal",
@@ -257,17 +265,33 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
     min: 25,
     max: 70,
   });
-  const [outputTab, setOutputTab] = React.useState<"run" | "result">("run");
+  const [outputTab, setOutputTab] = React.useState<"run" | "result" | "grade">(manualReview ? "grade" : "run");
   const [drawingLayout, setDrawingLayout] = React.useState("below");
   const [drawingShare, setDrawingShare] = React.useState(45);
   const [turtleTab, setTurtleTab] = React.useState("code");
   const {
     containerRef: outputRef,
     size: outputHeight,
+    resizeBy: resizeOutput,
     dividerProps: outputDivider,
-  } = useSplitPane({ axis: "vertical", initial: 250, min: 150, max: 700 });
+  } = useSplitPane({ axis: "vertical", initial: manualReview ? 320 : 250, min: 150, max: 700 });
   const [panelOpen, setPanelOpen] = React.useState(true);
   const panelId = React.useId();
+  React.useEffect(() => {
+    if (!manualReview) return;
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const adapt = () => setPanelOpen(desktop.matches);
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !desktop.matches && document.getElementById(panelId)) {
+        setPanelOpen(false);
+        document.querySelector<HTMLButtonElement>(`button[aria-controls="${panelId}"]`)?.focus();
+      }
+    };
+    adapt();
+    desktop.addEventListener('change', adapt);
+    window.addEventListener('keydown', escape);
+    return () => { desktop.removeEventListener('change', adapt); window.removeEventListener('keydown', escape); };
+  }, [manualReview, panelId]);
   const slug = useAcademySlug();
   const target = {
     academyId: props.academyId,
@@ -298,10 +322,10 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
     data.kind === "programming" ? data.review.problemTitle : data.title;
   const student =
     data.kind === "programming" ? data.review.studentName : data.studentName;
-  const score = data.kind === "programming" ? data.review.score : data.score;
+  const score = manualAssessment ? (manualAssessment.scoreHundredths === null ? null : manualAssessment.scoreHundredths / 100) : data.kind === "programming" ? data.review.score : data.score;
   const completed =
-    data.kind === "programming" ? data.review.accepted : data.completed;
-  const maximum = data.kind === "programming" ? 100 : (data.maximum ?? 100);
+    manualAssessment ? manualAssessment.completed : data.kind === "programming" ? data.review.accepted : data.completed;
+  const maximum = manualAssessment ? manualAssessment.maximumHundredths / 100 : data.kind === "programming" ? 100 : (data.maximum ?? 100);
   const stopPython = runner.stop;
   const stop = React.useCallback(() => {
     generation.current++;
@@ -316,18 +340,18 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
   }, [stopPython]);
   const onRegisterGuard = props.onRegisterGuard;
   React.useEffect(() => {
-    onRegisterGuard(() => !dirty || window.confirm(t("history.discard")));
+    onRegisterGuard(() => !(dirty || gradingDirty) || window.confirm(gradingDirty ? rt("unsaved_grade") : t("history.discard")));
     return () => onRegisterGuard(null);
-  }, [dirty, onRegisterGuard, t]);
+  }, [dirty, gradingDirty, onRegisterGuard, rt, t]);
   React.useEffect(() => {
-    if (!dirty) return;
+    if (!(dirty || gradingDirty)) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
+  }, [dirty, gradingDirty]);
   React.useEffect(() => {
     if (!props.active) {
       generation.current++;
@@ -432,7 +456,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
     : runner.running;
   return (
     <section
-      className="flex h-full min-h-0 flex-col"
+      className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
       data-testid="historical-submission"
     >
       <header className="shrink-0 border-b border-border bg-card px-3 py-2.5">
@@ -480,7 +504,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                     )}
               </p>
             </div>
-            {score != null ? (
+            {score != null && !manualReview ? (
               <span className="rounded-full bg-success/10 px-2 py-1 text-xs font-semibold text-success">
                 {score} / {maximum}
               </span>
@@ -488,7 +512,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
             {noWork ? null : (
               <span className="flex items-center gap-1 rounded-full bg-peer-soft px-2 py-1 text-xs font-semibold text-peer">
                 <ShieldCheck className="size-3.5" />
-                {t("history.private_badge")}
+                {manualReview ? rt("submitted_code") : t("history.private_badge")}
               </span>
             )}
             {props.headerActions}
@@ -542,11 +566,11 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
               </div>
               {!noWork ? (
                 <span
-                  title={t("history.private_hint")}
+                  title={manualReview ? rt("teacher_hint") : t("history.private_hint")}
                   className="inline-flex items-center gap-1.5 rounded-full bg-peer-soft px-3 py-1.5 text-xs font-semibold text-peer"
                 >
                   <ShieldCheck className="size-3.5" />
-                  {t("history.private_badge")}
+                  {manualReview ? rt("submitted_code") : t("history.private_badge")}
                 </span>
               ) : null}
             </div>
@@ -579,7 +603,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                       )}
                     </span>
                   ) : null}
-                  {score != null ? (
+                  {score != null && !manualReview ? (
                     <span
                       className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${completed ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}
                     >
@@ -594,8 +618,17 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
           </>
         )}
       </header>
-      {data.kind === 'programming' && data.review.manualAssessment && props.submissionId ? <div className="max-h-[55vh] shrink-0 overflow-auto border-b border-border p-4">
-        <ProgrammingGradingPanel key={props.submissionId} academyId={props.academyId} classId={props.classId} submissionId={props.submissionId} initial={data.review.manualAssessment} canPublish={data.review.canPublishManualReview ?? false}/>
+      {manualReview ? <div role="tablist" aria-label={rt("tab_code_grading")} className="flex shrink-0 gap-1 border-b border-border bg-card px-3 py-1.5 lg:hidden" onKeyDown={event => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        const next = event.key === "Home" ? "problem" : event.key === "End" ? "code" : mobilePane === "code" ? "problem" : "code";
+        setMobilePane(next);
+        event.currentTarget.querySelector<HTMLButtonElement>(`[data-pane="${next}"]`)?.focus();
+      }}>
+        {(["problem", "code"] as const).map(pane => <button key={pane} type="button" role="tab" data-pane={pane} tabIndex={mobilePane === pane ? 0 : -1} aria-selected={mobilePane === pane}
+          onClick={() => {setMobilePane(pane); setPanelOpen(false);}} className="rounded-md px-3 py-1.5 text-xs font-semibold text-sub aria-selected:bg-brand-soft aria-selected:text-brand">
+          {pane === "problem" ? tl("workspace.tab_problem") : rt("tab_code_grading")}
+        </button>)}
       </div> : null}
       {data.kind === "manual" && data.explanation ? (
         <details className="border-b border-border px-5 py-3">
@@ -651,15 +684,16 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
         />
         <div
           ref={paneRef}
-          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto lg:flex-row lg:overflow-hidden"
+          className={`flex min-h-0 min-w-0 flex-1 flex-col lg:flex-row lg:overflow-hidden ${manualReview ? "overflow-hidden" : "overflow-auto"}`}
         >
           <div
-            className="min-h-40 min-w-0 shrink-0 overflow-auto border-r border-border bg-card lg:min-h-0"
-            style={{ flexBasis: `${statementWidth}%` }}
+            data-testid="review-problem-description"
+            className={`min-w-0 shrink-0 overflow-auto border-r border-border bg-card lg:min-h-0 ${manualReview ? `min-h-0 flex-1 lg:flex-none lg:basis-[var(--statement-width)] ${mobilePane === "code" ? "hidden lg:block" : ""}` : "min-h-40"}`}
+            style={manualReview ? ({"--statement-width": `${statementWidth}%`} as React.CSSProperties) : { flexBasis: `${statementWidth}%` }}
           >
             {data.kind === "programming" && reference.data ? (
               <>
-                <GradingNotice exercise={reference.data.exercise} />
+                {!manualReview ? <GradingNotice exercise={reference.data.exercise} /> : null}
                 <ExerciseReferencePane
                   key={props.materialId}
                   academyId={props.academyId}
@@ -698,7 +732,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                 ) : null}
               </div>
             )}
-            {data.kind === "programming" && !data.draft ? (
+            {data.kind === "programming" && !data.draft && !manualReview ? (
               <details className="m-5 rounded-lg border border-border p-3">
                 <summary className="cursor-pointer text-sm font-semibold">
                   {t("history.saved_result")}
@@ -748,7 +782,15 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
             ) : null}
           </div>
           <div
-            aria-hidden
+            role="separator"
+            aria-label={rt("resize_description")}
+            aria-orientation="vertical"
+            aria-valuemin={25} aria-valuemax={70} aria-valuenow={Math.round(statementWidth)}
+            tabIndex={manualReview ? 0 : undefined}
+            onKeyDown={event => {
+              if (!manualReview || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+              event.preventDefault(); resizeStatement(event.key === "ArrowLeft" ? -2 : 2);
+            }}
             className="hidden w-1 shrink-0 cursor-col-resize bg-border hover:bg-brand/40 lg:block"
             {...dividerProps}
           />
@@ -773,7 +815,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
               className={
                 turtle
                   ? manualStyles.workspace
-                  : "flex min-h-96 min-w-0 flex-1 flex-col bg-editor-bg lg:min-h-0"
+                  : manualReview ? `min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-editor-bg ${mobilePane === "problem" ? "hidden lg:flex" : "flex"}` : "flex min-h-96 min-w-0 flex-1 flex-col bg-editor-bg lg:min-h-0"
               }
               data-testid={
                 turtle ? "private-turtle-workspace" : "private-coding-workspace"
@@ -813,6 +855,10 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                       {name}
                     </button>
                   ))}
+                {manualReview ? <div className="flex min-w-0 items-center gap-2 text-[11px] text-white/55"><span className="hidden truncate sm:inline">{rt(scratchEditing ? "private_code" : "submitted_code")}</span><button type="button" aria-pressed={scratchEditing} onClick={() => {
+                  if (scratchEditing && dirty && !window.confirm(t("history.discard"))) return;
+                  if (scratchEditing) {stop(); setFiles(original); runner.clear();} setScratchEditing(value => !value);
+                }} className="shrink-0 rounded px-2 py-1 text-white/70 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-brand">{rt(scratchEditing ? "restore_code" : "try_changes")}</button></div> : null}
                 <div className="ml-auto flex items-center px-3">
                   <FontSizeControls {...preferences} />
                 </div>
@@ -828,12 +874,13 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                   theme="paircode-dark"
                   height="100%"
                   value={files[file] ?? ""}
-                  onChange={(value) =>
-                    setFiles((old) => ({ ...old, [file]: value ?? "" }))
-                  }
+                  onChange={(value) => {
+                    if (manualReview && !scratchEditing) return;
+                    setFiles((old) => ({ ...old, [file]: value ?? "" }));
+                  }}
                   options={{
-                    ariaLabel: t("history.private_editor"),
-                    readOnly: !props.active,
+                    ariaLabel: manualReview && !scratchEditing ? rt("submitted_code") : t("history.private_editor"),
+                    readOnly: !props.active || (manualReview && !scratchEditing),
                     automaticLayout: true,
                     fontFamily: EDITOR_FONT_FAMILY,
                     fontSize: preferences.fontSize,
@@ -844,6 +891,15 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
               </div>
               {!turtle ? (
                 <div
+                  role="separator"
+                  aria-label={rt("resize_grading")}
+                  aria-orientation="horizontal"
+                  aria-valuemin={150} aria-valuemax={700} aria-valuenow={Math.round(outputHeight)}
+                  tabIndex={manualReview ? 0 : undefined}
+                  onKeyDown={event => {
+                    if (!manualReview || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
+                    event.preventDefault(); resizeOutput(event.key === "ArrowUp" ? 24 : -24);
+                  }}
                   className="hidden h-1 shrink-0 cursor-row-resize bg-border hover:bg-brand/40 lg:block"
                   {...outputDivider}
                 />
@@ -852,29 +908,20 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                 className={`${turtle ? manualStyles.controls : ""} flex shrink-0 flex-wrap items-center gap-2 border-y border-white/10 bg-editor-bg px-3 py-2`}
               >
                 {!turtle ? (
-                  <div
-                    className="mr-auto flex self-stretch gap-4"
-                    role="tablist"
-                    aria-label={t("history.output_panels")}
-                  >
-                    <button
-                      role="tab"
-                      aria-selected={outputTab === "run"}
-                      onClick={() => setOutputTab("run")}
-                      className="border-b-2 border-transparent py-1 text-xs font-semibold text-white/60 aria-selected:border-brand aria-selected:text-white"
-                    >
-                      {t("history.your_run")}
-                    </button>
-                    {!data.draft ? (
-                      <button
-                        role="tab"
-                        aria-selected={outputTab === "result"}
-                        onClick={() => setOutputTab("result")}
-                        className="border-b-2 border-transparent py-1 text-xs font-semibold text-white/60 aria-selected:border-peer aria-selected:text-white"
-                      >
-                        {t("history.saved_result")}
-                      </button>
-                    ) : null}
+                  <div className="mr-auto flex min-w-0 self-stretch gap-4" role="tablist" aria-label={t("history.output_panels")} onKeyDown={event => {
+                    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                    event.preventDefault(); const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+                    const index = tabs.indexOf(document.activeElement as HTMLButtonElement);
+                    const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowLeft" ? tabs.length - 1 : 1)) % tabs.length;
+                    tabs[next]?.click(); tabs[next]?.focus();
+                  }}>
+                    {(manualReview ? ["grade", "run"] as const : data.draft ? ["run"] as const : ["run", "result"] as const).map(tab => <button
+                      key={tab} type="button" role="tab" aria-selected={outputTab === tab} tabIndex={outputTab === tab ? 0 : -1}
+                      aria-controls={`${panelId}-output-${tab}`} id={`${panelId}-tab-${tab}`} onClick={() => setOutputTab(tab)}
+                      className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent py-1 text-xs font-semibold text-white/50 focus-visible:outline-2 focus-visible:outline-brand aria-selected:border-brand aria-selected:text-white">
+                      {tab === "grade" ? <ListChecks aria-hidden className="size-3.5"/> : null}
+                      {tab === "grade" ? rt("tab_grading") : t(tab === "run" ? "history.your_run" : "history.saved_result")}
+                    </button>)}
                   </div>
                 ) : null}
                 {coding
@@ -1044,10 +1091,19 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
               ) : (
                 <div
                   className="flex min-h-32 shrink-0 flex-col"
-                  style={{ height: outputHeight }}
+                  data-testid="review-output-pane"
+                  style={{ height: outputHeight, ...(manualReview ? {maxHeight: "56%"} : {}) }}
                 >
+                  {manualReview && manualAssessment && props.submissionId ? <div role="tabpanel" id={`${panelId}-output-grade`} aria-labelledby={`${panelId}-tab-grade`}
+                    style={{display:outputTab === "grade" ? "flex" : "none"}} className="min-h-0 flex-1 flex-col">
+                    {scratchEditing ? <p className="shrink-0 border-b border-white/10 px-4 py-2 text-xs text-amber-200">{rt("teacher_hint")}</p> : null}
+                    <ProgrammingGradingPanel key={props.submissionId} variant="terminal" academyId={props.academyId} classId={props.classId}
+                      submissionId={props.submissionId} initial={manualAssessment} canPublish={data.kind === "programming" && (data.review.canPublishManualReview ?? false)} onDirtyChange={setGradingDirty}/>
+                  </div> : null}
+                  <div role="tabpanel" id={`${panelId}-output-${outputTab === "result" ? "result" : "run"}`} aria-labelledby={`${panelId}-tab-${outputTab === "result" ? "result" : "run"}`}
+                    style={{display:outputTab === "grade" ? "none" : "flex"}} className="min-h-0 flex-1 flex-col">
                   <p className="shrink-0 border-b border-white/10 px-3 py-2 font-mono text-[11px] text-white/45">
-                    {t("history.private_hint")}
+                    {manualReview && scratchEditing ? rt("editing_private") : t("history.private_hint")}
                   </p>
                   {outputTab === "result" && data.kind === "programming" ? (
                     <div className="min-h-0 flex-1 overflow-auto p-4 text-xs text-white/80">
@@ -1086,6 +1142,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                       />
                     </div>
                   )}
+                  </div>
                 </div>
               )}
             </div>

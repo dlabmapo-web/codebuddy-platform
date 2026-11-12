@@ -126,6 +126,15 @@ export function useSplitPane({
 
   return {
     size,
+    /** Keyboard adjustment uses the same bounds as pointer resizing. */
+    resizeBy(delta: number) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      const ceiling = axis === 'vertical' && rect
+        ? Math.min(max, Math.max(min, rect.height - MIN_OPPOSITE_PX)) : max;
+      const floor = axis === 'horizontal' && minPx && rect?.width
+        ? Math.max(min, Math.min(max, (minPx / rect.width) * 100)) : min;
+      setSize(current => Math.max(floor, Math.min(ceiling, current + delta)));
+    },
     dragging,
     containerRef,
     dividerProps: {

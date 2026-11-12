@@ -823,7 +823,7 @@ function HistoryContent(props: Props) {
             kind={state.kind}
             onRegisterGuard={registerGuard}
             active={reviewOpen && props.visible !== false}
-            onBack={() => setReviewOpen(false)}
+            onBack={() => { if (guard.current?.() ?? true) setReviewOpen(false); }}
             queryScope={nonce}
           />
         </div>

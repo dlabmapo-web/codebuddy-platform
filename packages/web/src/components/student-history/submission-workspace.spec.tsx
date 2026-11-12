@@ -12,7 +12,12 @@ const setup = vi.hoisted(() => ({
   reference: vi.fn(),
   curriculum: vi.fn(),
   manualRun: vi.fn(),
+  readOnly: false,
   onChange: null as null | ((s: string) => void),
+}));
+vi.mock("@/components/programming-review/use-review-translation", () => ({useReviewTranslation: () => (key: string) => key}));
+vi.mock("@/components/programming-review/grading-panel", () => ({
+  ProgrammingGradingPanel: ({onDirtyChange}: {onDirtyChange: (dirty: boolean) => void}) => <button data-testid="grading-form" onClick={() => onDirtyChange(true)}>Edit grade</button>,
 }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (s: string) => s }),
@@ -22,8 +27,9 @@ vi.mock("@/i18n", () => ({
   useLayoutTranslation: () => ({ t: (s: string) => s }),
 }));
 vi.mock("next/dynamic", () => ({
-  default: () => (props: { value: string; onChange: (s: string) => void }) => {
+  default: () => (props: { value: string; onChange: (s: string) => void; options: {readOnly: boolean} }) => {
     setup.onChange = props.onChange;
+    setup.readOnly = props.options.readOnly;
     return <pre data-testid="scratch">{props.value}</pre>;
   },
 }));
@@ -99,7 +105,7 @@ afterEach(() => {
   setup.reference.mockReset();
   setup.curriculum.mockReset();
 });
-it("runs an editable private copy, guards discard and keeps the fetched submission unchanged", async () => {
+it.each([false, true])("preserves saved code, private runs and discard guards (manual review: %s)", async (manual) => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const original: Extract<HistorySubmission, { kind: "programming" }> = {
     kind: "programming",
@@ -120,6 +126,9 @@ it("runs an editable private copy, guards discard and keeps the fetched submissi
       code: 'print("original")',
       language: "PYTHON",
       score: 100,
+      ...(manual ? {manualAssessment: {version:1 as const, messageVersion:1 as const, state:'AWAITING_REVIEW' as const,
+        maximumHundredths:10000, includeInScore:false, reviewVersion:0, scoreHundredths:null, completed:null,
+        feedback:'', reviewerName:null, reviewedAt:null}, canPublishManualReview:true} : {}),
       cases: [],
       statement: "",
       passedCount: 0,
@@ -189,6 +198,20 @@ it("runs an editable private copy, guards discard and keeps the fetched submissi
       membershipId: "student",
       materialId: "material",
     });
+    if (manual) {
+      expect(setup.readOnly).toBe(true);
+      await act(() => setup.onChange?.('print("must not edit saved code")'));
+      expect(host.querySelector('[data-testid="scratch"]')?.textContent).toBe('print("original")');
+      const grading = host.querySelector('[data-testid="grading-form"]')!;
+      expect(grading.closest('[data-testid="review-output-pane"]')).not.toBeNull();
+      expect(host.querySelectorAll('[data-testid="grading-form"]')).toHaveLength(1);
+      vi.stubGlobal("confirm", vi.fn().mockReturnValue(false));
+      await act(() => (grading as HTMLButtonElement).click());
+      expect(guard.current?.()).toBe(false);
+      expect(confirm).toHaveBeenCalledWith('unsaved_grade');
+      await act(() => [...host.querySelectorAll('button')].find(b => b.textContent === 'try_changes')!.click());
+      expect(setup.readOnly).toBe(false);
+    }
     await act(() => setup.onChange?.('print("private")'));
     const run = Array.from(host.querySelectorAll("button")).find(
       (b) => b.textContent === "history.run",

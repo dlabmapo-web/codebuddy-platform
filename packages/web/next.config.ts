@@ -33,6 +33,8 @@ const deploymentId = process.env.DEPLOYMENT_VERSION?.replace(
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Floating development controls must not intercept real mobile workspace actions in E2E.
+  ...(process.env.COVE_DLAB_E2E === '1' ? { devIndicators: false as const } : {}),
   // The isolated SSO suite must not stop or reuse a developer's normal server.
   distDir: process.env.COVE_TURTLE_BROWSER_E2E === '1' ? '.next-turtle-browser' : process.env.COVE_COURSE_TURTLE_E2E === '1' ? '.next-course-turtle' : process.env.COVE_DLAB_E2E === "1" ? ".next-dlab" : process.env.COVE_TURTLE_E2E === '1' ? '.next-turtle' : ".next",
   // The app consumes workspace packages outside packages/web. Next's default

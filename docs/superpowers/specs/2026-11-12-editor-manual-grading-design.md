@@ -1,7 +1,7 @@
 # Manual grading inside the editor workspace
 
 Date: 2026-11-12
-Status: implementation requested by the user, following their supplied workspace layout.
+Status: implemented and verified. Evidence: [verification report](../../research/2026-11-12-editor-manual-grading-verification.md).
 
 ## Problem and chosen layout
 

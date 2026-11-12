@@ -33,5 +33,22 @@
   "refresh": "Refresh assessment",
   "no_feedback": "No feedback provided.",
   "score_change": "{{previous}} → {{next}}",
-  "no_review": "No published assessment yet."
+  "no_review": "No published assessment yet.",
+  "tab_grading": "Teacher grading",
+  "tab_code_grading": "Code & grading",
+  "submitted_code": "Submitted code",
+  "private_code": "Private test copy",
+  "try_changes": "Try changes",
+  "restore_code": "Restore submitted code",
+  "publish": "Publish grade",
+  "update": "Update grade",
+  "teacher_hint": "Grades apply to the saved submission.",
+  "score_hint": "0–{{maximum}} points · up to two decimals",
+  "resize_grading": "Resize editor and grading panel",
+  "resize_description": "Resize description and editor",
+  "back_grading": "Back to grading",
+  "editing_private": "You are testing a private copy. The student’s submitted code is unchanged.",
+  "readonly_hint": "Only authorized teaching staff can publish a grade.",
+  "unsaved_grade": "Your grading changes have not been saved. Leave this submission?",
+  "loading_history": "Loading review history…"
 }

@@ -19,9 +19,10 @@ export function Providers({
   theme: Theme;
 }) {
   const pathname = usePathname();
-  // Floating debug controls otherwise cover Previous/Next in fullscreen lessons.
-  const fullscreenLesson =
-    pathname === routes.turtle || /\/learn\/(?:exercises|documents|turtle|quizzes|videos)\//.test(pathname);
+  // Floating debug controls otherwise cover actions in fullscreen workspaces.
+  const fullscreenWorkspace =
+    pathname === routes.turtle || /\/learn\/(?:exercises|documents|turtle|quizzes|videos)\//.test(pathname) ||
+    /\/teach\/classes\/[^/]+\/students\/[^/]+\/(?:work|submissions)\//.test(pathname);
   const [queryClient] = useState(() => getQueryClient());
   useEffect(() => {
     const refresh = (event: Event) => {
@@ -38,7 +39,7 @@ export function Providers({
     <ThemeProvider initialTheme={theme}>
       <QueryClientProvider client={queryClient}>
         {children}
-        {process.env.NODE_ENV === 'development' && !fullscreenLesson ? (
+        {process.env.NODE_ENV === 'development' && !fullscreenWorkspace ? (
           <ReactQueryDevtools initialIsOpen={false} />
         ) : null}
       </QueryClientProvider>

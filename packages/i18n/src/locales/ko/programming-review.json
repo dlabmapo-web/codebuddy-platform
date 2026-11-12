@@ -33,5 +33,22 @@
   "refresh": "채점 결과 새로고침",
   "no_feedback": "등록된 피드백이 없습니다.",
   "score_change": "{{previous}} → {{next}}",
-  "no_review": "아직 등록된 채점 결과가 없습니다."
+  "no_review": "아직 등록된 채점 결과가 없습니다.",
+  "tab_grading": "교사 채점",
+  "tab_code_grading": "코드 · 채점",
+  "submitted_code": "제출한 코드",
+  "private_code": "개인 테스트 사본",
+  "try_changes": "코드 수정해 보기",
+  "restore_code": "제출 코드로 복원",
+  "publish": "채점 결과 등록",
+  "update": "채점 결과 수정",
+  "teacher_hint": "이 채점 결과는 저장된 제출 코드에 적용됩니다.",
+  "score_hint": "0–{{maximum}}점 · 소수점 둘째 자리까지",
+  "resize_grading": "코드와 채점 영역 크기 조절",
+  "resize_description": "문제 설명과 코드 영역 크기 조절",
+  "back_grading": "채점으로 돌아가기",
+  "editing_private": "개인 사본으로 테스트 중입니다. 학생의 제출 코드는 변경되지 않습니다.",
+  "readonly_hint": "권한이 있는 선생님만 채점 결과를 등록할 수 있습니다.",
+  "unsaved_grade": "아직 저장하지 않은 채점 내용이 있습니다. 이 제출에서 나가시겠습니까?",
+  "loading_history": "채점 기록을 불러오는 중…"
 }

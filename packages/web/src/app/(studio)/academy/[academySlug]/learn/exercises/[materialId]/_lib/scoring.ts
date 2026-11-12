@@ -72,7 +72,7 @@ export function verdictTone(
  * read as the student's failure.
  */
 export function showsScore(result: SubmissionResult | null): boolean {
-  return result !== null && result.status !== 'ERRORED' && result.status !== 'CANCELLED';
+  return result !== null && result.status !== 'RECORDED' && result.status !== 'ERRORED' && result.status !== 'CANCELLED';
 }
 
 /**

@@ -1,4 +1,5 @@
 'use client';
+import { ProgrammingAssessmentResult } from '@/components/programming-review/assessment-result';
 
 import { buildCaseCells } from '@cove/shared';
 import { AlertTriangle, ExternalLink, LoaderCircle } from 'lucide-react';
@@ -71,6 +72,8 @@ export function StudentResultPanel({
     );
   }
 
+  if (result?.status === 'RECORDED') return <div className="space-y-3 p-4"><ProgrammingAssessmentResult assessment={result.manualAssessment} dark/>
+    {submission.submissionId ? <Link className="text-sm text-brand underline" href={routes.academyTeachSubmission(academySlug, classId, membershipId, submission.submissionId)}>{t('workspace.result.open_review')}</Link> : null}</div>;
   const presentation = resultPresentation(result, false);
   const cells = result
     ? buildCaseCells({ totalCount: result.totalCount, reported: result.cases })

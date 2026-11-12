@@ -267,6 +267,8 @@ export function buildCurrentCourseWorkbook(input: {
           problem.aiFeedbackEnabled ? "TRUE" : "FALSE",
           problem.submissionPolicy ?? "AUTOMATIC",
           problem.referencePdfMaterialId ?? "",
+          String((problem.manualAssessment?.maximumHundredths ?? 10000) / 100),
+          problem.manualAssessment?.includeInScore ? "TRUE" : "FALSE",
         ]);
 
         problem.solutions.forEach((solution, index) => solutions.push([problem.key, String(index + 1), solution.title ?? "", solution.code]));

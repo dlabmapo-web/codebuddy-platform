@@ -19,6 +19,7 @@ export type AssignedClassActor = {
   /** The teacher's own membership, which is what a class assignment stores.
    *  Empty for a platform operator, who has none — see `scope`. */
   membershipId: string;
+  canPublishReview?: boolean;
   /**
    * Which classes this actor's teaching surfaces cover.
    *
@@ -103,6 +104,7 @@ export async function requireAssignedTeacherActor(input: {
     userId: actor.userId,
     academyId: input.academyId,
     membershipId: membership.id,
+    canPublishReview: actor.via === "membership",
     ...(actor.roles.some(roleCanTeachAcademy) && actor.via !== "platform" && actor.via !== "support"
       ? { scope: "academy-staff" as const } : {}),
   };

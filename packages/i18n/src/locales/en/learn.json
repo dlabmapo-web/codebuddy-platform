@@ -297,7 +297,9 @@
       "NOT_ACCEPTED": "Not accepted",
       "JUDGE_ERROR": "Judge error",
       "CANCELLED": "Cancelled",
-      "IN_PROGRESS": "In progress"
+      "IN_PROGRESS": "In progress",
+      "MANUAL_REVIEW": "Awaiting teacher grading",
+      "MANUALLY_GRADED": "Teacher graded"
     },
     "facet": {
       "class": "Class",

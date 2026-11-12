@@ -190,6 +190,11 @@ const server = createServer(async (req, res) => {
         await db.classEnrollment.create({ data: { classId: classroom.id, membershipId: student.id, enrolledByUserId: owner.userId } });
         classes.push(classroom);
       }
+      if (input.teacherFixtureId) {
+        const teacherIdentity = await db.dlabIdentity.findUniqueOrThrow({where:{externalUserId:input.teacherFixtureId}});
+        const teacherMember = await db.academyMembership.findUniqueOrThrow({where:{academyId_userId:{academyId:fixture.academy.id,userId:teacherIdentity.userId}}});
+        await db.class.update({where:{id:classes[0].id},data:{teacherMembershipId:teacherMember.id}});
+      }
       let reviewStudentMembershipId;
       if (input.reviewStudentFixtureId) {
         const reviewIdentity = await db.dlabIdentity.findUniqueOrThrow({where:{externalUserId:input.reviewStudentFixtureId}});

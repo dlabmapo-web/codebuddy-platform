@@ -755,7 +755,7 @@ export const monitoringExerciseContextSchema =
     latestSubmission: z
       .object({
         submissionId: z.uuid(),
-        status: z.enum(["QUEUED", "RUNNING", "PASSED", "FAILED", "ERRORED", "CANCELLED"]),
+        status: z.enum(["QUEUED", "RUNNING", "PASSED", "FAILED", "ERRORED", "CANCELLED", "RECORDED"]),
       })
       .nullable(),
   });

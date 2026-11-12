@@ -37,6 +37,7 @@ export function useSubmission({
   classId,
   materialId,
   initialResult = null,
+  initialLatest,
   solveSessionId,
   reopenSolveSession,
 }: {
@@ -51,13 +52,14 @@ export function useSubmission({
    * student chose to review, exactly as it read when they submitted it.
    */
   initialResult?: SubmissionResult | null;
+  initialLatest?: import("@cove/shared").LatestSubmission | null;
   /** The sitting this attempt belongs to; the server owns its elapsed time. */
   solveSessionId?: string | null;
   /** Opens a fresh sitting after the server rejected the current one. */
   reopenSolveSession?: () => Promise<{ solveSessionId: string } | null>;
 }) {
   const queryClient = useQueryClient();
-  const latest = useLatestSubmission({ academyId, materialId, classId, mode: 'student' }, userId);
+  const latest = useLatestSubmission({ academyId, materialId, classId, mode: 'student' }, userId, true, initialLatest);
   const [submitting, setSubmitting] = React.useState(false);
   const [submissionId, setSubmissionId] = React.useState<string | null>(null);
   const [totalCount, setTotalCount] = React.useState(0);
@@ -83,6 +85,7 @@ export function useSubmission({
     setError(null);
   }
 
+  const requestRef = React.useRef<{code: string; materialId: string; classId: string; id: string} | null>(null);
   const sourceRef = React.useRef<EventSource | null>(null);
   const fallbackRef = React.useRef<SubmissionFallback | null>(null);
 
@@ -103,7 +106,8 @@ export function useSubmission({
           submissionId: id,
         });
         if (!isTerminalStatus(fetched.status)) return false;
-        setResult(fetched);
+        setResult(previous => previous?.submissionId === fetched.submissionId &&
+          (previous.manualAssessment?.reviewVersion ?? 0) > (fetched.manualAssessment?.reviewVersion ?? 0) ? previous : fetched);
         setSubmitting(false);
         teardown();
         // The verdict moves progress, so the outline and catalog are stale.
@@ -120,6 +124,17 @@ export function useSubmission({
     [academyId, queryClient, teardown, userId, materialId],
   );
 
+  React.useEffect(() => {
+    if (result?.status !== 'RECORDED') return;
+    const refresh = (event?: Event) => {
+      const detail = (event as CustomEvent | undefined)?.detail;
+      if (detail && (detail.academyId !== academyId || (detail.submissionId && detail.submissionId !== result.submissionId))) return;
+      void loadResult(result.submissionId);
+    };
+    window.addEventListener('cove:assessment-changed', refresh); window.addEventListener('focus', refresh);
+    return () => { window.removeEventListener('cove:assessment-changed', refresh); window.removeEventListener('focus', refresh); };
+  }, [academyId, result?.submissionId, result?.status, loadResult]);
+
   const submit = React.useCallback(
     async (code: string) => {
       teardown();
@@ -128,13 +143,17 @@ export function useSubmission({
       setReported([]);
       setError(null);
 
-      let accepted: { submissionId: string; totalCount: number };
+      requestRef.current = requestRef.current?.code === code && requestRef.current.materialId === materialId && requestRef.current.classId === classId
+        ? requestRef.current : {code, materialId, classId, id: crypto.randomUUID()};
+      const identity = {requestId: requestRef.current.id, manualAssessmentVersion: 1 as const};
+      let accepted: { submissionId: string; totalCount: number; result?: SubmissionResult };
       try {
         accepted = await orpc.learn.submit({
           academyId,
           classId,
           materialId,
           code,
+          ...identity,
           ...(solveSessionId ? { solveSessionId } : {}),
         });
       } catch (caught) {
@@ -149,6 +168,7 @@ export function useSubmission({
               classId,
               materialId,
               code,
+              ...identity,
               ...(reopened ? { solveSessionId: reopened.solveSessionId } : {}),
             });
           } catch (retried) {
@@ -163,6 +183,17 @@ export function useSubmission({
         }
       }
 
+      if (accepted.result?.status === 'RECORDED') {
+        setSubmissionId(accepted.submissionId); setTotalCount(0); setResult(accepted.result); setSubmitting(false);
+        requestRef.current = null;
+        const assessment = accepted.result.manualAssessment!;
+        queryClient.setQueryData(['latest-submission', userId, academyId, materialId, 'student', classId, false, undefined], {
+          submissionId: accepted.submissionId, createdAt: accepted.result.createdAt, submissionPolicy: 'MANUAL_REVIEW',
+          status: assessment.state, scoreHundredths: assessment.scoreHundredths, maximumHundredths: assessment.maximumHundredths,
+        });
+        return;
+      }
+      requestRef.current = null;
       void queryClient.invalidateQueries({ queryKey: ['latest-submission', userId, academyId, materialId] });
       setSubmissionId(accepted.submissionId);
       setTotalCount(accepted.totalCount);

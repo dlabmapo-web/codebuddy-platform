@@ -208,6 +208,7 @@ enum TestCaseVisibility {
 }
 
 enum SubmissionStatus {
+  RECORDED
   QUEUED
   RUNNING
   PASSED
@@ -246,6 +247,7 @@ enum CaseComparator {
 /// before weighted grading stays LEGACY_STDIO, and its stored scores keep their
 /// original meaning. CUSTOM is deliberately absent until grader scripts exist.
 enum SubmissionPolicy {
+  MANUAL_REVIEW
   PRACTICE_ONLY
   AUTOMATIC
 }
@@ -396,6 +398,7 @@ model User {
   libraryCourseImports LibraryCourseImport[]
   manualDrafts      ManualDraft[]
   manualSubmissions ManualSubmission[]
+  programmingReviews ProgrammingSubmissionReview[]
   manualReviews     ManualReview[]
   pdfUploads        PdfAsset[]
 
@@ -1667,6 +1670,8 @@ model ProgrammingExercise {
   /// read back from here while grading, so editing an exercise cannot
   /// reinterpret work a student has already handed in.
   inputPromptPolicy         InputPromptPolicy    @default(INCLUDE) @map("input_prompt_policy")
+  manualMaximumHundredths Int @default(10000) @map("manual_maximum_hundredths")
+  manualIncludeInScore Boolean @default(false) @map("manual_include_in_score")
   submissionPolicy          SubmissionPolicy @default(AUTOMATIC) @map("submission_policy")
   gradingMode               GradingProfileMode   @default(LEGACY_STDIO) @map("grading_mode")
   /// Which version of the comparison and scoring semantics applies. Dispatch
@@ -1790,6 +1795,11 @@ model ExerciseCollaborationDocument {
 
 /// One graded attempt at an exercise.
 model Submission {
+  requestId String? @map("request_id") @db.Uuid
+  reviewVersion Int @default(0) @map("review_version")
+  manualAssessmentSnapshot Json? @map("manual_assessment_snapshot")
+  manualReviewResult Json? @map("manual_review_result")
+  manualReviews ProgrammingSubmissionReview[]
   /// Immutable quiz question, choices and answer key, never executed as code.
   quizSnapshot     Json?            @map("quiz_snapshot")
   id               String           @id @default(uuid()) @db.Uuid
@@ -1822,7 +1832,7 @@ model Submission {
   /// 0-100. Every problem is worth the same, whatever its case count: a
   /// student must not score differently because an author split one case in
   /// two. Derived from cases passed, never stored per case.
-  score            Int              @default(0)
+  score            Int?             @default(0)
   runtimeMs        Int?             @map("runtime_ms")
 
   /// The grading profile as it stood when this attempt was admitted.
@@ -1921,6 +1931,9 @@ model Submission {
   /// reached a verdict. Partial in the migration — the column is null on every
   /// ordinary submission, which is nearly all of them.
   @@index([regradeRunId, status])
+  // Partial in SQL: only original manual receipts need this assessment lookup.
+  @@index([classId, materialId, userId, gradingRevision, createdAt(sort: Desc), id(sort: Desc)], map: "submissions_manual_assessment_history_idx")
+  @@unique([userId, requestId])
   @@map("submissions")
 }
 
@@ -2851,4 +2864,26 @@ model ExplanationMaterial {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
   @@map("explanation_materials")
+}
+
+/// Append-only human assessment of an immutable programming submission.
+model ProgrammingSubmissionReview {
+  id String @id @default(uuid()) @db.Uuid
+  submissionId String @map("submission_id") @db.Uuid
+  reviewerId String @map("reviewer_id") @db.Uuid
+  reviewerName String @map("reviewer_name")
+  version Int
+  requestId String @map("request_id") @db.Uuid
+  scoreHundredths Int @map("score_hundredths")
+  completed Boolean
+  feedback String
+  reason String
+  previousScoreHundredths Int? @map("previous_score_hundredths")
+  deltaHundredths Int? @map("delta_hundredths")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  reviewer User @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+  @@unique([submissionId, version])
+  @@unique([reviewerId, requestId])
+  @@map("programming_submission_reviews")
 }

@@ -1,3 +1,4 @@
+import { programmingAssessmentSchema } from "./programming-review.js";
 import { quizFeedbackSchema } from "./quiz.js";
 import { z } from "zod";
 
@@ -239,8 +240,9 @@ export type TeacherStudentProgressDetail = z.infer<
 export const teacherAttemptSummarySchema = z
   .object({
     submissionId: z.uuid(),
-    accepted: z.boolean(),
-    score: percentSchema,
+    accepted: z.boolean().nullable(),
+    score: percentSchema.nullable(),
+    manualAssessment: programmingAssessmentSchema.optional(),
     earnedWeight: countSchema.nullable().optional(),
     possibleWeight: countSchema.nullable().optional(),
     passedCount: countSchema,
@@ -419,6 +421,7 @@ export type TeacherReviewCase = z.infer<typeof teacherReviewCaseSchema>;
 
 export const teacherSubmissionReviewSchema = z
   .object({
+    canPublishManualReview: z.boolean().optional(),
     quiz: quizFeedbackSchema.nullable().optional(),
     submissionId: z.uuid(),
     /**
@@ -434,8 +437,9 @@ export const teacherSubmissionReviewSchema = z
     moduleTitle: labelSchema,
     lectureTitle: labelSchema,
     outlineNumber: z.string().max(24).nullable(),
-    accepted: z.boolean(),
-    score: percentSchema,
+    accepted: z.boolean().nullable(),
+    score: percentSchema.nullable(),
+    manualAssessment: programmingAssessmentSchema.optional(),
     earnedWeight: countSchema.nullable().optional(),
     possibleWeight: countSchema.nullable().optional(),
     passedCount: countSchema,

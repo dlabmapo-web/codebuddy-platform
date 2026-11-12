@@ -1,4 +1,5 @@
 'use client';
+import { ProgrammingGradingPanel } from '@/components/programming-review/grading-panel';
 import { monacoLanguageFor } from '@/lib/workspace/exercise-language';
 import { QuizFeedback } from '@/components/workspace/quiz-feedback';
 
@@ -36,14 +37,21 @@ const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), {
  * are absent from the payload, not hidden by the markup.
  */
 export function SubmissionReview({
-  review,
+  review, academyId, classId,
 }: {
+  academyId: string; classId: string;
   review: TeacherSubmissionReview;
 }) {
   const { t } = useTranslation('teach');
   const locale = useLocale();
   const samples = review.cases.filter((item) => item.isSample);
 
+  if (review.manualAssessment) return <div className="grid gap-5 p-4 lg:grid-cols-2">
+    <section className="min-w-0 space-y-3"><h1 className="text-lg font-bold">{review.problemTitle}</h1><p className="text-sm text-sub">{review.studentName} · {formatDateTime(review.createdAt, locale, true)}</p>
+      <div className="h-[32rem] overflow-hidden rounded-xl border border-border"><MonacoEditor beforeMount={registerPaircodeTheme} height="100%" language={monacoLanguageFor(review.language)} theme="paircode-dark" value={review.code} options={{readOnly: true, domReadOnly: true, minimap: {enabled: false}, automaticLayout: true, fontSize: 14}}/></div>
+    </section>
+    <ProgrammingGradingPanel key={review.submissionId} academyId={academyId} classId={classId} submissionId={review.submissionId} initial={review.manualAssessment} canPublish={review.canPublishManualReview ?? false}/>
+  </div>;
   return (
     <div className="flex flex-col gap-4">
       {/* The way back moved to the page's `back` slot, above the heading,

@@ -119,8 +119,8 @@ export function ExerciseWorkspace({
           onChange={(starterCode) => update('starterCode', starterCode)}
           value={draft.starterCode}
         />
-        <SubmissionPolicyEditor draft={draft} editable={editable} onChange={policy => update('submissionPolicy', policy)} />
-        {draft.submissionPolicy !== 'PRACTICE_ONLY' ? <div data-testid="grading-cases">        <AnswersEditor
+        <SubmissionPolicyEditor draft={draft} editable={editable} onChange={policy => update('submissionPolicy', policy)} onAssessmentChange={value => update('manualAssessment', value)} />
+        {(draft.submissionPolicy ?? 'AUTOMATIC') === 'AUTOMATIC' ? <div data-testid="grading-cases">        <AnswersEditor
           editable={editable}
           error={authoring.errorFor('test')}
           grading={draft.grading}

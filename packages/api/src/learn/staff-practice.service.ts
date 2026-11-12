@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { manualProgrammingResult } from "./programming-assessment.js";
 import { NativeAdmission, frozenNativeDescriptor } from "../judge/native-admission.js";
 import { runtimeQueueName } from "../judge/judge.queue.js";
 import { snapshotTransaction } from "../judge/snapshot-transaction.js";
@@ -5,7 +7,7 @@ import type { Prisma } from "../generated/prisma/client.js";
 import { createPracticeAttempt } from "./staff-practice.repository.js";
 import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { isCompiledLanguage, quizDefinitionSchema, rolesHavePermission, submissionResultSchema, type SaveDraftResult } from "@cove/shared";
+import { programmingAssessmentSnapshotSchema, isCompiledLanguage, quizDefinitionSchema, rolesHavePermission, submissionResultSchema, type SaveDraftResult } from "@cove/shared";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AcademyAccessService, type AcademyAccess } from "../authorization/academy-access.service.js";
 import { learningScopeFor } from "../classes/assigned-course-access.js";
@@ -87,6 +89,18 @@ export class StaffPracticeService {
     const attempt = existing ?? await snapshotTransaction(this.prisma, async tx => {
       const { material, exercise } = await this.authorizedMaterial(actor, input, tx);
       if (exercise.submissionPolicy === "PRACTICE_ONLY") throw new AppException("EXERCISE_PRACTICE_ONLY", HttpStatus.BAD_REQUEST);
+      if (exercise.submissionPolicy === 'MANUAL_REVIEW') {
+        const id = randomUUID(), createdAt = new Date();
+        const manual = {version: 1, messageVersion: 1, maximumHundredths: exercise.manualMaximumHundredths, includeInScore: exercise.manualIncludeInScore};
+        const result = {...manualProgrammingResult({id, sourceMaterialId: material.id, createdAt, manualAssessmentSnapshot: manual}), manualAssessment: null};
+        return createPracticeAttempt(tx, {id, academyId: input.academyId, userId: actor.userId,
+          materialId: material.id, requestId: input.requestId, code: input.code, status: 'RECORDED', createdAt,
+          context: input.preview ? `preview:${exercise.gradingRevision}` : 'live',
+          snapshot: {version: 2, submissionPolicy: 'MANUAL_REVIEW', courseId: material.lecture.courseModule.courseId,
+            gradingRevision: exercise.gradingRevision, language: exercise.language, manualAssessment: manual},
+          result: JSON.parse(JSON.stringify(result)),
+        });
+      }
       const quiz = exercise.quiz == null ? null : quizDefinitionSchema.parse(exercise.quiz);
       if (quiz && !quiz.choices.some((choice) => choice.id === input.code)) {
         throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.BAD_REQUEST);
@@ -118,6 +132,7 @@ export class StaffPracticeService {
     if (attempt.materialId !== input.materialId || attempt.code !== input.code) {
       throw new AppException("PERMISSION_DENIED", HttpStatus.CONFLICT);
     }
+    if (attempt.status === "RECORDED") return {submissionId: attempt.id, totalCount: 0, result: submissionResultSchema.parse(attempt.result)};
     try { if (attempt.status === "QUEUED") await this.queue.enqueuePractice(attempt.id, frozenNativeDescriptor(practiceSnapshotSchema.parse(attempt.snapshot).executionRuntimeSnapshot)); }
     catch { throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE); }
     const stored = practiceSnapshotSchema.parse(attempt.snapshot);
@@ -126,7 +141,8 @@ export class StaffPracticeService {
 
   async runtimeForStream(identity: SupabaseIdentity, input: { academyId: string; submissionId: string }) {
     await this.get(identity, input);
-    const row = await this.prisma.staffPracticeAttempt.findUniqueOrThrow({ where: { id: input.submissionId }, select: { snapshot: true } });
+    const row = await this.prisma.staffPracticeAttempt.findUniqueOrThrow({ where: { id: input.submissionId }, select: { snapshot: true, status: true } });
+    if (row.status === "RECORDED") return null;
     return frozenNativeDescriptor(practiceSnapshotSchema.parse(row.snapshot).executionRuntimeSnapshot);
   }
 
@@ -167,6 +183,11 @@ export class StaffPracticeService {
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
     if (!row) return null;
+    if (row.status === 'RECORDED') {
+      const manual = programmingAssessmentSnapshotSchema.parse((row.snapshot as {manualAssessment?: unknown}).manualAssessment);
+      return {submissionId: row.id, createdAt: row.createdAt.toISOString(),
+        submissionPolicy: 'MANUAL_REVIEW' as const, status: 'RECORDED' as const, scoreHundredths: null, maximumHundredths: manual.maximumHundredths};
+    }
     const snapshot = practiceSnapshotSchema.parse(row.snapshot);
     const result = row.result ? submissionResultSchema.parse(row.result) : null;
     const maximum = snapshot.materialMaximumHundredths;

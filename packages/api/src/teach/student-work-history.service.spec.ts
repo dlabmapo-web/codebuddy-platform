@@ -10,6 +10,8 @@ import type { PrismaService } from "../database/prisma.service.js";
 import type { TeacherProgressAccessService } from "./teacher-progress-access.service.js";
 import type { TeacherProgressRepository } from "./teacher-progress.repository.js";
 import type { TeacherProgressService } from "./teacher-progress.service.js";
+import {readClassHistoryMaterials} from '../learn/curriculum-read.js';
+vi.mock('../learn/curriculum-read.js',()=>({readClassHistoryMaterials:vi.fn((db:{material:{findMany:Function}})=>db.material.findMany())}));
 const identity = { authUserId: "auth" } as SupabaseIdentity;
 const target = {
   academyId: "academy",
@@ -87,35 +89,9 @@ describe("student saved-work boundary", () => {
   it("includes all visible activity types while retaining academy and class assignment gates", async () => {
     const { service, db } = setup();
     await service.listStudentMaterials(identity, { ...target, page: 1 });
-    const where = db.material.findMany.mock.calls[0][0].where;
-    expect(where.AND[0]).toMatchObject({
-      isVisible: true,
-      OR: [
-        { programmingExercise: { isNot: null } },
-        { manualMaterial: { isNot: null } },
-        { explanationMaterial: { isNot: null } },
-        { pdfDocument: { isNot: null } },
-        { videoLesson: { isNot: null } },
-      ],
-      lecture: {
-        isVisible: true,
-        courseModule: {
-          isVisible: true,
-          course: { academyId: "academy", isVisible: true },
-        },
-      },
-    });
-    expect(where.AND[1]).toEqual({
-      lecture: {
-        courseModule: {
-          course: { classAssignments: { some: { classId: "class" } } },
-        },
-      },
-    });
-    expect(where.AND[0]).not.toHaveProperty("programmingExercise");
-    expect(db.manualSubmission.findMany.mock.calls[0][0].where.id.in).toEqual([
-      "latest",
-    ]);
+    expect(readClassHistoryMaterials).toHaveBeenLastCalledWith(db, 'academy', 'class');
+    // SQL visibility, academy and class-assignment parity is covered on real PostgreSQL.
+
   });
   it("checks current class access before selecting source", async () => {
     const { service, db, access } = setup();

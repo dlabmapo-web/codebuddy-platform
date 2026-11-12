@@ -1,3 +1,5 @@
+import { readSubmissionAdmission } from "./submission-admission-read.js";
+import { manualProgrammingResult } from "./programming-assessment.js";
 import { resolveGradingProfile } from "../judge/grading-profile.js";
 import { isCompiledLanguage, rolesHavePermission, roleCanMonitor } from "@cove/shared";
 import { StaffPracticeService } from "./staff-practice.service.js";
@@ -169,7 +171,7 @@ export class LearnService {
       where: { userId: learner.userId, materialId: material.id, classId: context.classId,
         course: { academyId: input.academyId }, regradeRunId: null },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      select: { id: true, createdAt: true, status: true, score: true, materialMaximumHundredths: true, appliedScoreHundredths: true, gradingAborted: true },
+      select: { id: true, sourceMaterialId: true, submissionPolicy: true, manualAssessmentSnapshot: true, manualReviewResult: true, createdAt: true, status: true, score: true, materialMaximumHundredths: true, appliedScoreHundredths: true, gradingAborted: true },
     }));
   }
 
@@ -255,9 +257,9 @@ export class LearnService {
     // The historical attempt is loaded beside the workspace, not instead of
     // it. A submission that does not resolve leaves the ordinary workspace
     // exactly as it was — including whatever draft is already saved.
-    const [workspace, outline, selectedSubmission] = await Promise.all([
+    const [workspace, outline, selectedSubmission, latestManual] = await Promise.all([
       this.buildWorkspace(material, learner.userId, staff),
-      this.curriculum.outlineFor(course, learner.userId, undefined, staff),
+      this.curriculum.outlineFor(course, learner.userId, classContext.classId ?? undefined, staff),
       input.submissionId
         ? this.submissions.findSelected(
             {
@@ -268,7 +270,15 @@ export class LearnService {
             { materialId: material.id, submissionId: input.submissionId },
           )
         : Promise.resolve(null),
+      !staff && material.programmingExercise.submissionPolicy === 'MANUAL_REVIEW' && classContext.classId
+        ? this.prisma.submission.findFirst({where: {userId: learner.userId, materialId: material.id,
+          classId: classContext.classId, regradeRunId: null}, orderBy: [{createdAt:'desc'},{id:'desc'}]})
+        : Promise.resolve(null),
     ]);
+    if (!staff && material.programmingExercise.submissionPolicy === 'MANUAL_REVIEW') {
+      workspace.latestSubmission = automaticLatestSubmission(latestManual);
+      workspace.latestResult = latestManual?.submissionPolicy === 'MANUAL_REVIEW' ? manualProgrammingResult(latestManual) : null;
+    }
     const navigator = toNavigatorContext(outline, material.id);
     if (material.type !== 'PROGRAMMING_EXERCISE' && !selectedSubmission)
       throw new AppException('EXERCISE_NOT_AVAILABLE', HttpStatus.NOT_FOUND);
@@ -362,13 +372,14 @@ export class LearnService {
     scope: LearningScope,
     preview = false,
   ) {
-    const material = await this.prisma.material.findFirst({
+    const reachable = await this.prisma.material.findFirst({
       where: {
         id: input.materialId,
         ...(preview ? { AND: [scope.material, { lecture: { courseModule: { course: { academyId: input.academyId } } } }] } : reachableMaterialWhere(input.academyId, scope)),
       },
-      include: workspaceMaterialReadInclude,
+      select: {id: true},
     });
+    const material = reachable ? await readSubmissionAdmission(this.prisma, input.materialId, input.academyId, {workspace: true, preview}) : null;
     if (!material?.programmingExercise) {
       throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
     }
@@ -429,7 +440,8 @@ export class LearnService {
       },
       exercise: {
         submissionPolicy: exercise.submissionPolicy ?? "AUTOMATIC",
-        submissionAvailability: exercise.submissionPolicy === "PRACTICE_ONLY" ? "PRACTICE_ONLY" : exercise.quiz || (exercise.testCases.length && resolveGradingProfile(exercise, exercise.testCases).kind !== "unsupported") ? "READY" : "INVALID_GRADING",
+        submissionAvailability: exercise.submissionPolicy === "PRACTICE_ONLY" ? "PRACTICE_ONLY" : exercise.submissionPolicy === "MANUAL_REVIEW" || exercise.quiz || (exercise.testCases.length && resolveGradingProfile(exercise, exercise.testCases).kind !== "unsupported") ? "READY" : "INVALID_GRADING",
+        manualAssessment: {maximumHundredths: exercise.manualMaximumHundredths, includeInScore: exercise.manualIncludeInScore},
         maximumPoints: (exercise.materialMaximumHundredths ?? 10000) / 100,
         hasReferencePdf: Boolean(exercise.referencePdfMaterialId),
         referencePdf: referencePdfMetadata(exercise.referencePdf, course.id),
@@ -450,7 +462,7 @@ export class LearnService {
         gradingRevision: exercise.gradingRevision,
         // C and C++ have no browser runtime: their samples are always the server's.
         serverSampleChecks: isCompiledLanguage(exercise.language) || (sampleChecks?.isEnabled ?? false),
-        sampleTestCases: (exercise.submissionPolicy === "PRACTICE_ONLY" ? [] : exercise.testCases)
+        sampleTestCases: ((exercise.submissionPolicy ?? "AUTOMATIC") !== "AUTOMATIC" ? [] : exercise.testCases)
           .filter((testCase) => testCase.visibility === "SAMPLE")
           .map((testCase) => ({
             position: testCase.position,
@@ -462,7 +474,7 @@ export class LearnService {
           position: hint.position,
           content: hint.content,
         })),
-        hiddenTestCaseCount: (exercise.submissionPolicy === "PRACTICE_ONLY" ? [] : exercise.testCases).filter(
+        hiddenTestCaseCount: ((exercise.submissionPolicy ?? "AUTOMATIC") !== "AUTOMATIC" ? [] : exercise.testCases).filter(
           (testCase) => testCase.visibility === "HIDDEN",
         ).length,
       },

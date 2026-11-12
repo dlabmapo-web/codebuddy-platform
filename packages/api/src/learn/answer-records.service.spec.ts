@@ -304,7 +304,7 @@ describe("AnswerRecordsService filtering", () => {
     });
 
     expect(rowsWhere(prisma)).toMatchObject({
-      AND: [{ status: { in: ["PASSED", "QUEUED", "RUNNING"] } }],
+      AND: [{ OR: [{status: { in: ["PASSED", "QUEUED", "RUNNING"] }}] }],
     });
   });
 

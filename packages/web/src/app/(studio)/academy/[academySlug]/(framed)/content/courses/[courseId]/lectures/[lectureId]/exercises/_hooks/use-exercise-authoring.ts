@@ -94,7 +94,7 @@ export function useExerciseAuthoring({
    * academy as `problemsWithoutTests`, and a submission to one is refused, so
    * the author needs the fact — not a locked button.
    */
-  const notGradeable = !completeness.find((item) => item.id === 'test')!
+  const notGradeable = draft.submissionPolicy !== 'MANUAL_REVIEW' && !completeness.find((item) => item.id === 'test')!
     .complete;
 
   const builderPath = contentPaths.course(target.courseId);
@@ -146,7 +146,7 @@ export function useExerciseAuthoring({
   ) {
     if (!editable) return;
     setTouched((current) => { const next = new Set(current).add(key); if (key === "submissionPolicy") next.add("testCases"); return next; });
-    setDraft((current) => key === "submissionPolicy" ? withSubmissionPolicy(current, value as "PRACTICE_ONLY" | "AUTOMATIC") : ({ ...current, [key]: value }));
+    setDraft((current) => key === "submissionPolicy" ? withSubmissionPolicy(current, value as "PRACTICE_ONLY" | "AUTOMATIC" | "MANUAL_REVIEW") : ({ ...current, [key]: value }));
   }
 
   /** Errors surface per field, next to the input that needs fixing. */

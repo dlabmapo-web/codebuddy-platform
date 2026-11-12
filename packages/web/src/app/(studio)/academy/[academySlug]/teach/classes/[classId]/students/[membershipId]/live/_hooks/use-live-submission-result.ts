@@ -87,6 +87,15 @@ export function useLiveSubmissionResult({
     retry: 1,
   });
 
+  const {refetch: refreshReview} = review;
+  React.useEffect(() => {
+    const refresh = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (!detail || (detail.academyId === academyId && detail.submissionId === submissionId)) void refreshReview();
+    };
+    window.addEventListener('cove:assessment-changed', refresh);
+    return () => window.removeEventListener('cove:assessment-changed', refresh);
+  }, [academyId, submissionId, refreshReview]);
   const loaded = Boolean(review.data && review.data.submissionId === submissionId);
   const view = liveResultView(current, {
     loading: review.isFetching,

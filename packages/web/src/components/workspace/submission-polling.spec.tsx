@@ -66,6 +66,7 @@ describe('bounded result polling', () => {
   it('separates automatic execution, human review, terminal states and access failures', () => {
     const now = Date.parse(pending.createdAt);
     expect(submissionPollInterval(pending, now)).toBe(1000);
+    expect(submissionPollInterval({...pending,submissionPolicy:'MANUAL_REVIEW',status:'AWAITING_REVIEW'},now+1000)).toBe(false);
     expect(submissionPollInterval(pending, now + 120000)).toBe(false);
     expect(submissionPollInterval({ ...pending, status: 'AWAITING_REVIEW' }, now + 3600000)).toBe(15000);
     for (const status of ['GRADED', 'ERROR', 'RECORDED', 'CANCELLED'] as const) expect(submissionPollInterval({ ...pending, status }, now)).toBe(false);
@@ -88,6 +89,23 @@ describe('bounded result polling', () => {
       expect(result!.data).toMatchObject({ status: 'GRADED', scoreHundredths: 0 });
       expect(read).toHaveBeenCalledTimes(1);
     } finally { await act(async () => root.unmount()); client.clear(); host.remove(); }
+  });
+  it('keeps a newer manual correction when an earlier read completes late',async()=>{
+    const client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:Infinity}}});
+    const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+    let seed:LatestSubmission={...pending,submissionPolicy:'MANUAL_REVIEW',status:'GRADED',reviewVersion:1,scoreHundredths:8000};
+    let resolveOld:(value:LatestSubmission)=>void=()=>{};
+    const read=vi.fn(()=>new Promise<LatestSubmission>(resolve=>{resolveOld=resolve;}));
+    let result:ReturnType<typeof useSubmissionStatus>;
+    function Probe(){result=useSubmissionStatus({queryKey:['manual-correction'],enabled:true,seed,read});return null;}
+    try{
+      await act(async()=>{root.render(<QueryClientProvider client={client}><Probe/></QueryClientProvider>);});
+      act(()=>{void result!.refetch();});
+      seed={...seed,reviewVersion:2,scoreHundredths:9000};
+      await act(async()=>{root.render(<QueryClientProvider client={client}><Probe/></QueryClientProvider>);await pause(20);});
+      await act(async()=>{resolveOld({...seed,reviewVersion:1,scoreHundredths:8000});await pause(20);});
+      expect(result!.data).toMatchObject({reviewVersion:2,scoreHundredths:9000});
+    }finally{await act(async()=>root.unmount());client.clear();host.remove();}
   });
   it('invalidates once on terminal transition and ignores late results from another owner/context', async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });

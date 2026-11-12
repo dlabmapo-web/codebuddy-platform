@@ -72,7 +72,10 @@ export class SubmissionController {
       submissionId,
     );
 
-    const routing = await this.prisma.submission.findUnique({ where: { id: submissionId }, select: { executionRuntimeSnapshot: true } });
+    const routing = await this.prisma.submission.findUnique({ where: { id: submissionId }, select: { executionRuntimeSnapshot: true, status: true } });
+    if (routing?.status === 'RECORDED') return new Observable<StreamEvent>(subscriber => {
+      subscriber.next({type: 'result', data: JSON.stringify({status: 'RECORDED', passedCount: 0, totalCount: 0})}); subscriber.complete();
+    });
     const descriptor = frozenNativeDescriptor(routing?.executionRuntimeSnapshot);
     const events = descriptor ? this.queue?.forRuntime(descriptor).events : this.queue?.events;
 

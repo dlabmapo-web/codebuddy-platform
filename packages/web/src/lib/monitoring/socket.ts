@@ -36,6 +36,11 @@ export async function createMonitoringSocket(): Promise<Socket> {
         );
     },
   });
+  socket.on('assessment.changed', (detail: unknown) => {
+    if (!detail || typeof detail !== 'object' || !('academyId' in detail) || !('submissionId' in detail)) return;
+    window.dispatchEvent(new CustomEvent('cove:assessment-changed', {detail}));
+  });
+  socket.on('connect', () => window.dispatchEvent(new Event('cove:assessment-changed')));
   socket.connect();
   return socket;
 }

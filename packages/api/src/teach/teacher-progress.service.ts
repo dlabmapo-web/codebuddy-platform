@@ -1,3 +1,4 @@
+import { programmingAssessment } from "../learn/programming-assessment.js";
 import { quizFeedback } from "@cove/shared";
 import { programExit } from "../judge/program-exit.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
@@ -91,7 +92,7 @@ export class TeacherProgressService {
   ): Promise<TeacherStudentsResult> {
     const now = new Date();
     const scope = await this.access.requireClassScope(identity, input);
-    const exercises = filterExercises(scope.exercises, {
+    const exercises = filterExercises(automaticExercises(scope), {
       courseIds: input.courseIds,
     });
     const eligible = exercises.filter((exercise) => exercise.isRequired);
@@ -171,7 +172,7 @@ export class TeacherProgressService {
 
     // The student's whole class curriculum, so the summary above the table
     // keeps meaning the same thing while the table itself is filtered.
-    const all = scope.exercises;
+    const all = automaticExercises(scope);
     const allIds = all.map((exercise) => exercise.materialId);
     const eligibleIds = all
       .filter((exercise) => exercise.isRequired)
@@ -277,6 +278,7 @@ export class TeacherProgressService {
     const totalCount = await this.repository.countAttempts({
       userId: student.userId,
       materialId: exercise.materialId,
+      classId: input.classId,
     });
     const { page, pageCount, skip } = resolveTeacherPage({
       requestedPage: input.page ?? 1,
@@ -286,6 +288,7 @@ export class TeacherProgressService {
     const rows = await this.repository.listAttempts({
       userId: student.userId,
       materialId: exercise.materialId,
+      classId: input.classId,
       skip,
       take: TEACHER_ATTEMPTS_PAGE_SIZE,
     });
@@ -295,7 +298,8 @@ export class TeacherProgressService {
       studentName: student.displayName,
       attempts: rows.map((row) => ({
         submissionId: row.id,
-        accepted: row.status === "PASSED",
+        accepted: row.status === "RECORDED" ? null : row.status === "PASSED",
+        ...(row.submissionPolicy === "MANUAL_REVIEW" ? {manualAssessment: programmingAssessment(row)} : {}),
         score: row.score,
         passedCount: row.passedCount,
         totalCount: row.totalCount,
@@ -320,7 +324,7 @@ export class TeacherProgressService {
   ): Promise<TeacherCurriculumResult> {
     const now = new Date();
     const scope = await this.access.requireClassScope(identity, input);
-    const exercises = filterExercises(scope.exercises, {
+    const exercises = filterExercises(automaticExercises(scope), {
       courseIds: input.courseIds,
     });
     const rollup = await this.rollupFor(scope, exercises, now);
@@ -365,7 +369,7 @@ export class TeacherProgressService {
     const now = new Date();
     const scope = await this.access.requireClassScope(identity, input);
     const course = scope.courses.find((item) => item.id === input.courseId);
-    const owned = scope.exercises.filter(
+    const owned = automaticExercises(scope).filter(
       (exercise) => exercise.courseId === input.courseId,
     );
     if (!course || owned.length === 0) {
@@ -439,7 +443,7 @@ export class TeacherProgressService {
   ): Promise<TeacherLectureProblemsResult> {
     const now = new Date();
     const scope = await this.access.requireClassScope(identity, input);
-    const owned = scope.exercises.filter(
+    const owned = automaticExercises(scope).filter(
       (exercise) => exercise.lectureId === input.lectureId,
     );
     if (owned.length === 0) {
@@ -568,6 +572,7 @@ export class TeacherProgressService {
     const submission = await this.repository.findSubmissionForReview({
       userId: student.userId,
       submissionId: input.submissionId,
+      classId: input.classId,
       materialIds: scope.exercises.map((exercise) => exercise.materialId),
     });
     // The frozen id has to agree with the live relation. A row whose exercise
@@ -589,6 +594,7 @@ export class TeacherProgressService {
     const hidden = submission.cases.filter((item) => !item.isSample);
 
     return {
+      canPublishManualReview: scope.actor.canPublishReview ?? false,
       submissionId: submission.id,
       // Checked equal to the live relation above, and never null.
       materialId: submission.sourceMaterialId,
@@ -603,7 +609,8 @@ export class TeacherProgressService {
         lecturePosition: submission.lecturePosition,
         problemPosition: submission.problemPosition,
       }),
-      accepted: submission.status === "PASSED",
+      accepted: submission.status === "RECORDED" ? null : submission.status === "PASSED",
+      ...(submission.submissionPolicy === "MANUAL_REVIEW" ? {manualAssessment: programmingAssessment(submission)} : {}),
       score: submission.score,
       earnedWeight: submission.earnedWeight ?? null,
       possibleWeight: submission.possibleWeight ?? null,
@@ -842,6 +849,11 @@ function studentRow(input: {
     attentionCount: input.reasons?.size ?? 0,
     attentionKinds: [...kinds],
   };
+}
+
+/** Human grades have their own mixed history and never enter judge metrics. */
+function automaticExercises(scope: TeacherClassScope) {
+  return scope.exercises.filter(exercise => exercise.submissionPolicy !== "MANUAL_REVIEW");
 }
 
 function filterExercises(

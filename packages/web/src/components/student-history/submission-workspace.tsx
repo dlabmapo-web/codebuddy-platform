@@ -1,4 +1,5 @@
 "use client";
+import { ProgrammingGradingPanel } from "@/components/programming-review/grading-panel";
 import * as React from "react";
 import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
@@ -593,6 +594,9 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
           </>
         )}
       </header>
+      {data.kind === 'programming' && data.review.manualAssessment && props.submissionId ? <div className="max-h-[55vh] shrink-0 overflow-auto border-b border-border p-4">
+        <ProgrammingGradingPanel key={props.submissionId} academyId={props.academyId} classId={props.classId} submissionId={props.submissionId} initial={data.review.manualAssessment} canPublish={data.review.canPublishManualReview ?? false}/>
+      </div> : null}
       {data.kind === "manual" && data.explanation ? (
         <details className="border-b border-border px-5 py-3">
           <summary className="cursor-pointer text-sm font-semibold">

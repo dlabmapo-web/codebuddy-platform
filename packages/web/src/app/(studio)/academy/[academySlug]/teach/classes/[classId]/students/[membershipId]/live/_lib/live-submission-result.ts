@@ -178,6 +178,7 @@ export function reviewAsSubmissionResult(
     passedCount: review.passedCount,
     totalCount: review.totalCount,
     score: review.score,
+    ...(review.manualAssessment ? {submissionPolicy: "MANUAL_REVIEW" as const, manualAssessment: review.manualAssessment} : {}),
     earnedWeight: review.earnedWeight ?? null,
     possibleWeight: review.possibleWeight ?? null,
     runtimeMs: review.runtimeMs,

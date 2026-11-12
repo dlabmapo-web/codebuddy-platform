@@ -75,7 +75,7 @@ export default async function SubmissionReviewPage({
       showPageHeading={false}
       title={t('progress.review.title')}
     >
-      <SubmissionReview review={review} />
+      <SubmissionReview review={review} academyId={academyId} classId={classId} />
     </StudioPage>
   );
 }

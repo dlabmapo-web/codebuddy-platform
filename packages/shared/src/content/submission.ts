@@ -1,5 +1,6 @@
 import { quizFeedbackSchema } from "./quiz.js";
 import { z } from "zod";
+import { programmingAssessmentSchema } from "./programming-review.js";
 
 /**
  * Submission results as a student may see them.
@@ -17,6 +18,7 @@ export const submissionStatuses = [
   "FAILED",
   "ERRORED",
   "CANCELLED",
+  "RECORDED",
 ] as const;
 export const submissionStatusSchema = z.enum(submissionStatuses);
 export type SubmissionStatus = z.infer<typeof submissionStatusSchema>;
@@ -111,6 +113,8 @@ export const submissionCaseSchema = z.object({
 export type SubmissionCaseResult = z.infer<typeof submissionCaseSchema>;
 
 export const submissionResultSchema = z.object({
+  submissionPolicy: z.enum(["AUTOMATIC", "MANUAL_REVIEW"]).optional(),
+  manualAssessment: programmingAssessmentSchema.nullable().optional(),
   quiz: quizFeedbackSchema.nullable().optional(),
   submissionId: z.uuid(),
   materialId: z.uuid(),
@@ -122,7 +126,7 @@ export const submissionResultSchema = z.object({
    * weighted grading it is earned over possible weight, so a 30/30/40 problem
    * passing only its last case reads 40, not 33.
    */
-  score: z.number().int().min(0).max(100),
+  score: z.number().int().min(0).max(100).nullable(),
   /** Weighted grading only: the points behind `score`. Null on legacy. */
   earnedWeight: z.number().int().nonnegative().nullable().default(null),
   possibleWeight: z.number().int().nonnegative().nullable().default(null),
@@ -137,6 +141,16 @@ export const submissionResultSchema = z.object({
   compileFailed: z.boolean().optional(),
   /** GCC's messages for a program that did not compile. */
   compileDiagnostics: z.string().nullable().optional(),
+}).superRefine((value, ctx) => {
+  if (value.status === "RECORDED") {
+    if (value.submissionPolicy !== "MANUAL_REVIEW" || value.score !== null || value.totalCount !== 0 ||
+        value.passedCount !== 0 || value.cases.length !== 0 || value.runtimeMs !== null || value.gradedAt !== null ||
+        value.earnedWeight !== null || value.possibleWeight !== null || value.quiz != null || value.compileFailed || value.compileDiagnostics != null) {
+      ctx.addIssue({code: "custom", message: "Recorded submissions must be ungraded manual receipts."});
+    }
+  } else if (value.score === null || value.submissionPolicy === "MANUAL_REVIEW" || value.manualAssessment != null) {
+    ctx.addIssue({code: "custom", message: "Automatic submissions require a numeric judge score."});
+  }
 });
 export type SubmissionResult = z.infer<typeof submissionResultSchema>;
 
@@ -155,6 +169,8 @@ export const submitExerciseSchema = z.object({
   academyId: z.uuid(),
   materialId: z.uuid(),
   classId: z.uuid(),
+  requestId: z.uuid().optional(),
+  manualAssessmentVersion: z.literal(1).optional(),
   code: z.string().min(1).max(100_000),
   /**
    * Which sitting this attempt belongs to. The server owns the elapsed value
@@ -169,7 +185,10 @@ export const submitExerciseSchema = z.object({
 
 export const submissionAcceptedSchema = z.object({
   submissionId: z.uuid(),
-  totalCount: z.number().int().positive(),
+  totalCount: z.number().int().nonnegative(),
+  result: submissionResultSchema.optional(),
+}).superRefine((value, ctx) => {
+  if (value.totalCount === 0 && value.result?.status !== "RECORDED") ctx.addIssue({code: "custom", path: ["totalCount"], message: "Zero cases require a recorded manual submission."});
 });
 
 export const submissionInputSchema = z.object({

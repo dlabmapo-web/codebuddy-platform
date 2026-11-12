@@ -9,6 +9,8 @@ vi.mock("./curriculum-read.js", () => ({
   withCurricula: async (_db: unknown, courses: unknown) => courses,
 }));
 
+vi.mock('./submission-admission-read.js', () => ({readSubmissionAdmission: async (db: {material: {findFirst: Function}}) => db.material.findFirst({})}));
+
 function fixture(role = 'STUDENT', via = 'membership') {
   const db = { material: { findFirst: vi.fn().mockResolvedValue({ id: 'material', type: 'PROGRAMMING_EXERCISE', programmingExercise: {}, lecture: { courseModule: { course: { id: 'course' } } } }) },
     submission: { findFirst: vi.fn().mockResolvedValue({ id: 'newest', createdAt: new Date('2026-10-23'), status: 'FAILED', score: 0 }) } };

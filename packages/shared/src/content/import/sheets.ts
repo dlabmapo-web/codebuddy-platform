@@ -86,6 +86,8 @@ export const problemColumns = [
   "ai_feedback_enabled",
   "submission_policy",
   "reference_pdf_material_id",
+  "manual_maximum_points",
+  "manual_include_in_score",
 ] as const;
 export type ProblemColumn = (typeof problemColumns)[number];
 

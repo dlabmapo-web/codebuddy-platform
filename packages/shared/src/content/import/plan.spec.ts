@@ -731,3 +731,19 @@ it('round-trips a PDF-only practice policy without inventing statements, tests o
   expect(plan.counts.errors).toBe(0);
   expect(plan.modules[0].lectures[0].problems[0]).toMatchObject({ submissionPolicy: 'PRACTICE_ONLY', action: 'UNCHANGED' });
 });
+
+it('round-trips manual grading settings without tests or private solutions', () => {
+  const course = structuredClone(existingCourse);
+  const problem = course.modules[0]!.lectures[0]!.problems[0]!;
+  problem.submissionPolicy = 'MANUAL_REVIEW';
+  problem.manualAssessment = {maximumHundredths: 12550, includeInScore: false};
+  problem.solutions = []; problem.testCases = [];
+  const generated = buildCurrentCourseWorkbook({course,locale:'en'});
+  const sheet = (name: string) => generated.sheets.find(entry => entry.name === name)?.rows ?? [];
+  const plan = () => planContentImport({course,workbook:readWorkbookRows({Structure:sheet('Structure'),Problems:sheet('Problems'),Solutions:sheet('Solutions'),'Test Cases':sheet('Test Cases'),Hints:sheet('Hints')})});
+  expect(plan().counts.errors).toBe(0);
+  expect(plan().modules[0].lectures[0].problems[0]).toMatchObject({submissionPolicy:'MANUAL_REVIEW',manualAssessment:problem.manualAssessment,action:'UNCHANGED',gradingChanged:false});
+  const rows=sheet('Problems'), index=rows[0].indexOf('manual_include_in_score');
+  expect(index).toBeGreaterThan(-1); rows[1][index]='TRUE';
+  expect(plan().modules[0].lectures[0].problems[0]).toMatchObject({manualAssessment:{maximumHundredths:12550,includeInScore:true},action:'UPDATE',gradingChanged:true});
+});

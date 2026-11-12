@@ -47,6 +47,15 @@ export class MonitoringRevocationService {
     this.cleanupWatch = cleanupWatch ?? null;
   }
 
+  publishProgrammingAssessment(input: {academyId: string; classId: string; materialId: string; submissionId: string; studentMembershipId?: string; version: number}) {
+    try {
+      const rooms = [monitoringRooms.classPresence(input.academyId, input.classId)];
+      if (input.studentMembershipId) rooms.push(monitoringRooms.student(input.academyId, input.studentMembershipId));
+      this.server?.to(rooms).emit('assessment.changed', {academyId: input.academyId, classId: input.classId,
+        materialId: input.materialId, submissionId: input.submissionId, version: input.version});
+    } catch { this.logger.warn('Assessment persisted; realtime refresh unavailable'); }
+  }
+
   /** Archived, or its teacher replaced: nobody keeps watching this class. */
   async revokeClass(
     classId: string,

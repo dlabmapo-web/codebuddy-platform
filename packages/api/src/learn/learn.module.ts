@@ -1,3 +1,5 @@
+import { ProgrammingReviewService } from "./programming-review.service.js";
+import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.module.js";
 import { PracticeSubmissionController } from "./practice-submission.controller.js";
 import { StaffPracticeService } from "./staff-practice.service.js";
 import { Module } from "@nestjs/common";
@@ -28,9 +30,10 @@ import { SubmissionService } from "./submission.service.js";
  */
 @Module({
   // `MediaModule` signs the assigned teacher's photo for the class pages.
-  imports: [AcademiesModule, AuthModule, AuthorizationModule, MediaModule],
+  imports: [MonitoringRevocationModule, AcademiesModule, AuthModule, AuthorizationModule, MediaModule],
   controllers: [SubmissionController, PracticeSubmissionController],
   providers: [
+    ProgrammingReviewService,
     AnswerRecordsService,
     CurriculumOutlineService,
     LearnClassService,
@@ -57,6 +60,7 @@ import { SubmissionService } from "./submission.service.js";
   // curriculum through it. Two implementations of "what a course looks like"
   // is exactly what the teacher's navigator must not introduce.
   exports: [
+    ProgrammingReviewService,
     AnswerRecordsService,
     CurriculumOutlineService,
     LearnClassService,

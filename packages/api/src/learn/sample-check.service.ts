@@ -23,7 +23,7 @@ import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
-import { runSnapshotFor, sampleSnapshotFor } from "../judge/sample-check-snapshot.js";
+import { runExerciseFor, runSnapshotFor, sampleSnapshotFor } from "../judge/sample-check-snapshot.js";
 import { JudgeQueue } from "../judge/judge.queue.js";
 import { SAMPLE_QUEUE_WAIT_MS } from "../judge/sample-check.runner.js";
 import {
@@ -117,6 +117,8 @@ export class SampleCheckService {
     if (!material || !exercise) throw notFound();
     if (exercise.submissionPolicy === "PRACTICE_ONLY") throw new AppException("EXERCISE_PRACTICE_ONLY", HttpStatus.BAD_REQUEST);
 
+    if (exercise.submissionPolicy === "MANUAL_REVIEW") throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.BAD_REQUEST);
+
     // An authorized class context, exactly as Submit requires one. Practice
     // is still work done in a class.
     await this.classContext.resolve({
@@ -206,7 +208,7 @@ export class SampleCheckService {
     }
     const descriptor = await this.native().select({
       academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision, context: "live", kind: "run",
-    }, exercise);
+    }, runExerciseFor(exercise, input.stdin));
     if (descriptor?.engine !== "native-gcc") throw unavailable();
     const snapshot = runSnapshotFor(
       exercise, input.stdin, input.code,
@@ -248,6 +250,7 @@ export class SampleCheckService {
       throw new AppException("SAMPLE_CHECK_STALE", HttpStatus.CONFLICT);
     }
     const run = "stdin" in input;
+    if (!run && exercise.submissionPolicy === "MANUAL_REVIEW") throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.BAD_REQUEST);
     const testCase = run ? null : exercise.testCases.find(
       (candidate) => candidate.position === input.position && candidate.visibility === "SAMPLE",
     );
@@ -255,7 +258,7 @@ export class SampleCheckService {
     const descriptor = await this.native().select({
       academyId: input.academyId, materialId: material.id, gradingRevision: exercise.gradingRevision,
       context: input.preview ? "preview" : "live", kind: run ? "run" : "sample",
-    }, exercise);
+    }, run ? runExerciseFor(exercise, input.stdin) : exercise);
     if (descriptor?.engine !== "native-gcc") throw unavailable();
     const pyodide = this.config.get("PYODIDE_VERSION", { infer: true });
     const snapshot = run

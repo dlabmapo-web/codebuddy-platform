@@ -284,7 +284,9 @@
       "NOT_ACCEPTED": "오답",
       "JUDGE_ERROR": "채점 오류",
       "CANCELLED": "취소됨",
-      "IN_PROGRESS": "진행 중"
+      "IN_PROGRESS": "진행 중",
+      "MANUAL_REVIEW": "수동 채점 대기",
+      "MANUALLY_GRADED": "수동 채점 완료"
     },
     "facet": {
       "class": "반",

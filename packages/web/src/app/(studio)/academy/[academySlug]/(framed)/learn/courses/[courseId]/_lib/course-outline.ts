@@ -69,11 +69,11 @@ export function formatProblemOutlineNumber(
  * 0% complete, and drawing an empty bar for it would say it is.
  */
 export function lectureProgress(lecture: {
-  exercises: ReadonlyArray<{ status: string; submissionPolicy?: string }>;
+  exercises: ReadonlyArray<{ status: string; submissionPolicy?: string; manualAssessment?: {includeInScore: boolean} }>;
   videos?:ReadonlyArray<{status:string;video:{includeInScore:boolean}}>;
   manualMaterials?:ReadonlyArray<{status:string;includeInScore:boolean}>;
 }): { total: number; solved: number; percent: number | null } {
-  const assessed=[...lecture.exercises.filter(exercise => exercise.submissionPolicy !== 'PRACTICE_ONLY'),...(lecture.videos??[]).filter(v=>v.video.includeInScore),...(lecture.manualMaterials??[]).filter(m=>m.includeInScore)];
+  const assessed=[...lecture.exercises.filter(exercise => exercise.submissionPolicy !== 'PRACTICE_ONLY' && (exercise.submissionPolicy !== 'MANUAL_REVIEW' || exercise.manualAssessment?.includeInScore)),...(lecture.videos??[]).filter(v=>v.video.includeInScore),...(lecture.manualMaterials??[]).filter(m=>m.includeInScore)];
   const total = assessed.length;
   const solved = assessed.filter(
     (exercise) => exercise.status === 'SOLVED',

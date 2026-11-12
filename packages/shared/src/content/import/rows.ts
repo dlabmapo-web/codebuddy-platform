@@ -90,7 +90,9 @@ export type NormalizedProblemRow = RowLocation & {
   solutions: ExerciseSolutionEntry[];
   /** Null means the cell was blank: create as false, preserve on update. */
   aiFeedbackEnabled: boolean | null;
-  submissionPolicy?: "PRACTICE_ONLY" | "AUTOMATIC";
+  submissionPolicy?: "PRACTICE_ONLY" | "AUTOMATIC" | "MANUAL_REVIEW";
+  manualMaximumHundredths?: number;
+  manualIncludeInScore?: boolean;
   referencePdfMaterialId?: string;
 };
 
@@ -489,11 +491,20 @@ export function readProblemsSheet(grid: SheetGrid): {
     }
 
     const policyCell = String(get("submission_policy") ?? "").trim();
-    const submissionPolicy = policyCell === "PRACTICE_ONLY" || policyCell === "AUTOMATIC" ? policyCell : undefined;
+    const submissionPolicy = policyCell === "PRACTICE_ONLY" || policyCell === "AUTOMATIC" || policyCell === "MANUAL_REVIEW" ? policyCell : undefined;
     if (policyCell && !submissionPolicy) issues.push(issue(location, "submission_policy_invalid", "submission_policy", policyCell, problemKey));
+    const maximumCell = String(get('manual_maximum_points') ?? '').trim();
+    const includeCell = get('manual_include_in_score');
+    const maximum = maximumCell ? Number(maximumCell) : undefined;
+    if (maximum !== undefined && (!/^\d+(?:\.\d{1,2})?$/.test(maximumCell) || maximum <= 0 || maximum > 10000))
+      issues.push(issue(location, 'submission_policy_invalid', 'manual_maximum_points', maximumCell, problemKey));
+    const manualIncludeInScore = isBlankCell(includeCell) ? undefined : normalizeStrictBoolean(includeCell);
+    if (manualIncludeInScore === null) issues.push(issue(location, 'boolean_invalid', 'manual_include_in_score', includeCell, problemKey));
     rows.push({
       ...location,
       submissionPolicy,
+      manualMaximumHundredths: maximum === undefined ? undefined : Math.round(maximum*100),
+      manualIncludeInScore: manualIncludeInScore ?? undefined,
       referencePdfMaterialId: String(get("reference_pdf_material_id") ?? "").trim() || undefined,
       problemKey,
       lectureKey,

@@ -7,6 +7,8 @@ import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
 
+import { useReviewTranslation } from '@/components/programming-review/use-review-translation';
+
 import { useLocale } from '@/i18n';
 
 import { useAttemptsQuery } from '../_hooks/use-teacher-progress';
@@ -52,6 +54,7 @@ export function AttemptHistory({
   const academySlug = useAcademySlug();
   const { t } = useTranslation('teach');
   const locale = useLocale();
+  const review = useReviewTranslation();
   const attempts = useAttemptsQuery(
     { academyId, classId },
     { membershipId, materialId, page },
@@ -102,19 +105,19 @@ export function AttemptHistory({
             <Td>
               <span
                 className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-bold ${
-                  attempt.accepted
+                  attempt.manualAssessment ? 'bg-brand/10 text-brand' : attempt.accepted
                     ? 'bg-success/10 text-success'
                     : 'bg-danger/10 text-danger'
                 }`}
               >
-                {attempt.accepted
+                {attempt.manualAssessment ? review(attempt.manualAssessment.state === 'GRADED' ? 'graded' : 'pending') : attempt.accepted
                   ? t('progress.result.accepted')
                   : t('progress.result.not_accepted')}
               </span>
             </Td>
-            <Td numeric>{attempt.score}</Td>
+            <Td numeric>{attempt.manualAssessment ? (attempt.manualAssessment.scoreHundredths === null ? '—' : `${attempt.manualAssessment.scoreHundredths / 100} / ${attempt.manualAssessment.maximumHundredths / 100}`) : attempt.score}</Td>
             <Td numeric>
-              {t('progress.attempts.tests_value', {
+              {attempt.manualAssessment ? '—' : t('progress.attempts.tests_value', {
                 passed: attempt.passedCount,
                 total: attempt.totalCount,
               })}

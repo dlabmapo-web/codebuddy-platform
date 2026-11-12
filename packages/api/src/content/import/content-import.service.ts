@@ -944,6 +944,8 @@ export class ContentImportService {
       constraints: planned.constraints,
       starterCode: planned.starterCode,
       aiFeedbackEnabled: planned.aiFeedbackEnabled,
+      manualMaximumHundredths: planned.manualAssessment?.maximumHundredths ?? existing?.programmingExercise?.manualMaximumHundredths ?? 10000,
+      manualIncludeInScore: planned.manualAssessment?.includeInScore ?? existing?.programmingExercise?.manualIncludeInScore ?? false,
       submissionPolicy: planned.submissionPolicy ?? existing?.programmingExercise?.submissionPolicy ?? "AUTOMATIC",
     };
 
@@ -1002,6 +1004,8 @@ export class ContentImportService {
           title: planned.title,
           externalKey: planned.key,
           difficulty: planned.difficulty,
+          manualMaximumHundredths: exerciseFields.manualMaximumHundredths,
+          manualIncludeInScore: exerciseFields.manualIncludeInScore,
           submissionPolicy: exerciseFields.submissionPolicy,
           isVisible: true,
           testCaseCount: planned.testCases.length,
@@ -1269,6 +1273,7 @@ function toProjection(course: CourseWithContent): CourseProjection {
               solutions: privateSolutions(exercise.solutions),
               aiFeedbackEnabled: exercise.aiFeedbackEnabled,
               referencePdfMaterialId: exercise.referencePdfMaterialId,
+              manualAssessment: {maximumHundredths: exercise.manualMaximumHundredths, includeInScore: exercise.manualIncludeInScore},
               submissionPolicy: exercise.submissionPolicy,
               gradingMode: exercise.gradingMode,
               testCases: exercise.testCases.map((testCase) => ({

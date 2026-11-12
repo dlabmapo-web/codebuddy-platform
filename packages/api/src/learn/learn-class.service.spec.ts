@@ -21,6 +21,10 @@ vi.mock("./curriculum-read.js", () => ({
   withCurricula: async (_db: unknown, courses: unknown) => courses,
 }));
 
+vi.mock('./manual-assessment-read.js', () => ({
+  readAssessmentRevisions: (db: {programmingExercise: {findMany: () => Promise<unknown>}}) => db.programmingExercise.findMany(),
+}));
+
 const identity: SupabaseIdentity = {
   authUserId: "10000000-0000-4000-8000-000000000001",
   email: "student@example.com",

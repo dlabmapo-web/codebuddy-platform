@@ -1,0 +1,49 @@
+{
+  "publication": {
+    "total": 17,
+    "reads": 12,
+    "writes": 3,
+    "control": 2
+  },
+  "idempotent_publication": {
+    "total": 13,
+    "reads": 11,
+    "writes": 0,
+    "control": 2
+  },
+  "reads": {
+    "small": {
+      "student_result": 4,
+      "staff_review": 6,
+      "student_history": 12,
+      "teacher_attempts": 13,
+      "teacher_work_history": 15,
+      "teacher_problem_students": 23,
+      "teacher_student_materials": 22,
+      "latest": 6,
+      "learner_bootstrap": 19
+    },
+    "expanded": {
+      "student_result": 4,
+      "staff_review": 6,
+      "student_history": 12,
+      "teacher_attempts": 13,
+      "teacher_work_history": 15,
+      "teacher_problem_students": 23,
+      "teacher_student_materials": 22,
+      "latest": 6,
+      "learner_bootstrap": 19
+    }
+  },
+  "material_metadata": {
+    "v2": 6,
+    "feature": 1,
+    "delta": -5
+  },
+  "correction": {
+    "total": 17,
+    "reads": 12,
+    "writes": 3,
+    "control": 2
+  }
+}

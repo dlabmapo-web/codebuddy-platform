@@ -193,6 +193,7 @@ type ExerciseRecord = Prisma.MaterialGetPayload<{
 
 type ExerciseWriteInput = {
   submissionPolicy?: SubmissionPolicy;
+  manualAssessment?: { maximumHundredths: number; includeInScore: boolean };
   /** C or C++ in a C/C++ course; checked against the course. */
   language?: ExerciseLanguage;
   referencePdfMaterialId?: string | null;
@@ -1312,6 +1313,8 @@ export class CourseService {
               // generated workbook round-trips a hand-made problem unchanged.
               externalKey: stableKeyFromUuid(randomUUID()),
               submissionPolicy: inferSubmissionPolicy(input),
+              manualMaximumHundredths: input.manualAssessment?.maximumHundredths ?? 10000,
+              manualIncludeInScore: input.manualAssessment?.includeInScore ?? false,
               referencePdfMaterialId: input.referencePdfMaterialId ?? null,
               quiz: input.quiz ?? PrismaValues.DbNull,
               difficulty: input.difficulty,
@@ -1376,23 +1379,24 @@ export class CourseService {
     if (exercise.updatedAt.toISOString() !== input.expectedUpdatedAt) {
       throw new AppException("CONTENT_EDIT_CONFLICT", HttpStatus.CONFLICT);
     }
+    const submissionPolicy = input.submissionPolicy ?? exercise.submissionPolicy ?? "AUTOMATIC";
     // Checked against the limit this exercise actually has, which an imported
     // or migrated problem may not share with the authoring default.
-    assertGradingSupported(input, exercise.timeLimitMs);
+    assertGradingSupported({...input, submissionPolicy}, exercise.timeLimitMs);
     // Absent keeps the stored language. A C/C++ problem may move between C
     // and C++, which is a different program for every case; nothing leaves
     // its course's family.
     const language = input.quiz || input.language === undefined
       ? exercise.language
       : exerciseLanguageIn(current.lecture.courseModule.course.language, input.language);
-    assertLanguageGrading(input, language);
+    assertLanguageGrading({...input, submissionPolicy}, language);
     const profileColumns = exerciseProfileColumns(input.grading);
-    const submissionPolicy = input.submissionPolicy ?? exercise.submissionPolicy ?? "AUTOMATIC";
     const definitionChanged =
       !sameQuizGrading(exercise.quiz, input.quiz) ||
       !sameGradingDefinition(exercise.testCases, input.testCases) ||
       !sameGradingProfile(exercise, profileColumns);
-    const gradingChanged = definitionChanged || language !== exercise.language ||
+    const manualChanged = Boolean(input.manualAssessment && (input.manualAssessment.maximumHundredths !== exercise.manualMaximumHundredths || input.manualAssessment.includeInScore !== exercise.manualIncludeInScore));
+    const gradingChanged = manualChanged || definitionChanged || language !== exercise.language ||
       submissionPolicy !== (exercise.submissionPolicy ?? "AUTOMATIC");
     const nextRevision = exercise.gradingRevision + (gradingChanged ? 1 : 0);
     const record = await this.prisma.$transaction(async (tx) => {
@@ -1408,6 +1412,7 @@ export class CourseService {
         data: {
           ...(input.referencePdfMaterialId !== undefined ? { referencePdfMaterialId: input.referencePdfMaterialId } : {}),
           submissionPolicy,
+          ...(input.manualAssessment ? {manualMaximumHundredths: input.manualAssessment.maximumHundredths, manualIncludeInScore: input.manualAssessment.includeInScore} : {}),
           quiz: input.quiz ?? PrismaValues.DbNull,
           difficulty: input.difficulty,
           description: input.description,
@@ -1782,6 +1787,7 @@ function assertGradingSupported(
   input: ExerciseWriteInput,
   timeLimitMs: number,
 ) {
+  if (input.submissionPolicy === "MANUAL_REVIEW") return;
   const issues = gradingProfileIssues({
     grading: input.grading,
     testCases: input.testCases,
@@ -1904,6 +1910,7 @@ function exerciseAuditFromInput(
   language: ExerciseLanguage,
 ) {
   return {
+    manualAssessment: input.manualAssessment,
     submissionPolicy: inferSubmissionPolicy(input),
     referencePdfMaterialId: input.referencePdfMaterialId,
     instructionSource: input.referencePdfMaterialId ? "PDF" : "TEXT",
@@ -1935,6 +1942,7 @@ function exerciseAuditFromInput(
 function exerciseRecordAudit(record: ExerciseRecord) {
   const exercise = record.programmingExercise!;
   return {
+    manualAssessment: {maximumHundredths: exercise.manualMaximumHundredths ?? 10000, includeInScore: exercise.manualIncludeInScore ?? false},
     submissionPolicy: exercise.submissionPolicy ?? "AUTOMATIC",
     referencePdfMaterialId: exercise.referencePdfMaterialId ?? null,
     title: record.title,
@@ -2150,6 +2158,7 @@ function serializeExercise(
   return {
     quiz:
       exercise.quiz == null ? null : quizDefinitionSchema.parse(exercise.quiz),
+    manualAssessment: {maximumHundredths: exercise.manualMaximumHundredths ?? 10000, includeInScore: exercise.manualIncludeInScore ?? false},
     submissionPolicy: exercise.submissionPolicy ?? "AUTOMATIC",
     referencePdfMaterialId: exercise.referencePdfMaterialId,
     materialId: exercise.materialId,
@@ -2249,7 +2258,7 @@ function exerciseLanguageIn(course: CourseLanguage, requested: ExerciseLanguage 
  * the input-prompt setting only has a meaning for Python's `input()`.
  */
 function assertLanguageGrading(input: ExerciseWriteInput, language: ExerciseLanguage) {
-  if (input.quiz || !isCompiledLanguage(language)) return;
+  if (input.quiz || input.submissionPolicy === "MANUAL_REVIEW" || !isCompiledLanguage(language)) return;
   if (input.grading.mode !== "ELICE_STDIO" || input.grading.inputPromptPolicy !== "INCLUDE")
     throw new AppException(
       "EXERCISE_VALIDATION_FAILED",

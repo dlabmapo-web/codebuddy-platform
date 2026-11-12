@@ -7,8 +7,12 @@ import type { ApiEnvironment } from "../config/env.schema.js";
 import type { PrismaService } from "../database/prisma.service.js";
 import type { JudgeQueue } from "../judge/judge.queue.js";
 import type { LearningClassContextService } from "./learning-class-context.service.js";
+import { readSubmissionAdmission } from "./submission-admission-read.js";
 import { SubmissionService } from "./submission.service.js";
 
+vi.mock('./submission-admission-read.js', () => ({
+  readSubmissionAdmission: vi.fn((db: {material: {findFirst: (value: unknown) => Promise<unknown>}}, id: string) => db.material.findFirst({where: {id}})),
+}));
 const identity: SupabaseIdentity = {
   authUserId: "10000000-0000-4000-8000-000000000001",
   email: "student@example.com",
@@ -226,6 +230,7 @@ function createService(options?: {
     access,
     queue,
     transaction,
+    classContext,
     service: new SubmissionService(prisma, access, config, classContext, queue),
   };
 }
@@ -287,49 +292,16 @@ describe("SubmissionService.submit", () => {
     ).toBeLessThan(vi.mocked(queue.enqueue).mock.invocationCallOrder[0]!);
   });
 
-  it("checks the complete visibility chain inside the snapshot transaction", async () => {
-    const { service, prisma, transaction } = createService();
-
-    await service.submit(identity, { academyId, classId, materialId, code: "print(1)" });
-
-    expect(transaction.material.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          id: materialId,
-          AND: expect.arrayContaining([
-            expect.objectContaining({
-              isVisible: true,
-              lecture: expect.objectContaining({ isVisible: true }),
-            }),
-          ]),
-        }),
-      }),
-    );
+  it('uses the joined admission reader inside the snapshot transaction', async () => {
+    const {service, prisma, transaction} = createService();
+    await service.submit(identity, {academyId, classId, materialId, code: 'print(1)'});
+    expect(readSubmissionAdmission).toHaveBeenCalledWith(transaction, materialId, academyId);
     expect(prisma.material.findFirst).not.toHaveBeenCalled();
   });
-
-  it("also requires an active class assignment before grading", async () => {
-    const { service, transaction } = createService();
-
-    await service.submit(identity, { academyId, classId, materialId, code: "print(1)" });
-
-    expect(transaction.material.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          AND: expect.arrayContaining([
-            {
-              lecture: {
-                courseModule: {
-                  course: expect.objectContaining({
-                    classAssignments: expect.anything(),
-                  }),
-                },
-              },
-            },
-          ]),
-        }),
-      }),
-    );
+  it('resolves the delivery class before recording an automatic attempt', async () => {
+    const {service, transaction, classContext} = createService();
+    await service.submit(identity, {academyId, classId, materialId, code: 'print(1)'});
+    expect(classContext.resolveWith).toHaveBeenCalledWith(transaction, {academyId, userId, courseId: '60000000-0000-4000-8000-000000000001', requestedClassId: classId});
   });
 });
 

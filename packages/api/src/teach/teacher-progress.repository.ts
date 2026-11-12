@@ -341,6 +341,7 @@ export class TeacherProgressRepository {
   async countAttempts(input: {
     userId: string;
     materialId: string;
+    classId?: string;
   }): Promise<number> {
     return this.prisma.submission.count({ where: attemptWhere(input) });
   }
@@ -348,6 +349,7 @@ export class TeacherProgressRepository {
   async listAttempts(input: {
     userId: string;
     materialId: string;
+    classId?: string;
     skip: number;
     take: number;
   }) {
@@ -359,6 +361,7 @@ export class TeacherProgressRepository {
       select: {
         id: true,
         status: true,
+        submissionPolicy: true, manualAssessmentSnapshot: true, manualReviewResult: true,
         score: true,
         earnedWeight: true,
         possibleWeight: true,
@@ -383,20 +386,23 @@ export class TeacherProgressRepository {
     userId: string;
     materialIds: string[];
     submissionId: string;
+    classId?: string;
   }) {
     if (input.materialIds.length === 0) return null;
     return this.prisma.submission.findFirst({
       where: {
         id: input.submissionId,
+        ...(input.classId ? {classId: input.classId} : {}),
         userId: input.userId,
         materialId: { in: input.materialIds },
-        status: { in: ["PASSED", "FAILED"] satisfies SubmissionStatus[] },
+        status: { in: ["PASSED", "FAILED", "RECORDED"] satisfies SubmissionStatus[] },
       },
       select: {
         id: true,
         materialId: true,
         sourceMaterialId: true,
         status: true,
+        submissionPolicy: true, manualAssessmentSnapshot: true, manualReviewResult: true,
         score: true,
         earnedWeight: true,
         possibleWeight: true,
@@ -450,16 +456,17 @@ export class TeacherProgressRepository {
 }
 
 /** One student's counted attempts at one exercise, scoped as §6.4 requires. */
-function attemptWhere(input: { userId: string; materialId: string }) {
+function attemptWhere(input: { userId: string; materialId: string; classId?: string }) {
   return {
     userId: input.userId,
+    ...(input.classId ? {classId: input.classId} : {}),
     materialId: input.materialId,
     sourceMaterialId: input.materialId,
     // Counted attempts only: a queued, cancelled, or judge-faulted row is not
     // something the student did, so it never appears in a history a teacher
     // reads back to them. A platform re-grade is the same kind of thing — the
     // row carries the student's code, but the student did not write it today.
-    status: { in: ["PASSED", "FAILED"] satisfies SubmissionStatus[] },
+    status: { in: ["PASSED", "FAILED", "RECORDED"] satisfies SubmissionStatus[] },
     regradeRunId: null,
   } satisfies Prisma.SubmissionWhereInput;
 }

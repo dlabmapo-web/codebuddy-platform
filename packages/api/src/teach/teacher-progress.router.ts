@@ -19,6 +19,10 @@ export function createTeacherProgressRouter(
   const access = createAccess(os, deps);
 
   return {
+    getProgrammingReview: os.teacherProgress.getProgrammingReview.use(access.authenticated)
+      .handler(({context, input}) => deps.programmingReviewService.get(context.identity, input)),
+    publishProgrammingReview: os.teacherProgress.publishProgrammingReview.use(access.authenticated)
+      .handler(({context, input}) => deps.programmingReviewService.publish(context.identity, input)),
     listStudents: os.teacherProgress.listStudents
       .use(access.authenticated)
       .handler(({ context, input }) =>

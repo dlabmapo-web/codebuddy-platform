@@ -31,7 +31,7 @@ describe("TeacherProgressRepository.findSubmissionForReview", () => {
           id: "submission-a",
           userId: "student-user",
           materialId: { in: ["exercise-a", "exercise-b"] },
-          status: { in: ["PASSED", "FAILED"] },
+          status: { in: ["PASSED", "FAILED", "RECORDED"] },
         },
       }),
     );

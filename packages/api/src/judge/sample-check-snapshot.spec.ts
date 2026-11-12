@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { legacyCaseGrading } from "@cove/shared";
-import { sampleSnapshotFor } from "./sample-check-snapshot.js";
+import { legacyCaseGrading, type NativeGccDescriptor } from "@cove/shared";
+import { runExerciseFor, runSnapshotFor, sampleInputPromptPolicy, sampleSnapshotFor } from "./sample-check-snapshot.js";
 import type { ExerciseGradingSource } from "./grading-profile.js";
 
 const sample = { ...legacyCaseGrading, input: "6", expectedOutput: "4", visibility: "SAMPLE" as const, label: null };
@@ -24,5 +24,38 @@ describe("legacy sample admission snapshot", () => {
     expect(sampleSnapshotFor(exercise, exercise.testCases[1]!, "", "0.27.5")).toBeNull();
     expect(sampleSnapshotFor({ ...exercise, gradingSemanticVersion: "future" }, sample, "", "0.27.5")).toBeNull();
     expect(sampleSnapshotFor({ ...exercise, testCases: [{ ...sample, weight: 2 }] }, sample, "", "0.27.5")).toBeNull();
+  });
+});
+
+const digest = `sha256:${"1".repeat(64)}`;
+const gcc: NativeGccDescriptor = {
+  schemaVersion: 1,
+  engine: "native-gcc",
+  gccVersion: "12.2.0",
+  architecture: "arm64",
+  toolchainRootfsDigest: digest,
+  runRootfsDigest: digest,
+  packageManifestDigest: digest,
+  compile: { C: { argv: ["/usr/bin/gcc-12"] }, CPP: { argv: ["/usr/bin/g++-12"], pchDigest: digest } },
+  nsjailRevision: "d8415bc8eea43cdd413daba25af63127019a1189",
+  nsjailBinaryDigest: digest,
+  sandboxPolicyVersion: "nsjail-gcc-v1",
+  compilePolicyDigest: digest,
+  runPolicyDigest: digest,
+  execGateDigest: digest,
+  comparator: { engine: "pyodide", version: "0.27.5", packageDigest: digest, semanticsVersion: "cove-python-comparator-v1" },
+};
+describe('manual compiled Run', () => {
+  it.each(['C','CPP'] as const)('executes %s with no authored tests or automatic grading profile',language=>{
+    const source={...exercise,language,submissionPolicy:'MANUAL_REVIEW' as const,testCases:[]};
+    const selected=runExerciseFor(source,'student input');
+    expect(selected.testCases).toHaveLength(1);
+    expect(source.testCases).toHaveLength(0);
+    const snapshot=runSnapshotFor(source,'student input','student code','0.27.5',gcc);
+    expect(snapshot).toMatchObject({run:true,language,gradingSemanticVersion:'elice-v1',testCase:{input:'student input',expectedOutput:''}});
+    expect(sampleInputPromptPolicy(snapshot!)).toBe('INCLUDE');
+  });
+  it('keeps refusing invalid automatic profiles',()=>{
+    expect(runSnapshotFor({...exercise,language:'C',testCases:[]},'','','0.27.5',gcc)).toBeNull();
   });
 });

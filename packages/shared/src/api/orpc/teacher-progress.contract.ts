@@ -1,3 +1,5 @@
+import { z } from "zod";
+import { programmingReviewInputSchema, programmingReviewViewSchema } from "../../content/programming-review.js";
 import { oc } from "@orpc/contract";
 
 import {
@@ -33,6 +35,8 @@ import {
  * See §12 of the teacher solution status design.
  */
 export const teacherProgressContract = {
+  getProgrammingReview: oc.input(z.object({ academyId: z.uuid(), classId: z.uuid(), submissionId: z.uuid() })).output(programmingReviewViewSchema),
+  publishProgrammingReview: oc.input(programmingReviewInputSchema).output(programmingReviewViewSchema),
   /** The roster page: class summary, student rows, facets, pagination. */
   listStudents: oc
     .input(listTeacherStudentsInputSchema)

@@ -1,5 +1,5 @@
 import { nativeRuntimeVersion } from "@cove/grading-runtime";
-import { nativeAnyRuntimeDescriptorSchema, type NativeAnyRuntimeDescriptor } from "@cove/shared";
+import { defaultEliceGradingProfile, nativeAnyRuntimeDescriptorSchema, type NativeAnyRuntimeDescriptor } from "@cove/shared";
 import { inputPromptPolicySchema, programmingExerciseGradingModeSchema, inputPromptPolicyForSemanticVersion, type InputPromptPolicy } from "@cove/shared";
 import type { ExerciseGradingSource } from "./grading-profile.js";
 import { gradingSnapshotFor, gradingPolicySnapshotSchema, resolveGradingProfile } from "./grading-profile.js";
@@ -62,6 +62,21 @@ export function sampleSnapshotFor(
   };
 }
 
+/** Manual Run executes one user input without borrowing a grading definition. */
+export function runExerciseFor(exercise: ExerciseGradingSource, stdin: string): ExerciseGradingSource {
+  if (exercise.submissionPolicy !== "MANUAL_REVIEW") return exercise;
+  return {
+    ...exercise, gradingMode: "ELICE_STDIO", gradingSemanticVersion: "elice-v1", inputPromptPolicy: "INCLUDE",
+    totalTimeLimitMs: defaultEliceGradingProfile.totalTimeLimitMs,
+    comparatorTimeLimitMs: defaultEliceGradingProfile.comparatorTimeLimitMs,
+    materialMaximumHundredths: defaultEliceGradingProfile.materialMaximumHundredths,
+    materialScorePolicy: defaultEliceGradingProfile.materialScorePolicy,
+    continuationPolicy: "CONTINUE_WITHIN_BUDGET", exitStatusPolicy: "FAIL_ON_RUNTIME_ERROR",
+    testCases: [{input: stdin, expectedOutput: "", visibility: "SAMPLE", comparator: "STDOUT",
+      weight: 1, timeLimitMsOverride: null, softTimeLimitMs: null, softPenalty: null, label: null}],
+  };
+}
+
 /**
  * A C/C++ Run: the student's code on their own input, frozen like a sample
  * check with that input as its one case. Nothing is compared; the case limit
@@ -75,6 +90,7 @@ export function runSnapshotFor(
   descriptor: NativeAnyRuntimeDescriptor,
   endOfInput = false,
 ): SampleSnapshot | null {
+  exercise = runExerciseFor(exercise, stdin);
   const language = exercise.language;
   if (language !== "C" && language !== "CPP" || descriptor.engine !== "native-gcc") return null;
   const profile = resolveGradingProfile(exercise, exercise.testCases);

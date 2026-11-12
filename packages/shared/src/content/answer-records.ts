@@ -1,3 +1,4 @@
+import { programmingAssessmentSchema } from "./programming-review.js";
 import { z } from "zod";
 
 import type { SubmissionStatus } from "./submission.js";
@@ -29,6 +30,8 @@ const outlinePositionSchema = z.number().int().nonnegative();
  * growing three different ideas of what "not accepted" means.
  */
 export const answerRecordResults = [
+  "MANUAL_REVIEW",
+  "MANUALLY_GRADED",
   "ACCEPTED",
   "NOT_ACCEPTED",
   "JUDGE_ERROR",
@@ -42,6 +45,8 @@ export function answerRecordResultFor(
   status: SubmissionStatus,
 ): AnswerRecordResult {
   switch (status) {
+    case "RECORDED":
+      return "MANUAL_REVIEW";
     case "PASSED":
       return "ACCEPTED";
     case "FAILED":
@@ -60,6 +65,9 @@ export function submissionStatusesFor(
   result: AnswerRecordResult,
 ): SubmissionStatus[] {
   switch (result) {
+    case "MANUAL_REVIEW":
+    case "MANUALLY_GRADED":
+      return ["RECORDED"];
     case "ACCEPTED":
       return ["PASSED"];
     case "NOT_ACCEPTED":
@@ -94,7 +102,8 @@ export const answerRecordRowSchema = z
     lecturePosition: outlinePositionSchema,
     problemPosition: outlinePositionSchema,
     result: answerRecordResultSchema,
-    score: z.number().int().min(0).max(100),
+    manualAssessment: programmingAssessmentSchema.optional(),
+    score: z.number().int().min(0).max(100).nullable(),
     passedCount: z.number().int().nonnegative(),
     totalCount: z.number().int().nonnegative(),
     /** Null for rows written before solve sessions existed. */

@@ -1,4 +1,3 @@
-import { holdsRoleWhere } from "../authorization/membership-roles.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import type { LearningClassContext } from "@cove/shared";
 
@@ -6,7 +5,7 @@ import { AppException } from "../common/app-exception.js";
 import { PrismaService } from "../database/prisma.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 
-type ClassContextDatabase = Pick<Prisma.TransactionClient, "academyMembership">;
+type ClassContextDatabase = Pick<Prisma.TransactionClient, "$queryRaw">;
 
 /**
  * Resolves the delivery class for student work on one course.
@@ -39,33 +38,18 @@ export class LearningClassContextService {
       requestedClassId?: string;
     },
   ): Promise<LearningClassContext & { membershipId: string }> {
-    const membership = await database.academyMembership.findFirst({
-      where: {
-        academyId: input.academyId,
-        userId: input.userId,
-        ...holdsRoleWhere("STUDENT"),
-        status: "ACTIVE",
-      },
-      select: {
-        id: true,
-        classEnrollments: {
-          where: {
-            class: {
-              status: "ACTIVE",
-              courseAssignments: { some: { courseId: input.courseId } },
-            },
-          },
-          select: { class: { select: { id: true, name: true } } },
-          orderBy: [{ class: { name: "asc" } }, { classId: "asc" }],
-        },
-      },
-    });
-
-    const classes =
-      membership?.classEnrollments.map(({ class: item }) => ({
-        classId: item.id,
-        name: item.name,
-      })) ?? [];
+    const [membership] = await database.$queryRaw<Array<{id: string; classes: Array<{classId: string; name: string}>}>>`
+      SELECT m.id, COALESCE(jsonb_agg(jsonb_build_object('classId', cl.id, 'name', cl.name)
+        ORDER BY cl.name, cl.id) FILTER (WHERE cl.id IS NOT NULL), '[]'::jsonb) AS classes
+      FROM academy_memberships m
+      LEFT JOIN class_enrollments ce ON ce.membership_id=m.id
+      LEFT JOIN class_courses cc ON cc.class_id=ce.class_id AND cc.course_id=${input.courseId}::uuid
+      LEFT JOIN classes cl ON cl.id=cc.class_id AND cl.status='ACTIVE' AND cl.academy_id=${input.academyId}::uuid
+      WHERE m.academy_id=${input.academyId}::uuid AND m.user_id=${input.userId}::uuid AND m.status='ACTIVE'
+        AND (m.role='STUDENT' OR EXISTS (SELECT 1 FROM academy_membership_roles r WHERE r.membership_id=m.id AND r.role='STUDENT'))
+      GROUP BY m.id
+    `;
+    const classes = membership?.classes ?? [];
     if (!membership || classes.length === 0) {
       throw new AppException("COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
     }

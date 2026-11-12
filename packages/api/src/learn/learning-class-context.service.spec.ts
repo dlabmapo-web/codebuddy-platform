@@ -11,12 +11,8 @@ const classB = "50000000-0000-4000-8000-000000000005";
 
 function service(classes: Array<{ id: string; name: string }>) {
   const prisma = {
-    academyMembership: {
-      findFirst: vi.fn().mockResolvedValue({
-        id: "60000000-0000-4000-8000-000000000006",
-        classEnrollments: classes.map((item) => ({ class: item })),
-      }),
-    },
+    $queryRaw: vi.fn().mockResolvedValue([{id: '60000000-0000-4000-8000-000000000006',
+      classes: classes.map(item => ({classId: item.id, name: item.name}))}]),
   } as unknown as PrismaService;
   return { prisma, service: new LearningClassContextService(prisma) };
 }

@@ -56,6 +56,7 @@ type CaseGrading = {
 
 /** What an exercise must supply to be snapshotted. */
 export type ExerciseGradingSource = ProfileColumns & {
+  submissionPolicy?: "AUTOMATIC" | "PRACTICE_ONLY" | "MANUAL_REVIEW";
   /** Absent means Python, as every exercise was before C and C++. */
   language?: ExerciseLanguage;
   timeLimitMs: number;

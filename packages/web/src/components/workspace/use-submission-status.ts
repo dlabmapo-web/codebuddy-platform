@@ -10,9 +10,9 @@ function denied(error: unknown) {
   const value = error as { status?: number; code?: string };
   return [401, 403, 404].includes(value.status ?? 0) || ['UNAUTHORIZED', 'FORBIDDEN', 'NOT_FOUND'].includes(value.code ?? '');
 }
-const order = (a: LatestSubmission, b: LatestSubmission) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.submissionId.localeCompare(b.submissionId);
+const order = (a: LatestSubmission, b: LatestSubmission) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.submissionId.localeCompare(b.submissionId) || (a.reviewVersion ?? 0) - (b.reviewVersion ?? 0);
 export function submissionPollInterval(latest: LatestSubmission | null | undefined, now: number, failures = 0, error?: unknown): number | false {
-  if (denied(error)) return false;
+  if (denied(error) || latest?.submissionPolicy === "MANUAL_REVIEW") return false;
   if (latest && !['PENDING', 'AWAITING_REVIEW'].includes(latest.status)) return false;
   if (latest?.status === 'PENDING' && now - Date.parse(latest.createdAt) >= 120000) return false;
   if (failures) return failures <= 3 ? 1000 * 2 ** failures : false;
@@ -21,7 +21,7 @@ export function submissionPollInterval(latest: LatestSubmission | null | undefin
 }
 
 function settledSeed(seed: LatestSubmission | null | undefined) {
-  return seed === null || (seed !== undefined && !['PENDING', 'AWAITING_REVIEW'].includes(seed.status));
+  return seed?.submissionPolicy === 'MANUAL_REVIEW' || seed === null || (seed !== undefined && !['PENDING', 'AWAITING_REVIEW'].includes(seed.status));
 }
 /** Shared polling policy. Query keys retain owner, class, role and revision scope. */
 export function useSubmissionStatus(options: {
@@ -59,11 +59,20 @@ export function useSubmissionStatus(options: {
     refetchInterval: query => submissionPollInterval(query.state.data, Date.now(), failures.current.key === key ? failures.current.count : 0, query.state.error),
   });
   const { refetch } = query;
+  useEffect(() => {
+    const refresh = (event?: Event) => {
+      const detail = (event as CustomEvent | undefined)?.detail;
+      if (detail && !(JSON.parse(key) as QueryKey).includes(detail.academyId)) return;
+      if (options.enabled) void refetch();
+    };
+    window.addEventListener('cove:assessment-changed', refresh);
+    return () => window.removeEventListener('cove:assessment-changed', refresh);
+  }, [key, options.enabled, refetch]);
   const onTerminal = options.onTerminal;
   useEffect(() => {
     if (!options.enabled || !options.seed) return;
     const seed = options.seed, current = client.getQueryData<LatestSubmission | null>(options.queryKey);
-    const newer = !current || (current.submissionId !== seed.submissionId && order(seed, current) > 0);
+    const newer = !current || order(seed, current) > 0;
     const completed = current?.submissionId === seed.submissionId && ['PENDING', 'AWAITING_REVIEW'].includes(current.status) && !['PENDING', 'AWAITING_REVIEW'].includes(seed.status);
     if (newer || completed) {
       // A full workspace response may already contain a committed grade. Cancel

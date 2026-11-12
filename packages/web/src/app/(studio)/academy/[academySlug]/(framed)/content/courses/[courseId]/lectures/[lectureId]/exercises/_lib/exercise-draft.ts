@@ -62,6 +62,7 @@ export type HintDraft = {
 
 export type ExerciseDraft = {
   submissionPolicy?: SubmissionPolicy;
+  manualAssessment?: {maximumHundredths: number; includeInScore: boolean};
   referencePdfMaterialId?: string | null;
   quiz?: QuizDefinition | null;
   title: string;
@@ -117,6 +118,7 @@ export function contextToDraft(
   }
 
   return {
+    manualAssessment: exercise.manualAssessment ?? {maximumHundredths: 10000, includeInScore: false},
     submissionPolicy: inferSubmissionPolicy(exercise),
     referencePdfMaterialId: exercise.referencePdfMaterialId ?? null,
     quiz: exercise.quiz ?? null,
@@ -187,6 +189,7 @@ export function withSubmissionPolicy(draft: ExerciseDraft, submissionPolicy: Sub
 
 export function draftToPayload(draft: ExerciseDraft) {
   return {
+    manualAssessment: draft.manualAssessment,
     submissionPolicy: draft.quiz ? "AUTOMATIC" as const : draft.submissionPolicy,
     referencePdfMaterialId: draft.quiz ? null : draft.referencePdfMaterialId,
     ...(draft.quiz ? { quiz: draft.quiz } : {}),
@@ -199,11 +202,11 @@ export function draftToPayload(draft: ExerciseDraft) {
     starterCode: draft.starterCode,
     // Checked by the server against the course: C or C++ in a C/C++ course.
     ...(draft.quiz ? {} : { language: draft.language }),
-    solutions: draft.quiz ? [] : draft.referencePdfMaterialId ? draft.solutions.filter(solution => solution.code.trim() || solution.title?.trim()) : draft.solutions,
+    solutions: draft.quiz ? [] : (draft.referencePdfMaterialId || draft.submissionPolicy === "MANUAL_REVIEW") ? draft.solutions.filter(solution => solution.code.trim() || solution.title?.trim()) : draft.solutions,
     aiFeedbackEnabled: draft.aiFeedbackEnabled,
     isVisible: draft.isVisible,
     testCases: (draft.quiz ? [] : draft.testCases)
-      .filter((testCase) => draft.submissionPolicy === 'AUTOMATIC' || (draft.submissionPolicy === 'PRACTICE_ONLY'
+      .filter((testCase) => draft.submissionPolicy === 'AUTOMATIC' || ((draft.submissionPolicy === 'PRACTICE_ONLY' || draft.submissionPolicy === 'MANUAL_REVIEW')
         ? !(testCase.key === 'new-sample' && !testCase.expectedOutput && !testCase.input && !testCase.label)
         : testCase.expectedOutput.trim().length > 0))
       .map((testCase) => ({
@@ -248,7 +251,7 @@ export function exerciseCompleteness(draft: ExerciseDraft) {
     {
       id: 'solution',
       complete: draft.quiz ? quizDefinitionSchema.safeParse(draft.quiz).success : draft.solutions.length > 0 && exerciseSolutionsSchema.safeParse(draft.solutions).success,
-      optional: Boolean(!draft.quiz && draft.referencePdfMaterialId),
+      optional: draft.submissionPolicy === 'MANUAL_REVIEW' || Boolean(!draft.quiz && draft.referencePdfMaterialId),
     },
     {
       id: 'test',
@@ -263,6 +266,7 @@ export function exerciseCompleteness(draft: ExerciseDraft) {
  * them — shown in the editor so the author fixes it before pressing Save.
  */
 export function draftGradingIssues(draft: ExerciseDraft): GradingIssue[] {
+  if (draft.submissionPolicy === "MANUAL_REVIEW") return [];
   const payload = draftToPayload(draft);
   return gradingProfileIssues({
     grading: payload.grading,

@@ -1,3 +1,5 @@
+import { latestSubmissionSchema } from "./latest-submission.js";
+import { manualAssessmentSettingsSchema } from "./course.js";
 import { submissionPolicySchema } from "./course.js";
 import {videoMetadataSchema} from "./video.js";
 import { publicQuizSchema } from "./quiz.js";
@@ -66,6 +68,7 @@ export const learnHintSchema = z.object({
 export type LearnHint = z.infer<typeof learnHintSchema>;
 
 export const learnExerciseSummarySchema = z.object({
+  manualAssessment: manualAssessmentSettingsSchema.optional(),
   submissionPolicy: submissionPolicySchema.optional(),
   hasReferencePdf: z.boolean().optional(),
   materialId: z.uuid(),
@@ -244,6 +247,7 @@ export type LearnExerciseRef = z.infer<typeof learnExerciseRefSchema>;
 
 export const learnExerciseSchema = z.object({
   submissionPolicy: submissionPolicySchema.optional(),
+  manualAssessment: manualAssessmentSettingsSchema.optional(),
   submissionAvailability: z.enum(["READY", "PRACTICE_ONLY", "INVALID_GRADING"]).optional(),
   maximumPoints: z.number().nonnegative().optional(),
   hasReferencePdf: z.boolean().optional(),
@@ -287,6 +291,8 @@ export const learnExerciseSchema = z.object({
 export type LearnExercise = z.infer<typeof learnExerciseSchema>;
 
 export const learnExerciseWorkspaceSchema = z.object({
+  latestSubmission: latestSubmissionSchema.nullable().optional(),
+  latestResult: submissionResultSchema.nullable().optional(),
   breadcrumb: z.object({
     course: z.object({ id: z.uuid(), title: titleSchema }),
     module: z.object({ id: z.uuid(), title: titleSchema }),
@@ -812,7 +818,7 @@ export const practiceSubmitSchema = learnMaterialInputSchema.extend({
 export const practiceHistorySchema = z.object({
   attempts: z.array(z.object({
     submissionId: z.uuid(), code: z.string(), createdAt: z.iso.datetime(),
-    status: z.enum(["QUEUED", "RUNNING", "PASSED", "FAILED", "ERRORED", "CANCELLED"]),
+    status: z.enum(["QUEUED", "RUNNING", "PASSED", "FAILED", "ERRORED", "CANCELLED", "RECORDED"]),
     score: z.number().nullable(),
   })),
 });

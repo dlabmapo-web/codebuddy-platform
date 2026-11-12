@@ -11,6 +11,12 @@ import type { LearningClassContextService } from "./learning-class-context.servi
 import type { SubmissionService } from "./submission.service.js";
 import { withCurriculum } from "./curriculum-read.js";
 
+vi.mock('./submission-admission-read.js', () => ({
+  readSubmissionAdmission: async (db: {material: {findFirst: {mock: {results: Array<{value: unknown}>}}}}) => db.material.findFirst.mock.results.at(-1)?.value,
+}));
+vi.mock('./manual-assessment-read.js', () => ({
+  readAssessmentRevisions: (db: {programmingExercise: {findMany: () => Promise<unknown>}}) => db.programmingExercise.findMany(),
+}));
 vi.mock("./curriculum-read.js", () => ({
   // Unit fixtures already carry each course's hierarchy, as the include did;
   // the one-statement reader itself is proven against Prisma by

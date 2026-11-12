@@ -109,7 +109,7 @@ function ProgrammingWorkspace({
   // Entering on a historical attempt opens on its verdict; ordinary entry
   // still opens on the terminal.
   const [outputTab, setOutputTab] = React.useState<OutputTab>(
-    bootstrap.selectedSubmission ? 'result' : 'terminal',
+    bootstrap.selectedSubmission || bootstrap.workspace.latestResult ? 'result' : 'terminal',
   );
   const [revealedHints, setRevealedHints] = React.useState(0);
   const beforeTransitionRef =
@@ -174,7 +174,8 @@ function ProgrammingWorkspace({
     academyId, userId,
     classId,
     materialId: exercise.materialId,
-    initialResult: selected?.result ?? null,
+    initialResult: selected?.result ?? bootstrap.workspace.latestResult ?? null,
+    initialLatest: bootstrap.workspace.latestSubmission,
     solveSessionId: solveSession.solveSessionId,
     reopenSolveSession: solveSession.reopen,
   });

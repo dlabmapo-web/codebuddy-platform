@@ -25,18 +25,20 @@ export function usePracticeSubmission(academyId: string, materialId: string, pre
       // A read started before commit may finish after the terminal stream event.
       return committed && isTerminalStatus(committed.status) ? committed : next;
     },
+    staleTime: query => query.state.data?.status === 'RECORDED' ? Infinity : 0,
     enabled: Boolean(submissionId), retry: 1, refetchOnWindowFocus: true,
     refetchInterval: (query) => Date.now() - acceptedAt.current >= 120000 || query.state.error || (query.state.data && isTerminalStatus(query.state.data.status)) ? false : 1000,
   });
+  const recorded = result.data?.status === "RECORDED";
   React.useEffect(() => {
-    if (!submissionId) return;
+    if (!submissionId || recorded) return;
     return observePracticeSubmission({
       url: `/api/learn/practice-submissions/${submissionId}/stream?academyId=${encodeURIComponent(academyId)}`,
       submissionId, acceptedAt: acceptedAt.current,
       onResult: next => client.setQueryData<SubmissionResult>(['staff-practice', userId, academyId, 'result', submissionId], previous => previous && isTerminalStatus(previous.status) ? previous : next),
       recover: () => client.refetchQueries({ queryKey: ['staff-practice', userId, academyId, 'result', submissionId], exact: true }),
     });
-  }, [academyId, client, submissionId, userId]);
+  }, [academyId, client, submissionId, userId, recorded]);
   const history = useQuery({
     queryKey: ['staff-practice', userId, academyId, materialId, preview, gradingRevision, 'history'],
     queryFn: () => orpc.learn.listPracticeAttempts({ academyId, materialId, preview, gradingRevision }),
@@ -56,6 +58,10 @@ export function usePracticeSubmission(academyId: string, materialId: string, pre
     try {
       const accepted = await orpc.learn.submitPractice({ academyId, materialId, code, preview, gradingRevision, requestId: request.current.id });
       acceptedAt.current = Date.now();
+      if (accepted.result) {
+        client.setQueryData(['staff-practice', userId, academyId, 'result', accepted.submissionId], accepted.result);
+        setSelected(accepted.result);
+      }
       setTotalCount(accepted.totalCount); setId(accepted.submissionId);
       void client.invalidateQueries({ queryKey: ['latest-submission', userId, academyId, materialId] });
     } catch (caught) { setError(caught); }

@@ -446,8 +446,8 @@ export const resultChangedEventSchema = z.object({
    * that exercise from one that arrived just as the student moved on.
    */
   materialId: z.uuid(),
-  status: z.enum(["QUEUED", "RUNNING", "PASSED", "FAILED", "ERRORED", "CANCELLED"]),
-  score: z.number().int().min(0).max(100),
+  status: z.enum(["QUEUED", "RUNNING", "PASSED", "FAILED", "ERRORED", "CANCELLED", "RECORDED"]),
+  score: z.number().int().min(0).max(100).nullable(),
   passedCount: z.number().int().nonnegative(),
   totalCount: z.number().int().nonnegative(),
   runtimeMs: z.number().int().nonnegative().nullable(),

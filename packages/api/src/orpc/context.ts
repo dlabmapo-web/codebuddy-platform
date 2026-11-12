@@ -1,3 +1,4 @@
+import type { ProgrammingReviewService } from "../learn/programming-review.service.js";
 import type { StudentWorkHistoryService } from "../teach/student-work-history.service.js";
 import type { StaffPracticeService } from "../learn/staff-practice.service.js";
 import type { HelpRequestService } from "../monitoring/help-request.service.js";
@@ -73,6 +74,7 @@ export type ORPCImplementer = ReturnType<
 >;
 
 export type ORPCDeps = {
+  programmingReviewService: ProgrammingReviewService;
   academyTurtleService: AcademyTurtleService;
   academyAccessService: AcademyAccessService;
   authService: AuthService;

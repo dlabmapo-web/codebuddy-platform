@@ -13,7 +13,7 @@ export const problemWithoutTests: Prisma.MaterialWhereInput = {
   type: "PROGRAMMING_EXERCISE",
   OR: [
     { programmingExercise: { is: null } },
-    { programmingExercise: { quiz: { equals: Prisma.DbNull }, testCases: { none: {} } } },
+    { programmingExercise: { submissionPolicy: "AUTOMATIC", quiz: { equals: Prisma.DbNull }, testCases: { none: {} } } },
   ],
 };
 

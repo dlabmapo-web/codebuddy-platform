@@ -42,7 +42,10 @@ export class PracticeSubmissionController {
     const identity = await this.auth.verifyAccessToken(token);
     // Reject before attaching. Each subsequent read repeats current membership,
     // material access, academy and owner checks; this identity is not an access grant.
-    await this.practice.get(identity, { academyId, submissionId });
+    const initial = await this.practice.get(identity, { academyId, submissionId });
+    if (initial.status === 'RECORDED') return new Observable<StreamEvent>(subscriber => {
+      subscriber.next({type: 'result', data: JSON.stringify(initial)}); subscriber.complete();
+    });
     const subject = new ReplaySubject<StreamEvent>(1);
     const descriptor = await this.practice.runtimeForStream(identity, { academyId, submissionId });
     const events = descriptor ? this.queue?.forRuntime(descriptor).practiceEvents : this.queue?.practiceEvents;

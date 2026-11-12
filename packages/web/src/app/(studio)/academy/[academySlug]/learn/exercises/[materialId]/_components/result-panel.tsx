@@ -1,4 +1,5 @@
 'use client';
+import { ProgrammingAssessmentResult } from '@/components/programming-review/assessment-result';
 import { QuizFeedback } from '@/components/workspace/quiz-feedback';
 
 import { useTranslation } from 'react-i18next';
@@ -32,6 +33,8 @@ export function ResultPanel({
       </p>
     );
   }
+
+  if (result?.status === 'RECORDED') return <div className="p-4"><ProgrammingAssessmentResult assessment={result.manualAssessment} dark/></div>;
 
   const presentation = resultPresentation(result, submitting, Boolean(error));
   const hiddenResults = hiddenResultCount(result);

@@ -19,6 +19,8 @@ import {
  * reinforcement rather than the carrier of the verdict.
  */
 export const recordResultTones: Record<AnswerRecordResult, string> = {
+  MANUAL_REVIEW: 'bg-brand-soft text-brand',
+  MANUALLY_GRADED: 'bg-brand-soft text-brand',
   ACCEPTED: 'bg-success/10 text-success',
   NOT_ACCEPTED: 'bg-danger/10 text-danger',
   // Deliberately neither success nor danger: a system fault is not a grade.

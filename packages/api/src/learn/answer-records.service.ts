@@ -1,3 +1,4 @@
+import { programmingAssessment } from "./programming-assessment.js";
 import { Injectable } from "@nestjs/common";
 import {
   ANSWER_RECORDS_PAGE_SIZE,
@@ -102,6 +103,7 @@ export class AnswerRecordsService {
         lecturePosition: true,
         problemPosition: true,
         status: true,
+        submissionPolicy: true, manualAssessmentSnapshot: true, manualReviewResult: true,
         score: true,
         passedCount: true,
         totalCount: true,
@@ -129,7 +131,8 @@ export class AnswerRecordsService {
       modulePosition: item.modulePosition,
       lecturePosition: item.lecturePosition,
       problemPosition: item.problemPosition,
-      result: answerRecordResultFor(item.status),
+      result: item.status === "RECORDED" ? (item.manualReviewResult ? "MANUALLY_GRADED" : "MANUAL_REVIEW") : answerRecordResultFor(item.status),
+      ...(item.submissionPolicy === "MANUAL_REVIEW" ? {manualAssessment: programmingAssessment(item)} : {}),
       score: item.score,
       passedCount: item.passedCount,
       totalCount: item.totalCount,
@@ -178,9 +181,12 @@ export class AnswerRecordsService {
     }
 
     if (input.results?.length) {
-      conditions.push({
-        status: { in: input.results.flatMap(submissionStatusesFor) },
-      });
+      const automatic = input.results.filter(r => !['MANUAL_REVIEW', 'MANUALLY_GRADED'].includes(r));
+      conditions.push({OR: [
+        ...(automatic.length ? [{status: {in: automatic.flatMap(submissionStatusesFor)}}] : []),
+        ...(input.results.includes('MANUAL_REVIEW') ? [{status: 'RECORDED' as const, reviewVersion: 0}] : []),
+        ...(input.results.includes('MANUALLY_GRADED') ? [{status: 'RECORDED' as const, reviewVersion: {gt: 0}}] : []),
+      ]});
     }
 
     if (input.courseIds?.length) {
@@ -288,7 +294,7 @@ export class AnswerRecordsService {
           },
         },
       }),
-      this.prisma.submission.groupBy({ by: ["status"], where: owned }),
+      this.prisma.submission.groupBy({ by: ["status", "reviewVersion"], where: owned }),
     ]);
 
     const courses = new Map<string, AnswerRecordFacetOption>();
@@ -323,7 +329,7 @@ export class AnswerRecordsService {
     });
 
     const results = new Set<AnswerRecordResult>();
-    for (const group of statuses) results.add(answerRecordResultFor(group.status));
+    for (const group of statuses) results.add(group.status === "RECORDED" ? (group.reviewVersion > 0 ? "MANUALLY_GRADED" : "MANUAL_REVIEW") : answerRecordResultFor(group.status));
 
     return {
       results: [...results],

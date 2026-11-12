@@ -36,6 +36,7 @@ export type TeacherProgressActor = {
   academyId: string;
   /** The teacher's own membership, which is what a class assignment stores. */
   membershipId: string;
+  canPublishReview?: boolean;
 };
 
 export type ScopedStudent = {
@@ -52,6 +53,7 @@ export type ScopedExercise = {
   isRequired: boolean;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   gradingRevision: number;
+  submissionPolicy?: "AUTOMATIC" | "PRACTICE_ONLY" | "MANUAL_REVIEW";
   lectureId: string;
   lectureTitle: string;
   lectureDescription: string;
@@ -160,7 +162,7 @@ export class TeacherProgressAccessService {
           position: true,
           isRequired: true,
           programmingExercise: {
-            select: { difficulty: true, gradingRevision: true },
+            select: { difficulty: true, gradingRevision: true, submissionPolicy: true },
           },
           lecture: {
             select: {
@@ -210,6 +212,7 @@ export class TeacherProgressAccessService {
             isRequired: material.isRequired,
             difficulty: exercise.difficulty,
             gradingRevision: exercise.gradingRevision,
+            submissionPolicy: exercise.submissionPolicy,
             lectureId: lecture.id,
             lectureTitle: lecture.title,
             lectureDescription: lecture.description,

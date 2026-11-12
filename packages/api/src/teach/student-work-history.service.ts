@@ -1,3 +1,5 @@
+import { readManualProgrammingHistory } from "../learn/manual-assessment-read.js";
+import { programmingAssessment } from "../learn/programming-assessment.js";
 import { AppException } from "../common/app-exception.js";
 import { Injectable } from "@nestjs/common";
 import {
@@ -21,7 +23,7 @@ import {
   assignedClassWhere,
   classStudentWhere,
 } from "../classes/assigned-class-access.js";
-import { effectivelyVisibleActivityWhere } from "../learn/curriculum-visibility.js";
+import { readClassHistoryMaterials } from "../learn/curriculum-read.js";
 import { TeacherProgressAccessService } from "./teacher-progress-access.service.js";
 import { TeacherProgressRepository } from "./teacher-progress.repository.js";
 import { TeacherProgressService } from "./teacher-progress.service.js";
@@ -178,55 +180,7 @@ export class StudentWorkHistoryService {
     };
   }
   private async materials(input: Scope) {
-    return this.db.material.findMany({
-      where: {
-        AND: [
-          effectivelyVisibleActivityWhere(input.academyId),
-          {
-            lecture: {
-              courseModule: {
-                course: {
-                  classAssignments: { some: { classId: input.classId } },
-                },
-              },
-            },
-          },
-        ],
-      },
-      select: {
-        id: true,
-        title: true,
-        type: true,
-        position: true,
-        isRequired: true,
-        programmingExercise: { select: { gradingRevision: true } },
-        manualMaterial: {
-          select: { revision: true, includeInScore: true, submitEnabled: true },
-        },
-        lecture: {
-          select: {
-            id: true,
-            title: true,
-            position: true,
-            courseModule: {
-              select: {
-                id: true,
-                title: true,
-                position: true,
-                course: { select: { id: true, title: true } },
-              },
-            },
-          },
-        },
-      },
-      orderBy: [
-        { lecture: { courseModule: { courseId: "asc" } } },
-        { lecture: { courseModule: { position: "asc" } } },
-        { lecture: { position: "asc" } },
-        { position: "asc" },
-        { id: "asc" },
-      ],
-    });
+    return readClassHistoryMaterials(this.db, input.academyId, input.classId);
   }
   private async studentWork(
     identity: SupabaseIdentity,
@@ -244,7 +198,7 @@ export class StudentWorkHistoryService {
       programming = materials
         .filter((m) => m.programmingExercise)
         .map((m) => m.id);
-    const [counts, progress, manualCounts, latest, video] = await Promise.all([
+    const [counts, progress, manualCounts, latest, video, manualCoding] = await Promise.all([
       this.progress.countedAttemptsByExercise({
         userIds: [student.userId],
         materialIds: programming,
@@ -274,6 +228,7 @@ export class StudentWorkHistoryService {
         orderBy: { updatedAt: "desc" },
         distinct: ["materialId"],
       }),
+      readManualProgrammingHistory(this.db, materials.filter(m => m.programmingExercise?.submissionPolicy === 'MANUAL_REVIEW').map(m => m.id), [student.userId], input.classId),
     ]);
     const rows: HistoryMaterial[] = materials.map((m) => {
       const c = counts.find((r) => r.materialId === m.id),
@@ -288,7 +243,14 @@ export class StudentWorkHistoryService {
       let status: HistoryMaterial["status"] = "unrecorded",
         score: number | null = null,
         maximum: number | null = null;
-      if (m.programmingExercise) {
+      const manualCode = manualCoding.find(r => r.materialId === m.id);
+      if (m.programmingExercise?.submissionPolicy === 'MANUAL_REVIEW') {
+        const assessment = manualCode ? programmingAssessment(manualCode) : null;
+        const current = manualCode?.gradingRevision === m.programmingExercise.gradingRevision;
+        status = !manualCode ? 'not_started' : !current ? 'previous_revision' : !assessment?.reviewVersion ? 'pending' : assessment.completed ? 'completed' : 'in_progress';
+        score = current && assessment?.scoreHundredths != null ? assessment.scoreHundredths/100 : null;
+        maximum = (assessment?.maximumHundredths ?? m.programmingExercise.manualMaximumHundredths)/100;
+      } else if (m.programmingExercise) {
         status = p?.revisionMatches
           ? p.status === "SOLVED"
             ? "completed"
@@ -325,18 +287,18 @@ export class StudentWorkHistoryService {
         lectureTitle: m.lecture.title,
         lectureCompleted: 0,
         lectureEligible: 0,
-        required: m.isRequired && (!manual || manual.submitEnabled),
+        required: m.isRequired && (!manual || manual.submitEnabled) && (m.programmingExercise?.submissionPolicy !== "MANUAL_REVIEW" || m.programmingExercise.manualIncludeInScore),
         includedInScore: m.programmingExercise
-          ? true
+          ? m.programmingExercise.submissionPolicy === "MANUAL_REVIEW" ? m.programmingExercise.manualIncludeInScore : m.programmingExercise.submissionPolicy !== "PRACTICE_ONLY"
           : (manual?.includeInScore ?? false),
         revision:
           m.programmingExercise?.gradingRevision ?? manual?.revision ?? 0,
         status,
-        submissions: c?.attempts ?? mc?._count._all ?? 0,
+        submissions: manualCode?.submissions ?? c?.attempts ?? mc?._count._all ?? 0,
         score,
         maximum,
         latestAt:
-          c?.lastActivityAt?.toISOString() ??
+          manualCode?.createdAt.toISOString() ?? c?.lastActivityAt?.toISOString() ??
           mc?._max.createdAt?.toISOString() ??
           null,
         watchedMs: v?.watchedMs ?? null,
@@ -587,10 +549,10 @@ export class StudentWorkHistoryService {
         id: a.id,
         kind: "programming",
         createdAt: a.createdAt.toISOString(),
-        score: a.score,
-        maximum: 100,
-        completed: a.status === "PASSED",
-        status: a.status,
+        score: a.submissionPolicy === "MANUAL_REVIEW" ? (programmingAssessment(a).scoreHundredths === null ? null : programmingAssessment(a).scoreHundredths! / 100) : a.score,
+        maximum: a.submissionPolicy === "MANUAL_REVIEW" ? programmingAssessment(a).maximumHundredths / 100 : 100,
+        completed: a.submissionPolicy === "MANUAL_REVIEW" ? programmingAssessment(a).completed : a.status === "PASSED",
+        status: a.submissionPolicy === "MANUAL_REVIEW" ? programmingAssessment(a).state : a.status,
         ...(a.compileFailed ? { compileFailed: true } : {}),
         currentRevision:
           revisions.find((r) => r.id === a.id)?.gradingRevision ===
@@ -621,7 +583,7 @@ export class StudentWorkHistoryService {
       (m) => m.id === input.materialId,
     );
     if (!material) throw new AppException("TEACHER_PROGRESS_NOT_FOUND", 404);
-    const [coding, manual, progressRows, manualRows] = await Promise.all([
+    const [coding, manual, progressRows, manualRows, manualCoding] = await Promise.all([
       this.db.submission.groupBy({
         by: ["userId"],
         where: {
@@ -651,6 +613,7 @@ export class StudentWorkHistoryService {
       this.latestManualResults(input.classId, scope.studentUserIds, [
         input.materialId,
       ]),
+      readManualProgrammingHistory(this.db, material.programmingExercise?.submissionPolicy === "MANUAL_REVIEW" ? [input.materialId] : [], scope.studentUserIds, input.classId),
     ]);
     const members = await this.db.academyMembership.findMany({
       where: { id: { in: scope.students.map((s) => s.membershipId) } },
@@ -664,21 +627,25 @@ export class StudentWorkHistoryService {
           saved?.revision === material.manualMaterial?.revision
             ? effectiveManualResult(saved)
             : undefined;
+      const manualCode = manualCoding.find(a => a.userId === s.userId);
+      const assessment = manualCode ? programmingAssessment(manualCode) : null;
+      const manualCurrent = manualCode?.gradingRevision === material.programmingExercise?.gradingRevision;
+      const isManualCoding = material.programmingExercise?.submissionPolicy === "MANUAL_REVIEW";
       return {
-        score: codingProgress?.revisionMatches
+        score: isManualCoding ? (manualCurrent && assessment?.scoreHundredths != null ? assessment.scoreHundredths / 100 : null) : codingProgress?.revisionMatches
           ? codingProgress.bestScore
           : result
             ? result.scoreHundredths / 100
             : null,
-        maximum: codingProgress
+        maximum: isManualCoding ? (assessment?.maximumHundredths ?? material.programmingExercise!.manualMaximumHundredths) / 100 : codingProgress
           ? 100
           : saved
             ? saved.maximumHundredths / 100
             : null,
-        completed: codingProgress?.revisionMatches
+        completed: isManualCoding ? (manualCurrent ? assessment?.completed ?? null : null) : codingProgress?.revisionMatches
           ? codingProgress.status === "SOLVED"
           : (result?.completed ?? null),
-        latestAt:
+        latestAt: manualCode?.createdAt.toISOString() ??
           coding
             .find((a) => a.userId === s.userId)
             ?._max.createdAt?.toISOString() ??
@@ -689,7 +656,7 @@ export class StudentWorkHistoryService {
         membershipId: s.membershipId,
         name: s.displayName,
         identifier: m?.user.email ?? m?.user.username ?? null,
-        submissions:
+        submissions: (manualCode?.submissions ?? 0) +
           (coding.find((a) => a.userId === s.userId)?._count._all ?? 0) +
           (manual.find((a) => a.userId === s.userId)?._count._all ?? 0),
       };

@@ -1,7 +1,7 @@
 # Manual programming grading and inherited teaching access
 
 Date: 2026-11-12 (Asia/Seoul)
-Status: proposed implementation specification; application changes not implemented.
+Status: implemented locally; [verification evidence](../../research/2026-11-12-manual-review-submissions-verification.md). Not deployed.
 Feature branch: `feat/manual-review-submissions`
 Base: `feat/cove-studio-v2` at `0b7f810d`.
 
@@ -541,5 +541,11 @@ assessment-selection and result helpers across roles; no separate Manager grader
 
 When implemented, record commands/results, screenshots, role matrix and SQL
 counts in `docs/research/2026-11-12-manual-review-submissions-verification.md`.
-Distinguish executed/unrun checks and local/production evidence. This document
-does not claim an implemented feature or verified deployment.
+Distinguish executed/unrun checks and local/production evidence. The linked evidence distinguishes implemented behavior and executed local checks from production deployment.
+
+
+## 13. Implementation notes
+
+The implementation preserves append-only review rows and atomically projects the current assessment onto the immutable receipt in the same transaction. Existing history/latest readers select that projection without another relation-level query. Database triggers protect submitted code/settings and review rows; a scoped index supports latest manual assessment/history reads.
+
+Manual client capability is explicitly `manualAssessmentVersion: 1`. Older callers receive the existing localized `SAMPLE_CHECK_STALE` refresh-required conflict, preserving the layout translation payload budget. Teacher grading uses the mixed Student history/review surface; the automatic Solution status dashboard excludes manual exercises from judge metrics. Private staff receipts carry no student assessment. Review history reads return the latest 100 versions while retaining every version in the database.

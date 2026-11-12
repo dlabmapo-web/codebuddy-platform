@@ -87,7 +87,7 @@ export function AnswerRecords({
         accessorFn: (row) => row.score,
         header: t('learn:records.column.score'),
         cell: ({ row }) => (
-          <span className="font-mono tabular-nums">{row.original.score}</span>
+          <span className="font-mono tabular-nums">{row.original.manualAssessment ? (row.original.manualAssessment.scoreHundredths === null ? '—' : `${row.original.manualAssessment.scoreHundredths/100} / ${row.original.manualAssessment.maximumHundredths/100}`) : row.original.score ?? '—'}</span>
         ),
       },
       {
@@ -99,7 +99,7 @@ export function AnswerRecords({
         meta: { hideable: true },
         cell: ({ row }) => (
           <span className="font-mono tabular-nums text-sub">
-            {t('learn:records.tests_value', {
+            {row.original.manualAssessment ? '—' : t('learn:records.tests_value', {
               passed: row.original.passedCount,
               total: row.original.totalCount,
             })}

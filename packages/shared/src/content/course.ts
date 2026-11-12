@@ -33,7 +33,7 @@ export const testCaseVisibilities = ["SAMPLE", "HIDDEN"] as const;
 export const testCaseVisibilitySchema = z.enum(testCaseVisibilities);
 export type TestCaseVisibility = z.infer<typeof testCaseVisibilitySchema>;
 
-export const submissionPolicies = ["PRACTICE_ONLY", "AUTOMATIC"] as const;
+export const submissionPolicies = ["PRACTICE_ONLY", "AUTOMATIC", "MANUAL_REVIEW"] as const;
 export const submissionPolicySchema = z.enum(submissionPolicies);
 export type SubmissionPolicy = z.infer<typeof submissionPolicySchema>;
 
@@ -205,7 +205,14 @@ export const exerciseHintSchema = z.object({
   triggerExpression: z.string().trim().max(2_000).nullable(),
 });
 
+export const manualAssessmentSettingsSchema = z.object({
+  maximumHundredths: z.number().int().min(1).max(1000000).default(10000),
+  includeInScore: z.boolean().default(false),
+});
+export type ManualAssessmentSettings = z.infer<typeof manualAssessmentSettingsSchema>;
+
 export const programmingExerciseSchema = z.object({
+  manualAssessment: manualAssessmentSettingsSchema.optional(),
   submissionPolicy: submissionPolicySchema.optional(),
   referencePdfMaterialId: z.uuid().nullable().optional(),
   quiz: quizDefinitionSchema.nullable().optional(),
@@ -707,6 +714,7 @@ export function gradingProfileIssues(input: {
 }
 
 export const exerciseDraftFieldsSchema = z.object({
+  manualAssessment: manualAssessmentSettingsSchema.optional(),
   submissionPolicy: submissionPolicySchema.optional(),
   referencePdfMaterialId: z.uuid().nullable().optional(),
   quiz: quizDefinitionSchema.nullable().optional(),
@@ -770,7 +778,7 @@ function refineGrading(value: ExerciseDraftFields, context: z.RefinementCtx) {
       message: "Encoded problem data exceed the 20 MB request limit.",
     });
   }
-  if (value.quiz && value.submissionPolicy === "PRACTICE_ONLY") context.addIssue({ code: "custom", path: ["submissionPolicy"], message: "Quizzes require automatic grading." });
+  if (value.quiz && value.submissionPolicy && value.submissionPolicy !== "AUTOMATIC") context.addIssue({ code: "custom", path: ["submissionPolicy"], message: "Quizzes require automatic grading." });
   if (!value.quiz && value.submissionPolicy === "AUTOMATIC") value.testCases.forEach((test, index) => {
     if ((test.comparator === "STDOUT" || test.comparator === "STDOUT_MATCH") && !test.expectedOutput.trim()) context.addIssue({ code: "custom", path: ["testCases", index, "expectedOutput"], message: "Enter expected output for this test case." });
   });
@@ -789,6 +797,7 @@ function refineGrading(value: ExerciseDraftFields, context: z.RefinementCtx) {
     }
     return;
   }
+  if (value.submissionPolicy === "MANUAL_REVIEW") return;
   if (!value.solutions.length && !value.referencePdfMaterialId)
     context.addIssue({
       code: "custom",

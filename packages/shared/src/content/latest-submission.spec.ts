@@ -26,5 +26,6 @@ describe('latest manual submission semantics', () => {
     expect(shouldPollLatestSubmission(pending, now + 1000)).toBe(true);
     expect(shouldPollLatestSubmission(pending, now + 120000)).toBe(false);
     expect(shouldPollLatestSubmission(error, now)).toBe(false);
+    expect(shouldPollLatestSubmission({...pending!,submissionPolicy:'MANUAL_REVIEW',status:'AWAITING_REVIEW'},now+1000)).toBe(false);
   });
 });

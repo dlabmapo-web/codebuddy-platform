@@ -1,3 +1,5 @@
+import { readAssessmentRevisions } from "./manual-assessment-read.js";
+import { programmingAssessment } from "./programming-assessment.js";
 import {videoMetadata} from "../videos/video-metadata.js";
 import { effectiveManualResult } from "@cove/shared";
 import { pdfMetadata } from "../documents/pdf-metadata.js";
@@ -43,7 +45,7 @@ export const visibleCurriculumInclude = {
             // starter code, solutions and manual content are loaded by the
             // workspace that shows them, not once per material of a course.
             include: {
-              programmingExercise: { select: { difficulty: true, submissionPolicy: true, referencePdfMaterialId: true } },
+              programmingExercise: { select: { difficulty: true, submissionPolicy: true, referencePdfMaterialId: true, manualMaximumHundredths: true, manualIncludeInScore: true } },
               manualMaterial: { select: { includeInScore: true, maximumHundredths: true } },
               videoLesson: {
                 select: { assetId: true, revision: true, placement: true, includeInScore: true, maximumHundredths: true,
@@ -209,6 +211,7 @@ export class CurriculumOutlineService {
                     position: material.position,
                     difficulty: material.programmingExercise.difficulty,
                     submissionPolicy: material.programmingExercise.submissionPolicy ?? "AUTOMATIC",
+                    manualAssessment: {maximumHundredths: material.programmingExercise.manualMaximumHundredths, includeInScore: material.programmingExercise.manualIncludeInScore},
                     hasReferencePdf: Boolean(material.programmingExercise.referencePdfMaterialId),
                     status: statuses.get(material.id)?.status ?? "NOT_STARTED",
                     bestScore: statuses.get(material.id)?.bestScore ?? 0,
@@ -245,10 +248,7 @@ export class CurriculumOutlineService {
       // What each problem grades against *now*. Without it this projection
       // cannot tell a current record from one an author's correction has
       // already invalidated — see the note on the skip below.
-      this.prisma.programmingExercise.findMany({
-        where: { materialId: { in: materialIds } },
-        select: { materialId: true, gradingRevision: true },
-      }),
+      readAssessmentRevisions(this.prisma, materialIds, userId, classId),
     ]);
     const currentRevision = new Map(
       revisions.map((exercise) => [
@@ -275,13 +275,20 @@ export class CurriculumOutlineService {
       //
       // A re-grade restores the record at the current revision and both
       // surfaces agree again.
-      if (record.gradingRevision !== currentRevision.get(record.materialId)) {
+      if (record.gradingRevision !== currentRevision.get(record.materialId) || revisions.find(r => r.materialId === record.materialId)?.submissionPolicy === "MANUAL_REVIEW") {
         continue;
       }
       statuses.set(record.materialId, {
         status: record.status,
         bestScore: record.bestScore,
       });
+    }
+    for (const row of revisions) {
+      if (row.submissionPolicy !== 'MANUAL_REVIEW' || !row.manualAssessmentSnapshot) continue;
+      const assessment = programmingAssessment(row);
+      statuses.set(row.materialId, {status: assessment.completed ? 'SOLVED' : 'IN_PROGRESS', bestScore: 0,
+        scoreHundredths: assessment.includeInScore ? assessment.scoreHundredths ?? undefined : undefined,
+        maximumHundredths: assessment.maximumHundredths});
     }
     const attempts = await this.prisma.manualSubmission.findMany({
       where: { userId, classId, materialId: { in: materialIds } },
@@ -417,7 +424,7 @@ export function exerciseMaterialIds(
 
 /** Practice remains navigable but never increases the graded-progress denominator. */
 function gradedMaterialIds(course: Pick<VisibleCourse, "modules">): string[] {
-  const practice = new Set(course.modules.flatMap(m => m.lectures.flatMap(l => l.materials.filter(row => row.type === 'PROGRAMMING_EXERCISE' && row.programmingExercise?.submissionPolicy === "PRACTICE_ONLY").map(row => row.id))));
+  const practice = new Set(course.modules.flatMap(m => m.lectures.flatMap(l => l.materials.filter(row => row.type === 'PROGRAMMING_EXERCISE' && (row.programmingExercise?.submissionPolicy === "PRACTICE_ONLY" || (row.programmingExercise?.submissionPolicy === "MANUAL_REVIEW" && !row.programmingExercise.manualIncludeInScore))).map(row => row.id))));
   return exerciseMaterialIds(course).filter(id => !practice.has(id));
 }
 
@@ -446,7 +453,8 @@ export function manualGradeSummaryFor(
   for (const module of course.modules)
     for (const lecture of module.lectures)
       for (const material of lecture.materials) {
-        const scored=material.manualMaterial??material.videoLesson;
+        const pe = material.programmingExercise;
+        const scored = pe?.submissionPolicy === "MANUAL_REVIEW" ? {includeInScore: pe.manualIncludeInScore, maximumHundredths: pe.manualMaximumHundredths} : material.manualMaterial ?? material.videoLesson;
         if (!scored?.includeInScore || (material.videoLesson && (material.videoLesson.placement==="SUPPLEMENTARY" || material.videoLesson.asset.state!=="READY"))) continue;
         const status = statuses.get(material.id);
         maximumHundredths +=

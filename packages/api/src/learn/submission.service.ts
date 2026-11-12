@@ -1,7 +1,9 @@
+import { manualProgrammingResult } from "./programming-assessment.js";
+import { readSubmissionAdmission } from "./submission-admission-read.js";
 import { nativeRuntimeVersion } from "@cove/grading-runtime";
 import type { NativeAnyRuntimeDescriptor } from "@cove/shared";
 import { programExit } from "../judge/program-exit.js";
-import { NativeAdmission } from "../judge/native-admission.js";
+import { NativeAdmission, frozenNativeDescriptor } from "../judge/native-admission.js";
 import { snapshotTransaction } from "../judge/snapshot-transaction.js";
 import { runtimeQueueName } from "../judge/judge.queue.js";
 import { isCompiledLanguage, quizDefinitionSchema, quizFeedback } from "@cove/shared";
@@ -89,8 +91,10 @@ export class SubmissionService {
       classId: string;
       code: string;
       solveSessionId?: string;
+      requestId?: string;
+      manualAssessmentVersion?: 1;
     },
-  ): Promise<{ submissionId: string; totalCount: number }> {
+  ): Promise<{ submissionId: string; totalCount: number; result?: SubmissionResult }> {
     const actor = await this.access.requirePermission(
       identity.authUserId,
       input.academyId,
@@ -98,14 +102,16 @@ export class SubmissionService {
     );
     const { userId } = actor;
     const scope = learningScopeFor(input.academyId, actor);
-    if (!this.queue) {
-      throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
-    }
-    await this.consumeRateLimit(userId);
 
-    let createdSubmission: { id: string; totalCount: number; descriptor: NativeAnyRuntimeDescriptor | null };
+
+    let createdSubmission: { id: string; totalCount: number; descriptor: NativeAnyRuntimeDescriptor | null; result?: SubmissionResult };
     try {
-      createdSubmission = await snapshotTransaction(this.prisma, async (tx) => {
+      // A joined admission read freezes the whole definition in one statement.
+      // READ COMMITTED lets a same-key waiter see the receipt committed by the lock holder.
+      const transact = input.requestId
+        ? <T>(action: (tx: Prisma.TransactionClient) => Promise<T>) => this.prisma.$transaction(action, {isolationLevel: 'ReadCommitted', timeout: 10000})
+        : <T>(action: (tx: Prisma.TransactionClient) => Promise<T>) => snapshotTransaction(this.prisma, action);
+      createdSubmission = await transact(async (tx) => {
         // Serialize admission against typed runtime conversion. A conversion
         // takes FOR UPDATE; an earlier admission must commit before its pending
         // work inventory, and a later admission must read the converted type.
@@ -113,28 +119,49 @@ export class SubmissionService {
         // Visibility and grading inputs are read in the same transaction that
         // owns the snapshot. A concurrent hide or test edit therefore cannot
         // create a submission from a mixed curriculum state.
-        const material = await tx.material.findFirst({
-          where: {
-            id: input.materialId,
-            ...reachableMaterialWhere(input.academyId, scope),
-          },
-          include: {
-            programmingExercise: {
-              include: {
-                testCases: {
-                  orderBy: [{ position: "asc" }, { id: "asc" }],
-                },
-              },
-            },
-            // The course title is joined because the record labels are frozen
-            // here, in the transaction that owns the grading snapshot.
-            lecture: {
-              include: { courseModule: { include: { course: true } } },
-            },
-          },
-        });
+        const material = await readSubmissionAdmission(tx, input.materialId, input.academyId);
         const exercise = material?.programmingExercise;
-        if (exercise?.submissionPolicy === "PRACTICE_ONLY") throw new AppException("EXERCISE_PRACTICE_ONLY", HttpStatus.BAD_REQUEST);
+        if (!material || material.type !== "PROGRAMMING_EXERCISE" || !exercise) throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
+        if (material && exercise) {
+          await this.classContext.resolveWith(tx, { academyId: input.academyId, userId,
+            courseId: material.lecture.courseModule.courseId, requestedClassId: input.classId });
+          if (input.requestId) {
+            await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${userId + ':' + input.requestId}, 0))`;
+            const existing = await tx.submission.findUnique({ where: { userId_requestId: { userId, requestId: input.requestId } } });
+            if (existing) {
+              if (existing.sourceMaterialId !== input.materialId || existing.classId !== input.classId || existing.code !== input.code)
+                throw new AppException("CONTENT_EDIT_CONFLICT", HttpStatus.CONFLICT);
+              return { id: existing.id, totalCount: existing.totalCount, descriptor: frozenNativeDescriptor(existing.executionRuntimeSnapshot),
+                ...(existing.submissionPolicy === 'MANUAL_REVIEW' ? {result: manualProgrammingResult(existing)} : {}) };
+            }
+          }
+          if (exercise.submissionPolicy === 'PRACTICE_ONLY') throw new AppException('EXERCISE_PRACTICE_ONLY', HttpStatus.BAD_REQUEST);
+          if (exercise.submissionPolicy === 'MANUAL_REVIEW') {
+            if (!input.requestId || input.manualAssessmentVersion !== 1) throw new AppException('SAMPLE_CHECK_STALE', HttpStatus.CONFLICT);
+            await this.consumeRateLimit(userId);
+            const solveSession = input.solveSessionId ? await this.requireSolveSession(tx, {
+              solveSessionId: input.solveSessionId, userId, materialId: material.id, classId: input.classId,
+            }) : null;
+            const cm = material.lecture.courseModule;
+            const receipt = await tx.submission.create({data: {
+              userId, materialId: material.id, sourceMaterialId: material.id, courseId: cm.courseId,
+              classId: input.classId, requestId: input.requestId, code: input.code, language: exercise.language,
+              gradingRevision: exercise.gradingRevision, timeLimitMs: exercise.timeLimitMs, memoryLimitMb: exercise.memoryLimitMb,
+              submissionPolicy: 'MANUAL_REVIEW', status: 'RECORDED', score: null, totalCount: 0,
+              engineVersion: 'manual-record-v1', manualAssessmentSnapshot: {
+                version: 1, messageVersion: 1, maximumHundredths: exercise.manualMaximumHundredths,
+                includeInScore: exercise.manualIncludeInScore,
+              },
+              solveSessionId: solveSession?.id, solveElapsedSec: solveSession ? solveElapsedSeconds(solveSession.startedAt, new Date()) : null,
+              problemTitle: material.title, courseTitle: cm.course.title, moduleTitle: cm.title,
+              lectureTitle: material.lecture.title, modulePosition: cm.position,
+              lecturePosition: material.lecture.position, problemPosition: material.position,
+            }});
+            return {id: receipt.id, totalCount: 0, descriptor: null, result: manualProgrammingResult(receipt)};
+          }
+        }
+        if (!this.queue) throw new AppException('GRADING_UNAVAILABLE', HttpStatus.SERVICE_UNAVAILABLE);
+        await this.consumeRateLimit(userId);
         if (!material || material.type !== 'PROGRAMMING_EXERCISE' || !exercise || (!exercise.quiz && exercise.testCases.length === 0)) {
           throw new AppException(
             "EXERCISE_NOT_AVAILABLE",
@@ -174,13 +201,6 @@ export class SubmissionService {
           throw new AppException("GRADING_UNAVAILABLE", HttpStatus.SERVICE_UNAVAILABLE);
         const snapshot = gradingSnapshotFor(exercise, { engineVersion, descriptor });
 
-        await this.classContext.resolveWith(tx, {
-          academyId: input.academyId,
-          userId,
-          courseId: material.lecture.courseModule.courseId,
-          requestedClassId: input.classId,
-        });
-
         // Read inside the same transaction as the snapshot, and against the
         // server clock. The browser names a session; it never reports how long
         // it took, so a patched client cannot post an impressive solve time.
@@ -209,6 +229,7 @@ export class SubmissionService {
             ...snapshot.submission,
             ...(quiz ? { quizSnapshot: { version: 1, title: material.title, description: exercise.description, definition: quiz } } : {}),
             code: input.code,
+            requestId: input.requestId,
             totalCount: quiz ? 1 : exercise.testCases.length,
             engineVersion: descriptor ? nativeRuntimeVersion(descriptor) : engineVersion,
             ...(descriptor ? { executionQueue: runtimeQueueName("official", descriptor) } : {}),
@@ -233,16 +254,21 @@ export class SubmissionService {
         return { id: created.id, totalCount: quiz ? 1 : exercise.testCases.length, descriptor };
       });
     } catch (error) {
+      if (isUniqueViolation(error) && input.requestId) {
+        const existing = await this.prisma.submission.findUnique({where: {userId_requestId: {userId, requestId: input.requestId}}});
+        if (existing) return this.submit(identity, input);
+      }
       if (isUniqueViolation(error)) {
         throw new AppException("SUBMISSION_IN_FLIGHT", HttpStatus.CONFLICT);
       }
       throw error;
     }
 
+    if (createdSubmission.result) return { submissionId: createdSubmission.id, totalCount: 0, result: createdSubmission.result };
     const submissionId = createdSubmission.id;
     try {
-      if (createdSubmission.descriptor) await this.queue.enqueue(submissionId, createdSubmission.descriptor);
-      else await this.queue.enqueue(submissionId);
+      if (createdSubmission.descriptor) await this.queue!.enqueue(submissionId, createdSubmission.descriptor);
+      else await this.queue!.enqueue(submissionId);
     } catch (error) {
       this.logger.error(`enqueue failed for ${submissionId}: ${String(error)}`);
     }
@@ -320,6 +346,7 @@ export class SubmissionService {
     userId: string,
     submission: OwnedSubmission,
   ): Promise<SubmissionResult> {
+    if (submission.submissionPolicy === "MANUAL_REVIEW") return manualProgrammingResult(submission);
     const progress = submission.materialId
       ? await this.prisma.studentExerciseProgress.findUnique({
           where: {

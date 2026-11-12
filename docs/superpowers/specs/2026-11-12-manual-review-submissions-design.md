@@ -201,7 +201,8 @@ After publication offer `점수 수정` with final-score input and optional
 old -> new score, and enforces the same bounds. First publication has no delta
 option because no previous grade exists. The server derives the delta from its
 previous review and the requested final score, never a client-reported old score.
-Corrections require a nonempty reason (maximum 1000 characters). Feedback and
+Correction reasons are optional (maximum 1000 characters), including when only
+completion changes, per the user's 2026-11-12 refinement. Feedback and
 completion corrections use this same audited operation. Authorized staff can
 inspect review versions, actor/time, reason and score/completion changes.
 
@@ -270,7 +271,7 @@ these reviews in the existing read projections; no new progress table or manual
 write to automatic ExerciseProgress is required.
 
 Publish input: submission ID, academy/class context, expectedVersion, request UUID,
-final score, completion, feedback and correction reason. One transaction checks
+final score, completion, feedback and optional correction reason. One transaction checks
 the current real teaching grant and stored class/material/student scope,
 compare-and-swaps reviewVersion, inserts the next review, and writes audit.
 A stale version conflicts
@@ -503,8 +504,8 @@ assessment-selection and result helpers across roles; no separate Manager grader
    reload or Refresh. Also publish zero and partial/full marks with either
    completion state.
 4. Correct 80 -> 90 by final score and +10 adjustment, then feedback/completion
-   with reason. Retain review/audit history. Reject blank first score, invalid
-   bounds/precision, missing correction reasons and forged previous scores.
+   with or without a reason. Retain review/audit history. Reject blank first score,
+   invalid bounds/precision, notes exceeding 1000 characters and forged previous scores.
 5. Concurrent reviewers at the same version: one commits, one conflicts without
    data loss. Same-request retry after response loss returns that version;
    changed payload conflicts without partial writes.

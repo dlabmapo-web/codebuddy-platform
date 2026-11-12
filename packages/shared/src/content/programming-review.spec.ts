@@ -20,10 +20,12 @@ describe('manual programming contracts',()=>{
     expect(submissionResultSchema.safeParse({...receipt,submissionPolicy:'AUTOMATIC'}).success).toBe(false);
     expect(submissionResultSchema.safeParse({...receipt,status:'PASSED',submissionPolicy:'AUTOMATIC'}).success).toBe(false);
   });
-  it('accepts a true zero and decimal hundredths, enforces correction reasons and integer input',()=>{
+  it('accepts zero, decimal hundredths and optional correction reasons while enforcing integer input',()=>{
     const input={academyId:id,classId:id,submissionId:id,requestId:id,expectedVersion:0,scoreHundredths:0,completed:false,feedback:'',reason:''};
     expect(programmingReviewInputSchema.safeParse(input).success).toBe(true);
-    expect(programmingReviewInputSchema.safeParse({...input,expectedVersion:1}).success).toBe(false);
+    expect(programmingReviewInputSchema.safeParse({...input,expectedVersion:1}).success).toBe(true);
+    expect(programmingReviewInputSchema.parse({...input,expectedVersion:1,reason:undefined}).reason).toBe('');
+    expect(programmingReviewInputSchema.safeParse({...input,reason:'x'.repeat(1001)}).success).toBe(false);
     expect(programmingReviewInputSchema.safeParse({...input,expectedVersion:1,reason:'Correction',scoreHundredths:9012}).success).toBe(true);
     expect(programmingReviewInputSchema.safeParse({...input,scoreHundredths:1.5}).success).toBe(false);
     expect(programmingReviewInputSchema.safeParse({...input,scoreHundredths:-1}).success).toBe(false);

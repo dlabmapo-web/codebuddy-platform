@@ -58,6 +58,7 @@ export class ProgrammingReviewService {
   }
 
   async publish(identity: SupabaseIdentity, requested: ProgrammingReviewInput) {
+    // Correction notes are optional; versions and audit history still record every update.
     const input = programmingReviewInputSchema.parse(requested);
     const actor = await this.access.requirePermission(identity.authUserId, input.academyId, 'submissions.assigned.review');
     if (actor.via !== 'membership') throw new ForbiddenException();

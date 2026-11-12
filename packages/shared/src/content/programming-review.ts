@@ -24,9 +24,7 @@ export const programmingReviewInputSchema = z.object({
   expectedVersion: z.number().int().nonnegative(), requestId: z.uuid(),
   scoreHundredths: z.number().int().min(0).max(1000000),
   completed: z.boolean(), feedback: z.string().max(10000),
-  reason: z.string().trim().max(1000),
-}).superRefine((value, ctx) => {
-  if (value.expectedVersion > 0 && !value.reason) ctx.addIssue({ code: 'custom', path: ['reason'], message: 'A correction reason is required.' });
+  reason: z.string().trim().max(1000).default(''),
 });
 export type ProgrammingReviewInput = z.infer<typeof programmingReviewInputSchema>;
 export const programmingReviewVersionSchema = z.object({

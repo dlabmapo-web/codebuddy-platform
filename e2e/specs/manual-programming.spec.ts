@@ -100,6 +100,8 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
     await student.getByRole('button',{name:/^Submit$|^제출$/}).click();
     await expect(student.getByTestId('programming-assessment')).toContainText(/Awaiting teacher grading|수동 채점 대기/);
     await expect(student.getByTestId('programming-assessment')).not.toContainText('0 / 100');
+    await expect(student.getByTestId('assessment-next-step')).toContainText('Talk to your teacher');
+    await student.screenshot({path:info.outputPath('student-result-pending.png')});
     expect(streams).toEqual([]);
     const latest=await rpc(student,'learn/getLatestSubmission',{academyId,materialId,classId,mode:'student'});
     const reviewRoute=routes.academyTeachStudentWork(manager.academy.slug,classId,room.studentMembershipId,materialId)+'?attempt='+latest.submissionId;
@@ -155,7 +157,6 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
       await expect(grading.getByRole('button',{name:/^Publish grade$|^Update grade$|^채점 결과 등록$|^채점 결과 수정$/})).toBeVisible();
       await grading.getByRole('textbox',{name:/Final score|최종 점수/}).fill(score);
       await expect(grading.getByText('→ '+score+' / 100',{exact:false})).toBeVisible();
-      await grading.getByRole('textbox',{name:/Correction reason|수정 사유/}).fill('Reviewed the loop structure.');
       await grading.getByRole('button',{name:/^Publish grade$|^Update grade$|^채점 결과 등록$|^채점 결과 수정$/}).click();
       await expect(grading.getByTestId('programming-assessment')).toContainText(score+' / 100');
     }
@@ -176,7 +177,7 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
     await reloadStudent(); await student.keyboard.press('Escape');
     await student.getByRole('button',{name:'코드',exact:true}).click();
     await expect(student.locator('html')).toHaveAttribute('data-theme','dark');
-    await expect(student.getByTestId('programming-assessment')).toContainText('해당 문제는 채점이 불가하므로 담당 선생님에게 수동으로 채점을 받으세요.');
+    await expect(student.getByTestId('assessment-next-step')).toContainText('선생님이 이 문제를 학습 완료로 표시했습니다.');
     await expect(student.getByTestId('programming-assessment')).toContainText('수동 채점 완료');
     await student.screenshot({path:info.outputPath('student-manual-result-ko-dark-mobile.png'),fullPage:true});
     await page.context().addCookies([{name:'i18next',value:'ko',url:studio},{name:'cove-theme',value:'dark',url:studio}]);
@@ -241,7 +242,6 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
     await expect(page.getByRole('button',{name:'Edit grade',exact:true})).toHaveCount(1);
     const tutoringDrawer=page.getByTestId('programming-grading-drawer');
     await tutoringDrawer.getByRole('textbox',{name:'Final score',exact:true}).fill('97');
-    await tutoringDrawer.getByRole('textbox',{name:'Correction reason',exact:true}).fill('Reviewed together during tutoring.');
     await tutoringDrawer.getByRole('button',{name:'Update grade',exact:true}).click();
     await expect(student.getByTestId('programming-assessment')).toContainText('97 / 100');
     await page.screenshot({path:info.outputPath('tutoring-grading-sidebar.png')});
@@ -265,19 +265,25 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
     await page.getByRole('button',{name:'Return to monitoring',exact:true}).click();
     await expect(page.getByTestId('inline-tutoring')).toHaveCount(0);
     await expect(page.getByTestId('observation-connection')).toContainText('Live');
-    for (const [staff,score] of [[teacher,'98'],[lead,'99']] as const) {
+    for (const [staff,score] of [[teacher,'98'],[lead,'98']] as const) {
       await staff.setViewportSize({width:1440,height:1000});await staff.goto(liveRoute);
       await expect(staff.getByTestId('observation-connection')).toContainText('Live');
       await expect(staff.getByTestId('student-current-material')).toContainText('Live on');
       await staff.getByRole('button',{name:'Edit grade',exact:true}).click();
       const grading=staff.getByTestId('programming-grading-drawer');
       await grading.getByRole('textbox',{name:'Final score',exact:true}).fill(score);
-      await grading.getByRole('textbox',{name:'Correction reason',exact:true}).fill('Staff review from live monitoring.');
-      if(score==='99')await grading.getByRole('radio',{name:'Learning complete',exact:true}).check();
+      if(staff===lead){
+        await grading.getByRole('radio',{name:'Learning complete',exact:true}).check();
+        await expect(grading.getByRole('textbox',{name:'Final score',exact:true})).toHaveValue('98');
+      }
+      await expect(grading.getByRole('button',{name:'Update grade',exact:true})).toBeEnabled();
       await grading.getByRole('button',{name:'Update grade',exact:true}).click();
+      await expect(grading.getByText('Assessment published.',{exact:true})).toBeVisible();
       await expect(student.getByTestId('programming-assessment')).toContainText(score+' / 100');
       await expect(staff.getByTestId('observation-connection')).toContainText('Live');
     }
+    await expect(student.getByTestId('assessment-next-step')).toContainText('선생님이 이 문제를 학습 완료로 표시했습니다.');
+    await student.screenshot({path:info.outputPath('student-result-complete.png')});
     await assertHistoryOutcome(true);
     await info.attach('navigation-aborts',{body:JSON.stringify(navigationAborts),contentType:'application/json'});
     expect(browserErrors).toEqual([]);

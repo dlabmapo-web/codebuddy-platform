@@ -26,7 +26,6 @@
   "history": "채점 기록",
   "version": "{{version}}차 · {{name}} · {{time}}",
   "invalid": "만점 이내의 점수를 소수점 둘째 자리까지 입력하세요.",
-  "reason_required": "수정 사유를 입력하세요.",
   "saved": "채점 결과가 등록되었습니다.",
   "conflict": "채점 결과가 변경되었을 수 있습니다. 저장된 결과를 불러온 후 다시 적용하세요. 입력 내용은 유지됩니다.",
   "reload": "저장된 채점 결과 불러오기",
@@ -67,5 +66,15 @@
   "completion_help": "이 문제의 학습 완료 여부를 선택하세요.",
   "complete_help": "학습 완료로 반영됩니다",
   "needs_work_help": "학습 중 상태를 유지합니다",
-  "publish_help": "점수와 학습 완료 여부가 함께 등록됩니다."
+  "publish_help": "점수와 학습 완료 여부가 함께 등록됩니다.",
+  "teacher_feedback": "선생님 피드백",
+  "talk_teacher": "선생님께 채점을 요청하세요",
+  "talk_teacher_next": "선생님과 다음 단계를 확인하세요",
+  "ready_next": "다음 문제에 도전해 보세요",
+  "talk_teacher_pending_help": "코드가 저장되었습니다. 선생님께 검토할 준비가 되었다고 알려주세요. 도움이 필요하면 상단의 도움 요청하기를 이용하세요.",
+  "needs_work_next_help": "점수가 등록되었지만 아직 추가 학습이 필요합니다. 피드백을 읽고 선생님께 어떤 부분을 보완하면 좋을지 물어보세요.",
+  "complete_next_help": "선생님이 이 문제를 학습 완료로 표시했습니다. 피드백을 확인하고 다음 문제로 넘어가세요.",
+  "reason_example": "예: 학생이 남은 요구 사항을 모두 완료했습니다.",
+  "reason_help": "변경 내용을 설명하고 싶을 때만 입력하세요.",
+  "reason_optional": "수정 사유 (선택)"
 }

@@ -120,6 +120,16 @@ describe.skipIf(!url)('manual programming assessment on disposable PostgreSQL', 
     await expect(review.publish(identity('teacher'),{...first,scoreHundredths:1})).rejects.toThrow();
     await expect(review.publish(identity('teacher'),grade(accepted.submissionId,{expectedVersion:2,reason:'',scoreHundredths:10001}))).rejects.toThrow();
   });
+  it.each(['teacher','lead','manager'])('%s updates completion without a reason and preserves the score and review history',async name=>{
+    const accepted=await submit.submit(identity('student'),request('completion-only correction'));
+    await review.publish(identity(name),grade(accepted.submissionId,{scoreHundredths:7900,completed:false}));
+    const correction=grade(accepted.submissionId,{expectedVersion:1,scoreHundredths:7900,completed:true});
+    const result=await review.publish(identity(name),correction);
+    expect(result.assessment).toMatchObject({scoreHundredths:7900,completed:true,reviewVersion:2});
+    expect(result.reviews[0]).toMatchObject({reason:'',previousScoreHundredths:7900,scoreHundredths:7900,deltaHundredths:0,completed:true});
+    expect(result.reviews).toHaveLength(2);
+    expect((await review.publish(identity(name),correction)).assessment.reviewVersion).toBe(2);
+  });
   it('serializes concurrent reviewers and checks revocation on publication',async()=>{
     const accepted=await submit.submit(identity('student'),request());
     const results=await Promise.allSettled(['teacher','manager'].map(name=>review.publish(identity(name),grade(accepted.submissionId))));

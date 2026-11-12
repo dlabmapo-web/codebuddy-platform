@@ -26,7 +26,6 @@
   "history": "Review history",
   "version": "Version {{version}} · {{name}} · {{time}}",
   "invalid": "Enter a score within the maximum, with up to two decimal places.",
-  "reason_required": "Enter a reason for this correction.",
   "saved": "Assessment published.",
   "conflict": "The assessment may have changed. Reload the saved assessment before trying again. Your input is preserved.",
   "reload": "Reload saved assessment",
@@ -67,5 +66,15 @@
   "completion_help": "Choose whether this problem is complete.",
   "complete_help": "Counts toward learning progress",
   "needs_work_help": "Keeps the problem in progress",
-  "publish_help": "The score and learning outcome will be published together."
+  "publish_help": "The score and learning outcome will be published together.",
+  "teacher_feedback": "Teacher feedback",
+  "talk_teacher": "Talk to your teacher",
+  "talk_teacher_next": "Check the next steps with your teacher",
+  "ready_next": "Ready for your next challenge",
+  "talk_teacher_pending_help": "Your code is saved. Let your teacher know you are ready for a review. You can use Request help above if you need assistance.",
+  "needs_work_next_help": "Your score is saved, and this problem still needs more work. Read the feedback and ask your teacher what to improve before completing it.",
+  "complete_next_help": "Your teacher has marked this problem complete. Review their feedback, then continue to the next problem.",
+  "reason_example": "For example: The student completed the remaining requirements.",
+  "reason_help": "Add a note only if you want to explain this update.",
+  "reason_optional": "Correction reason (optional)"
 }

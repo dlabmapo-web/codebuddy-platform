@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {programmingReviewInputSchema} from './programming-review.js';
+import {programmingAssessmentSchema,programmingReviewInputSchema} from './programming-review.js';
 import {createProgrammingExerciseSchema,legacyGradingProfile} from './course.js';
 import {submissionAcceptedSchema,submissionResultSchema} from './submission.js';
 const id='10000000-0000-4000-8000-000000000001';
@@ -23,11 +23,16 @@ describe('manual programming contracts',()=>{
   it('accepts zero, decimal hundredths and optional correction reasons while enforcing integer input',()=>{
     const input={academyId:id,classId:id,submissionId:id,requestId:id,expectedVersion:0,scoreHundredths:0,completed:false,feedback:'',reason:''};
     expect(programmingReviewInputSchema.safeParse(input).success).toBe(true);
+    expect(programmingReviewInputSchema.parse(input).completed).toBe(true);
+    expect(programmingReviewInputSchema.parse({...input,completed:undefined}).completed).toBe(true);
     expect(programmingReviewInputSchema.safeParse({...input,expectedVersion:1}).success).toBe(true);
     expect(programmingReviewInputSchema.parse({...input,expectedVersion:1,reason:undefined}).reason).toBe('');
     expect(programmingReviewInputSchema.safeParse({...input,reason:'x'.repeat(1001)}).success).toBe(false);
     expect(programmingReviewInputSchema.safeParse({...input,expectedVersion:1,reason:'Correction',scoreHundredths:9012}).success).toBe(true);
     expect(programmingReviewInputSchema.safeParse({...input,scoreHundredths:1.5}).success).toBe(false);
     expect(programmingReviewInputSchema.safeParse({...input,scoreHundredths:-1}).success).toBe(false);
+  });
+  it('normalizes a legacy graded snapshot to complete even when its score is zero',()=>{
+    expect(programmingAssessmentSchema.parse({version:1,messageVersion:1,maximumHundredths:10000,includeInScore:true,state:'GRADED',reviewVersion:1,scoreHundredths:0,completed:false,feedback:'',reviewerName:'Teacher',reviewedAt:'2026-11-12T00:00:00.000Z'})).toMatchObject({completed:true,scoreHundredths:0});
   });
 });

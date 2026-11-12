@@ -14,7 +14,7 @@ vi.stubGlobal('React',React);vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
 const initial:ProgrammingAssessment={version:1,messageVersion:1,maximumHundredths:10000,includeInScore:false,
   state:'GRADED',reviewVersion:1,scoreHundredths:8000,completed:true,feedback:'Original feedback',reviewerName:'Teacher',reviewedAt:'2026-11-12T00:00:00.000Z'};
 describe('teacher grading refresh',()=>{
-  it('saves a completion-only correction without a reason or a changed score',async()=>{
+  it('saves a score correction without a completion choice or required reason',async()=>{
     const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
     const incomplete={...initial,completed:false};mocks.publish.mockResolvedValue({assessment:{...initial,reviewVersion:2},reviews:[]});mocks.publish.mockClear();
     try {
@@ -23,10 +23,11 @@ describe('teacher grading refresh',()=>{
       expect(submit.disabled).toBe(false);
       const reason=host.querySelector<HTMLTextAreaElement>('textarea[aria-label="reason"]')!;
       expect(reason.required).toBe(false);expect(reason.closest('details')?.open).toBe(false);
-      await act(()=>host.querySelector<HTMLInputElement>('input[type="radio"][aria-label="complete"]')!.click());
+      expect(host.querySelector('input[type="radio"]')).toBeNull();
       expect(submit.disabled).toBe(false);
       await act(async()=>submit.click());
-      expect(mocks.publish).toHaveBeenCalledWith(expect.objectContaining({scoreHundredths:8000,completed:true,reason:'',expectedVersion:1}));
+      expect(mocks.publish).toHaveBeenCalledWith(expect.objectContaining({scoreHundredths:8000,reason:'',expectedVersion:1}));
+      expect(mocks.publish.mock.calls[0]![0]).not.toHaveProperty('completed');
       expect(host.textContent).toContain('saved');
     } finally {await act(()=>root.unmount());host.remove();}
   });

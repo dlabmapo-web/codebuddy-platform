@@ -17,13 +17,14 @@ export const programmingAssessmentSchema = programmingAssessmentSnapshotSchema.e
       (value.reviewVersion === 0 || value.scoreHundredths === null || value.scoreHundredths > value.maximumHundredths || value.completed === null || value.reviewedAt === null || value.reviewerName === null)) {
     ctx.addIssue({code: 'custom', message: 'Inconsistent programming assessment state.'});
   }
-});
+}).transform(value => value.state === 'GRADED' ? {...value, completed: true} : value);
 export type ProgrammingAssessment = z.infer<typeof programmingAssessmentSchema>;
 export const programmingReviewInputSchema = z.object({
   academyId: z.uuid(), classId: z.uuid(), submissionId: z.uuid(),
   expectedVersion: z.number().int().nonnegative(), requestId: z.uuid(),
   scoreHundredths: z.number().int().min(0).max(1000000),
-  completed: z.boolean(), feedback: z.string().max(10000),
+  // Retired client choice: tolerate older clients, but every score completes the problem.
+  completed: z.boolean().transform((): boolean => true).default(true), feedback: z.string().max(10000),
   reason: z.string().trim().max(1000).default(''),
 });
 export type ProgrammingReviewInput = z.infer<typeof programmingReviewInputSchema>;

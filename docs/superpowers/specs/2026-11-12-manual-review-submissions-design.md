@@ -10,7 +10,7 @@ Base: `feat/cove-studio-v2` at `0b7f810d`.
 Authors can create a runnable programming exercise that accepts code submissions
 and directs students to their teacher instead of assigning an automatic score.
 Authorized teaching staff inspect the submitted code, publish a score and optional
-feedback, mark the work complete, and correct a published assessment. Students
+feedback, and correct a published assessment. Publishing any score finishes the problem. Students
 see the teacher's result in their workspace and submission history.
 
 Managers can perform Team Lead and Teacher work. Team Leads can perform Teacher
@@ -75,7 +75,7 @@ assignment for Managers/Team Leads.
 | --- | --- | --- | --- |
 | Configure exercise mode, maximum and inclusion | Existing curriculum review only; no new authoring right | Existing author/publish authority | Same author/publish authority |
 | Inspect submitted student code | Assigned homeroom/assistant classes | All active own-academy classes | All active own-academy classes |
-| Publish/correct score, feedback and completion | Same assigned classes | Same academy-wide teaching scope | Same academy-wide teaching scope |
+| Publish/correct score and feedback | Same assigned classes | Same academy-wide teaching scope | Same academy-wide teaching scope |
 | Personal practice/authorized preview | Existing practice/review rights | Existing practice/review rights | Existing practice/review rights |
 | Manager-only settings/credentials | No | No | Existing Manager permissions |
 
@@ -126,7 +126,7 @@ Expose a dedicated `manualAssessment` configuration with persisted exercise fiel
   maximum 1000000, matching current manual-material bounds.
 - `includeInScore`: default false, labeled `성적에 포함`. When false show
   `성적 제외`; explain that an individual teacher score remains visible.
-- Completion is explicitly selected by the reviewer, independently of full marks.
+- Any published teacher score completes the problem; no separate completion choice is shown.
 
 Keep these separate from automatic grader maximum/scoring settings. Practice and
 Automatic retain but ignore manual settings. Omitted new settings use these
@@ -164,9 +164,9 @@ case progress, runtime metric, or compilation verdict. A draft save or failed
 request must never show a submitted receipt.
 
 After publication show `수동 채점 완료`, exact score/maximum, optional feedback,
-completion, reviewer display name and review time. Submission time remains
+reviewer display name and review time. No separate learning-outcome labels or choices are shown. Submission time remains
 separate. Published zero displays `0 / maximum`, never pending. Keep the original
-notice as context; the published assessment is the primary result.
+teacher guidance only while pending; reviewed work shows feedback and a next-step message.
 
 The latest strip describes the newest accepted submission, pending or graded.
 Never pair an older score with a newer timestamp. Selecting an older attempt
@@ -192,18 +192,16 @@ Team Lead use these routes without changing roles.
    Show success only after commit.
 
 First publication requires an explicitly entered score; an untouched field is
-not zero. `학습 완료` defaults false and is explicit. Any published score is a
-reviewed assessment even when completion is false. Opening code does not complete
-review.
+not zero. Publishing any score, including zero, completes the problem. There is
+no separate learning-completion choice. Opening code does not complete review.
 
 After publication offer `점수 수정` with final-score input and optional
 `점수 조정`. Adjustment accepts a signed amount with two decimal places, previews
 old -> new score, and enforces the same bounds. First publication has no delta
 option because no previous grade exists. The server derives the delta from its
 previous review and the requested final score, never a client-reported old score.
-Correction reasons are optional (maximum 1000 characters), including when only
-completion changes, per the user's 2026-11-12 refinement. Feedback and
-completion corrections use this same audited operation. Authorized staff can
+Correction reasons are optional (maximum 1000 characters), per the user's
+2026-11-12 refinement. Score and feedback corrections use the same audited operation. Authorized staff can
 inspect review versions, actor/time, reason and score/completion changes.
 
 Edits remain local until Apply; no server-side grading-draft workflow is added.
@@ -271,7 +269,8 @@ these reviews in the existing read projections; no new progress table or manual
 write to automatic ExerciseProgress is required.
 
 Publish input: submission ID, academy/class context, expectedVersion, request UUID,
-final score, completion, feedback and optional correction reason. One transaction checks
+final score, feedback and optional correction reason. Legacy completion input is
+accepted but normalized to true; it is not a staff choice. One transaction checks
 the current real teaching grant and stored class/material/student scope,
 compare-and-swaps reviewVersion, inserts the next review, and writes audit.
 A stale version conflicts
@@ -298,7 +297,7 @@ Raw result.score stays null for manual policy even after review. Read exact huma
 points from manualAssessment; update student/teacher contracts and renderers
 together. Never coerce null to zero or round human points into an integer percent.
 Automatic shapes and case disclosure keep existing semantics. Teacher accepted
-is not applicable; completed comes from the published review.
+is not applicable; completed is true once a score has been published.
 
 Allow zero cases only on manual acceptance and return its committed receipt/
 pending assessment, seeding the client without judge SSE or a redundant fetch.
@@ -361,9 +360,9 @@ revision, never highest score or latest review time. A new pending attempt makes
 current assessment pending while preserving older grades. Reviewing old work
 never grades the latest attempt.
 
-Reviewed is distinct from complete: zero is valid, partial credit can be complete,
-and full marks can be incomplete when explicitly selected. Only a published
-review changes completion.
+Every published score completes the problem, including zero and partial credit.
+Existing GRADED snapshots with a retired false completion value are read as
+complete without rewriting historical review rows. Pending work is not complete.
 
 ### 8.2 Course inclusion and progress
 
@@ -371,7 +370,7 @@ Individual teacher scores are visible regardless of includeInScore. False shows
 성적 제외 and omits the material from assessed course totals and graded-progress
 denominators, while preserving its review/history. True includes it in existing
 human/manual assessment summaries using its maximum. Pending is shown as pending,
-not an awarded zero; explicit completion supplies manual assessed-progress state.
+not an awarded zero; a published score supplies completed manual assessed-progress state.
 
 Do not count manual grading in automatic best-score, failures, judge attempts or
 acceptance rate. Included human grades may enter existing mixed student assessment
@@ -499,11 +498,11 @@ assessment-selection and result helpers across roles; no separate Manager grader
 2. Submit exact code while judge execution is unavailable but auth/storage/
    limiter work. Verify notice, pending and timestamp, no fake score/cases/job/
    runtime request/judge SSE or waiting interval.
-3. Assigned Teacher publishes 80/100 with feedback and completion. Student sees
-   exact grade, feedback, completion, reviewer and separate times through event,
+3. Assigned Teacher publishes 80/100 with feedback; completion follows automatically. Student sees
+   exact grade, feedback, reviewer and separate times through event,
    reload or Refresh. Also publish zero and partial/full marks with either
-   completion state.
-4. Correct 80 -> 90 by final score and +10 adjustment, then feedback/completion
+   automatic completion, including legacy false completion input.
+4. Correct 80 -> 90 by final score and +10 adjustment, then feedback
    with or without a reason. Retain review/audit history. Reject blank first score,
    invalid bounds/precision, notes exceeding 1000 characters and forged previous scores.
 5. Concurrent reviewers at the same version: one commits, one conflicts without
@@ -525,7 +524,7 @@ assessment-selection and result helpers across roles; no separate Manager grader
     not student reviews, grades, progress or rewards.
 11. Excluded material shows its individual grade and 성적 제외 without assessed
     totals/denominators. Included material reflects pending/reviewed zero/partial/
-    full grade and explicit completion in manual summaries, without automatic
+    full grade and automatic completion in manual summaries, without automatic
     failure/acceptance-rate/reward changes.
 12. Change mode/maximum/inclusion/revision after admission. Historical review
     uses frozen settings; it cannot rescale old work or update the new revision.

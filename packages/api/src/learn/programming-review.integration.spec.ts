@@ -120,9 +120,9 @@ describe.skipIf(!url)('manual programming assessment on disposable PostgreSQL', 
     await expect(review.publish(identity('teacher'),{...first,scoreHundredths:1})).rejects.toThrow();
     await expect(review.publish(identity('teacher'),grade(accepted.submissionId,{expectedVersion:2,reason:'',scoreHundredths:10001}))).rejects.toThrow();
   });
-  it.each(['teacher','lead','manager'])('%s updates completion without a reason and preserves the score and review history',async name=>{
+  it.each(['teacher','lead','manager'])('%s completes the problem when publishing or correcting a score without a reason',async name=>{
     const accepted=await submit.submit(identity('student'),request('completion-only correction'));
-    await review.publish(identity(name),grade(accepted.submissionId,{scoreHundredths:7900,completed:false}));
+    expect((await review.publish(identity(name),grade(accepted.submissionId,{scoreHundredths:7900,completed:false}))).assessment.completed).toBe(true);
     const correction=grade(accepted.submissionId,{expectedVersion:1,scoreHundredths:7900,completed:true});
     const result=await review.publish(identity(name),correction);
     expect(result.assessment).toMatchObject({scoreHundredths:7900,completed:true,reviewVersion:2});
@@ -145,18 +145,28 @@ describe.skipIf(!url)('manual programming assessment on disposable PostgreSQL', 
     expect(queue.enqueuePractice).not.toHaveBeenCalled();
     expect(await practice.latest(identity('manager'),{academyId,materialId})).toMatchObject({status:'RECORDED',scoreHundredths:null});
   });
-  it('reports grading separately from completion in history without changing completed totals',async()=>{
-    const accepted=await submit.submit(identity('student'),request('history outcome'));
+  it('a zero teacher score completes the problem and updates history totals without a separate choice',async()=>{
+    const accepted=await submit.submit(identity('student'),request('score completes problem'));
     const read=()=>history.listStudentMaterials(identity('manager'),{academyId,classId,membershipId:people.student!.membership,page:1});
     expect((await read()).rows.find(row=>row.materialId===materialId)).toMatchObject({status:'pending',manualReview:{state:'AWAITING_REVIEW',completed:null}});
-    await review.publish(identity('teacher'),grade(accepted.submissionId,{scoreHundredths:10000,completed:false}));
-    let rows=(await read()).rows;
-    expect(rows.find(row=>row.materialId===materialId)).toMatchObject({status:'in_progress',score:100,manualReview:{state:'GRADED',completed:false}});
-    expect(rows.find(row=>row.materialId===materialId)?.lectureCompleted).toBe(0);
-    await review.publish(identity('manager'),grade(accepted.submissionId,{expectedVersion:1,scoreHundredths:10000,completed:true,reason:'Learning is complete'}));
-    rows=(await read()).rows;
-    expect(rows.find(row=>row.materialId===materialId)).toMatchObject({status:'completed',manualReview:{state:'GRADED',completed:true}});
-    expect(rows.find(row=>row.materialId===materialId)?.lectureCompleted).toBe(1);
+    await review.publish(identity('teacher'),grade(accepted.submissionId,{scoreHundredths:0,completed:false}));
+    const rows=(await read()).rows;
+    expect(rows.find(row=>row.materialId===materialId)).toMatchObject({status:'completed',score:0,manualReview:{state:'GRADED',completed:true},lectureCompleted:1});
+    expect((await outline.statusByMaterial(people.student!.id,[materialId],classId)).get(materialId)).toMatchObject({status:'SOLVED',scoreHundredths:0});
+  });
+  it('counts legacy graded snapshots as complete without rewriting their immutable review history or breaking replay',async()=>{
+    const accepted=await submit.submit(identity('student'),request('legacy reviewed code'));
+    const requestId=randomUUID(),now=new Date();
+    const legacy={version:1,messageVersion:1,maximumHundredths:10000,includeInScore:true,state:'GRADED',scoreHundredths:7900,completed:false,feedback:'Legacy feedback',reviewerName:'teacher',reviewedAt:now.toISOString(),reviewVersion:1};
+    await db.programmingSubmissionReview.create({data:{id:randomUUID(),submissionId:accepted.submissionId,reviewerId:people.teacher!.id,reviewerName:'teacher',version:1,requestId,scoreHundredths:7900,completed:false,feedback:legacy.feedback,reason:'',createdAt:now}});
+    await db.submission.update({where:{id:accepted.submissionId},data:{reviewVersion:1,manualReviewResult:legacy}});
+    const rows=(await history.listStudentMaterials(identity('manager'),{academyId,classId,membershipId:people.student!.membership,page:1})).rows;
+    expect(rows.find(row=>row.materialId===materialId)).toMatchObject({status:'completed',score:79,lectureCompleted:1});
+    expect((await outline.statusByMaterial(people.student!.id,[materialId],classId)).get(materialId)).toMatchObject({status:'SOLVED',scoreHundredths:7900});
+    const replay=await review.publish(identity('teacher'),grade(accepted.submissionId,{requestId,scoreHundredths:7900,completed:false,feedback:legacy.feedback}));
+    expect(replay.assessment).toMatchObject({completed:true,scoreHundredths:7900,reviewVersion:1});
+    expect(replay.reviews).toHaveLength(1);expect(replay.reviews[0]?.completed).toBe(false);
+    expect((await db.submission.findUniqueOrThrow({where:{id:accepted.submissionId}})).manualReviewResult).toMatchObject({completed:false});
   });
   it('uses newest submission for pending/graded summaries and excluded course totals',async()=>{
     const accepted=await submit.submit(identity('student'),request()); await review.publish(identity('teacher'),grade(accepted.submissionId));

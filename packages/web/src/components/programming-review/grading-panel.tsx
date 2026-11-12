@@ -34,14 +34,14 @@ export function ProgrammingGradingPanel({academyId, classId, submissionId, initi
   const [assessment, setAssessment] = useState(initial);
   const [score, setScore] = useState(initial.scoreHundredths === null ? '' : String(initial.scoreHundredths/100));
   const [adjust, setAdjust] = useState(''), [adjusting, setAdjusting] = useState(false);
-  const [feedback, setFeedback] = useState(initial.feedback), [completed, setCompleted] = useState(initial.completed ?? false);
+  const [feedback, setFeedback] = useState(initial.feedback);
   const [reason, setReason] = useState(''), [saving, setSaving] = useState(false);
   const [error, setError] = useState(''), [saved, setSaved] = useState(false);
   const [history, setHistory] = useState<Awaited<ReturnType<typeof orpc.teacherProgress.getProgrammingReview>>['reviews'] | null>(null);
   const [showHistory, setShowHistory] = useState(false), [historyLoading, setHistoryLoading] = useState(false);
   const formId = useId();
   const dirty = canPublish && (score !== (assessment.scoreHundredths === null ? '' : String(assessment.scoreHundredths / 100)) ||
-    feedback !== assessment.feedback || completed !== (assessment.completed ?? false) || reason.trim() !== '' || (adjusting && adjust !== ''));
+    feedback !== assessment.feedback || reason.trim() !== '' || (adjusting && adjust !== ''));
   useEffect(() => { onDirtyChange?.(dirty); return () => onDirtyChange?.(false); }, [dirty, onDirtyChange]);
   useEffect(() => { onSavingChange?.(saving); return () => onSavingChange?.(false); }, [saving, onSavingChange]);
   const request = useRef<{signature: string; id: string} | null>(null);
@@ -57,7 +57,7 @@ export function ProgrammingGradingPanel({academyId, classId, submissionId, initi
     event.preventDefault(); if (saving) return;
     setSaved(false);
     if (finalScore === null || !Number.isSafeInteger(finalScore) || finalScore < 0 || finalScore > assessment.maximumHundredths) {setError(t('invalid')); return;}
-    const value = {...target, expectedVersion: assessment.reviewVersion, scoreHundredths: finalScore, completed, feedback, reason: reason.trim()};
+    const value = {...target, expectedVersion: assessment.reviewVersion, scoreHundredths: finalScore, feedback, reason: reason.trim()};
     const signature = JSON.stringify(value);
     request.current = request.current?.signature === signature ? request.current : {signature, id: crypto.randomUUID()};
     setSaving(true); setError('');
@@ -89,7 +89,7 @@ export function ProgrammingGradingPanel({academyId, classId, submissionId, initi
       <div hidden={!showHistory} className="min-h-0 flex-1 overflow-auto px-5 py-4">
         {historyLoading ? <p role="status" className="text-sub">{t('loading_history')}</p> : !history?.length ? <p className="text-sub">{t('no_review')}</p> : <ol className="space-y-4">{history.map(review => <li key={review.version} className="border-l-2 border-border pl-3 text-xs">
           <p className="font-semibold">{t('version', {version:review.version, name:review.reviewerName, time:formatDateTime(review.createdAt,locale,true)})}</p>
-          <p className="mt-1 font-mono text-sub">{review.previousScoreHundredths === null ? '—' : review.previousScoreHundredths / 100} → {review.scoreHundredths / 100} · {t(review.completed ? 'complete' : 'incomplete')}</p>
+          <p className="mt-1 font-mono text-sub">{review.previousScoreHundredths === null ? '—' : review.previousScoreHundredths / 100} → {review.scoreHundredths / 100}</p>
           <p className="mt-2 whitespace-pre-wrap break-words">{review.feedback}</p>{review.reason ? <p className="mt-1 whitespace-pre-wrap break-words text-sub">{review.reason}</p> : null}
         </li>)}</ol>}
       </div>
@@ -108,16 +108,6 @@ export function ProgrammingGradingPanel({academyId, classId, submissionId, initi
               <p className="mt-2 text-xs text-sub">{t('score_hint', {maximum:assessment.maximumHundredths / 100})}</p>
               {assessment.reviewVersion > 0 ? <label className="mt-3 flex items-center gap-2 text-xs text-sub"><input type="checkbox" checked={adjusting} onChange={e => {setAdjusting(e.target.checked); setSaved(false);}} className="accent-brand" />{t('adjust')}</label> : null}
             </div>
-            <fieldset className="min-w-0">
-              <legend className="text-xs font-semibold">{t('learning_progress')}</legend>
-              <p className="mt-1 text-[11px] text-sub">{t('completion_help')}</p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {[true, false].map(value => <label key={String(value)} className={`flex min-w-0 cursor-pointer items-start gap-2 rounded-xl border p-3 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand ${completed === value ? 'border-brand bg-brand-soft/70' : 'border-border bg-card hover:bg-canvas'}`}>
-                  <input type="radio" name={`${formId}-completed`} aria-label={t(value ? 'complete' : 'needs_work')} checked={completed === value} onChange={() => {setCompleted(value); setSaved(false);}} className="mt-0.5 size-3.5 shrink-0 accent-brand" />
-                  <span className="min-w-0"><span className="block text-xs font-semibold leading-5">{t(value ? 'complete' : 'needs_work')}</span><span className="mt-1 block text-[11px] leading-4 text-sub">{t(value ? 'complete_help' : 'needs_work_help')}</span></span>
-                </label>)}
-              </div>
-            </fieldset>
             <label className="block text-xs font-semibold">{t('feedback')}
               <textarea rows={3} maxLength={10000} value={feedback} onChange={e => {setFeedback(e.target.value); setSaved(false);}}
                 className="mt-2 block min-h-24 w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm font-normal leading-6 outline-none focus:border-brand focus:ring-1 focus:ring-brand" />
@@ -150,7 +140,6 @@ export function ProgrammingGradingPanel({academyId, classId, submissionId, initi
       </label>
       <p className="text-sm tabular-nums">{assessment.scoreHundredths === null ? '—' : assessment.scoreHundredths/100} → {finalScore === null || !Number.isFinite(finalScore) ? '—' : finalScore/100} / {assessment.maximumHundredths/100}</p>
       <label className="block text-sm font-semibold">{t('feedback')}<textarea maxLength={10000} value={feedback} disabled={saving} onChange={e => setFeedback(e.target.value)} className="mt-1 block min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2"/></label>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={completed} disabled={saving} onChange={e => setCompleted(e.target.checked)}/>{t('complete')}</label>
       {assessment.reviewVersion > 0 ? <label className="block text-sm font-semibold">{t('reason_optional')}<textarea aria-label={t('reason')} maxLength={1000} value={reason} disabled={saving} onChange={e => setReason(e.target.value)} className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2"/></label> : null}
       {error ? <div role="alert" className="space-y-2 text-sm text-danger"><p>{error}</p><button type="button" onClick={() => void reload()} className="underline">{t('reload')}</button></div> : null}
       {saved ? <p role="status" className="text-sm text-success">{t('saved')}</p> : null}
@@ -160,7 +149,7 @@ export function ProgrammingGradingPanel({academyId, classId, submissionId, initi
     {canPublish ? <button type="button" className="text-sm underline" onClick={() => void reload()}>{t('history')}</button> : null}
     {history ? <ol className="space-y-3 text-sm">{history.map(review => <li key={review.version} className="rounded-lg border border-border p-3">
       <p className="font-semibold">{t('version', {version: review.version, name: review.reviewerName, time: formatDateTime(review.createdAt, locale, true)})}</p>
-      <p>{review.previousScoreHundredths === null ? '—' : review.previousScoreHundredths/100} → {review.scoreHundredths/100} · {t(review.completed ? 'complete' : 'incomplete')}</p>
+      <p>{review.previousScoreHundredths === null ? '—' : review.previousScoreHundredths/100} → {review.scoreHundredths/100}</p>
       <p className="whitespace-pre-wrap break-words">{review.feedback}</p>{review.reason ? <p className="whitespace-pre-wrap break-words opacity-70">{review.reason}</p> : null}
     </li>)}</ol> : null}
   </div>;

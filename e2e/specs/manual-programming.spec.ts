@@ -147,7 +147,7 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
     }
     await teacher.screenshot({path:info.outputPath('teacher-grading-sidebar-mobile.png')});
     expect(await teacher.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    await panel.getByRole('radio',{name:/Learning complete|학습 완료/}).check();
+    await expect(panel.getByRole('radio')).toHaveCount(0);
     await panel.getByRole('button',{name:/^Publish grade$|^Update grade$|^채점 결과 등록$|^채점 결과 수정$/}).click();
     await expect(panel).toContainText('80 / 100');
     await expect(student.getByTestId('programming-assessment')).toContainText('80 / 100');
@@ -177,7 +177,7 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
     await reloadStudent(); await student.keyboard.press('Escape');
     await student.getByRole('button',{name:'코드',exact:true}).click();
     await expect(student.locator('html')).toHaveAttribute('data-theme','dark');
-    await expect(student.getByTestId('assessment-next-step')).toContainText('선생님이 이 문제를 학습 완료로 표시했습니다.');
+    await expect(student.getByTestId('assessment-next-step')).toContainText('선생님이 이 문제를 채점했습니다.');
     await expect(student.getByTestId('programming-assessment')).toContainText('수동 채점 완료');
     await student.screenshot({path:info.outputPath('student-manual-result-ko-dark-mobile.png'),fullPage:true});
     await page.context().addCookies([{name:'i18next',value:'ko',url:studio},{name:'cove-theme',value:'dark',url:studio}]);
@@ -216,18 +216,18 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
     await liveDrawer.getByRole('button',{name:'Publish grade',exact:true}).click();
     await expect(liveDrawer.getByTestId('programming-assessment')).toContainText('95 / 100');
     await expect(student.getByTestId('programming-assessment')).toContainText('95 / 100');
-    async function assertHistoryOutcome(complete:boolean) {
+    async function assertHistoryGraded(stage:string) {
       const history=await page.context().newPage();
       try {
         await history.goto(routes.academyTeachProgress(manager.academy.slug,classId)+'?view=students&student='+room.studentMembershipId+'&course='+room.courseId);
         const row=history.getByRole('row').filter({hasText:'Manual while-loop Mission'});
         await expect(row.getByTestId('history-manual-assessment')).toContainText('Graded');
-        await expect(row.getByTestId('history-manual-assessment')).toContainText(complete?'Learning complete':'Needs more work');
+        await expect(row.getByTestId('history-manual-assessment')).not.toContainText(/Learning complete|Needs more work/);
         await row.scrollIntoViewIfNeeded();
-        await history.screenshot({path:info.outputPath(complete?'history-graded-complete.png':'history-graded-needs-work.png')});
+        await history.screenshot({path:info.outputPath(`history-graded-${stage}.png`)});
       } finally {await history.close();}
     }
-    await assertHistoryOutcome(false);
+    await assertHistoryGraded('after-publication');
     await page.screenshot({path:info.outputPath('live-grading-sidebar.png')});
     await liveDrawer.getByRole('button',{name:'Close grading',exact:true}).click();
     await expect(liveDrawer).toHaveCount(0);
@@ -272,19 +272,16 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
       await staff.getByRole('button',{name:'Edit grade',exact:true}).click();
       const grading=staff.getByTestId('programming-grading-drawer');
       await grading.getByRole('textbox',{name:'Final score',exact:true}).fill(score);
-      if(staff===lead){
-        await grading.getByRole('radio',{name:'Learning complete',exact:true}).check();
-        await expect(grading.getByRole('textbox',{name:'Final score',exact:true})).toHaveValue('98');
-      }
+      await expect(grading.getByRole('radio')).toHaveCount(0);
       await expect(grading.getByRole('button',{name:'Update grade',exact:true})).toBeEnabled();
       await grading.getByRole('button',{name:'Update grade',exact:true}).click();
       await expect(grading.getByText('Assessment published.',{exact:true})).toBeVisible();
       await expect(student.getByTestId('programming-assessment')).toContainText(score+' / 100');
       await expect(staff.getByTestId('observation-connection')).toContainText('Live');
     }
-    await expect(student.getByTestId('assessment-next-step')).toContainText('선생님이 이 문제를 학습 완료로 표시했습니다.');
+    await expect(student.getByTestId('assessment-next-step')).toContainText('선생님이 이 문제를 채점했습니다.');
     await student.screenshot({path:info.outputPath('student-result-complete.png')});
-    await assertHistoryOutcome(true);
+    await assertHistoryGraded('after-correction');
     await info.attach('navigation-aborts',{body:JSON.stringify(navigationAborts),contentType:'application/json'});
     expect(browserErrors).toEqual([]);
   }finally{await offlineContext.close();await studentContext.close();await leadContext.close();await teacherContext.close();}

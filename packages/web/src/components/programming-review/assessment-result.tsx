@@ -1,7 +1,7 @@
 'use client';
 import type { ProgrammingAssessment } from '@cove/shared';
 import { formatDateTime } from '@cove/i18n/format';
-import { BookOpenCheck, CheckCircle2, ClipboardCheck, Clock3, Code2, MessageCircle, RefreshCw, UserRound } from 'lucide-react';
+import { CheckCircle2, ClipboardCheck, Clock3, Code2, MessageCircle, RefreshCw, UserRound } from 'lucide-react';
 import { useLocale } from '@/i18n';
 import { useReviewTranslation } from './use-review-translation';
 export function ProgrammingAssessmentResult({assessment, dark = false, onRefresh}: {assessment?: ProgrammingAssessment | null; dark?: boolean; onRefresh?: () => void}) {
@@ -13,7 +13,6 @@ export function ProgrammingAssessmentResult({assessment, dark = false, onRefresh
   const blue = dark ? 'border-blue-400/20 bg-blue-400/10 text-blue-300' : 'border-brand/20 bg-brand-soft text-brand';
   const green = dark ? 'bg-emerald-400/10 text-emerald-300' : 'bg-success/10 text-success';
   const amber = dark ? 'bg-amber-400/10 text-amber-300' : 'bg-warning/10 text-warning';
-  const OutcomeIcon = assessment?.completed ? CheckCircle2 : BookOpenCheck;
   return <section role="status" data-testid="programming-assessment" className={`overflow-hidden rounded-xl border text-sm ${dark ? 'border-white/15 bg-white/[0.04] text-white/90' : 'border-border bg-card text-ink'}`}>
     <header className="flex items-center gap-3 px-4 pb-3 pt-4">
       <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${!assessment || graded ? blue : amber}`}><Icon aria-hidden className="size-5" /></span>
@@ -26,7 +25,7 @@ export function ProgrammingAssessmentResult({assessment, dark = false, onRefresh
         {graded ? <>
           <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 ${blue}`}>
             <div><p className="text-xs font-semibold">{t('score')}</p><p className="mt-1 font-mono font-bold tabular-nums" data-testid="assessment-score"><span className="text-3xl">{number.format(assessment.scoreHundredths! / 100)}</span><span className="text-base opacity-70"> / {number.format(assessment.maximumHundredths / 100)}</span></p></div>
-            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold ${assessment.completed ? green : amber}`}><OutcomeIcon aria-hidden className="size-4 shrink-0" />{t(assessment.completed ? 'complete' : 'needs_work')}</span>
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold ${green}`}><CheckCircle2 aria-hidden className="size-4 shrink-0" />{t('graded_short')}</span>
           </div>
           <div className={`rounded-lg p-3 ${dark ? 'bg-black/10' : 'bg-canvas'}`}>
             <p className={`mb-1 flex items-center gap-1.5 text-xs font-semibold ${muted}`}><MessageCircle aria-hidden className="size-3.5" />{t('teacher_feedback')}</p>
@@ -34,8 +33,8 @@ export function ProgrammingAssessmentResult({assessment, dark = false, onRefresh
           </div>
         </> : <p className={`leading-6 ${muted}`}>{t('notice')}</p>}
         <div className={`flex items-start gap-2.5 rounded-lg border p-3 ${blue}`} data-testid="assessment-next-step">
-          {assessment.completed ? <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0" /> : <MessageCircle aria-hidden className="mt-0.5 size-4 shrink-0" />}
-          <div><p className="text-xs font-semibold">{t(!graded ? 'talk_teacher' : assessment.completed ? 'ready_next' : 'talk_teacher_next')}</p><p className={`mt-1 text-xs leading-5 ${dark ? 'text-white/75' : 'text-ink/80'}`}>{t(!graded ? 'talk_teacher_pending_help' : assessment.completed ? 'complete_next_help' : 'needs_work_next_help')}</p></div>
+          {graded ? <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0" /> : <MessageCircle aria-hidden className="mt-0.5 size-4 shrink-0" />}
+          <div><p className="text-xs font-semibold">{t(graded ? 'ready_next' : 'talk_teacher')}</p><p className={`mt-1 text-xs leading-5 ${dark ? 'text-white/75' : 'text-ink/80'}`}>{t(graded ? 'graded_next_help' : 'talk_teacher_pending_help')}</p></div>
         </div>
         {graded ? <p className={`flex items-start gap-2 text-[11px] leading-5 ${muted}`}><UserRound aria-hidden className="mt-0.5 size-3.5 shrink-0" /><span>{t('reviewer', {name: assessment.reviewerName})}<br />{t('reviewed_at', {time: formatDateTime(assessment.reviewedAt!, locale, true)})}</span></p> : null}
       </div>

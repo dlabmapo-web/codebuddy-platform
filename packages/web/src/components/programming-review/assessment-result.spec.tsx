@@ -18,12 +18,12 @@ it.each([false,true])('gives state-specific next steps and preserves scores/feed
     expect(host.querySelector('[data-testid="assessment-score"]')).toBeNull();
     await render(graded);
     expect(host.querySelector('[data-testid="assessment-score"]')?.textContent).toBe('79.25 / 100');
-    expect(host.textContent).toContain('needs_work');expect(host.textContent).toContain(graded.feedback);
-    expect(host.textContent).toContain('needs_work_next_help');expect(host.textContent).not.toContain('notice');
+    expect(host.textContent).toContain('graded_short');expect(host.textContent).not.toContain('needs_work');expect(host.textContent).toContain(graded.feedback);
+    expect(host.textContent).toContain('graded_next_help');expect(host.textContent).not.toContain('notice');
     await act(()=>host.querySelector('button')!.click());expect(refresh).toHaveBeenCalledOnce();
     await render({...graded,completed:true,scoreHundredths:0,feedback:''});
     expect(host.querySelector('[data-testid="assessment-score"]')?.textContent).toBe('0 / 100');
-    expect(host.textContent).toContain('complete_next_help');expect(host.textContent).toContain('no_feedback');
+    expect(host.textContent).toContain('graded_next_help');expect(host.textContent).toContain('no_feedback');
     expect(host.textContent).not.toContain('needs_work');
     await render();expect(host.textContent).toBe('practice');expect(host.querySelector('button')).toBeNull();
   } finally {await act(()=>root.unmount());}

@@ -1,5 +1,7 @@
 # Publishing a programming score finishes the problem
 
+Implemented and verified. [Checks and screenshots](../../research/2026-11-12-score-completes-manual-programming-verification.md).
+
 The user replaces the separate learning-completion decision with one rule: any published teacher score completes the problem, including zero. Remove the learning outcome choices and Learning complete / Needs more work labels from manual programming grading, student results and review history. Keep score, optional feedback/reason, permissions, exact decimal handling, version conflicts, immutable submitted code, audit records and live refresh.
 
 The request contract accepts omitted completion and tolerates legacy boolean values, normalizing every publication to completed=true. Current assessment parsing normalizes existing GRADED snapshots to completed=true, so existing reviewed submissions finish in all readers without a data rewrite or new database query. Pending submissions remain incomplete; a newer ungraded submission and old grading revisions retain their existing eligibility rules. Historical review rows retain their original values; their retired completion field is no longer displayed. Idempotent replay ignores the retired request field and returns the reviewed score with current completion semantics.

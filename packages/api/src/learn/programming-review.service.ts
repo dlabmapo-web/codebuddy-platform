@@ -58,7 +58,7 @@ export class ProgrammingReviewService {
   }
 
   async publish(identity: SupabaseIdentity, requested: ProgrammingReviewInput) {
-    // Correction notes are optional; versions and audit history still record every update.
+    // Every score completes the problem; notes stay optional and every update is versioned.
     const input = programmingReviewInputSchema.parse(requested);
     const actor = await this.access.requirePermission(identity.authUserId, input.academyId, 'submissions.assigned.review');
     if (actor.via !== 'membership') throw new ForbiddenException();
@@ -85,7 +85,7 @@ export class ProgrammingReviewService {
       const existing = await tx.programmingSubmissionReview.findUnique({where: {reviewerId_requestId: {reviewerId: actor.userId, requestId: input.requestId}}});
       if (existing) {
         if (existing.submissionId !== row.id || existing.version !== input.expectedVersion+1 ||
-          existing.scoreHundredths !== input.scoreHundredths || existing.completed !== input.completed ||
+          existing.scoreHundredths !== input.scoreHundredths ||
           existing.feedback !== input.feedback || existing.reason !== input.reason) throw new ConflictException('Request identity changed');
         return {...row, reviewVersion: existing.version, manualReviewResult: {...programmingAssessment(row),
           state: 'GRADED' as const, scoreHundredths: existing.scoreHundredths, completed: existing.completed,

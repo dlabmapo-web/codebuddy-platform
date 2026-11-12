@@ -1,7 +1,7 @@
 # Grading sidebar clarity and Safari scroll boundaries
 
 Date: 2026-11-12
-Status: implementation requested by the user, refining the existing sidebar.
+Status: implemented and verified. See [verification and screenshots](../../research/2026-11-12-grading-sidebar-polish-verification.md).
 
 Keep grading in the right sidebar and keep the existing workspace. Use Cove's existing typography, blue actions, muted surfaces and border tokens. Tighten the student/problem header, group score and learning outcome visibly, replace the easy-to-miss footer checkbox with explicit Learning complete / Needs more work choices, and retain a docked publish action. Existing false completion values and grades remain unchanged. A score never silently marks learning complete. Grade status and learning completion have separate labels.
 
@@ -11,4 +11,4 @@ The Safari image is consistent with native horizontal history-swipe panning, rat
 
 Keep live peer pointers beneath the grading surface so remote cursor labels cannot paint over form controls. Retain snapshot pinning, permissions, guards, decimal validation and publication events. Do not modify the user's saved grades during testing.
 
-Verification: focused outcome/history/wheel tests; web/API/shared types and changed-file lint; existing 15-statement small/expanded student-material read in disposable integration; isolated Chromium/WebKit grading, completion/history, sidebar geometry and scroll scenarios; native Safari read-only check.
+Verification: focused outcome/history/wheel tests; web/API/shared types and changed-file lint; existing 22-statement small/expanded student-material read in disposable integration; isolated Chromium/WebKit grading, completion/history, sidebar geometry and scroll scenarios; native Safari read-only check.

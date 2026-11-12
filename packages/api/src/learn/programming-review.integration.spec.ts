@@ -135,6 +135,19 @@ describe.skipIf(!url)('manual programming assessment on disposable PostgreSQL', 
     expect(queue.enqueuePractice).not.toHaveBeenCalled();
     expect(await practice.latest(identity('manager'),{academyId,materialId})).toMatchObject({status:'RECORDED',scoreHundredths:null});
   });
+  it('reports grading separately from completion in history without changing completed totals',async()=>{
+    const accepted=await submit.submit(identity('student'),request('history outcome'));
+    const read=()=>history.listStudentMaterials(identity('manager'),{academyId,classId,membershipId:people.student!.membership,page:1});
+    expect((await read()).rows.find(row=>row.materialId===materialId)).toMatchObject({status:'pending',manualReview:{state:'AWAITING_REVIEW',completed:null}});
+    await review.publish(identity('teacher'),grade(accepted.submissionId,{scoreHundredths:10000,completed:false}));
+    let rows=(await read()).rows;
+    expect(rows.find(row=>row.materialId===materialId)).toMatchObject({status:'in_progress',score:100,manualReview:{state:'GRADED',completed:false}});
+    expect(rows.find(row=>row.materialId===materialId)?.lectureCompleted).toBe(0);
+    await review.publish(identity('manager'),grade(accepted.submissionId,{expectedVersion:1,scoreHundredths:10000,completed:true,reason:'Learning is complete'}));
+    rows=(await read()).rows;
+    expect(rows.find(row=>row.materialId===materialId)).toMatchObject({status:'completed',manualReview:{state:'GRADED',completed:true}});
+    expect(rows.find(row=>row.materialId===materialId)?.lectureCompleted).toBe(1);
+  });
   it('uses newest submission for pending/graded summaries and excluded course totals',async()=>{
     const accepted=await submit.submit(identity('student'),request()); await review.publish(identity('teacher'),grade(accepted.submissionId));
     const newer=await submit.submit(identity('student'),request('new code'));

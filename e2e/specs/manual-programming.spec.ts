@@ -29,8 +29,36 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
   const studentContext=await browser.newContext({baseURL:studio}),leadContext=await browser.newContext({baseURL:studio}),teacherContext=await browser.newContext({baseURL:studio});
   const student=await studentContext.newPage(),lead=await leadContext.newPage(),teacher=await teacherContext.newPage();
   const offlineContext=await browser.newContext({baseURL:studio}),offline=await offlineContext.newPage();
+  let reloadingStudent=false;
+  const navigationAborts:string[]=[],browserErrors:string[]=[];
+  for(const observed of [page,student,lead,teacher])observed.on('pageerror',error=>{
+    // WebKit can report an outgoing outline fetch as an exception during reload.
+    // Restrict this exception to that controlled window and exact resource.
+    if(info.project.name==='webkit' && observed===student && reloadingStudent && error.name==='Fetch API cannot load http' && /\/api\/rpc\/learn\/getCourseOutline due to access control checks\.$/.test(error.message)) navigationAborts.push(error.message);
+    else browserErrors.push(error.message);
+  });
+  const reloadStudent=async()=>{
+    reloadingStudent=true;
+    try {await student.reload();} finally {reloadingStudent=false;}
+  };
   try{
     await enter(page,manager);await enter(student,studentFixture);await enter(lead,leadFixture);await enter(teacher,teacherFixture);await enter(offline,offlineFixture);
+    await expect(page.locator('html')).toHaveAttribute('data-cove-scroll-boundary','');
+    const beforeSwipe=page.url();await page.mouse.move(700,300);await page.mouse.wheel(-700,0);
+    await expect(page).toHaveURL(beforeSwipe);
+    expect(await page.evaluate(()=>document.documentElement.scrollLeft)).toBe(0);
+    await page.evaluate(()=>{
+      const scroller=document.createElement('div');scroller.dataset.testid='scroll-boundary-fixture';
+      scroller.style.cssText='position:fixed;left:400px;top:200px;width:200px;height:120px;overflow:auto;z-index:200;background:white';
+      const content=document.createElement('div');content.style.cssText='width:1000px;height:800px';scroller.append(content);document.body.append(scroller);
+    });
+    const localScroll=page.getByTestId('scroll-boundary-fixture');await localScroll.hover();await page.mouse.wheel(250,0);
+    await expect.poll(()=>localScroll.evaluate(node=>node.scrollLeft)).toBeGreaterThan(0);
+    await page.mouse.wheel(-2000,0);await expect.poll(()=>localScroll.evaluate(node=>node.scrollLeft)).toBe(0);
+    await page.mouse.wheel(-300,0);expect(await page.evaluate(()=>document.documentElement.scrollLeft)).toBe(0);
+    await page.mouse.wheel(0,180);await expect.poll(()=>localScroll.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
+    expect(await page.evaluate(()=>{const event=new WheelEvent('wheel',{deltaX:150,ctrlKey:true,bubbles:true,cancelable:true});document.body.dispatchEvent(event);return event.defaultPrevented;})).toBe(false);
+    await localScroll.evaluate(node=>node.remove());
     const seeded=await request.post(`${provider}/fixtures/${manager.id}/classroom`,{data:{studentFixtureId:studentFixture.id,teacherFixtureId:teacherFixture.id,reviewStudentFixtureId:offlineFixture.id,emptyWork:true}});
     expect(seeded.ok(),await seeded.text()).toBe(true);const room=await seeded.json();
     const academyId=manager.academy.id,classId=room.classes[0].id;
@@ -85,6 +113,15 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
       expect(await teacher.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1)).toBe(true);
       await teacher.screenshot({path:info.outputPath(`teacher-history-${viewport.width}.png`)});
     }
+    const statement=teacher.frameLocator('iframe').first();
+    await expect(statement.locator('html')).toHaveAttribute('data-cove-scroll-boundary','');
+    await statement.locator('#cove-rich-text-root').evaluate(body=>{
+      const pre=document.createElement('pre');pre.dataset.testid='frame-scroll-fixture';pre.style.cssText='display:block;width:160px;height:60px;overflow-x:auto;white-space:pre';
+      pre.textContent='long code '.repeat(100);body.prepend(pre);
+    });
+    const frameScroll=statement.getByTestId('frame-scroll-fixture');await frameScroll.hover();await teacher.mouse.wheel(250,0);
+    await expect.poll(()=>frameScroll.evaluate(node=>node.scrollLeft)).toBeGreaterThan(0);
+    await frameScroll.evaluate(node=>node.remove());
     await teacher.getByRole('button',{name:'Grade submission',exact:true}).click();
     const drawer=teacher.getByTestId('programming-grading-drawer'),panel=drawer.getByTestId('programming-grading-panel');
     await expect(drawer).toBeVisible();
@@ -108,7 +145,7 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
     }
     await teacher.screenshot({path:info.outputPath('teacher-grading-sidebar-mobile.png')});
     expect(await teacher.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    await panel.getByRole('checkbox',{name:/Learning complete|학습 완료/}).check();
+    await panel.getByRole('radio',{name:/Learning complete|학습 완료/}).check();
     await panel.getByRole('button',{name:/^Publish grade$|^Update grade$|^채점 결과 등록$|^채점 결과 수정$/}).click();
     await expect(panel).toContainText('80 / 100');
     await expect(student.getByTestId('programming-assessment')).toContainText('80 / 100');
@@ -122,7 +159,8 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
       await grading.getByRole('button',{name:/^Publish grade$|^Update grade$|^채점 결과 등록$|^채점 결과 수정$/}).click();
       await expect(grading.getByTestId('programming-assessment')).toContainText(score+' / 100');
     }
-    await student.reload();await expect(student.getByTestId('programming-assessment')).toContainText('90 / 100');
+    await reloadStudent();
+    await expect(student.getByTestId('programming-assessment')).toContainText('90 / 100');
     await expect(student.getByTestId('programming-assessment')).toContainText(/Excluded from course score|성적 제외/);
     await page.getByRole('button',{name:/^Review history$|^채점 기록$/}).click();
     await page.evaluate(()=>window.scrollTo(0,0));
@@ -135,7 +173,7 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
     expect(await student.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
     await expect(page.getByTestId('programming-grading-panel')).toContainText(/Version 3|3차/);
     await studentContext.addCookies([{name:'i18next',value:'ko',url:studio},{name:'cove-theme',value:'dark',url:studio}]);
-    await student.reload(); await student.keyboard.press('Escape');
+    await reloadStudent(); await student.keyboard.press('Escape');
     await student.getByRole('button',{name:'코드',exact:true}).click();
     await expect(student.locator('html')).toHaveAttribute('data-theme','dark');
     await expect(student.getByTestId('programming-assessment')).toContainText('해당 문제는 채점이 불가하므로 담당 선생님에게 수동으로 채점을 받으세요.');
@@ -177,6 +215,18 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
     await liveDrawer.getByRole('button',{name:'Publish grade',exact:true}).click();
     await expect(liveDrawer.getByTestId('programming-assessment')).toContainText('95 / 100');
     await expect(student.getByTestId('programming-assessment')).toContainText('95 / 100');
+    async function assertHistoryOutcome(complete:boolean) {
+      const history=await page.context().newPage();
+      try {
+        await history.goto(routes.academyTeachProgress(manager.academy.slug,classId)+'?view=students&student='+room.studentMembershipId+'&course='+room.courseId);
+        const row=history.getByRole('row').filter({hasText:'Manual while-loop Mission'});
+        await expect(row.getByTestId('history-manual-assessment')).toContainText('Graded');
+        await expect(row.getByTestId('history-manual-assessment')).toContainText(complete?'Learning complete':'Needs more work');
+        await row.scrollIntoViewIfNeeded();
+        await history.screenshot({path:info.outputPath(complete?'history-graded-complete.png':'history-graded-needs-work.png')});
+      } finally {await history.close();}
+    }
+    await assertHistoryOutcome(false);
     await page.screenshot({path:info.outputPath('live-grading-sidebar.png')});
     await liveDrawer.getByRole('button',{name:'Close grading',exact:true}).click();
     await expect(liveDrawer).toHaveCount(0);
@@ -217,13 +267,19 @@ test('student submits; assigned Teacher, Team Lead and Manager publish/correct w
     await expect(page.getByTestId('observation-connection')).toContainText('Live');
     for (const [staff,score] of [[teacher,'98'],[lead,'99']] as const) {
       await staff.setViewportSize({width:1440,height:1000});await staff.goto(liveRoute);
+      await expect(staff.getByTestId('observation-connection')).toContainText('Live');
+      await expect(staff.getByTestId('student-current-material')).toContainText('Live on');
       await staff.getByRole('button',{name:'Edit grade',exact:true}).click();
       const grading=staff.getByTestId('programming-grading-drawer');
       await grading.getByRole('textbox',{name:'Final score',exact:true}).fill(score);
       await grading.getByRole('textbox',{name:'Correction reason',exact:true}).fill('Staff review from live monitoring.');
+      if(score==='99')await grading.getByRole('radio',{name:'Learning complete',exact:true}).check();
       await grading.getByRole('button',{name:'Update grade',exact:true}).click();
       await expect(student.getByTestId('programming-assessment')).toContainText(score+' / 100');
       await expect(staff.getByTestId('observation-connection')).toContainText('Live');
     }
+    await assertHistoryOutcome(true);
+    await info.attach('navigation-aborts',{body:JSON.stringify(navigationAborts),contentType:'application/json'});
+    expect(browserErrors).toEqual([]);
   }finally{await offlineContext.close();await studentContext.close();await leadContext.close();await teacherContext.close();}
 });

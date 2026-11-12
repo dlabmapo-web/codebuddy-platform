@@ -2,21 +2,18 @@
 import {
   BookOpen,
   FileText,
-  CheckCircle2,
   Code2,
   Turtle,
   ListChecks,
   Video,
   PenLine,
   ArrowUpRight,
-  Clock3,
-  Circle,
-  CircleDashed,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { formatDateTime } from "@cove/i18n/format";
 import { useLocale } from "@/i18n";
 import type { HistoryMaterial } from "@cove/shared";
+import { HistoryStatus } from "./history-status";
 import { historyAction } from "./history-ui";
 export function HistoryMaterialGroups({
   materials,
@@ -101,20 +98,7 @@ export function HistoryMaterialGroups({
                       </span>
                     </td>
                     <td className="p-3 text-xs">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-semibold ${row.status === "completed" ? "bg-success/10 text-success" : row.status === "in_progress" || row.status === "pending" ? "bg-warning/10 text-warning" : "bg-canvas text-sub"}`}
-                      >
-                        {row.status === "completed" ? (
-                          <CheckCircle2 className="size-3.5" />
-                        ) : row.status === "pending" ? (
-                          <Clock3 className="size-3.5" />
-                        ) : row.status === "in_progress" ? (
-                          <CircleDashed className="size-3.5" />
-                        ) : (
-                          <Circle className="size-3" />
-                        )}
-                        {t(`history.statuses.${row.status}`)}
-                      </span>
+                      <HistoryStatus status={row.status} manualReview={row.manualReview} />
                       {row.type === "PDF_DOCUMENT" ? (
                         <span className="mt-1 block text-[11px] text-sub">
                           {t("history.pdf_unrecorded")}

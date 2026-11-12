@@ -243,10 +243,12 @@ export class StudentWorkHistoryService {
       let status: HistoryMaterial["status"] = "unrecorded",
         score: number | null = null,
         maximum: number | null = null;
+      let manualReview: HistoryMaterial["manualReview"];
       const manualCode = manualCoding.find(r => r.materialId === m.id);
       if (m.programmingExercise?.submissionPolicy === 'MANUAL_REVIEW') {
         const assessment = manualCode ? programmingAssessment(manualCode) : null;
         const current = manualCode?.gradingRevision === m.programmingExercise.gradingRevision;
+        if (current && assessment) manualReview = {state:assessment.state, completed:assessment.completed};
         status = !manualCode ? 'not_started' : !current ? 'previous_revision' : !assessment?.reviewVersion ? 'pending' : assessment.completed ? 'completed' : 'in_progress';
         score = current && assessment?.scoreHundredths != null ? assessment.scoreHundredths/100 : null;
         maximum = (assessment?.maximumHundredths ?? m.programmingExercise.manualMaximumHundredths)/100;
@@ -294,6 +296,7 @@ export class StudentWorkHistoryService {
         revision:
           m.programmingExercise?.gradingRevision ?? manual?.revision ?? 0,
         status,
+        ...(manualReview ? {manualReview} : {}),
         submissions: manualCode?.submissions ?? c?.attempts ?? mc?._count._all ?? 0,
         score,
         maximum,

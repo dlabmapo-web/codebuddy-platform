@@ -60,5 +60,12 @@
   "grade_latest": "Review newer submission",
   "view_submitted_code": "View submitted code",
   "tab_code": "Code",
-  "resize_output": "Resize editor and output"
+  "resize_output": "Resize editor and output",
+  "graded_short": "Graded",
+  "needs_work": "Needs more work",
+  "learning_progress": "Learning progress",
+  "completion_help": "Choose whether this problem is complete.",
+  "complete_help": "Counts toward learning progress",
+  "needs_work_help": "Keeps the problem in progress",
+  "publish_help": "The score and learning outcome will be published together."
 }

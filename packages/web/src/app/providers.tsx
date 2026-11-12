@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import { installHorizontalScrollBoundary } from '@/lib/horizontal-scroll-boundary';
 import { assessmentCacheMatches } from '@/lib/assessment-cache';
 import { getQueryClient } from '@/lib/query';
 import { ThemeProvider } from '@/lib/theme/theme-provider';
@@ -23,6 +24,8 @@ export function Providers({
   const fullscreenWorkspace =
     pathname === routes.turtle || /\/learn\/(?:exercises|documents|turtle|quizzes|videos)\//.test(pathname) ||
     /\/teach\/classes\/[^/]+\/students\/[^/]+\/(?:work|submissions|live)(?:\/|$)/.test(pathname);
+  const academyPage = pathname.startsWith('/academy/');
+  useEffect(() => academyPage ? installHorizontalScrollBoundary(document) : undefined, [academyPage]);
   const [queryClient] = useState(() => getQueryClient());
   useEffect(() => {
     const refresh = (event: Event) => {

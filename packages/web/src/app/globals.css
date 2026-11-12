@@ -445,6 +445,13 @@
  * tracking it wants for Korean display text makes Latin body copy hard to read.
  * Body stays near-neutral; only display sizes tighten up.
  */
+/* Keep authenticated pages anchored during horizontal trackpad overscroll.
+ * Actual horizontal tables/editors scroll in their own containers. */
+html[data-cove-scroll-boundary], html[data-cove-scroll-boundary] > body {
+  overscroll-behavior-x: none;
+  overflow-x: clip;
+}
+
 body {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 15px;

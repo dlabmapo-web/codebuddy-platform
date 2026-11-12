@@ -70,7 +70,7 @@ export function ProgrammingGradingDrawer({
         <ClipboardCheck aria-hidden className="size-4" />{t(review?.manualAssessment?.state === 'GRADED' ? 'edit_grade' : 'grade_submission')}
       </SheetTrigger> : null}
       <SheetContent side="right" title={t('grade_submission')} description={t('saved_submission_hint')} portalContainer={container}
-        className="w-[440px] max-w-[100vw] min-w-0 border-l border-border bg-card text-ink"
+        className="z-[100] w-[440px] max-w-[100vw] min-w-0 border-l border-border bg-card text-ink"
         data-testid="programming-grading-drawer" ref={contentRef}
         onCloseAutoFocus={event => {
           // Keep focus on a control the user chose while the close animation ran.
@@ -79,21 +79,26 @@ export function ProgrammingGradingDrawer({
         }}
         onInteractOutside={event => event.preventDefault()}
         onEscapeKeyDown={event => { event.preventDefault(); event.stopPropagation(); prepareLeave(); }}>
-        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-4">
-          <div className="min-w-0">
-            <h2 className="text-lg font-bold">{t('grade_submission')}</h2>
-            <p className="mt-1 truncate text-sm font-semibold" title={snapshot?.studentName}>{snapshot?.studentName}</p>
-            <p className="mt-0.5 truncate text-xs text-sub" title={snapshot?.problemTitle}>{snapshot?.problemTitle}</p>
-            {snapshot?.createdAt ? <p className="mt-1 text-xs text-sub">{formatDateTime(snapshot.createdAt, locale, true)}</p> : null}
+        <header className="shrink-0 border-b border-border bg-card px-5 pb-4 pt-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 text-base font-bold"><ClipboardCheck aria-hidden className="size-4 text-brand" />{t('grade_submission')}</h2>
+            <button type="button" aria-label={t('close_grading')} onClick={prepareLeave} className="grid size-9 shrink-0 place-items-center rounded-lg text-sub hover:bg-canvas focus-visible:outline-2 focus-visible:outline-brand"><X aria-hidden className="size-4" /></button>
           </div>
-          <button type="button" aria-label={t('close_grading')} onClick={prepareLeave} className="rounded-lg p-2 text-sub hover:bg-canvas focus-visible:outline-2 focus-visible:outline-brand"><X aria-hidden className="size-4" /></button>
+          <div className="mt-3 flex min-w-0 items-start gap-3">
+            <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-soft text-sm font-bold text-brand">{[...(snapshot?.studentName ?? '')][0]}</span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold" title={snapshot?.studentName}>{snapshot?.studentName}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-sub" title={snapshot?.problemTitle}>{snapshot?.problemTitle}</p>
+              {snapshot?.createdAt ? <p className="mt-1 text-[11px] text-sub">{formatDateTime(snapshot.createdAt, locale, true)}</p> : null}
+            </div>
+          </div>
         </header>
         {newer ? <div role="status" className="shrink-0 border-b border-border bg-brand-soft px-5 py-3 text-xs leading-5">
           <p>{t('newer_submission')}</p>
           <button type="button" onClick={() => { if (prepareLeave()) openLatest(); }} className="mt-1 font-semibold text-brand underline">{t('grade_latest')}</button>
         </div> : null}
         {snapshot?.manualAssessment ? <>
-          <details className="shrink-0 border-b border-border px-5 py-3">
+          <details className="shrink-0 border-b border-border bg-canvas/60 px-5 py-2.5">
             <summary className="cursor-pointer text-xs font-semibold text-brand">{t('view_submitted_code')}</summary>
             <p className="mt-2 text-xs leading-5 text-sub">{t('saved_submission_hint')}</p>
             <pre className="mt-2 max-h-[30vh] overflow-auto rounded-lg bg-editor-bg p-3 font-mono text-xs leading-5 text-white/85" data-testid="grading-submitted-code">{snapshot.code}</pre>

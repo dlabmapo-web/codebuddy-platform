@@ -36,6 +36,7 @@ import {
   HistoryError,
   HistoryPager,
 } from "./history-ui";
+import { HistoryStatus } from "./history-status";
 import { HistoryMaterialGroups } from "./history-materials";
 import { HistoryStudentOverview } from "./history-overview";
 import dynamic from "next/dynamic";
@@ -741,7 +742,7 @@ function HistoryContent(props: Props) {
                                 ? t("history.statuses.pending")
                                 : `${a.score} / ${a.maximum}`}{" "}
                               ·{" "}
-                              {a.completed === null
+                              {a.status === 'GRADED' && a.currentRevision ? <HistoryStatus status={a.completed ? 'completed' : 'in_progress'} manualReview={{state:'GRADED',completed:a.completed}} /> : a.completed === null
                                 ? t("history.statuses.pending")
                                 : t(
                                     a.completed

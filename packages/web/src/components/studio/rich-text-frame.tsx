@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { enhanceCodeExamples, codeExampleFrameStyles, type CodeExampleLabels } from '@/components/explanation/code-example-frame';
 
+import { installHorizontalScrollBoundary } from '@/lib/horizontal-scroll-boundary';
 import { iframePointerMoveEvent } from '@/lib/monitoring/awareness/iframe-pointer-capture';
 import { useTheme } from '@/lib/theme/theme-provider';
 
@@ -88,12 +89,15 @@ export function RichTextFrame({
           }),
         );
       };
+      const detachScrollBoundary = document.documentElement.hasAttribute('data-cove-scroll-boundary')
+        ? installHorizontalScrollBoundary(innerDocument) : () => {};
       innerWindow.addEventListener('pointermove', forward, true);
       // WebKit's sandboxed srcDoc path reports Mouse Events consistently even
       // when Pointer Events are absent. The outer throttle coalesces browsers
       // that report both.
       innerWindow.addEventListener('mousemove', forward, true);
       detachPointerBridge = () => {
+        detachScrollBoundary();
         innerWindow.removeEventListener('pointermove', forward, true);
         innerWindow.removeEventListener('mousemove', forward, true);
       };

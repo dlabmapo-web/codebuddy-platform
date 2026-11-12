@@ -61,6 +61,8 @@ export const historyMaterialSchema = z.object({
   includedInScore: z.boolean(),
   revision: count,
   status: historyFilterSchema.shape.status.unwrap(),
+  /** Assessment and learning completion are independent; no code/feedback in lists. */
+  manualReview: z.object({state:z.enum(['AWAITING_REVIEW','GRADED']),completed:z.boolean().nullable()}).optional(),
   submissions: count,
   score: z.number().nullable(),
   maximum: z.number().nullable(),

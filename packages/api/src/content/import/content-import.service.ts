@@ -29,6 +29,7 @@ import {
   defaultExerciseTimeLimitMs,
   defaultEliceGradingProfile,
   isCompiledLanguage,
+  semanticVersionForMode,
   type ExerciseLanguage,
 } from "@cove/shared";
 
@@ -977,6 +978,10 @@ export class ContentImportService {
               ...(compiled
                 ? {
                     ...exerciseProfileColumns(defaultEliceGradingProfile),
+                    gradingSemanticVersion: semanticVersionForMode(
+                      defaultEliceGradingProfile.mode,
+                      defaultEliceGradingProfile.inputPromptPolicy,
+                    ),
                     ...(planned.starterCode.trim() ? {} : { starterCode: compiledStarterTemplates[input.language as "C" | "CPP"] }),
                   }
                 : {}),

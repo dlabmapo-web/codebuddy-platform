@@ -4,6 +4,7 @@ import type { AuditService } from "../../academies/audit.service.js";
 import type { SupabaseIdentity } from "../../auth/auth.types.js";
 import type { AcademyAccessService } from "../../authorization/academy-access.service.js";
 import type { PrismaService } from "../../database/prisma.service.js";
+import { resolveGradingProfile } from "../../judge/grading-profile.js";
 import { ContentImportService } from "./content-import.service.js";
 
 const identity: SupabaseIdentity = {
@@ -146,7 +147,7 @@ describe("ContentImportService problems in a course's language", () => {
     testCases: [{ position: 1, input: "1 2\n", expectedOutput: "3", visibility: "SAMPLE" }],
     hints: [], solutions: [],
   };
-  async function importInto(language: "PYTHON" | "CPP") {
+  async function importInto(language: "PYTHON" | "C" | "CPP") {
     const create = vi.fn().mockResolvedValue({ id: "60000000-0000-4000-8000-000000000001" });
     const tx = {
       material: { create, aggregate: vi.fn().mockResolvedValue({ _max: { position: null } }) },
@@ -168,6 +169,19 @@ describe("ContentImportService problems in a course's language", () => {
       inputPromptPolicy: "INCLUDE",
       starterCode: expect.stringContaining("#include <iostream>"),
     });
+  });
+
+  it.each(["C", "CPP"] as const)("creates an immediately gradable %s exercise after database defaults apply", async (language) => {
+    const exercise = await importInto(language);
+    // Prisma supplies legacy-v1 when the writer omits the semantic version.
+    // Admission must accept the persisted definition without a manual edit.
+    const persisted = { gradingSemanticVersion: "legacy-v1", ...exercise };
+    const cases = exercise.testCases.create.map((testCase: object) => ({
+      comparator: "STDOUT" as const, weight: 1,
+      timeLimitMsOverride: null, softTimeLimitMs: null, softPenalty: null,
+      ...testCase,
+    }));
+    expect(resolveGradingProfile(persisted, cases)).toMatchObject({ kind: "elice", inputPromptPolicy: "INCLUDE" });
   });
 
   it("leaves a Python course's new problem as the import always made it", async () => {

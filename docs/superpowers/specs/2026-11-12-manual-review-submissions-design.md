@@ -1,23 +1,29 @@
-# Programming submissions with a manual-review message
+# Manual programming grading and inherited teaching access
 
 Date: 2026-11-12 (Asia/Seoul)
-Status: proposed implementation specification; no application changes implemented.
+Status: proposed implementation specification; application changes not implemented.
 Feature branch: `feat/manual-review-submissions`
 Base: `feat/cove-studio-v2` at `0b7f810d`.
 
-## 1. Requested outcome and release boundary
+## 1. Outcome and scope
 
-An exercise author can choose a mode in which students still have Run and Submit,
-but submitting saves their code and displays a message directing them to their
-teacher instead of assigning an automatic score. This is distinct from 자유 연습,
-which has no submission. The user explicitly selected **Save code + show message
-first** on 2026-11-12 and then requested a new branch from v2 and this specification.
+Authors can create a runnable programming exercise that accepts code submissions
+and directs students to their teacher instead of assigning an automatic score.
+Authorized teaching staff inspect the submitted code, publish a score and optional
+feedback, mark the work complete, and correct a published assessment. Students
+see the teacher's result in their workspace and submission history.
 
-This release includes immutable submissions, student history, assigned-teacher
-access to saved code, staff self-test parity, and the exact Korean message below.
-Teacher score entry, teacher feedback authoring, review completion, review queues,
-notifications, custom message authoring, arbitrary grader scripts, and automatic
-fallback from failed grading to manual review are outside this release.
+Managers can perform Team Lead and Teacher work. Team Leads can perform Teacher
+work. Teachers assess work within their assigned classes. Authorization uses
+actual current memberships and class scope; changing the selected sidebar role
+is not required to use inherited teaching capabilities.
+
+This specification includes submission persistence, grading/correction,
+student-visible feedback, score inclusion settings, history, realtime refresh,
+and staff self-test isolation. Automatic score overrides, bulk grading, rubric
+builders, external notifications, custom messages, arbitrary grader scripts, and
+automatic fallback to manual grading are outside scope. Existing automatic
+graders and other manual material types retain their behavior.
 
 ## 2. Elice evidence and intended parity
 
@@ -26,421 +32,514 @@ Inspected through the authenticated Elice UI during this conversation on
 
 - [Course library](https://dlab.elice.io/my-courses/library/teach?tab=all).
 - [CH06 Mission, material 17/18](https://dlab.elice.io/courses/765886/lectures/6637920/lecturepages/54488115).
-- [The Mission editor](https://dlab.elice.io/courses/765886/lectures/6637920/lecturepages/54488115/edit).
+- [Mission editor](https://dlab.elice.io/courses/765886/lectures/6637920/lecturepages/54488115/edit).
 
-The Mission is the rock-paper-scissors while-loop exercise in the supplied
-screenshot. Its learning workspace exposes Run, Submit, last submission score,
-and last submission time. Basic Info has **Don't include in score** checked.
-Grader Code has grading enabled and one STDIO contains-text case worth 100 points.
-Under Grading Messages, **Begin grading** contains:
+The rock-paper-scissors Mission exposes Run, Submit, last submission score, and
+last submission time. Basic Info has **Don't include in score** checked. Grader
+Code enables a 100-point STDIO contains-text case. Its **Begin grading** message
+contains the sentence shown in the user's screenshot:
 
 ```text
 해당 문제는 채점이 불가하므로 담당 선생님에게 수동으로 채점을 받으세요.
 ```
 
-The supplied screenshot shows this sentence in the terminal/output area. The
-inspected configuration establishes a custom message alongside a configured
-automatic grader; it does not establish a built-in Elice mode that suppresses all
-automatic scores. No Run or Submit was performed during this inspection, and no
-course configuration was saved.
+This establishes a custom message alongside an automatic grader, not a built-in
+score-free Elice mode. No Run or Submit was performed and no Elice configuration
+was saved during inspection.
 
-Elice also documents a separate [manual score adjustment workflow through
-Tutoring](https://help.elice.io/help/en/docs/elicelxp/for-admin/material/exercise/grading/manual),
-which requires an existing student submission. That workflow is reference
-context, not part of this release.
+Elice's [manual grading documentation](https://help.elice.io/help/en/docs/elicelxp/for-admin/material/exercise/grading/manual)
+describes selecting a student through Tutoring, inspecting code, opening score
+adjustment, entering an addition/subtraction, and applying it. At least one
+student submission must exist before assigning a manual score.
 
-Cove matches the requested learner experience: an ordinary runnable programming
-exercise, an available Submit action, a saved code snapshot, and the same message
-in the output pane. Cove explicitly models this as unscored submission rather
-than introducing a dummy automatic test. Retain Cove's components, themes, and
-access rules. The screenshot's numeric zero is not reproduced as a grade.
+Cove implements the full human-assessment workflow for MANUAL_REVIEW exercises:
+Submit -> notice -> staff inspection -> score -> Apply -> student-visible result.
+Final-score entry is the primary control, with an adjustment option after the
+first assessment. Pending work has no grade; a published zero is a real grade.
+Attempt selection, completion, audit, role and score-inclusion rules below are
+explicit Cove decisions, not claims about unverified Elice behavior. Retain
+Cove's components and themes.
 
-## 3. Approach and alternatives
+Extend the existing programming submission path. A custom message on automatic
+grading would still generate grader scores; using a written-response material
+would lose the programming workspace. Neither meets this scope.
 
-Extend the existing programming exercise `submissionPolicy` with `MANUAL_REVIEW`.
-Keep `PRACTICE_ONLY` and `AUTOMATIC` behavior intact. Keep this policy independent
-of `grading.mode`, which chooses LEGACY_STDIO or ELICE_STDIO engine semantics.
+## 3. Role inheritance and class scope
 
-Two alternatives were considered:
+Follow the implemented [Team Lead and Manager teaching policy](2026-10-22-team-lead-academy-teaching-access-design.md)
+and [Manager teaching policy](2026-10-22-manager-academy-teaching-access-design.md).
+These supersede older grading documents requiring an extra Teacher role or
+assignment for Managers/Team Leads.
 
-1. Add a message to automatic grading, as in the inspected Elice configuration.
-   This still admits grading jobs and can produce scores, contrary to the feedback.
-2. Use a written-response/manual material. This would move the activity out of
-   the existing programming editor and execution workflow.
+| Capability | Teacher | Team Lead | Manager |
+| --- | --- | --- | --- |
+| Configure exercise mode, maximum and inclusion | Existing curriculum review only; no new authoring right | Existing author/publish authority | Same author/publish authority |
+| Inspect submitted student code | Assigned homeroom/assistant classes | All active own-academy classes | All active own-academy classes |
+| Publish/correct score, feedback and completion | Same assigned classes | Same academy-wide teaching scope | Same academy-wide teaching scope |
+| Personal practice/authorized preview | Existing practice/review rights | Existing practice/review rights | Existing practice/review rights |
+| Manager-only settings/credentials | No | No | Existing Manager permissions |
 
-The policy extension reuses programming authoring, submission ownership, history,
-and teacher code inspection without either limitation.
+Managers and Team Leads need no additional TEACHER grant, class assignment,
+view-role switch, Manager approval, or special grading role. Stored roles and
+actual staffing records do not change. Team Lead teaching access does not grant
+Manager-only administration. Effective multi-role membership uses its real role
+union. Teacher-only users need a homeroom or assistant assignment.
 
-## 4. Author and learner behavior
+Use `submissions.assigned.review`, `rolesHavePermission`, `roleCanTeachAcademy`,
+`requireAssignedTeacherActor`, and `assignedClassWhere` with existing
+`academy-staff` scope. Reuse the academy-access reader and resolved actor. Avoid
+rank comparisons and duplicated role allowlists. Return server-authorized
+`canReview`/`canPublishReview` capabilities for all shared routes/components.
 
-### 4.1 Authoring
+Every read/write checks active user, membership, academy/class, student enrollment,
+and the visible course/material assigned to the class. Derive the class from the
+stored submission; client context cannot redirect a review. Managers/Team Leads
+can grade an active own-academy class without an assigned teacher. All roles are
+denied foreign-academy and archived-class writes. Losing both academy-wide roles
+falls back to assigned Teacher scope only if Teacher is still held. Recheck
+revocation when publishing/correcting, not only when opening the panel.
 
-Show three choices in the existing grading-policy section on academy, console,
-and library authoring surfaces that share the exercise editor:
+Platform/support inspection and assumed roles gain no grading writes. A real
+same-academy teaching membership must independently authorize publication.
+Existing inspection reads remain subject to their own access rules.
 
-| Policy | Korean label | Meaning |
+## 4. Authoring and assessment settings
+
+Extend `submissionPolicy` independently of `grading.mode`:
+
+| Policy | Korean label | Behavior |
 | --- | --- | --- |
-| `PRACTICE_ONLY` | 자유 연습 | Run code without submitting or receiving a score. |
-| `AUTOMATIC` | 자동 채점 | Submit code for configured test-case grading. |
-| `MANUAL_REVIEW` | 수동 채점 안내 | Save submitted code and direct the student to their teacher. |
+| `PRACTICE_ONLY` | 자유 연습 | Run; no submission or grade. |
+| `AUTOMATIC` | 자동 채점 | Existing configured test-case grading. |
+| `MANUAL_REVIEW` | 수동 채점 | Submit code for teacher assessment. |
 
-Manual-mode help: `코드를 제출하면 저장되며, 자동 점수 대신 담당 선생님에게 수동 채점을 받으라는 안내가 표시됩니다.`
+Help: `코드를 제출하면 담당 선생님이 확인한 후 점수와 피드백을 등록합니다.`
 
-Support ordinary Python, C, C++, and existing PDF-backed programming exercises
-where currently valid. Do not add new PDF/language combinations. Legacy coding
-quizzes remain automatic; reject a manual policy for a quiz on both client and
-server. Other material types keep their existing policies.
+Use the shared academy/console/library exercise editor. Support ordinary Python,
+C/C++, and already valid PDF-backed exercises without new PDF/language
+combinations. Legacy coding quizzes remain Automatic, enforced client/server.
+Other material types keep existing settings.
 
-Manual mode requires no test cases, solution, or executable grading configuration.
-Hide automatic test and grading controls while retaining their saved/draft data.
-The normal body, code-size, language, PDF access, and safe-content validations
-still apply. Switching back to Automatic restores controls and requires its
-existing configuration validation. Do not silently create or remove test cases.
+Expose a dedicated `manualAssessment` configuration with persisted exercise fields:
 
-Save the policy explicitly. A policy change is audited, increments the existing
-grading configuration revision, and invalidates affected authoring/bootstrap and
-outline caches. Explain that it applies to future submissions; historical
-submissions retain their recorded policy and results.
+- `maximumHundredths`: positive integer hundredths, default 10000 (100 points),
+  maximum 1000000, matching current manual-material bounds.
+- `includeInScore`: default false, labeled `성적에 포함`. When false show
+  `성적 제외`; explain that an individual teacher score remains visible.
+- Completion is explicitly selected by the reviewer, independently of full marks.
 
-### 4.2 Workspace and result
+Keep these separate from automatic grader maximum/scoring settings. Practice and
+Automatic retain but ignore manual settings. Omitted new settings use these
+defaults; omitted update settings preserve stored values.
 
-| Mode | Run | Test run | Submit | Result |
-| --- | --- | --- | --- | --- |
-| Practice | Existing runtime rules | Hidden | Hidden | Existing execution output |
-| Automatic | Existing runtime rules | Existing sample-case rules | Existing grading rules | Existing scored result |
-| Manual review | Existing runtime rules | Hidden | Available under participation rules | Saved receipt and manual-review message |
+Manual review requires no tests, solution, or executable grading profile. Hide
+automatic controls but retain saved/draft tests and configuration. Keep ordinary
+code/body/file/language validation. Returning to Automatic restores its controls
+and validation; changing modes never invents or discards tests.
 
-Manual Submit depends on code availability, valid participation, and an active
-save/submit operation, not on interpreter warm-up or native judge availability.
-Retain existing mutual exclusion while a run, sample test, or submission is active.
-A failing Run does not prevent the student from submitting their code for human
-inspection. Run continues to show its own normal output/errors.
+Policy, maximum and inclusion changes are audited, increment the existing
+assessment/grading revision, and invalidate affected authoring/bootstrap/outline
+caches. They apply to new attempts; existing submissions retain frozen settings.
+Do not silently regrade or rescale old work.
 
-Submit opens the existing result area in the output pane. After the server commits
-the code, show a neutral receipt headed `제출이 완료되었습니다.` and the exact
-sentence from section 2. Do not display a success receipt after only saving a draft
-or after a rejected/failed request. Show no pass/fail icon, numeric score, maximum,
-case progress, runtime metric, or compilation verdict for this receipt.
+## 5. Student and staff workflows
 
-The toolbar's latest-submission value is `수동 확인 필요` and its server timestamp.
-Before the first submission, retain `—`. Reopening an older attempt changes the
-result pane but never replaces the latest-submission strip with that old attempt.
-Reload and exercise navigation restore the receipt and exact saved code through
-the existing server bootstrap/history mechanism.
+### 5.1 Student submission and results
 
-The message belongs in the result/output pane, not a modal or toast that
-disappears. Live teacher observation must render the same saved result through
-the existing authorized result channel. Do not fabricate terminal execution
-start/finish messages or run student code merely to print the notice.
+| Mode | Run | Test run | Submit |
+| --- | --- | --- | --- |
+| Practice | Existing runtime rules | Hidden | Hidden |
+| Automatic | Existing runtime rules | Existing sample-case rules | Existing grader rules |
+| Manual review | Existing runtime rules | Hidden | Current student participation rules |
 
-Provide English translations, including: `This problem cannot be automatically
-graded. Please ask your assigned teacher to grade it manually.` Use the existing
-locale-aware timestamp formatter. Verify keyboard navigation across all three
-policy choices, screen-reader status announcements, mobile wrapping, and both
-themes. Staff receipts say their private practice was saved and is not
-automatically graded; they must not imply a student teacher-review task exists.
+Manual Submit depends on code and authorized participation, not interpreter
+warm-up or native judge health. Preserve mutual exclusion during active
+execution/save/submit. A failed Run does not prohibit submitting code for human
+review. Run retains its own output/errors.
 
-## 5. Data and public contracts
+After commit, open the existing result/output pane with
+`제출이 완료되었습니다.` and the exact Korean notice in section 2. Until review,
+show `수동 채점 대기`, submission time, and no numeric score, pass/fail verdict,
+case progress, runtime metric, or compilation verdict. A draft save or failed
+request must never show a submitted receipt.
 
-### 5.1 Persistent receipt
+After publication show `수동 채점 완료`, exact score/maximum, optional feedback,
+completion, reviewer display name and review time. Submission time remains
+separate. Published zero displays `0 / maximum`, never pending. Keep the original
+notice as context; the published assessment is the primary result.
 
-Use the existing student `Submission` and private `StaffPracticeAttempt` stores.
-Add `RECORDED` to `SubmissionStatus`. It is terminal for submission processing;
-it is neither a judge verdict nor an indication that teacher grading is complete.
+The latest strip describes the newest accepted submission, pending or graded.
+Never pair an older score with a newer timestamp. Selecting an older attempt
+changes only the selected result pane. Reload restores both selected and latest
+results. A newer unreviewed submission displays pending even when older work has
+a grade.
 
-Student receipt invariants:
+### 5.2 Staff grading and correction
 
-- `submissionPolicy = MANUAL_REVIEW`, `status = RECORDED`.
-- Exact code, language, owner, academy/course context, class, material/source ID,
-  grading revision, frozen hierarchy labels/positions, and server creation time.
-- Retain the existing server-validated solve-session timing when supplied.
-- `score = null`; `passedCount = 0`, `totalCount = 0`, and no case/result rows.
-- No awarded weights, applied score, material maximum, runtime, failure reason,
-  compile diagnostics, execution runtime snapshot, or execution queue.
-- `gradedAt = null`; an unscored receipt was not graded.
+Use My classes -> student work/history -> submission detail. Add a pending/manual
+filter to existing paginated history, not a separate dashboard. Link the same
+panel from tutoring/live observation when a saved submission exists. Manager and
+Team Lead use these routes without changing roles.
 
-Make `Submission.score` nullable, retaining its existing default and numeric
-behavior for automatic records. Add a database constraint that requires null for
-manual receipts and disallows null for automatic records. Preserve existing
-automatic in-progress defaults; do not rewrite historical scores. Enforce the
-manual policy/status pairing and zero-case receipt shape in the admission path
-and meaningful persistence tests. Automatic workers must never receive a manual
-receipt or reinterpret a null score as zero.
+1. Open a specific immutable attempt. Show student/class, saved code, language,
+   submission time, frozen maximum/inclusion, existing review, and whether this
+   is the latest/current-revision attempt.
+2. Enter final score (0 to frozen maximum, at most two decimal places), optional
+   plain-text feedback (maximum 10000 characters), and `학습 완료`.
+3. Preview score/maximum and click `적용`. No extra approval dialog or Manager
+   approval is needed. Disable duplicate in-flight publishing.
+4. Persist assessment/audit atomically; refresh staff and student projections.
+   Show success only after commit.
 
-Store a small versioned manual receipt marker in the existing JSON snapshot
-facility, including `messageVersion: 1`. Use `engineVersion = manual-record-v1`
-only as a storage-format identifier for this nonexecuted receipt; it must never
-be selected as an execution engine. Do not copy retained hidden tests or an
-automatic grading-policy bundle into a manual receipt.
+First publication requires an explicitly entered score; an untouched field is
+not zero. `학습 완료` defaults false and is explicit. Any published score is a
+reviewed assessment even when completion is false. Opening code does not complete
+review.
 
-For staff practice, preserve the existing automatic v1 snapshot parser unchanged
-as one branch of a policy-discriminated union. Add a manual snapshot branch with
-version 2, frozen language/course/revision context, and message version, without
-grader cases or a runtime descriptor. Store a completed unscored result and
-`RECORDED` status atomically. All staff readers must recognize the new branch
-before parsing automatic-only snapshot fields.
+After publication offer `점수 수정` with final-score input and optional
+`점수 조정`. Adjustment accepts a signed amount with two decimal places, previews
+old -> new score, and enforces the same bounds. First publication has no delta
+option because no previous grade exists. The server derives the delta from its
+previous review and the requested final score, never a client-reported old score.
+Corrections require a nonempty reason (maximum 1000 characters). Feedback and
+completion corrections use this same audited operation. Authorized staff can
+inspect review versions, actor/time, reason and score/completion changes.
 
-### 5.2 Result, acceptance, history, and latest-summary contracts
+Edits remain local until Apply; no server-side grading-draft workflow is added.
+Conflicts preserve input and show the current saved review for reconciliation.
+If a new attempt arrives while grading, do not retarget the panel or lose input:
+publish to the opened attempt and indicate that the newer one still needs review.
 
-Expose the recorded policy in result/history projections; legacy projections
-that omit it continue to mean Automatic. Extend result and history score fields
-to allow null for manual receipts and discriminate validation by policy/status.
-Automatic score ranges and existing case-disclosure rules remain unchanged.
-Teacher inspection's `accepted`/`completed` fields must be nullable or explicitly
-not applicable for manual receipts; do not map them to a false correctness verdict.
+### 5.3 Private practice and presentation
 
-Allow acceptance with `totalCount: 0` only for a manual receipt. Return its
-terminal receipt in the acceptance response so the new client does not open an
-SSE stream or issue a follow-up fetch merely to display a committed message.
-Automatic acceptance retains its existing fields and SSE behavior. Do not make
-zero cases valid for ordinary automatic code submissions.
+Teacher/Team Lead/Manager self-tests use existing private live/preview stores.
+Show `연습 제출 저장됨` without a numeric grade or a teacher-review task. The
+student-review endpoint cannot grade staff practice. Practice never enters
+student assessment lists, scores, progress or rewards.
 
-If a caller directly requests the existing grading stream for a recorded manual
-receipt, authorize it and finish with its durable terminal state. Do not attach
-worker listeners or start recurring status reads for that receipt.
+Use existing Cove components, themes, locale-aware dates, keyboard controls,
+accessible status announcements, decimal validation, and responsive panels.
+Provide English/Korean messages, errors and empty states. Keep results in the
+output pane; do not execute code or fabricate terminal process messages merely
+to print the notice.
 
-Project the latest summary as `RECORDED`, with `scoreHundredths: null` and
-`maximumHundredths: null`, plus the recorded policy. Widen the maximum field only
-where an unscored receipt needs null; retain existing maxima for scored and
-existing manual-material results. Use the policy to render `수동 확인 필요` for
-students and private-practice wording for staff. Do not use `AWAITING_REVIEW` for
-this first-release receipt: that existing state triggers background polling and
-there is no new teacher grading transition to wait for in this release.
+## 6. Persistence and contracts
 
-Add a `MANUAL_REVIEW` answer-record category/filter mapped to `RECORDED`.
-Include these records in normal paginated history. Preserve the meanings of
-existing automatic-attempt/acceptance summary metrics; label them clearly as
-graded metrics where the mixed table would otherwise be misleading.
+### 6.1 Immutable admission
 
-### 5.3 Retry identity
+Use student `Submission` and private `StaffPracticeAttempt`. Add `RECORDED` to
+SubmissionStatus: terminal for execution, not terminal for human assessment.
+A manual student's immutable attempt contains:
 
-Add an optional UUID `requestId` to the student submit input and a nullable
-student request-key column with a unique `(userId, requestId)` constraint.
-Existing automatic callers may omit it. New clients always send it; manual
-admission requires it and rejects a missing key as a validation error before
-writing. Staff practice continues using its existing request identity.
+- MANUAL_REVIEW policy and RECORDED status.
+- Exact code/language, owner/class/course/material/source IDs, grading revision,
+  frozen hierarchy labels/positions, server creation time and validated solve
+  timing when supplied.
+- Frozen manual maximum, inclusion and message version; no retained hidden tests.
+- Raw `score = null`, zero case counts, no grader/case-result rows, awarded weights,
+  execution runtime/queue, runtime or compiler result; raw `gradedAt = null`.
 
-Reuse a key for retries of the same code/material/class/participation request.
-After rechecking current ownership and curriculum/class access, return the same
-receipt for the same key and payload, even if the exercise policy/revision has
-since changed. A changed payload or context with the same key returns conflict.
-An intentional new submission receives a new key. Handle uniqueness races
-specifically; do not mislabel a request-key collision as `SUBMISSION_IN_FLIGHT`.
-Apply abuse limits to fresh admissions, without charging an idempotent retry as
-another accepted submission. Do not silently retry an uncertain write with a new
-key; keep the key until the request is resolved or the student changes the draft.
+Make raw Submission.score nullable while preserving automatic defaults/behavior.
+Constrain manual raw score to null and automatic score to nonnull. Enforce policy/
+status/zero-case invariants in admission and persistence tests. Human reviews do
+not mutate code, raw score/status or automatic execution fields. Workers never
+receive these attempts.
 
-## 6. Admission, authorization, and runtime boundaries
+Use a versioned manual snapshot in the existing JSON facility, with
+`engineVersion = manual-record-v1` solely as a receipt-format identifier. Staff
+practice keeps the existing automatic v1 parser branch and adds manual v2 with
+frozen context/settings, no cases/runtime, and an atomically stored private
+RECORDED result.
 
-Refactor the existing submit flow around a common authorized admission context:
+### 6.2 Append-only programming reviews
 
-1. Resolve the actor and required participation permission once.
-2. Validate reachability, material type, visibility, ownership context, and class
-   enrollment/assignment. Preserve the existing material lock and transactional
-   policy snapshot protection against concurrent hide, edit, or conversion.
-3. Resolve an idempotent retry as defined above. For a fresh admission, apply
-   rate limiting and the current exercise policy.
-4. Reject Practice-only. For Manual review, validate request identity and code,
-   resolve any supplied solve session, and commit the receipt atomically.
-5. Only Automatic proceeds to active test reads, grading-profile validation,
-   native runtime admission, grading snapshots, and enqueueing.
+Add ProgrammingSubmissionReview related to student Submission. Reuse ManualReview
+semantics without moving code attempts into ManualSubmission or making its
+existing relation polymorphic. Each immutable version stores:
 
-The actual transaction boundaries may keep rate limiting outside a held database
-connection, but must not weaken the atomic authorization/configuration snapshot
-or allow a policy race to write an automatic attempt as a manual receipt. Access
-and class checks must not live only in the automatic branch. A forged manual
-request cannot bypass any of them.
+- ID, submission ID, reviewer user ID, frozen reviewer display name, server time.
+- Monotonic version, exact scoreHundredths, completed, feedback and change reason.
+- Previous score and server-derived delta, both null on first publication.
+- Review request UUID, unique per publishing user.
 
-Decouple the existing Redis-backed submission token limiter from the optional
-judge execution dependency as needed. Manual admission requires working storage,
-authentication, and abuse controls; it requires no healthy judge worker, native
-runtime admission, or BullMQ enqueue. Do not silently fail open when the limiter
-is unavailable. Return an appropriate save/submission-unavailable error while
-preserving code and retry identity, rather than claiming the work was recorded.
+Use unique `(submissionId, version)` and Submission.reviewVersion (initially 0).
+The highest committed version is the attempt's effective assessment. Retain every
+version; correction never destroys an old review or reruns an automatic grader.
+Render feedback safely as text. Derive current human-assessment progress from
+these reviews in the existing read projections; no new progress table or manual
+write to automatic ExerciseProgress is required.
 
-Reuse current owner/material/academy predicates for student receipt reads. Apply
-existing assigned-class/assigned-student checks for teacher inspection. New mode
-support grants no new authoring rights, enrollment bypass, support participation,
-or access to private solutions and hidden test data.
+Publish input: submission ID, academy/class context, expectedVersion, request UUID,
+final score, completion, feedback and correction reason. One transaction checks
+the current real teaching grant and stored class/material/student scope,
+compare-and-swaps reviewVersion, inserts the next review, and writes audit.
+A stale version conflicts
+without partial writes. Recheck revocation in that transaction using existing
+access-change locking conventions, not a stale open-page capability.
 
-Actual staff self-test uses the existing academy/user/material/live-or-preview
-context and revision protection. A staff receipt never enters student history,
-teacher review lists, grades, points, ranking, or student progress. Platform and
-support inspection remain read-only.
+Idempotent retries revalidate access and return the original version for the same
+request/payload before checking expectedVersion again. Reused UUID with changed
+payload/submission conflicts; deliberate corrections use new UUIDs. Audit actor,
+academy/class/student/submission, review version, before/after score/completion
+and reason. Do not duplicate full code/feedback into unnecessary audit payloads.
 
-## 7. History, teacher observation, and progress
+### 6.3 Public result and latest projection
 
-Include receipts in the student's per-exercise history, Answer records, selected
-historical workspace, and latest summary. Add them to assigned-teacher student
-work history and code inspection, which currently filter automatic attempts by
-`PASSED`/`FAILED`. Update list and count predicates together so pagination and
-filters agree. Lists select metadata only; fetch code for the one authorized
-detail workspace.
+Expose recorded policy and a manualAssessment object: state AWAITING_REVIEW or
+GRADED, frozen maximum/inclusion, exact nullable scoreHundredths, completion,
+feedback, reviewer display name, review time and version. Pending score,
+completion, reviewer/time are null and version is 0. Reviewed data comes from the
+effective published version. Pending feedback is an empty string; a published
+review may also have empty optional feedback. Private practice has RECORDED presentation and no
+student review object.
 
-Carry submission policy in the existing teacher exercise scope and projections
-so availability, badges, and graded aggregates use the same policy without
-additional per-exercise reads.
+Raw result.score stays null for manual policy even after review. Read exact human
+points from manualAssessment; update student/teacher contracts and renderers
+together. Never coerce null to zero or round human points into an integer percent.
+Automatic shapes and case disclosure keep existing semantics. Teacher accepted
+is not applicable; completed comes from the published review.
 
-Use a neutral `수동 확인 필요` badge. Teachers can open the immutable submitted
-snapshot and continue using existing live-observation tools; live draft content
-is never substituted for submitted code. Observation's result projections must
-carry the new unscored shape without displaying a score or triggering grading.
-No new score/feedback/review-complete action appears.
+Allow zero cases only on manual acceptance and return its committed receipt/
+pending assessment, seeding the client without judge SSE or a redundant fetch.
+Latest student summary maps the newest submission to AWAITING_REVIEW or GRADED,
+using its frozen maximum and effective exact score. Staff practice maps to
+RECORDED. Order latest by submission creation time/ID, never review time.
 
-For this release, Manual review exercises do not increase the automatic graded
-progress denominator. New receipts may mark participation as started but must not
-mark an exercise SOLVED, grant correctness points, enter score averages/rankings,
-or count as automatic failures. Existing grade, attempt, and solve metrics keep
-their automatic meaning. Do not reuse `ExerciseProgress.attemptCount` for the
-manual receipt count; derive paginated receipt history through bounded queries.
+Add pending/manual-graded answer-record filters using policy and review presence:
+a RECORDED row can have either assessment state. Extend existing status-only filter
+mappings accordingly; lists/counts must agree. Preserve automatic-attempt and
+acceptance-rate meanings; manual grades are never automatic passes/failures.
 
-Switching an exercise's policy does not delete or mutate old attempts/progress.
-Current automatic-progress denominators use the current policy; historical
-attempt displays use each attempt's frozen policy. Returning to Automatic follows
-existing grading-revision applicability rules and does not resurrect stale solved
-status. Already accepted automatic jobs finish against their frozen snapshots.
-Explicit regrading operations exclude manual receipts. Worker recovery, queue
-reconciliation, stale-job repair, and conversion inventory must treat RECORDED as
-nonqueued terminal data and leave it untouched.
+### 6.4 Admission retry identity
 
-## 8. Copying, migration, and deployment compatibility
+Add optional student request UUID and nullable stored request key with unique
+`(userId, requestId)`. New clients send it; manual admission requires it. Existing
+automatic callers may omit it. Staff retains current request identity.
 
-Round-trip MANUAL_REVIEW through create/update, authoring context, exercise
-bootstrap, curriculum/navigator projections, publishing/version snapshots,
-restore, course copy, library import/adoption, and workbook import/export. Remove
-two-value enum assumptions in workbook parsing and planning. Intentionally
-unscored materials must not be reported as invalid automatic exercises missing
-test cases in console/library readiness diagnostics.
+After access checks, identical key/code/material/class returns the same attempt,
+even after policy changes or review. Conflicting payload/context conflicts.
+Handle uniqueness races separately from SUBMISSION_IN_FLIGHT. An intentional new
+submission uses a new key; fresh admissions consume rate limits, idempotent retry
+does not consume them twice. Preserve keys after uncertain writes.
 
-Add migrations for the enum values, nullable student score, receipt constraints,
-and request identity. Existing policy defaults/inference remain unchanged:
-omitted policy on an update preserves the stored value, and old creates/imports
-use existing Practice/Automatic inference. Never infer Manual review from absent
-tests, random input, runtime failure, a title, or the presence of a solution.
-No bulk conversion of production content is part of this release.
+## 7. Admission and read authorization
 
-Because enum values and null scores are new to old readers, make the third choice
-available only once the database migration, compatible API/web, and affected
-worker/recovery readers are deployed. Old browser clients must receive a stable
-refresh-required rejection for unsupported manual submission admission rather
-than a result their old schema cannot parse. Use the required request identity
-and an explicit client receipt-capability version on the new submit request for
-this check; do not interpret request identity alone as proof of client support.
+Resolve actor and participation permission once. Validate material reachability,
+type/visibility and class enrollment/assignment; preserve material locking and
+transactional configuration snapshots against edits. Resolve retries and apply
+abuse limits. Reject Practice. Manual admission validates code/request/solve
+session and commits the frozen assessment. Only Automatic reads active tests,
+validates a grader, selects runtime, snapshots tests and enqueues execution.
 
-Implement migration ordering using the repository's deployment conventions. New
-PostgreSQL enum values must be committed before migrations/statements that use
-them. Release verification must prove the migration works from the v2 base.
-Once real manual receipts exist, rollback must retain readers compatible with
-their enum/null-score shapes; do not delete receipts or rewrite them as failed
-automatic attempts to enable rollback.
+Class/ownership checks cannot remain only in the automatic branch. Rate limiting
+may remain outside a held connection without weakening atomic configuration and
+access checks. Separate the Redis-backed limiter from optional execution
+admission as needed: manual work requires working auth/storage/abuse controls,
+but not judge workers/native admission/BullMQ enqueue. Limiter failure fails
+closed with a submission-unavailable error and preserved code/request identity.
 
-## 9. Read-path and performance requirements
+Student assessment reads require current owner/material/academy/class access.
+Review reads/writes use section 3's actual membership scope and stored class,
+student and material. Apply this to list/count/detail/correction/subscriptions.
+Read code only for authorized detail. Sidebar role or cached canReview never
+authorizes publication.
 
-Follow root AGENTS.md. No query per material, history row, student, test, or image.
-Use `readCurricula`/`withCurriculum` and the academy-access readers; reuse resolved
-actors/classes instead of checking them repeatedly. Start independent reads
-together. Do not add a new deep include chain to the existing submission path;
-manual admission should not load retained cases or full descriptions/solutions.
+An older manual attempt remains reviewable after a mode/revision change while
+its current class/material/course/student are reachable. Show a stale indicator;
+grade frozen settings/history, without altering current-revision assessment.
+Archived class or revoked assignment/course/enrollment prevents new protected
+reads/writes under current access rules.
 
-Read initial policy, latest receipt, selected historical result, and navigator
-data during the existing server render/bootstrap. Preserve React request caching
-and server-read freshness. Manual receipt acceptance seeds the client cache
-directly. It opens no judge SSE connection and starts no interval polling.
-Teacher observation reuses the existing event channel and authorized result read.
+## 8. Effective grade, completion and refresh
 
-Add query-event integration evidence against disposable Docker PostgreSQL through
-`COVE_INTEGRATION_DATABASE_URL`, following
-`packages/api/src/content/navigation-performance.integration.spec.ts`. Count each
-changed complete service read, including authorization/class resolution:
+### 8.1 Attempt selection
 
-- Learner bootstrap and selected receipt; latest receipt.
-- Student history and assigned-teacher history/detail.
-- Staff live and unpublished-preview receipt reads.
-- Curriculum outline/navigator and authoring context when changed.
+Each attempt retains its effective review. Current material assessment uses the
+latest accepted submission for the student/class/current applicable grading
+revision, never highest score or latest review time. A new pending attempt makes
+current assessment pending while preserving older grades. Reviewing old work
+never grades the latest attempt.
 
-Measure the v2 baseline and feature with small and expanded fixtures (1 and 20
-materials/receipts/students as appropriate). Counts must remain constant as row
-counts grow; metadata-only policy propagation must add no statement. Existing
-read paths must not exceed their baseline statement count. For genuinely new
-paths, record their fixed measured count and verify it does not grow. Refactor
-the touched query when needed to meet these budgets. State actual counts and any
-delta in implementation commits and verification evidence; do not invent counts
-in this specification. Never run integration fixtures against shared Supabase.
+Reviewed is distinct from complete: zero is valid, partial credit can be complete,
+and full marks can be incomplete when explicitly selected. Only a published
+review changes completion.
 
-## 10. Implementation boundaries and sequence
+### 8.2 Course inclusion and progress
 
-| Area | Existing implementation to extend |
+Individual teacher scores are visible regardless of includeInScore. False shows
+성적 제외 and omits the material from assessed course totals and graded-progress
+denominators, while preserving its review/history. True includes it in existing
+human/manual assessment summaries using its maximum. Pending is shown as pending,
+not an awarded zero; explicit completion supplies manual assessed-progress state.
+
+Do not count manual grading in automatic best-score, failures, judge attempts or
+acceptance rate. Included human grades may enter existing mixed student assessment
+totals through manual-grade semantics. No new automatic correctness rewards or
+ranking points are granted; a new reward policy is outside scope.
+
+Current revision/settings determine assessment applicability. For a selected
+current-revision attempt use its frozen maximum/inclusion; before such an attempt
+use authored settings. Changing assessment settings advances revision, leaving
+old attempts historical without silently rescaling/counting them under new
+settings. Warn authors of this effect before Save. Reuse manual-grade summaries
+rather than including manual exercises in automatic correctness totals.
+
+### 8.3 Events and recovery
+
+Manual admission finishes execution processing immediately: no judge SSE or
+waiting interval. A directly requested grading stream authorizes then returns
+RECORDED without worker subscriptions or recurring reads.
+
+After review commit, publish an authenticated assessment-change event through
+Cove's existing realtime transport, extended with owner/class/material
+subscriptions. Send identifiers/version; authorized reads supply feedback and
+score. Refresh affected student workspace, teacher observation, history, latest
+and manual-summary caches only. Recheck grants for subscriptions/reads; stale
+sockets do not preserve revoked access.
+
+Add a policy-aware shared latest-hook option: manual AWAITING_REVIEW must not
+inherit its existing 15-second polling. Refresh on grade events, reconnect,
+window focus and explicit Refresh. Next authorized read recovers missed events.
+An event failure does not roll back a committed grade or produce a retryable
+publish error. Existing automatic SSE and other manual-material polling remain.
+
+Automatic in-flight jobs finish their immutable snapshots. Regrading, stale-job
+repair, runtime conversion and worker reconciliation exclude manual RECORDED
+attempts/reviews. Mode switches never rewrite historical grades or private work.
+
+## 9. Migration, round trips and deployment
+
+Round-trip policy/manual settings through create/update/context, bootstrap,
+outline/navigator, publishing/version restore, course copy, library adoption and
+workbook rows/plan/export. Preserve automatic semantics. Intentional manual
+no-test exercises must not trigger missing-automatic-tests readiness diagnostics.
+
+Migrate policy/status enum values, nullable raw score, frozen assessment snapshot,
+request identity, reviewVersion, review table/constraints/indexes, and exercise
+manual settings. Index review version lookup and scoped history. Pending counts
+use bounded joins/anti-joins, not queries per attempt. Do not rewrite old grades,
+roles or staffing records. Omitted updates preserve policy/settings; old creates
+and imports keep Practice/Automatic inference. Never infer Manual from no tests.
+
+Deploy database and compatible API/web/worker readers before enabling this mode
+or admitting attempts/reviews. New submit requests carry explicit manual-
+assessment capability version; unsupported old callers get refresh-required
+errors, not unparseable results. Request identity alone is not capability proof.
+Commit new PostgreSQL enum values before constraints/statements use them.
+
+After real manual records exist, rollback must retain compatible enum/null-score/
+review readers. Never delete reviews or convert receipts to automatic failures
+to enable rollback. This spec authorizes no deployment, bulk production content
+conversion or real student test submission.
+
+## 10. Read performance and evidence
+
+Follow AGENTS.md: no material/student/attempt loop queries. Reuse curriculum and
+academy-access readers, resolved actors/classes and shared assessment projections.
+Join latest reviews or read them in one bounded bulk statement; avoid deep
+relation includes. Lists select metadata; detail selects only required code/
+feedback. Start independent reads together.
+
+Server-render policy/current/latest assessment, selected result and navigator
+inside existing bootstrap. Preserve React request caching/server-read freshness.
+Submission/review responses seed scoped caches. Add no manual waiting poller.
+
+Count complete changed service reads with Prisma query events on disposable
+Docker PostgreSQL through COVE_INTEGRATION_DATABASE_URL, following
+`packages/api/src/content/navigation-performance.integration.spec.ts`. Compare v2
+baseline and feature with 1/20 materials/students/attempts/review versions:
+
+- Learner bootstrap, selected result, latest and history.
+- Teacher pending/graded counts/list, detail and review versions.
+- Team Lead/Manager without extra Teacher grants/assignments.
+- Staff live/preview, authoring, outline and manual summary.
+- Publication/correction authorization and response reads, including retries.
+
+Metadata propagation adds no statement. Existing paths retain baseline statement
+counts by joining reviews into existing reads; genuinely new paths have a fixed
+measured count independent of row/version count. Publish/correct transactions
+have fixed counts; report writes separately from reads. Record actual counts and
+deltas in commits/evidence. Never run fixtures on shared Supabase or report an
+unmeasured count as a result.
+
+## 11. Implementation boundaries and sequence
+
+| Area | Implementation to extend |
 | --- | --- |
-| Policy, result, latest, and history contracts | `packages/shared/src/content/{course,learn,submission,latest-submission,answer-records}.ts`, relevant teacher/monitoring contracts and oRPC definitions |
-| Storage and migration | `packages/api/prisma/schema.prisma`, new ordered Prisma migrations |
-| Student admission/results | `packages/api/src/learn/submission.service.ts`, `latest-submission.ts`, `learn.service.ts`, `answer-records.service.ts` |
-| Staff receipts | `packages/api/src/learn/staff-practice.service.ts`, `staff-practice.repository.ts`, `packages/api/src/judge/practice-snapshot.ts` |
-| Authoring, snapshots, copying and import/export | `packages/api/src/content/course.service.ts`, `content/library/course-tree-copy.ts`, import services, shared workbook rows/plan/template, readiness diagnostics |
-| Outline/progress | `packages/api/src/learn/curriculum-read.ts`, `curriculum-outline.service.ts`, web course-outline helpers |
-| Teacher history and observation | `packages/api/src/teach/teacher-progress.repository.ts`, `teacher-progress.service.ts`, `student-work-history.service.ts`, monitoring projections and teacher result UI |
-| Exercise author UI | Existing exercise `submission-policy-editor.tsx`, `exercise-workspace.tsx`, `exercise-draft.ts`, `use-exercise-authoring.ts` shared across academy/console/library |
-| Learner/staff UI | Existing exercise `workspace.tsx`, `staff-workspace.tsx`, `editor-pane.tsx`, `result-panel.tsx`, submission hooks, scoring helpers, shared summary and history workspaces |
-| Localized copy | Existing English/Korean grading, practice, submission, history and teacher namespaces |
+| Policy/settings/results | Shared course, learn, submission, latest-submission, answer-records and teacher contracts; oRPC definitions |
+| Persistence | Prisma schema/migrations; ProgrammingSubmissionReview relation and request/version constraints |
+| Role scope | Shared auth/roles/monitoring, assigned-class-access, resolved academy/teacher scopes |
+| Admission | Learn submission/staff-practice services and repositories; policy-discriminated practice snapshots |
+| Assessment writes | Focused programming-review service/router; existing manual-review concurrency/audit patterns |
+| History/progress | Teacher progress/access/repository, student-work-history, learn records and curriculum/manual-grade projections |
+| Authoring/distribution | Shared author UI/drafts, course serializers, library/adoption, versions and workbook paths |
+| Grading UI | Existing teacher submission detail/live observation, learner/staff result panels, latest/history components |
+| Refresh/localization | Existing realtime transport and scoped caches; English/Korean assessment/status/error copy |
 
-Implement in these dependency-ordered slices:
+Implement in dependency order:
 
-1. Receipt invariants, policy/status/result contracts, ordered migrations, and
-   compatibility handling for existing automatic readers.
-2. Authorized idempotent student and staff receipt admission; preserve automatic
-   grading admission and rate limits.
-3. Authoring, bootstrap, publishing/copy/import round trips, and readiness rules.
-4. Learner/staff result rendering, latest summaries, saved history, and teacher
-   inspection/observation with no polling or automatic-grade side effects.
-5. Local integration/query-count, regression, and browser acceptance evidence.
+1. Contracts, settings/receipt/review invariants, migrations and role matrix tests.
+2. Idempotent authorized student/staff admission and versioned review publication/
+   correction, audit and revocation checks.
+3. Authoring/distribution round trips, current assessment and score inclusion reads.
+4. Shared staff grading/correction panel, student results/history, live observation
+   and event refresh with private-practice isolation.
+5. Disposable integration/query-count, regressions, browser and release evidence.
 
-Read relevant installed Next.js guides under
-`packages/web/node_modules/next/dist/docs/` before changing web code. This document
-does not authorize production deployment or test submissions to a real course.
+Read installed Next.js guides under
+`packages/web/node_modules/next/dist/docs/` before web code changes. Share role,
+assessment-selection and result helpers across roles; no separate Manager grader.
 
-## 11. Acceptance and verification
+## 12. Acceptance criteria
 
-1. Author a no-test Python manual-review exercise, reload, and confirm the policy
-   survives. Repeat for an existing C/C++ exercise and a valid PDF-backed exercise.
-2. Student Run retains normal execution. Submit saves exact code and displays the
-   exact Korean message in the result/output pane, with timestamp and no score,
-   test progress, pass/fail, or compiler verdict.
-3. Disable/mock judge execution and native admission: manual Submit still succeeds
-   with working auth/storage/limiter. Assert no queue job, grading-case row,
-   execution request, grading SSE stream, or receipt polling interval is created.
-4. Reload, navigate away/back, select historical attempts, and switch language;
-   preserve saved code and newest receipt identity/time. An intentional second
-   submission creates a new immutable row and leaves the first intact.
-5. Exercise double clicks, concurrent retries, commit-success/response-loss,
-   changed-code/key conflicts, and policy-change-after-commit retries. A single
-   request identity creates exactly one receipt and no duplicate side effects.
-6. Save failures, rate limiting, invalid/expired solve sessions, revoked class
-   access, hidden materials, stale previews, and malformed code/requests never
-   display a false saved receipt or destroy the draft.
-7. Assigned teachers can list/open the saved submission. Wrong-class teachers,
-   other students/academies, support inspection, and forged IDs gain no new access.
-   Student and teacher views show null/not-applicable correctness for receipts.
-8. Verify teacher live observation receives the receipt and snapshot identity
-   through the current channel. Verify no saved-draft substitution or hidden test
-   or solution disclosure in either student or teacher list payloads.
-9. Verify eligible Teacher/Team Lead/Manager live and authorized preview self-tests
-   use isolated staff records, neutral practice wording, and existing revision
-   checks. No student review task, grade, progress, or reward is created.
-10. Verify manual items are excluded from automatic graded denominators/averages;
-    receipts affect neither automatic failures nor accepted-rate/solve metrics.
-    History pagination, counts, result filters, and latest summaries agree.
-11. Exercise Automatic -> Manual -> Practice -> Automatic, including retained
-    tests, old historical scores, revision applicability, and an in-flight
-    automatic job. Practice still refuses Submit server-side; invalid Automatic
-    still refuses submission. Regrade/recovery never picks up a manual receipt.
-12. Round-trip through library copy/adoption, workbook export/import, version
-    restore, and publishing. Old clients preserve stored policy on updates;
-    unsupported old manual-submit clients receive a refresh instruction.
-13. Run focused contract/API/UI tests, real PostgreSQL migration/constraint and
-    query-count integration tests, and Chromium/WebKit flows for student and staff
-    receipt persistence, teacher history, mobile, themes, and Korean/English.
-    Run relevant automatic Python/C/C++ grading regression checks once.
+1. Create Manual no-test Python/C/C++/valid PDF exercises. Persist maximum and
+   inclusion; round-trip editor/library/workbook/versions. Reject manual quizzes;
+   preserve Practice and Automatic behavior.
+2. Submit exact code while judge execution is unavailable but auth/storage/
+   limiter work. Verify notice, pending and timestamp, no fake score/cases/job/
+   runtime request/judge SSE or waiting interval.
+3. Assigned Teacher publishes 80/100 with feedback and completion. Student sees
+   exact grade, feedback, completion, reviewer and separate times through event,
+   reload or Refresh. Also publish zero and partial/full marks with either
+   completion state.
+4. Correct 80 -> 90 by final score and +10 adjustment, then feedback/completion
+   with reason. Retain review/audit history. Reject blank first score, invalid
+   bounds/precision, missing correction reasons and forged previous scores.
+5. Concurrent reviewers at the same version: one commits, one conflicts without
+   data loss. Same-request retry after response loss returns that version;
+   changed payload conflicts without partial writes.
+6. New pending submission supersedes current grade, not historical grades.
+   Reviewing old work does not grade/retarget new work. Latest and selected views
+   remain separate across reload/navigation.
+7. Teacher-only grades homeroom/assistant classes but not unrelated ones.
+   Team Lead-only and Manager-only each grade/correct any active own-academy
+   class, including unassigned classes, with no role switch or TEACHER grant.
+8. Test effective role unions in navigation/direct URL/API. Team Lead still cannot
+   use Manager-only settings/credentials. Teacher gets no publish-authoring right.
+9. Revoke role, assignment, enrollment, course assignment, membership or academy
+   activity while panels/sockets are open. Subsequent read/publish/correct is
+   denied. Foreign/archived classes, forged IDs, students and platform/support
+   inspection cannot publish grades.
+10. Staff live/authorized-preview self-test creates isolated RECORDED practice,
+    not student reviews, grades, progress or rewards.
+11. Excluded material shows its individual grade and 성적 제외 without assessed
+    totals/denominators. Included material reflects pending/reviewed zero/partial/
+    full grade and explicit completion in manual summaries, without automatic
+    failure/acceptance-rate/reward changes.
+12. Change mode/maximum/inclusion/revision after admission. Historical review
+    uses frozen settings; it cannot rescale old work or update the new revision.
+    Automatic in-flight jobs/regrades remain isolated from manual receipts.
+13. Check admission races, storage/limiter failures, invalid solve sessions,
+    review conflicts, missed events/reconnect and cache isolation. Preserve input,
+    prevent false success and recover committed results.
+14. Verify fixed SQL counts with small/expanded real PostgreSQL fixtures and
+    migration constraints from the v2 base. Run focused contracts/API/UI and
+    relevant Python/C/C++ automatic grading regressions.
+15. Browser-check student and all staff roles, inherited teaching routes,
+    grading/correction/result persistence in Chromium/WebKit, mobile, keyboard,
+    both themes and Korean/English, with no redundant hydration fetch.
 
-Record implementation commands, actual results, screenshots, and SQL counts in
-`docs/research/2026-11-12-manual-review-submissions-verification.md` when the feature
-is implemented. The verification document must distinguish executed checks from
-unrun checks and must not claim production verification from local evidence.
+When implemented, record commands/results, screenshots, role matrix and SQL
+counts in `docs/research/2026-11-12-manual-review-submissions-verification.md`.
+Distinguish executed/unrun checks and local/production evidence. This document
+does not claim an implemented feature or verified deployment.

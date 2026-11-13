@@ -82,7 +82,8 @@
       },
       "student": {
         "renamed": "Student academy name changed"
-      }
+      },
+      "manager_required": "Academy needs an active manager"
     },
     "class": {
       "assistants": {
@@ -241,6 +242,29 @@
       "review": {
         "published": "Teacher review published"
       }
+    },
+    "academy_roles": {
+      "reconciled": "OS academy roles synchronized"
+    },
+    "campus": {
+      "projected": "OS campus details synchronized"
+    },
+    "directory": {
+      "catchup": {
+        "completed": "Directory catch-up item completed"
+      }
+    },
+    "dlab": {
+      "directory": {
+        "catchup": "DLAB directory catch-up recorded"
+      }
+    },
+    "platform_role": {
+      "reconciled": "OS platform role synchronized"
+    },
+    "user": {
+      "provision_failed": "OS account synchronization failed",
+      "provisioned": "OS account synchronized"
     }
   }
 }

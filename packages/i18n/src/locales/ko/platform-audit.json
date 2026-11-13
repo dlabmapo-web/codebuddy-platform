@@ -82,7 +82,8 @@
       },
       "student": {
         "renamed": "학생 학원 이름 변경"
-      }
+      },
+      "manager_required": "아카데미에 활성 관리자가 필요함"
     },
     "class": {
       "assistants": {
@@ -241,6 +242,29 @@
       "review": {
         "published": "교사 평가 게시"
       }
+    },
+    "academy_roles": {
+      "reconciled": "OS 아카데미 역할 동기화"
+    },
+    "campus": {
+      "projected": "OS 캠퍼스 정보 동기화"
+    },
+    "directory": {
+      "catchup": {
+        "completed": "사용자·캠퍼스 기존 정보 반영 완료"
+      }
+    },
+    "dlab": {
+      "directory": {
+        "catchup": "디랩 사용자·캠퍼스 기존 정보 반영 기록"
+      }
+    },
+    "platform_role": {
+      "reconciled": "OS 플랫폼 역할 동기화"
+    },
+    "user": {
+      "provision_failed": "OS 계정 동기화 실패",
+      "provisioned": "OS 계정 동기화 완료"
     }
   }
 }

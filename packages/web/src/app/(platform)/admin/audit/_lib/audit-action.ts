@@ -142,6 +142,14 @@ export const auditActionLabels: Record<
   string,
   TranslationKey<'platform-audit'>
 > = {
+  'academy.manager_required': 'action.academy.manager_required',
+  'academy_roles.reconciled': 'action.academy_roles.reconciled',
+  'campus.projected': 'action.campus.projected',
+  'directory.catchup.completed': 'action.directory.catchup.completed',
+  'dlab.directory.catchup': 'action.dlab.directory.catchup',
+  'platform_role.reconciled': 'action.platform_role.reconciled',
+  'user.provision_failed': 'action.user.provision_failed',
+  'user.provisioned': 'action.user.provisioned',
   'academy.feature.updated': 'action.academy.feature.updated',
   'academy.invitation.accepted': 'action.academy.invitation.accepted',
   'academy.invitation.created': 'action.academy.invitation.created',

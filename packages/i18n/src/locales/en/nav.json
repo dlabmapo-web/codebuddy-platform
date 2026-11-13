@@ -14,7 +14,7 @@
   "link": {
     "overview": "Overview",
     "courses": "Courses",
-    "classes": "Classes",
+    "classes": "Class Management",
     "members": "Members",
     "students": "Students",
     "staff": "Teachers",
@@ -22,6 +22,7 @@
     "invitations": "Invitations",
     "my_courses": "My courses",
     "my_classes": "My classes",
+    "enter_my_classes": "Enter My Classes",
     "answer_records": "Answer records",
     "my_points": "My points",
     "solution_status": "Solution status",

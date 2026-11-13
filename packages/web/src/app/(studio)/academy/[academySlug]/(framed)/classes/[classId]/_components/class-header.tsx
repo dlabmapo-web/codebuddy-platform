@@ -16,8 +16,10 @@ import type { ClassDetailManagerState } from '../_hooks/use-class-detail-manager
 
 export function ClassHeader({
   manager,
+  teachingHref,
 }: {
   manager: ClassDetailManagerState;
+  teachingHref?: string;
 }) {
   const contentPaths = useContentBasePath();
   // See `builder-header.tsx`: under the console the shell's own back link is
@@ -32,10 +34,10 @@ export function ClassHeader({
       {shellOwnsBack ? null : (
         <Link
           className="inline-flex items-center gap-1.5 text-[13.5px] font-bold text-sub transition-colors hover:text-brand"
-          href={contentPaths.classes()}
+          href={teachingHref ?? contentPaths.classes()}
         >
           <ArrowLeft className="size-3.5" />
-          {t('detail.back')}
+          {t(teachingHref ? 'detail.return_to_class' : 'detail.back')}
         </Link>
       )}
 

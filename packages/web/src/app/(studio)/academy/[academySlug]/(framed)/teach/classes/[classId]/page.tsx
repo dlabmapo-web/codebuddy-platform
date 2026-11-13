@@ -6,9 +6,11 @@ import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { createServerORPCClient } from '@/lib/orpc-server';
 
 import { BackLink } from '@/components/studio/back-link';
-import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
+import { canManageClasses } from '@/lib/academy-access-state';
+import { routes } from '@/lib/routes';
 import { backTo } from '@/lib/back-to';
 import { LiveRoster } from './_components/live-roster';
+import { ClassManagementLink } from './_components/class-management-link';
 
 /**
  * One assigned class, live.
@@ -23,9 +25,9 @@ export default async function LiveClassPage({
   params: Promise<{ academySlug: string; classId: string }>;
 }) {
   const { academySlug, classId } = await params;
-  const { academyId } = await requireAcademyRoute(academySlug);
+  const { academyId, roles } = await requireAcademyRoute(academySlug);
   // The back link names its destination with the sidebar's own word for it.
-  const { t: tNav } = await getServerTranslation(['nav']);
+  const { t: tNav } = await getServerTranslation(['nav', 'monitoring']);
   let roster: MonitoringClassRoster | null = null;
   try {
     roster = await createServerORPCClient().monitoring.getClassRoster({
@@ -38,17 +40,22 @@ export default async function LiveClassPage({
   if (!roster) notFound();
 
   return (
-    <StudioPage
+    <LiveRoster
+      academyId={academyId}
+      initialRoster={roster}
+      serverReadToken={crypto.randomUUID()}
+      actions={canManageClasses(roles) ? (
+        <ClassManagementLink
+          href={`${routes.academyClass(academySlug, classId)}?from=teaching`}
+          label={tNav('monitoring:roster.edit_class')}
+        />
+      ) : null}
       back={
         <BackLink
           href={backTo.academyTeachClass(academySlug)}
-          label={tNav('link.solution_status')}
+          label={tNav('link.enter_my_classes')}
         />
       }
-      bleed
-      title={roster.class.name}
-    >
-      <LiveRoster academyId={academyId} initialRoster={roster} />
-    </StudioPage>
+    />
   );
 }

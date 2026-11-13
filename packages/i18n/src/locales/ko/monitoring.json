@@ -1,6 +1,6 @@
 {
   "classes": {
-    "title": "내 반",
+    "title": "내 반 들어가기",
     "description": "담당하고 있는 반입니다.",
     "empty_title": "담당 반이 없습니다",
     "empty_body": "반에 배정되면 여기에 표시됩니다.",
@@ -17,8 +17,12 @@
     "open": "실시간 반 열기"
   },
   "roster": {
-    "back": "내 반",
-    "courses_label": "과목",
+    "back": "내 반 들어가기",
+    "edit_class": "반 정보 수정",
+    "courses_label": "코스",
+    "view_course": "코스 보기",
+    "course_hidden": "학생에게 숨김",
+    "no_courses": "아직 이 반에 지정된 코스가 없습니다.",
     "summary_total": "등록",
     "summary_online": "접속",
     "summary_solving": "풀이 중",

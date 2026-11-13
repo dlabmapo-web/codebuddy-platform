@@ -313,10 +313,8 @@ export function canManageEnrollment(roles: readonly AcademyRole[]): boolean {
 /**
  * Who may say when a class meets.
  *
- * `MANAGER` alone. §5.1 and §8.1 of the student points design: the schedule
- * decides who is paid for turning up, which makes it a setting rather than a
- * piece of curriculum — a team lead who runs the content has no reason to move
- * a class's hours.
+ * Managers and Team Leads configure the timetable. An assigned Teacher
+ * may deliver the class without changing its schedule or attendance windows.
  */
 export function canManageClassSchedule(
   roles: readonly AcademyRole[],

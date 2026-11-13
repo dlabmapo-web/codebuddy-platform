@@ -47,7 +47,7 @@ export function CoursesManager({
           />
         </p>
         {canEdit && inAcademy ? (
-          <Button asChild variant="outline">
+          <Button asChild>
             <Link href={contentPaths.library()}>
               <Library className="size-4" />
               {library('action')}

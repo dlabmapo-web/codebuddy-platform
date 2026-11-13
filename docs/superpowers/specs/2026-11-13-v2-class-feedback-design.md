@@ -6,7 +6,7 @@ Branch: `fix/v2-feedback`
 
 Source reviewed: `b688c495`
 
-Status: proposed design for review; implementation has not started.
+Status: implemented and verified locally; see [verification evidence](../../research/2026-11-13-v2-class-feedback-verification.md).
 
 ## Purpose and scope
 
@@ -126,6 +126,14 @@ Expected read-cost change: **zero additional SQL statements for the new teaching
 
 Before implementation is accepted, capture before/after SQL counts for teaching-list, teaching-roster, and management-detail requests using Prisma query events against disposable Docker PostgreSQL through `COVE_INTEGRATION_DATABASE_URL`. Compare small and larger fixtures to prove that the new UI adds no per-row statements. Use `navigation-performance.integration.spec.ts` as the instrumentation pattern. Record measured counts in implementation evidence and state any changed count in the commit message; do not invent a baseline or test against shared Supabase databases.
 
+## Follow-up: live class header and assigned courses
+
+The user requested a more visible edit action and course navigation directly from the live class page. Use the existing blue primary button for Edit Class Information and group it with Student History and connection status in the class heading. Retain one back link above the heading and remove the redundant row below it. This keeps class-wide actions together without adding another toolbar or a floating action.
+
+Replace the existing non-interactive course badges with a labeled Courses section containing large links: course icon, full course title, an optional Hidden from students label, and View course with an arrow. Use the roster's existing `courses` data, and show a clear empty state when no courses are assigned. Each link opens the academy's canonical `/learn/courses/[courseId]` staff course detail, preserving the destination's existing role checks. Disable automatic course-link prefetch so listing several assigned courses does not trigger extra reads. Keep the current typefaces, blue brand tokens, borders and responsive layout; the visual emphasis comes from the blue edit action and course entry cards.
+
+Alternatives were retaining tiny clickable badges or introducing an extra course fetch and rich previews. Larger links provide a clear destination and touch target using the already authorized response. No API, schema, permissions, SQL statements or polling change is needed.
+
 ## Implementation touchpoints
 
 Paths under `packages/web/src/app/(studio)/academy/[academySlug]/(framed)/`:
@@ -160,4 +168,4 @@ The implementation must reread the installed Next.js guides relevant to any rout
 8. Run the affected packages' type checks and existing i18n, canonical route, and theme checks. Visually check Korean and English layouts on desktop/mobile and light/dark themes, particularly the longer navigation labels and adjacent blue course actions.
 9. SQL-count evidence confirms no added per-row reads or repeated initial hydration fetch introduced by this change.
 
-This document is the reviewable deliverable for the current request. Runtime verification and implementation checks above are requirements for the later code change, not claims that those checks have already run.
+Executed checks and the existing global theme-check limitation are recorded in the linked verification evidence.

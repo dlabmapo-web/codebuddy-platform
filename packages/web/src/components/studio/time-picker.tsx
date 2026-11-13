@@ -53,6 +53,8 @@ export function TimePicker({
   const [open, setOpen] = React.useState(false);
   const hour = Math.floor(minute / 60) % 24;
   const minuteOfHour = minute % 60;
+  // Keep an overnight endpoint on its stored day when either column changes.
+  const dayOffset = Math.floor(minute / (24 * 60)) * 24 * 60;
 
   // A stored time off the step — 16:07 from an earlier edit — still has to be
   // selectable and visible, so it joins the list rather than being rounded
@@ -79,14 +81,14 @@ export function TimePicker({
         <div className="flex">
           <Column
             label={label}
-            onSelect={(next) => onChange(next * 60 + minuteOfHour)}
+            onSelect={(next) => onChange(dayOffset + next * 60 + minuteOfHour)}
             selected={hour}
             values={HOURS}
           />
           <div aria-hidden className="w-px bg-border" />
           <Column
             label={label}
-            onSelect={(next) => onChange(hour * 60 + next)}
+            onSelect={(next) => onChange(dayOffset + hour * 60 + next)}
             selected={minuteOfHour}
             values={minutes}
           />

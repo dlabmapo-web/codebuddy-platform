@@ -9,6 +9,7 @@ import {
   canManageContent,
   canManageAcademy,
   canManageClasses,
+  canManageClassSchedule,
   canManageClassTeachers,
   canManageEnrollment,
   canManageExercises,
@@ -308,5 +309,18 @@ describe('resolveAcademyAccessState', () => {
     expect(
       academyRoleFor(input, '90000000-0000-4000-8000-000000000001'),
     ).toBeNull();
+  });
+});
+
+
+describe('class schedule permissions', () => {
+  it.each([
+    { roles: ['MANAGER'] as const, allowed: true },
+    { roles: ['TEAM_LEAD'] as const, allowed: true },
+    { roles: ['TEACHER'] as const, allowed: false },
+    { roles: ['STUDENT'] as const, allowed: false },
+    { roles: ['TEACHER', 'TEAM_LEAD'] as const, allowed: true },
+  ])('matches schedule controls to effective roles $roles', ({ roles, allowed }) => {
+    expect(canManageClassSchedule(roles)).toBe(allowed);
   });
 });

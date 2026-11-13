@@ -101,7 +101,6 @@ describe("roleHasPermission", () => {
     for (const permission of [
       "academy.settings.manage",
       "academy.members.manage",
-      "class-schedule.manage",
     ] as const) {
       expect(roleHasPermission("TEAM_LEAD", permission)).toBe(false);
       expect(roleHasPermission("MANAGER", permission)).toBe(true);
@@ -131,12 +130,10 @@ describe("roleHasPermission", () => {
     }
   });
 
-  it("keeps the class schedule with managers alone", () => {
-    // §5.1 and §8.1 of the student points design: a schedule edit changes who
-    // is paid for turning up, so it sits with the role that owns the academy's
-    // settings — not with the one that owns the curriculum.
+  it("allows managers and team leads to manage the class schedule", () => {
     expect(roleHasPermission("MANAGER", "class-schedule.manage")).toBe(true);
-    for (const role of ["TEAM_LEAD", "TEACHER", "STUDENT"] as const) {
+    expect(roleHasPermission("TEAM_LEAD", "class-schedule.manage")).toBe(true);
+    for (const role of ["TEACHER", "STUDENT"] as const) {
       expect(roleHasPermission(role, "class-schedule.manage")).toBe(false);
     }
   });

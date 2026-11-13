@@ -1,5 +1,5 @@
 {
-  "title": "Classes",
+  "title": "Class Management",
   "description": "A class connects curriculum to learners. Assign the courses a class studies, then enroll the students who take them.",
   "forbidden_title": "Classes are not available to you",
   "forbidden_body": "Managing classes needs an active Team Lead or Manager membership. Ask an academy manager to change your role.",
@@ -68,7 +68,8 @@
     "failed": "Could not save the class. Reload it and try again."
   },
   "detail": {
-    "back": "All classes",
+    "back": "Back to Class Management",
+    "return_to_class": "Return to Class",
     "not_found_title": "This class is not available",
     "not_found_body": "It may have been removed, or it belongs to another academy. Go back to the class list.",
     "archived_notice": "This class is archived. Its students cannot open its courses until you restore it.",

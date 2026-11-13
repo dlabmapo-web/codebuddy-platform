@@ -8,9 +8,9 @@ const studioOrigin = `http://127.0.0.1:${Number(process.env.COVE_DLAB_TEST_WEB_P
 type Fixture = { id: string; academy: { slug: string; id: string }; username?: string };
 // Sign-in lands on the role's work page; the academy root only redirects there.
 const entry = {
-  MANAGER: { path: '/classes', heading: 'Classes' },
-  TEAM_LEAD: { path: '/classes', heading: 'Classes' },
-  TEACHER: { path: '/teach/classes', heading: 'My classes' },
+  MANAGER: { path: '/classes', heading: 'Class Management' },
+  TEAM_LEAD: { path: '/classes', heading: 'Class Management' },
+  TEACHER: { path: '/teach/classes', heading: 'Enter My Classes' },
   STUDENT: { path: '/learn/courses', heading: 'My courses' },
 } as const;
 const landing = (slug: string, role: keyof typeof entry) => new RegExp('/academy/' + slug + entry[role].path + '$');
@@ -101,7 +101,7 @@ for (const [osRole, role] of [['student', 'STUDENT'], ['instructor', 'TEAM_LEAD'
     expect(first.platformRole).toBe('USER'); expect(first.memberships).toHaveLength(1); expect(first.memberships[0].role).toBe(role);
     const expectedRoles = role === 'MANAGER' ? ['MANAGER', 'TEAM_LEAD', 'TEACHER'] : role === 'TEAM_LEAD' ? ['TEAM_LEAD', 'TEACHER'] : [role];
     expect(first.memberships[0].roles.sort()).toEqual(expectedRoles.sort());
-    if (role === 'MANAGER' || role === 'TEAM_LEAD') await expect(page.getByRole('link', { name: 'My classes', exact: true })).toBeVisible();
+    if (role === 'MANAGER' || role === 'TEAM_LEAD') await expect(page.getByRole('link', { name: 'Enter My Classes', exact: true })).toBeVisible();
     await page.reload(); await expect(page).toHaveURL(landing(value.academy.slug, role));
     await page.goto('/sso/start'); await expect(page).toHaveURL(landing(value.academy.slug, role));
     const again = await (await request.get(fixtureOrigin + '/fixtures/' + value.id, { maxRetries: 2 })).json();
@@ -280,8 +280,8 @@ test(`OS ${staffRole} covers academy classes without teaching assignments`, asyn
     // A stale role-mode cookie cannot hide Manager identity or inherited actions.
     await page.context().addCookies([{ name: 'cove_academy_role', value: manager.academy.id + ':TEACHER', url: studioOrigin }]);
     await page.goto('/academy/' + manager.academy.slug);
-    if (staffRole === 'lab_head') await expect(page.getByRole('heading', { name: 'Classes', level: 1, exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'My classes', exact: true })).toBeVisible();
+    if (staffRole === 'lab_head') await expect(page.getByRole('heading', { name: 'Class Management', level: 1, exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Enter My Classes', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'My page', exact: true }).click();
     await expect(page.getByRole('menuitemradio')).toHaveCount(0);
     await page.keyboard.press('Escape');

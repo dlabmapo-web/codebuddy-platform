@@ -298,10 +298,8 @@ export const academyPermissions = [
   "class-teachers.manage",
   /**
    * When a class meets — the recurring windows attendance points are paid
-   * inside. `MANAGER` only, deliberately: §5.1 of the student points design
-   * puts the point economy's settings with the role that owns the academy's
-   * settings, and a schedule edit silently changes who gets paid for turning
-   * up. A team lead who runs the curriculum has no reason to move it.
+   * inside. Managers and Team Leads configure these windows; an assigned
+   * Teacher can deliver a class without changing its timetable.
    */
   "class-schedule.manage",
   /** Reserved for the later teacher monitoring design: what an assigned
@@ -345,6 +343,7 @@ const teamLeadPermissions = [
   "classes.manage",
   "class-teachers.manage",
   "class-enrollments.manage",
+  "class-schedule.manage",
   // Managers and Team Leads use these academy-wide. Teachers need an actual
   // class assignment; every surface still checks its academy and student scope.
   "classes.assigned.manage",
@@ -355,8 +354,8 @@ const teamLeadPermissions = [
  * Administration of the academy itself, which a Team Lead does not get.
  *
  * The boundary is ownership rather than seniority: who may change what the
- * academy *is* — its settings, who belongs to it, and when
- * classes meet — as opposed to what it teaches.
+ * academy *is* — its settings and who belongs to it — as opposed to
+ * how its classes are taught.
  */
 const managerOnlyPermissions = [
   "academy.settings.manage",
@@ -366,7 +365,6 @@ const managerOnlyPermissions = [
    * runs what the academy teaches; how a child signs in is not curriculum.
    */
   "academy.members.credentials.manage",
-  "class-schedule.manage",
 ] as const satisfies readonly AcademyPermission[];
 
 export const academyRolePermissions = {

@@ -202,3 +202,13 @@ it('keeps Courses active while authoring and removes the duplicate content desti
   expect(links.find(link => link.href.endsWith('/learn/courses'))?.alsoCurrentOn).toContain('/academy/cove-development/content/courses');
   expect(links.some(link => link.href.endsWith('/content/courses'))).toBe(false);
 });
+
+
+it('gives teaching entry a separate label from student classes', () => {
+  const options = { ...common, canManageAcademy: false, canReadAcademyMembers: false, canReviewApplications: false };
+  const staff = studioNavGroups({ ...options, canManageClasses: true, canMonitor: true }).flatMap(({ items }) => items);
+  expect(staff.find(({ href }) => href.endsWith('/teach/classes'))?.labelKey).toBe('link.enter_my_classes');
+  expect(staff.find(({ href }) => href === '/academy/cove-development/classes')?.labelKey).toBe('link.classes');
+  const student = studioNavGroups({ ...options, isStudent: true }).flatMap(({ items }) => items);
+  expect(student.find(({ href }) => href.endsWith('/learn/classes'))?.labelKey).toBe('link.my_classes');
+});

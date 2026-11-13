@@ -125,6 +125,7 @@ export function ClassSchedulePanel({
   const rows = draft ?? groupSlots(detail.schedule);
 
   const invalid = rows.some((row) => !rowIsValid(row));
+  const overLimit = slotCount(rows) > CLASS_SCHEDULE_MAX_SLOTS;
   // Counted in slots, not rows: the limit is on what gets stored, and one row
   // of five days is five of them.
   const full = slotCount(rows) >= CLASS_SCHEDULE_MAX_SLOTS;
@@ -171,7 +172,7 @@ export function ClassSchedulePanel({
                 {t('common:action.cancel')}
               </button>
               <Button
-                disabled={invalid || manager.schedulePending}
+                disabled={invalid || overLimit || manager.schedulePending}
                 onClick={() => manager.saveSchedule(expandRows(rows))}
                 size="sm"
               >

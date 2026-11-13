@@ -29,6 +29,7 @@ export function ClassDetailManager({
   canEnroll,
   canSetSchedule,
   initialDetail,
+  teachingHref,
 }: {
   academyId: string;
   canAssignCourses: boolean;
@@ -36,6 +37,7 @@ export function ClassDetailManager({
   canEnroll: boolean;
   canSetSchedule: boolean;
   initialDetail: ClassDetail;
+  teachingHref?: string;
 }) {
   const { t } = useLayoutTranslation(['classes', 'common']);
   const errorText = useErrorText();
@@ -50,7 +52,7 @@ export function ClassDetailManager({
 
   return (
     <div className="space-y-5">
-      <ClassHeader manager={manager} />
+      <ClassHeader manager={manager} teachingHref={teachingHref} />
 
       <ClassOverviewCard detail={manager.detail} />
 

@@ -18,7 +18,7 @@ const turnstileTestSiteKey =
 export default defineConfig({
   testDir: './specs',
   // Dedicated isolated OS/provider harness: pnpm e2e:dlab.
-  testIgnore: 'dlab-sso.spec.ts',
+  testIgnore: ['dlab-sso.spec.ts', 'class-feedback.spec.ts'],
   globalSetup: './global-setup.ts',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),

@@ -470,7 +470,7 @@ export function studioNavGroups({
   if (canMonitor) {
     teaching.push({
       href: `${base}/teach/classes`,
-      labelKey: 'link.my_classes',
+      labelKey: 'link.enter_my_classes',
       icon: MonitorPlay,
     });
     // §5.1 — the detailed roster the overview's previews all link into. It sits

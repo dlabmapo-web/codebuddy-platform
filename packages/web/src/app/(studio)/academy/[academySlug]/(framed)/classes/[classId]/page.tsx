@@ -14,13 +14,16 @@ import { createServerORPCClient } from '@/lib/orpc-server';
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import { ClassDetailManager } from './_components/class-detail-manager';
 import { createContentPaths } from '@/components/studio/content-paths';
+import { routes } from '@/lib/routes';
 
 export default async function ClassDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ academySlug: string; classId: string }>;
+  searchParams: Promise<{ from?: string | string[] }>;
 }) {
-  const { academySlug, classId } = await params;
+  const [{ academySlug, classId }, { from }] = await Promise.all([params, searchParams]);
   const contentPaths = createContentPaths(academySlug, 'academy');
   // The role comes from the guard, which resolves it from a membership or from
   // a platform operator's chosen view. Re-deriving it from `auth.me` hid every
@@ -63,6 +66,7 @@ export default async function ClassDetailPage({
           canEnroll={canEnroll}
           canSetSchedule={canSetSchedule}
           initialDetail={detail}
+          teachingHref={from === 'teaching' ? routes.academyTeachClass(academySlug, classId) : undefined}
         />
       ) : (
         <div className="rounded-card border border-danger/25 bg-danger/5 p-5">

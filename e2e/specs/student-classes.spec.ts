@@ -189,7 +189,7 @@ test('staff previewing curriculum get neither the link nor the pages', async ({
 
   // A Team Lead holds `curriculum.read` and can walk the courses they wrote.
   // That is not a class to belong to.
-  await expect(page.getByRole('link', { name: /my classes|내 반/i })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /^(my classes|내 반)$/i })).toHaveCount(0);
 
   await page.goto(classesUrl());
   await expect(

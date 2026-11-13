@@ -475,8 +475,8 @@ export class ClassesService {
    * name onto its own row when it was paid, so last month's attendance stays
    * explicable even after the window it was earned in is gone. §8.1.
    *
-   * `MANAGER` only. §5.1 — a schedule edit changes who is paid for turning up,
-   * which is a setting rather than a piece of curriculum.
+   * Managers and Team Leads configure class times. Ordinary assigned Teachers
+   * remain read-only because these windows also determine attendance points.
    */
   async setSchedule(
     identity: SupabaseIdentity,

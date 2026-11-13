@@ -45,7 +45,7 @@ export default async function TeachingClassesPage({
       title={t('classes.title')}
     >
       {classes && featureEnabled ? (
-        <TeachingClasses academyId={academyId} initialClasses={classes} />
+        <TeachingClasses academyId={academyId} initialClasses={classes} serverReadToken={crypto.randomUUID()} />
       ) : (
         <div className="rounded-card border border-border bg-surface p-5">
           <h2 className="text-[15px] font-bold">

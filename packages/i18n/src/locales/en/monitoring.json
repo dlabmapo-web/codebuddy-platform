@@ -1,6 +1,6 @@
 {
   "classes": {
-    "title": "My classes",
+    "title": "Enter My Classes",
     "description": "The classes you are responsible for.",
     "empty_title": "No classes yet",
     "empty_body": "You will see a class here once you are assigned to one.",
@@ -19,8 +19,12 @@
     "open": "Open live class"
   },
   "roster": {
-    "back": "My classes",
+    "back": "Enter My Classes",
+    "edit_class": "Edit Class Information",
     "courses_label": "Courses",
+    "view_course": "View course",
+    "course_hidden": "Hidden from students",
+    "no_courses": "No courses are assigned to this class yet.",
     "summary_total": "Enrolled",
     "summary_online": "Online",
     "summary_solving": "Solving",

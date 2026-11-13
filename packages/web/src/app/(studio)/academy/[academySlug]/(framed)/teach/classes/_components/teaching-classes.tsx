@@ -12,6 +12,7 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { orpc } from '@/lib/orpc';
+import { claimServerRead } from '@/lib/server-read';
 import { useAssignedClassPresence } from '@/lib/monitoring/use-assigned-class-presence';
 
 import { ConnectionBadge } from '../../_components/live-badges';
@@ -27,19 +28,23 @@ import { ConnectionBadge } from '../../_components/live-badges';
 export function TeachingClasses({
   academyId,
   initialClasses,
+  serverReadToken,
 }: {
   academyId: string;
   initialClasses: MonitoringClassSummary[];
+  serverReadToken?: string;
 }) {
   const academySlug = useAcademySlug();
   const { t } = useTranslation('monitoring');
+  const [seed] = React.useState(() => claimServerRead(serverReadToken)
+    ? { featureEnabled: true, classes: initialClasses } : undefined);
   const classesQuery = useQuery({
     queryKey: ['academy', academyId, 'teaching-classes'],
     queryFn: () => orpc.monitoring.listAssignedClasses({ academyId }),
-    initialData: { featureEnabled: true, classes: initialClasses },
+    initialData: seed,
     retry: false,
   });
-  const classes = classesQuery.data.classes;
+  const classes = classesQuery.data?.classes ?? initialClasses;
   const classIds = React.useMemo(
     () => classes.map((item) => item.classId),
     [classes],

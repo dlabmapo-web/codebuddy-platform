@@ -5,6 +5,8 @@ import type {
   ClassScheduleSlotInput,
   CourseSummary,
   EnrolledStudentSummary,
+  MonitoringClassRoster,
+  MonitoringClassSummary,
 } from '@cove/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -104,7 +106,31 @@ export function useClassDetailManager({
 
   const applyDetail = async (next: ClassDetail) => {
     queryClient.setQueryData(detailKey, next);
-    await queryClient.invalidateQueries({ queryKey: listKey });
+    // Update the visible class facts before a cached teaching page is restored.
+    const teachingListKey = ['academy', academyId, 'teaching-classes'];
+    const rosterKey = ['academy', academyId, 'teaching-roster', classId];
+    const facts = {
+      name: next.name,
+      description: next.description,
+      updatedAt: next.updatedAt,
+    };
+    queryClient.setQueryData<{
+      featureEnabled: boolean;
+      classes: MonitoringClassSummary[];
+    }>(teachingListKey, (current) => current ? {
+      ...current,
+      classes: current.classes.map((item) =>
+        item.classId === classId ? { ...item, ...facts } : item),
+    } : undefined);
+    queryClient.setQueryData<MonitoringClassRoster>(rosterKey, (current) => current ? {
+      ...current,
+      class: { ...current.class, ...facts },
+    } : undefined);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: listKey }),
+      queryClient.invalidateQueries({ queryKey: teachingListKey }),
+      queryClient.invalidateQueries({ queryKey: rosterKey }),
+    ]);
   };
 
   const updateMutation = useMutation({

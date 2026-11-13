@@ -150,7 +150,8 @@
     "details": "Details",
     "people_empty_title": "Nobody has joined yet",
     "invite_body": "Sends a link that makes this person a manager. You can copy the link here if the email does not arrive.",
-    "invite_submit": "Invite a manager"
+    "invite_submit": "Invite a manager",
+    "keep_suspended": "Keep suspended in Cove"
   },
   "never": "Never",
   "invite_link": {
@@ -212,7 +213,9 @@
     "slug_warning": "Links using the old slug will redirect here rather than break.",
     "save": "Save changes",
     "saving": "Saving…",
-    "archived": "An archived academy cannot be edited."
+    "archived": "An archived academy cannot be edited.",
+    "os_managed": "DLAB OS manages this campus name.",
+    "os_inactive": "DLAB OS has closed this campus. It cannot be restored until OS reactivates it."
   },
   "vitals": {
     "people": "Users",

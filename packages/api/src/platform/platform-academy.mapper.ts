@@ -81,6 +81,7 @@ export function toAcademySummary(
 }
 
 export type AcademyDetailRecord = AcademyRecord & {
+  dlabCampus?: { externalCampusId: string; status: string; localAcademyRestriction: "ACTIVE" | "SUSPENDED" | "ARCHIVED" | null } | null;
   organization: { id: string; name: string; slug: string };
   contactEmail: string | null;
   contactPhone: string | null;
@@ -98,6 +99,7 @@ export function toAcademyDetail(
   return {
     ...toAcademySummary(record, now),
     ...stats,
+    dlabSource: record.dlabCampus ?? null,
     organization: record.organization,
     contactEmail: record.contactEmail,
     contactPhone: record.contactPhone,

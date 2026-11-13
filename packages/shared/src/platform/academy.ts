@@ -143,6 +143,7 @@ export const platformAcademyDetailSchema = platformAcademySummarySchema
       name: z.string().min(1),
       slug: z.string().min(1),
     }),
+    dlabSource: z.object({ externalCampusId: z.string(), status: z.string(), localAcademyRestriction: academyStatusSchema.nullable() }).nullable().optional(),
     contactEmail: z.string().nullable(),
     contactPhone: z.string().nullable(),
     locality: z.string().nullable(),

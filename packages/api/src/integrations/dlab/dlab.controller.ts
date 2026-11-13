@@ -1,8 +1,8 @@
-import { ArgumentsHost, Body, Catch, Controller, ExceptionFilter, Logger, Param, Post, Put, Req, Res, UseFilters } from '@nestjs/common';
+import { ArgumentsHost, Body, Catch, Controller, ExceptionFilter, Logger, Optional, Param, Post, Put, Req, Res, UseFilters } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { dlabCampusSchema, dlabExternalId, dlabUserSchema } from '@cove/shared';
+import { dlabCampusSchema, dlabExternalId, dlabUserSchema, dlabDirectoryCampusResultSchema, dlabDirectoryUserResultSchema } from '@cove/shared';
 import { ConfigService } from '@nestjs/config';
 import { isTrustedBffRequest, bearerToken } from '../../orpc/context.js';
 import type { ApiEnvironment } from '../../config/env.schema.js';
@@ -10,6 +10,7 @@ import { DlabError } from './dlab-error.js';
 import { secretEqual } from './dlab-state.service.js';
 import { DlabSsoService } from './dlab-sso.service.js';
 import { DlabSourceService } from './dlab-source.service.js';
+import { DlabDirectoryService } from './dlab-directory.service.js';
 
 const opaque = z.string().regex(/^[a-f0-9]{64}$/);
 const begin = z.object({ binding: opaque, returnTo: z.string().max(1024).optional(), previousState: opaque.optional() });
@@ -33,6 +34,7 @@ export class DlabExceptionFilter implements ExceptionFilter {
     // Never log request URLs, bodies, headers, provider responses, or exception text.
     this.logger.warn({ status, reason, requestId: requestId.success ? requestId.data : undefined });
     res.setHeader('Cache-Control', 'no-store');
+    if (status === 503) res.setHeader('Retry-After', '5');
     res.status(status).json({ ...body, request_id: requestId.success ? requestId.data : randomUUID() });
   }
 }
@@ -70,7 +72,7 @@ export class DlabInternalController {
 @Controller('integrations/dlab/v1')
 @UseFilters(DlabExceptionFilter)
 export class DlabInboundController {
-  constructor(private readonly config: ConfigService<ApiEnvironment, true>, private readonly source: DlabSourceService) {}
+  constructor(private readonly config: ConfigService<ApiEnvironment, true>, private readonly source: DlabSourceService, @Optional() private readonly directory?: DlabDirectoryService) {}
   private authorize(req: Request) {
     const expected = this.config.get('DLAB_INBOUND_SERVER_KEY', { infer: true });
     const header = uniqueHeader(req, 'authorization');
@@ -79,21 +81,24 @@ export class DlabInboundController {
     if (!z.uuid().safeParse(uniqueHeader(req, 'x-request-id')).success) throw new DlabError('invalid_request_id', 400, 'X-Request-Id');
     const size = Buffer.byteLength(JSON.stringify(req.body ?? {}));
     if (size > 16384) throw new DlabError('payload_too_large');
+    if (this.config.get('DLAB_DIRECTORY_SYNC_ENABLED', { infer: true }) !== true) throw new DlabError('directory_sync_unavailable', 503);
+    if (this.config.get('DLAB_SSO_ROLLOUT_MODE', { infer: true }) !== 'campus') throw new DlabError('directory_campus_mode_required', 403);
   }
   @Put('campuses/:id')
   async campus(@Req() req: Request, @Param('id') id: string, @Body() body: unknown) {
     this.authorize(req);
     const input = dlabCampusSchema.safeParse(body);
     if (!dlabExternalId.safeParse(id).success || !input.success) throw new DlabError('invalid_campus');
-    const record = await this.source.campus(id, input.data, uniqueHeader(req, 'x-request-id')!);
-    return { ok: true, ...(record.academyId ? { id: record.academyId } : {}) };
+    const requestId = uniqueHeader(req, 'x-request-id')!;
+    const record = await this.source.campus(id, input.data, requestId, true);
+    return dlabDirectoryCampusResultSchema.parse({ ok: true, ...(record.academyId ? { id: record.academyId } : {}), request_id: requestId, outcome: record.directoryOutcome, provisioning_status: record.academyId ? 'READY' : 'SOURCE_ONLY_INACTIVE' });
   }
   @Put('users/:id')
   async user(@Req() req: Request, @Param('id') id: string, @Body() body: unknown) {
     this.authorize(req);
     const input = dlabUserSchema.safeParse(body);
     if (!dlabExternalId.safeParse(id).success || !input.success) throw new DlabError('invalid_user');
-    const record = await this.source.user(id, input.data, undefined, uniqueHeader(req, 'x-request-id')!);
-    return { ok: true, ...(record.userId ? { id: record.userId } : {}) };
+    if (!this.directory) throw new DlabError('directory_sync_unavailable', 503);
+    return dlabDirectoryUserResultSchema.parse(await this.directory.syncUser(id, input.data, uniqueHeader(req, 'x-request-id')!));
   }
 }

@@ -2728,6 +2728,7 @@ model ProgrammingExerciseSolution {
 
 /// OS source data can arrive before explicit academy mapping.
 model DlabCampus {
+  localAcademyRestriction AcademyStatus? @map("local_academy_restriction")
   ssoEnabled Boolean @default(false) @map("sso_enabled")
   ssoEnabledByUserId String? @map("sso_enabled_by_user_id") @db.Uuid
   ssoEnabledAt DateTime? @map("sso_enabled_at") @db.Timestamptz(6)
@@ -2761,6 +2762,9 @@ model DlabIdentity {
   revision Int @default(1)
   generation Int @default(1)
   provisioningStatus String @default("PENDING") @map("provisioning_status")
+  projectedRevision Int? @map("projected_revision")
+  lastProvisionErrorCode String? @map("last_provision_error_code")
+  lastProvisionRequestId String? @map("last_provision_request_id") @db.Uuid
   receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
   user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
   bindings DlabMembershipBinding[]

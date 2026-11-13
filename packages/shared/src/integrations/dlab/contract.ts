@@ -31,3 +31,14 @@ export function safeDlabReturnTo(value: unknown): string | null {
   if (/[\\\x00-\x20\x7f%?#]/.test(value) || value.includes('//') || value.split('/').some(p => p === '.' || p === '..')) return null;
   return /^\/academy\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-zA-Z0-9_/-]*)?$/.test(value) ? value : null;
 }
+
+/** A 200 user response represents a committed real directory projection. */
+export const dlabDirectoryUserResultSchema = z.object({
+  ok: z.literal(true), id: z.uuid(), request_id: z.uuid().optional(),
+  outcome: z.enum(['applied','unchanged','applied_restricted']),
+  provisioning_status: z.literal('READY'), membership_ids: z.array(z.uuid()),
+});
+export const dlabDirectoryCampusResultSchema = z.discriminatedUnion('provisioning_status',[
+  z.object({ ok:z.literal(true),id:z.uuid(),request_id:z.uuid(),outcome:z.enum(['applied','unchanged','applied_restricted']),provisioning_status:z.literal('READY') }),
+  z.object({ ok:z.literal(true),request_id:z.uuid(),outcome:z.literal('source_only_inactive'),provisioning_status:z.literal('SOURCE_ONLY_INACTIVE') }),
+]);

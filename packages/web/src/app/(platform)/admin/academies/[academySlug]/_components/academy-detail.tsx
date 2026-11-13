@@ -316,13 +316,15 @@ function LifecyclePanel({
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<unknown>(null);
 
+  const canRecordLocalHold = academy.status === 'SUSPENDED' && academy.dlabSource?.status === 'inactive' && !academy.dlabSource.localAcademyRestriction;
   const transitions = (['SUSPENDED', 'ACTIVE', 'ARCHIVED'] as const).filter(
-    (next) => canTransitionAcademyStatus(academy.status, next),
+    (next) => (canTransitionAcademyStatus(academy.status, next) || (next === 'SUSPENDED' && canRecordLocalHold))
+      && !(next === 'ACTIVE' && academy.dlabSource?.status === 'inactive'),
   );
 
   const labels: Record<AcademyStatus, string> = {
     ACTIVE: t('detail.restore'),
-    SUSPENDED: t('detail.suspend'),
+    SUSPENDED: t(canRecordLocalHold ? 'detail.keep_suspended' : 'detail.suspend'),
     ARCHIVED: t('detail.archive'),
   };
   const titles: Record<AcademyStatus, string> = {

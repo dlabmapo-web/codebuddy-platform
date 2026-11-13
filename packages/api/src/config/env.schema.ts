@@ -39,6 +39,7 @@ export const apiEnvironmentSchema = z.object({
   DLAB_OS_BASE_URL: z.literal(DLAB_OS_BASE_URL).default(DLAB_OS_BASE_URL),
   DLAB_SSO_ROLLOUT_MODE: z.enum(['allowlist', 'campus']).default('allowlist'),
   DLAB_AUTO_PROVISION_CAMPUSES: z.preprocess(v => v === 'true' || v === true, z.boolean()).default(false),
+  DLAB_DIRECTORY_SYNC_ENABLED: z.preprocess(v => v === 'true' || v === true, z.boolean()).default(false),
   DLAB_CLIENT_ID: z.literal('cove').default('cove'),
   DLAB_CLIENT_SECRET: z.string().min(32).optional(),
   DLAB_INBOUND_SERVER_KEY: z.string().min(32).optional(),
@@ -269,6 +270,7 @@ export const apiEnvironmentSchema = z.object({
       (environment.NODE_ENV === 'production' && ws !== environment.WEB_ORIGIN.replace(/^https:/, 'wss:').replace(/\/$/, '') + '/turtle-display')))
       context.addIssue({ code: 'custom', path: ['TURTLE_TRIAL_PUBLIC_WS_URL'], message: 'must use the isolated turtle-display WebSocket gateway' });
   }
+  if (environment.DLAB_DIRECTORY_SYNC_ENABLED && (!environment.DLAB_SSO_ENABLED || environment.DLAB_SSO_ROLLOUT_MODE !== 'campus')) context.addIssue({ code: 'custom', path: ['DLAB_DIRECTORY_SYNC_ENABLED'], message: 'requires enabled SSO in campus mode' });
   if (environment.DLAB_SSO_ENABLED) {
     if (environment.DLAB_SSO_ROLLOUT_MODE === 'allowlist' && !environment.DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS.length) context.addIssue({ code: 'custom', path: ['DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS'], message: 'must be nonempty in allowlist mode' });
     for (const key of ['DLAB_CLIENT_SECRET', 'DLAB_INBOUND_SERVER_KEY', 'DLAB_REDIRECT_URI', 'BFF_SHARED_SECRET'] as const) {

@@ -405,7 +405,11 @@ for (const osRole of ['tutor', 'edu_manager', 'lab_head'] as const) {
             // editor. The workspace no longer polls on a timer (only a light
             // submission-status check does), so trigger the refetch it does
             // perform: the one on returning to the tab.
-            const refetched = staffPage.waitForResponse(response => new URL(response.url()).pathname === '/api/manual' && new URL(response.url()).searchParams.get('preview') === 'false', { timeout: 10_000 });
+            // SSR data is fresh for five seconds. Advance Date only so the
+            // focus event actually refetches; timers and the open editor keep running.
+            await staffPage.clock.setFixedTime(Date.now() + 10_000);
+            const refetched = staffPage.waitForResponse(response => new URL(response.url()).pathname === '/api/manual' && new URL(response.url()).searchParams.get('materialId') === materialId && new URL(response.url()).searchParams.get('preview') === 'false', { timeout: 10_000 });
+            await staffPage.bringToFront();
             await staffPage.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
             await refetched;
             await expect(hint).toHaveValue('Use the language name.');
@@ -621,3 +625,42 @@ for (const engine of ['Chromium', 'WebKit'] as const) {
     }
   });
 }
+
+for (const engine of ['chromium','webkit']) test(`directory sync: manager assigns never-logged-in people before their first SSO in ${engine}`, async ({browser,request}) => {
+  const selected = engine === 'webkit' ? await webkit.launch() : browser;
+  const managerContext = await selected.newContext({baseURL:studioOrigin});
+  const studentContext = await selected.newContext({baseURL:studioOrigin});
+  try {
+    const manager = await fixture(request,'lab_head',{autoCampus:true,campusName:'Directory sync academy',prelogin:true,name:'Directory Manager'});
+    const student = await fixture(request,'student',{parentFixtureId:manager.id,prelogin:true,name:'Directory Student'});
+    const teacher = await fixture(request,'tutor',{parentFixtureId:manager.id,prelogin:true,name:'Directory Teacher'});
+    const before = await (await request.get(fixtureOrigin+'/fixtures/'+student.id)).json();
+    expect(before.lastSignInAt).toBeNull(); expect(before.studentLeaseCount).toBe(0);
+    const staff = await (await request.get(fixtureOrigin+'/fixtures/'+teacher.id)).json();
+    expect(staff.lastSignInAt).toBeNull(); expect(staff.memberships[0].role).toBe('TEACHER');
+    const page = await managerContext.newPage(); await enter(page,manager);
+    await expect(page).toHaveURL(landing(manager.academy.slug,'MANAGER'));
+    await page.goto(`/academy/${manager.academy.slug}/people`);
+    await expect(page.getByText('Directory Student',{exact:true})).toBeVisible();
+    await expect(page.getByText('Directory Teacher',{exact:true})).toBeVisible();
+    const created = await rpc(page,request,'academyClasses/create',{academyId:manager.academy.id,name:'Pre-login assigned class'});
+    expect(created.status()).toBe(200);
+    const decode = async (response:Awaited<ReturnType<typeof rpc>>) => {const body=await response.json();return body.json ?? body;};
+    const classroom = await decode(created), scope={academyId:manager.academy.id,classId:classroom.id};
+    const eligibleStudents=await decode(await rpc(page,request,'academyClasses/listEligibleStudents',scope));
+    expect(eligibleStudents.students.some((s:{membershipId:string}) => s.membershipId===before.memberships[0].id)).toBe(true);
+    expect((await rpc(page,request,'academyClasses/addStudents',{...scope,membershipIds:[before.memberships[0].id]})).status()).toBe(200);
+    const eligibleTeachers=await decode(await rpc(page,request,'academyClasses/listEligibleTeachers',scope));
+    expect(eligibleTeachers.teachers.some((s:{membershipId:string}) => s.membershipId===staff.memberships[0].id)).toBe(true);
+    const detail=await decode(await rpc(page,request,'academyClasses/get',scope));
+    expect((await rpc(page,request,'academyClasses/setTeacher',{...scope,teacherMembershipId:staff.memberships[0].id,expectedUpdatedAt:detail.updatedAt})).status()).toBe(200);
+    await page.reload(); await expect(page.getByText('Directory Student',{exact:true})).toBeVisible();
+    const learner=await studentContext.newPage();await enter(learner,student);
+    await expect(learner).toHaveURL(landing(student.academy.slug,'STUDENT'));
+    await learner.goto(`/academy/${student.academy.slug}/learn/classes`);
+    await expect(learner.getByText('Pre-login assigned class',{exact:true})).toBeVisible();
+    const after=await (await request.get(fixtureOrigin+'/fixtures/'+student.id)).json();
+    expect(after.userId).toBe(before.userId);expect(after.memberships).toEqual(before.memberships);expect(after.lastSignInAt).not.toBeNull();
+    await page.screenshot({path:test.info().outputPath(`prelogin-members-${engine}.png`),animations:'disabled'});
+  } finally {await managerContext.close();await studentContext.close();if(selected!==browser) await selected.close();}
+});

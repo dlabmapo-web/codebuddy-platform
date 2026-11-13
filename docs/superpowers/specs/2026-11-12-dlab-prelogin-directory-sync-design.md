@@ -2,7 +2,7 @@
 
 Date: 2026-11-12
 
-Status: Draft for user review; no implementation or production changes performed.
+Status: Implemented and locally verified on the feature branch. No production changes performed.
 
 Branch: `feat/dlab-prelogin-directory-sync`
 
@@ -233,4 +233,4 @@ Disabling the new gate stops inbound projection with explicit retryable failures
 
 Excluded: direct OS database access, password copying, name/email account merging, signup applications, OS class/enrollment synchronization, automatic class creation, role-map changes, granting campus managers platform Admin, deleting historical samples, session-cookie redesign and unrelated product changes.
 
-Implementation is done when user PUT creates real accounts/memberships before login, retries and later SSO preserve IDs/history, campus updates appear with independent restrictions intact, responses/recovery pass the full matrix, and stored-record catch-up is reviewable/resumable. Production completion additionally requires its separately approved rollout and real HQ acceptance. This draft is ready for user review before an implementation plan is written.
+Implementation is done when user PUT creates real accounts/memberships before login, retries and later SSO preserve IDs/history, campus updates appear with independent restrictions intact, responses/recovery pass the full matrix, and stored-record catch-up is reviewable/resumable. Production completion additionally requires its separately approved rollout and real HQ acceptance. Implementation follows the user-approved scope and the 2026-11-13 implementation plan. Production acceptance remains a separate authorized step.

@@ -42,7 +42,8 @@
     "dlab:set-campus-access": "tsx src/integrations/dlab/scripts/operator.ts access",
     "dlab:invalidate-sessions": "tsx src/integrations/dlab/scripts/operator.ts invalidate",
     "benchmark:native-classroom": "node --max-old-space-size=512 scripts/benchmark-native-classroom.mjs",
-    "test:native-harness": "node --test scripts/benchmark-native-classroom.test.mjs ../../deploy/native/deployment-contract.test.mjs"
+    "test:native-harness": "node --test scripts/benchmark-native-classroom.test.mjs ../../deploy/native/deployment-contract.test.mjs",
+    "dlab:sync-directory": "tsx src/integrations/dlab/scripts/sync-directory.ts"
   },
   "dependencies": {
     "@cove/shared": "workspace:*",

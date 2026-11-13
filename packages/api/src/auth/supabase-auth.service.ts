@@ -191,7 +191,7 @@ export class SupabaseAuthService {
   async createDlabUser(id: string, email: string, name: string): Promise<void> {
     const found = await this.client.auth.admin.getUserById(id);
     if (found.data?.user) {
-      if (found.data.user.email !== email || found.data.user.app_metadata?.dlab_managed !== true) throw new DlabError('identity_conflict', 409);
+      if (found.data.user.id !== id || found.data.user.email !== email || found.data.user.app_metadata?.dlab_managed !== true) throw new DlabError('identity_conflict', 409);
       return;
     }
     if (found.error && found.error.status !== 404 && found.error.code !== 'user_not_found') throw new DlabError('auth_provider_unavailable', 503);

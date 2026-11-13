@@ -341,7 +341,7 @@ describe.skipIf(!databaseUrl || !redisUrl)('automatic staff SSO, real isolated d
   it('recovers provider provisioning failure using the same reserved identity', async () => {
     const f = await fixture();
     f.auth.createDlabUser.mockRejectedValueOnce(new Error('provider fixture unavailable'));
-    await expect(f.login()).rejects.toThrow('provider fixture unavailable');
+    await expect(f.login()).rejects.toThrow('auth_provisioning_failed');
     const staged = await f.record(); expect(staged.userId).toBeNull();
     const fresh = await f.login(); expect(fresh.completed.authUserId).toBe(staged.reservedUserId);
     expect(f.auth.createDlabUser.mock.calls.every(call => call[0] === staged.reservedUserId)).toBe(true);

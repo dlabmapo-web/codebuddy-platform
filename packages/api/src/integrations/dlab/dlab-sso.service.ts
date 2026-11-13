@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import { buildPlaceholderEmail, dlabSsoUserSchema, safeDlabReturnTo, DLAB_ADMIN_DESTINATION } from '@cove/shared';
@@ -7,16 +7,17 @@ import { PrismaService } from '../../database/prisma.service.js';
 import { SupabaseAuthService } from '../../auth/supabase-auth.service.js';
 import { DlabStateService } from './dlab-state.service.js';
 import { DlabPolicyService } from './dlab-policy.service.js';
-import { DlabSourceService, sourceWrite } from './dlab-source.service.js';
+import { DlabSourceService } from './dlab-source.service.js';
 import { DlabReconcilerService, desiredDlabCampuses, dlabAdmitted } from './dlab-reconciler.service.js';
 import { dlabTransaction } from './dlab-transaction.js';
 import { DlabError } from './dlab-error.js';
+import { DlabDirectoryService } from './dlab-directory.service.js';
 
 type Attempt = { startedAt: number; returnTo: string | null; redirectUri: string };
 type Activation = { authUserId: string; generation: number; returnTo: string | null };
 @Injectable()
 export class DlabSsoService {
-  constructor(private readonly config: ConfigService<ApiEnvironment, true>, private readonly prisma: PrismaService, private readonly state: DlabStateService, private readonly source: DlabSourceService, private readonly policy: DlabPolicyService, private readonly auth: SupabaseAuthService, private readonly reconciler: DlabReconcilerService) {}
+  constructor(private readonly config: ConfigService<ApiEnvironment, true>, private readonly prisma: PrismaService, private readonly state: DlabStateService, private readonly source: DlabSourceService, private readonly policy: DlabPolicyService, private readonly auth: SupabaseAuthService, private readonly reconciler: DlabReconcilerService, @Optional() private readonly directory?: DlabDirectoryService) {}
   enabled() { if (!this.config.get('DLAB_SSO_ENABLED', { infer: true })) throw new DlabError('sso_unavailable', 503); }
   async start(binding: string, returnTo?: string, previousState?: string) {
     this.enabled();
@@ -42,25 +43,15 @@ export class DlabSsoService {
     if (!parsed.success) throw new DlabError('invalid_os_response');
     const input = parsed.data;
     if (!dlabAdmitted(this.config, input.external_user_id)) throw new DlabError('test_identity_not_enabled', 403);
-    return this.state.lock(input.external_user_id, async () => {
-      const saved = await this.source.user(input.external_user_id, input, attempt.startedAt, requestId);
+    return this.state.lock(input.external_user_id, async assertOwned => {
+      const saved = await this.source.user(input.external_user_id, input, attempt.startedAt, requestId, { deferReconcile: true });
       if (saved.accountStatus !== 'active') throw new DlabError('account_not_eligible', 403);
       const campuses = await dlabTransaction(this.prisma, tx => desiredDlabCampuses(tx, this.config, saved));
       if (!campuses.length) throw new DlabError('campus_mapping_required', 403);
-      const authUserId = saved.userId ? (await this.prisma.user.findUniqueOrThrow({ where: { id: saved.userId } })).authUserId! : saved.reservedUserId;
+      const directory = this.directory ?? new DlabDirectoryService(this.config, this.prisma, this.state, this.source, this.auth, this.reconciler);
+      await directory.provision(saved, requestId, assertOwned);
+      const authUserId = saved.reservedUserId;
       const email = buildPlaceholderEmail(saved.reservedUserId);
-      await this.auth.createDlabUser(authUserId, email, saved.name);
-      const changed = await dlabTransaction(this.prisma, async tx => {
-        await sourceWrite(tx);
-        const current = await tx.dlabIdentity.findUniqueOrThrow({ where: { externalUserId: saved.externalUserId } });
-        if (current.revision !== saved.revision || current.accountStatus !== 'active') throw new DlabError('identity_changed', 409);
-        const user = await tx.user.upsert({ where: { id: saved.reservedUserId }, create: { id: saved.reservedUserId, authUserId, email, emailIsPlaceholder: true, username: `dlab_${saved.reservedUserId.replaceAll('-', '').slice(0, 24)}`, displayName: saved.name, status: 'ACTIVE', platformRole: 'USER' }, update: { displayName: saved.name, lastSignInAt: new Date() } });
-        if (user.status !== 'ACTIVE' || user.authUserId !== authUserId) throw new DlabError('local_account_restricted', 403);
-        await tx.dlabIdentity.update({ where: { externalUserId: saved.externalUserId }, data: { userId: user.id, provisioningStatus: 'READY' } });
-        return this.reconciler.reconcile(tx, { ...current, userId: user.id });
-      });
-      // Only this login's account changed; other sessions need not re-verify.
-      await this.source.changed(changed, [authUserId]);
       const eligible = await this.policy.eligible(authUserId);
       if (!eligible) throw new DlabError('identity_not_bound', 403);
       const tokenHash = await this.auth.dlabTokenHash(authUserId, email);
@@ -74,6 +65,7 @@ export class DlabSsoService {
     const identity = await this.auth.verifyTokenClaims(token);
     if (identity.authUserId !== info.authUserId) throw new DlabError('session_identity_mismatch', 403);
     const allowed = await this.policy.activate(identity, info.generation);
+    await this.prisma.user.update({ where: { authUserId: identity.authUserId }, data: { lastSignInAt: new Date() } });
     if (allowed.isPlatformAdmin) return { destination: DLAB_ADMIN_DESTINATION, requiresStudentSession: false };
     const path = safeDlabReturnTo(info.returnTo);
     const requested = path && allowed.bindings.find(b => {

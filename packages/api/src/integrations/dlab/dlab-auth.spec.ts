@@ -24,6 +24,14 @@ describe('DLAB Supabase boundary', () => {
     await expect(instance.createDlabUser('bound-id', 'controlled@no-email.cove.invalid', 'Test')).rejects.toThrow('identity_conflict');
     expect(admin.createUser).not.toHaveBeenCalled();
   });
+  it.each(['bound-id', 'wrong-id'])('verifies the returned UUID on managed auth retry: %s', async returnedId => {
+    const { instance, admin } = service();
+    admin.getUserById.mockResolvedValue({ data: { user: { id: returnedId, email: 'controlled@no-email.cove.invalid', app_metadata: { dlab_managed: true } } } });
+    const result=instance.createDlabUser('bound-id','controlled@no-email.cove.invalid','Test');
+    if(returnedId==='bound-id') await expect(result).resolves.toBeUndefined();
+    else await expect(result).rejects.toThrow('identity_conflict');
+    expect(admin.createUser).not.toHaveBeenCalled();
+  });
   it('never returns bridge material for a different user', async () => {
     const { instance, admin } = service();
     admin.generateLink.mockResolvedValue({ data: { user: { id: 'wrong-id' }, properties: { hashed_token: 'private' } } });

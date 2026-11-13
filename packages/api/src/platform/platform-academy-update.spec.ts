@@ -46,7 +46,7 @@ const detail = {
 };
 
 function createService(options: {
-  current?: { name: string; slug: string; status: string };
+  current?: { name: string; slug: string; status: string; managed?: boolean };
   liveConflict?: boolean;
   retiredBy?: string | null;
 } = {}) {
@@ -93,6 +93,12 @@ function createService(options: {
 const input = { academyId, name: "New Name", slug: "new-slug" };
 
 describe("PlatformAcademyService.update", () => {
+  it("rejects a mapped source-name change before writing", async () => {
+    const {service,transaction}=createService({current:{name:"HQ name",slug:"old-slug",status:"ACTIVE",managed:true}});
+    await expect(service.update(identity,input)).rejects.toMatchObject({code:"DLAB_MANAGED_FIELDS"});
+    expect(transaction.academy.update).not.toHaveBeenCalled();
+  });
+
   it("retires the old slug so its links still resolve", async () => {
     const { service, history } = createService();
 

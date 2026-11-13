@@ -27,7 +27,7 @@ Object.assign(process.env, {
   SUPABASE_URL: 'https://dlab-sso-provider.invalid', SUPABASE_SECRET_KEY: 'local-e2e-admin-key',
   BFF_SHARED_SECRET: bffSecret, REDIS_URL: process.env.COVE_DLAB_TEST_REDIS_URL,
   MONITORING_REDIS_URL: process.env.COVE_DLAB_TEST_REDIS_URL, DLAB_SSO_ENABLED: 'true',
-  DLAB_OS_BASE_URL: 'https://os.dlabcampus.com/v1', DLAB_SSO_ROLLOUT_MODE: 'campus',
+  DLAB_DIRECTORY_SYNC_ENABLED: 'true', DLAB_OS_BASE_URL: 'https://os.dlabcampus.com/v1', DLAB_SSO_ROLLOUT_MODE: 'campus',
   DLAB_AUTO_PROVISION_CAMPUSES: 'true',
   DLAB_CLIENT_ID: 'cove', DLAB_CLIENT_SECRET: clientSecret,
   DLAB_INBOUND_SERVER_KEY: 'local-e2e-inbound-key-only-never-production', DLAB_REDIRECT_URI: studio + '/sso/callback',
@@ -123,6 +123,13 @@ const server = createServer(async (req, res) => {
         await db.user.create({ data: { id, authUserId: id, email, username: 'legacy_' + id.replaceAll('-', '').slice(0, 20), displayName: os.name, status: 'ACTIVE', platformRole: input.role === 'ADMIN' ? 'ADMIN' : 'USER' } });
         if (input.role !== 'ADMIN') await db.academyMembership.create({ data: { academyId: academy.id, userId: id, role: input.role, status: 'ACTIVE', joinedAt: new Date() } });
         return json(res, { id, academy, email, username: 'legacy_' + id.replaceAll('-', '').slice(0, 20) });
+      }
+      if (input.prelogin) {
+        const response = await originalFetch(api + '/api/integrations/dlab/v1/users/' + id, {
+          method:'PUT',headers:{Authorization:'Bearer '+process.env.DLAB_INBOUND_SERVER_KEY,'Content-Type':'application/json','X-Request-Id':randomUUID()},
+          body:JSON.stringify(os),
+        });
+        if (!response.ok) throw new Error('Pre-login sync failed: '+response.status);
       }
       return json(res, { id, academy, campus });
     }
@@ -247,7 +254,7 @@ const server = createServer(async (req, res) => {
       const identity = await db.dlabIdentity.findUnique({ where: { externalUserId: id }, include: { user: true, bindings: { include: { membership: { include: { extraRoles: true } } } } } });
       const sessionIds = [...sessions].filter(([, userId]) => userId === identity?.user?.authUserId).map(([id]) => id);
       const leases = await Promise.all(sessionIds.map(id => redis.get('cove:student-session:' + id)));
-      return json(res, identity ? { studentLeaseCount: leases.filter(Boolean).length, userId: identity.userId, role: identity.userRole, generation: identity.generation, platformRole: identity.user?.platformRole, memberships: identity.bindings.map(b => ({ id: b.membershipId, role: b.membership.role, roles: [b.membership.role, ...b.membership.extraRoles.map(r => r.role)], status: b.membership.status })) } : null);
+      return json(res, identity ? { studentLeaseCount: leases.filter(Boolean).length, lastSignInAt:identity.user?.lastSignInAt, userId: identity.userId, role: identity.userRole, generation: identity.generation, platformRole: identity.user?.platformRole, memberships: identity.bindings.map(b => ({ id: b.membershipId, role: b.membership.role, roles: [b.membership.role, ...b.membership.extraRoles.map(r => r.role)], status: b.membership.status })) } : null);
     }
     if (path === '/os/authorize') {
       const callback = new URL(url.searchParams.get('redirect_uri'));

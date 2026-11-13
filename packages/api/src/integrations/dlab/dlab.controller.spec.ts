@@ -42,12 +42,19 @@ describe('DLAB incoming trust boundaries', () => {
     const controller = new DlabInboundController(new ConfigService({ DLAB_SSO_ENABLED: true, DLAB_INBOUND_SERVER_KEY: key }) as never, {} as DlabSourceService);
     await expect(controller.campus(req, 'x', {})).rejects.toMatchObject({ reason: 'invalid_request_id' });
   });
-  it('persists a valid authenticated user, including an unknown role', async () => {
-    const source = { user: vi.fn().mockResolvedValue({ userId: null }) };
-    const controller = new DlabInboundController(new ConfigService({ DLAB_SSO_ENABLED: true, DLAB_INBOUND_SERVER_KEY: key }) as never, source as unknown as DlabSourceService);
+  it('returns retryable maintenance rather than source-only success', async () => {
+    const source = { user: vi.fn() };
+    const controller = new DlabInboundController(new ConfigService({ DLAB_SSO_ENABLED: true, DLAB_INBOUND_SERVER_KEY: key }) as never, source as never);
+    await expect(controller.user(request(`Bearer ${key}`), 'student', {})).rejects.toMatchObject({ reason: 'directory_sync_unavailable' });
+    expect(source.user).not.toHaveBeenCalled();
+  });
+  it('returns completed directory results, including unknown-role fallback', async () => {
+    const response = { ok: true, id: uuid, request_id: uuid, provisioning_status: 'READY', outcome: 'applied', membership_ids: [] };
+    const directory = { syncUser: vi.fn().mockResolvedValue(response) };
+    const controller = new DlabInboundController(new ConfigService({ DLAB_SSO_ENABLED: true, DLAB_INBOUND_SERVER_KEY: key, DLAB_DIRECTORY_SYNC_ENABLED: true, DLAB_SSO_ROLLOUT_MODE: 'campus' }) as never, {} as never, directory as never);
     const payload = { external_campus_id: 'campus', name: 'Test', user_role: 'future-role', account_status: 'active' };
-    expect(await controller.user(request(`Bearer ${key}`), 'student', payload)).toEqual({ ok: true });
-    expect(source.user).toHaveBeenCalledWith('student', payload, undefined, uuid);
+    expect(await controller.user(request(`Bearer ${key}`), 'student', payload)).toEqual(response);
+    expect(directory.syncUser).toHaveBeenCalledWith('student', payload, uuid);
   });
   it('does not let the inbound OS key mint sessions', async () => {
     const start = vi.fn();

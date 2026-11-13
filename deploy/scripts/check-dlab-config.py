@@ -25,6 +25,8 @@ def check(api, studio, deployment=None):
     if api.get('DLAB_OS_BASE_URL', 'https://os.dlabcampus.com/v1') != 'https://os.dlabcampus.com/v1':
         raise ValueError('DLAB_OS_BASE_URL must use https://os.dlabcampus.com/v1')
     enabled = api.get('DLAB_SSO_ENABLED') == 'true'
+    if api.get('DLAB_DIRECTORY_SYNC_ENABLED') == 'true' and (not enabled or mode != 'campus'):
+        raise ValueError('DLAB_DIRECTORY_SYNC_ENABLED requires enabled SSO in campus mode')
     if enabled != (studio.get('DLAB_SSO_ENABLED') == 'true'):
         raise ValueError('API and Studio DLAB_SSO_ENABLED must agree')
     if not enabled:

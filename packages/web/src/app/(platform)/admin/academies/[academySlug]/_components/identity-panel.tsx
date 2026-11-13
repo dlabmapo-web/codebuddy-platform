@@ -67,12 +67,14 @@ export function IdentityPanel({
           <span className="text-[13.5px] font-bold">{t('identity.name')}</span>
           <input
             className="h-11 rounded-lg border border-border bg-canvas px-3 text-[15px] outline-none focus:border-brand"
-            disabled={archived || pending}
+            disabled={archived || pending || !!academy.dlabSource}
             maxLength={120}
             onChange={(event) => setName(event.target.value)}
             value={name}
           />
+          {academy.dlabSource ? <span className="text-[12.5px] text-sub">{t('identity.os_managed')}</span> : null}
         </label>
+        {academy.dlabSource?.status === 'inactive' ? <p className="text-[13.5px] text-danger">{t('identity.os_inactive')}</p> : null}
 
         <label className="grid gap-1.5">
           <span className="text-[13.5px] font-bold">{t('identity.slug')}</span>

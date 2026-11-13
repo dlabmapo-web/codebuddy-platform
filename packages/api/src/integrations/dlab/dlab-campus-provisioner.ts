@@ -56,16 +56,13 @@ export class DlabCampusProvisioner {
 }
 
 /** A campus mapping/status change invalidates old grants before reconciliation. */
-export async function reconcileDlabCampus(tx: Prisma.TransactionClient, reconciler: DlabReconcilerService, externalCampusId: string) {
-  const identities = await tx.dlabIdentity.findMany({ where: { OR: [
+export async function reconcileDlabCampus(tx: Prisma.TransactionClient, reconciler: DlabReconcilerService, externalCampusId: string, triggeredAcademyId?: string) {
+  const where = { OR: [
     { externalCampusId }, { externalCampusIds: { has: externalCampusId } }, { bindings: { some: { externalCampusId } } },
-  ] }, orderBy: { externalUserId: 'asc' } });
-  const changed: string[] = [];
-  for (const identity of identities) {
-    const updated = await tx.dlabIdentity.update({ where: { externalUserId: identity.externalUserId }, data: {
-      generation: { increment: 1 }, revision: { increment: 1 },
-    } });
-    changed.push(...await reconciler.reconcile(tx, updated));
-  }
-  return changed;
+  ] };
+  // The academy status trigger already advanced bound identities. Advance only
+  // the remainder, so one logical closure does not invalidate twice.
+  await tx.dlabIdentity.updateMany({ where: { ...where, ...(triggeredAcademyId ? { bindings: { none: { membership: { academyId: triggeredAcademyId } } } } : {}) }, data: { generation: { increment: 1 }, revision: { increment: 1 } } });
+  const identities = await tx.dlabIdentity.findMany({ where, select: { externalUserId: true }, orderBy: { externalUserId: 'asc' } });
+  return reconciler.reconcileBatch(tx, identities.map(i => i.externalUserId));
 }

@@ -13,7 +13,7 @@ if (apply) args.pop();
 if (!['map', 'access', 'invalidate'].includes(command ?? '') || (command === 'invalidate' ? args.length !== 1 : args.length !== 3)) throw new Error('Usage: operator <map|access> <external-campus-id> <academy-id|enabled|disabled> <operator-id> [--apply]; operator invalidate <operator-id> [--apply]');
 const rolloutMode = process.env.DLAB_SSO_ROLLOUT_MODE ?? 'allowlist';
 if (!['allowlist', 'campus'].includes(rolloutMode)) throw new Error('Invalid DLAB_SSO_ROLLOUT_MODE');
-const config = new ConfigService({ ...process.env, DLAB_SSO_ROLLOUT_MODE: rolloutMode, DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS: (process.env.DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean) }) as unknown as ConfigService<ApiEnvironment, true>;
+const config = new ConfigService({ ...process.env, DLAB_DIRECTORY_SYNC_ENABLED: process.env.DLAB_DIRECTORY_SYNC_ENABLED === 'true', DLAB_SSO_ROLLOUT_MODE: rolloutMode, DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS: (process.env.DLAB_SSO_ALLOWED_EXTERNAL_USER_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean) }) as unknown as ConfigService<ApiEnvironment, true>;
 const prisma = new PrismaService(config);
 const reconciler = new DlabReconcilerService(config);
 const redisUrl = process.env.MONITORING_REDIS_URL ?? process.env.REDIS_URL;
@@ -41,10 +41,8 @@ try {
     }
     const identities = await tx.dlabIdentity.findMany({ where: campus ? { OR: [{ externalCampusId: campus.externalCampusId }, { externalCampusIds: { has: campus.externalCampusId } }, { bindings: { some: { externalCampusId: campus.externalCampusId } } }] } : {}, orderBy: { externalUserId: 'asc' } });
     if (apply) {
-      for (const identity of identities) {
-        const current = await tx.dlabIdentity.update({ where: { externalUserId: identity.externalUserId }, data: { generation: { increment: 1 }, revision: { increment: 1 } } });
-        await reconciler.reconcile(tx, current);
-      }
+      await tx.dlabIdentity.updateMany({ where: { externalUserId: { in: identities.map(i => i.externalUserId) } }, data: { generation: { increment: 1 }, revision: { increment: 1 } } });
+      await reconciler.reconcileBatch(tx, identities.map(i => i.externalUserId));
       await tx.auditLog.create({ data: { actorUserId: actorId, academyId: campus?.academyId, action: `dlab.${command}`, targetType: 'DlabIntegration', targetId: campus?.externalCampusId ?? 'all-managed-sessions', after: { command, target: args[1] ?? null, affectedIdentities: identities.length } } });
     }
     return { mode: apply ? 'apply' : 'dry-run', command, rolloutMode, databaseHost: databaseTarget.hostname, databaseName: databaseTarget.pathname, externalCampusId: campus?.externalCampusId ?? null, target: args[1] ?? null, affectedIdentities: identities.length };

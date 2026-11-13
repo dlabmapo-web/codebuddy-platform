@@ -61,10 +61,11 @@ describe.skipIf(!databaseUrl || !redisUrl)('HQ campus provisioning with isolated
     const f = fixture(false), payload = { name: '마포 테스트', status: 'active' as const, updated_at: '2026-11-04T00:00:00Z' };
     expect(await f.source.campus(f.campusId, payload)).toMatchObject({ academyId: null, ssoEnabled: false });
     f.config.set('DLAB_AUTO_PROVISION_CAMPUSES', true);
+    f.config.set('DLAB_DIRECTORY_SYNC_ENABLED', true);
     const controller = new DlabInboundController(f.config as never, f.source), requestId = randomUUID();
     const req = { body: payload, headers: { authorization: 'Bearer test-only-campus-inbound-key-32-bytes', 'x-request-id': requestId },
       rawHeaders: ['Authorization', 'Bearer test-only-campus-inbound-key-32-bytes', 'X-Request-Id', requestId] } as unknown as Request;
-    expect(await controller.campus(req, f.campusId, payload)).toEqual({ ok: true, id: expect.any(String) });
+    expect(await controller.campus(req, f.campusId, payload)).toMatchObject({ ok: true, id: expect.any(String), request_id: requestId, provisioning_status: 'READY', outcome: 'applied' });
     const saved = await f.record();
     expect(saved).toMatchObject({ ssoEnabled: true, academy: { name: payload.name, slug: dlabCampusSlug(f.campusId), timeZone: 'Asia/Seoul' } });
     expect((await db.academyFeatureFlag.findMany({ where: { academyId: saved.academyId! }, select: { feature: true, isEnabled: true } })).sort((a, b) => a.feature.localeCompare(b.feature)))

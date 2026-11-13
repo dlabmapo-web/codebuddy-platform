@@ -37,10 +37,11 @@ export class DlabStateService {
   async invalidate(kind: string, token: string, binding: string) {
     await this.consume(kind, token, binding).catch(() => undefined);
   }
-  async lock<T>(externalId: string, run: () => Promise<T>): Promise<T> {
+  async lock<T>(externalId: string, run: (assertOwned: () => Promise<void>) => Promise<T>): Promise<T> {
     const redis = this.requireRedis(), key = `cove:dlab:lock:${digest(externalId)}`, owner = randomBytes(32).toString('hex');
     if (await redis.set(key, owner, 'EX', 60, 'NX') !== 'OK') throw new DlabError('provisioning_busy', 503);
-    try { return await run(); }
+    const assertOwned = async () => { if (await redis.get(key) !== owner) throw new DlabError('provisioning_lock_lost', 503); };
+    try { return await run(assertOwned); }
     finally { await redis.eval("if redis.call('GET',KEYS[1]) == ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0", 1, key, owner); }
   }
 }

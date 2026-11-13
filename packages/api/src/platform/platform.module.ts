@@ -1,4 +1,5 @@
 import { PlatformLibraryImportService } from "./platform-library-import.service.js";
+import { DlabPolicyModule } from "../integrations/dlab/dlab-policy.module.js";
 import { Module } from "@nestjs/common";
 
 import { AcademiesModule } from "../academies/academies.module.js";
@@ -41,6 +42,7 @@ import { PlatformLifecycleService } from "./platform-lifecycle.service.js";
  */
 @Module({
   imports: [
+    DlabPolicyModule,
     AcademiesModule,
     AuthModule,
     AuthorizationModule,

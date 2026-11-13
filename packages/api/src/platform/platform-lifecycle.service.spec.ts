@@ -180,6 +180,18 @@ describe("PlatformLifecycleService.setStatus", () => {
     ).toBe("ACADEMY_NOT_FOUND");
   });
 
+  it("records local intent even when source already made the academy suspended", async () => {
+    const {service,transaction,update,auditWrite}=createService("SUSPENDED");
+    transaction.$queryRaw.mockResolvedValue([{id:academyId,status:"SUSPENDED",sourceStatus:"inactive",localRestriction:null}] as never);
+    await service.setStatus({authUserId:"auth-1"} as never,{academyId,status:"SUSPENDED",reason:"Keep closed locally"});
+    expect(update).toHaveBeenCalled();expect(auditWrite).toHaveBeenCalled();
+  });
+  it("refuses local restore while OS is inactive", async () => {
+    const {service,transaction,update}=createService("SUSPENDED");
+    transaction.$queryRaw.mockResolvedValue([{id:academyId,status:"SUSPENDED",sourceStatus:"inactive",localRestriction:"SUSPENDED"}] as never);
+    expect(await codeOf(service.setStatus({authUserId:"auth-1"} as never,{academyId,status:"ACTIVE",reason:"Restore"}))).toBe("ACADEMY_STATE_CONFLICT");
+    expect(update).not.toHaveBeenCalled();
+  });
   it("locks the row before deciding the transition", async () => {
     const { service, transaction } = createService("ACTIVE");
     await service.setStatus({ authUserId: "auth-1" } as never, {
@@ -187,7 +199,8 @@ describe("PlatformLifecycleService.setStatus", () => {
       status: "ARCHIVED",
       reason: "Contract ended.",
     });
-    const [sql] = transaction.$queryRaw.mock.calls[0] as [{ raw?: string[] } & string[]];
+    const [sql] = transaction.$queryRaw.mock.calls[1] as [{ raw?: string[] } & string[]];
     expect(sql.join("")).toContain("FOR UPDATE");
+    expect((transaction.$queryRaw.mock.calls[0]![0] as string[]).join("")).toContain("pg_advisory_xact_lock");
   });
 });

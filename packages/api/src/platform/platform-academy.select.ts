@@ -26,6 +26,7 @@ export const academySummarySelect = {
 
 export const academyDetailSelect = {
   ...academySummarySelect,
+  dlabCampus: { select: { externalCampusId: true, status: true, localAcademyRestriction: true } },
   contactEmail: true,
   contactPhone: true,
   locality: true,

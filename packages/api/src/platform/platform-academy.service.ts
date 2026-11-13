@@ -231,8 +231,8 @@ export class PlatformAcademyService {
 
     return this.prisma.$transaction(async (transaction) => {
       const rows = await transaction.$queryRaw<
-        { id: string; name: string; slug: string; status: AcademyStatus }[]
-      >`SELECT id, name, slug, status FROM academies WHERE id = ${input.academyId}::uuid FOR UPDATE`;
+        { id: string; name: string; slug: string; status: AcademyStatus; managed: boolean }[]
+      >`SELECT a.id, a.name, a.slug, a.status, EXISTS(SELECT 1 FROM dlab_campuses c WHERE c.academy_id=a.id) AS managed FROM academies a WHERE a.id = ${input.academyId}::uuid FOR UPDATE`;
       const current = rows[0];
       if (!current) {
         throw new AppException("ACADEMY_NOT_FOUND", HttpStatus.NOT_FOUND);
@@ -242,6 +242,9 @@ export class PlatformAcademyService {
         throw new AppException("ACADEMY_STATE_CONFLICT", HttpStatus.CONFLICT);
       }
 
+      if (current.managed && current.name !== input.name) {
+        throw new AppException("DLAB_MANAGED_FIELDS", HttpStatus.FORBIDDEN);
+      }
       const slugChanged = current.slug !== input.slug;
       if (slugChanged) {
         await this.requireSlugFree(transaction, input.slug, input.academyId);

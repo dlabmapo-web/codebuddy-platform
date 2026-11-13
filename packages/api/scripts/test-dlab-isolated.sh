@@ -24,6 +24,7 @@ export COVE_DLAB_TEST_REDIS_URL="redis://127.0.0.1:$dlab_redis_port/0"
 # Generation/build must also use this disposable target in a fresh worktree.
 export DATABASE_URL="$COVE_DLAB_TEST_DATABASE_URL"
 export DIRECT_URL="$COVE_DLAB_TEST_DATABASE_URL"
+export COVE_INTEGRATION_DATABASE_URL="$COVE_DLAB_TEST_DATABASE_URL"
 # Minimal Supabase schema scaffolding needed by existing application migrations.
 # These doubles do not validate Supabase provider-side credential guard behavior.
 docker exec -i "$dlab_pg" psql -U postgres -d cove_dlab_test -v ON_ERROR_STOP=1 <<'SQL'
@@ -41,7 +42,7 @@ pnpm --filter @cove/api build
 # The catch-up operator deliberately scans the complete source directory. Run
 # its database fixtures first, before legacy tests stage intentionally broken mappings.
 pnpm --filter @cove/api exec vitest run src/integrations/dlab/dlab-campus-provisioner.integration.spec.ts
-pnpm --filter @cove/api exec vitest run src/integrations/dlab src/authorization src/auth src/academies/academy-membership.service.spec.ts --fileParallelism=false --exclude '**/dlab-campus-provisioner.integration.spec.ts'
+pnpm --filter @cove/api exec vitest run src/integrations/dlab src/authorization src/auth src/platform/platform-lifecycle.service.spec.ts src/platform/platform-academy-update.spec.ts src/platform/platform-academy.mapper.spec.ts src/platform/platform-academy.service.spec.ts src/academies/academy-membership.service.spec.ts --fileParallelism=false --exclude '**/dlab-campus-provisioner.integration.spec.ts'
 pnpm --filter @cove/shared test src/integrations/dlab src/memberships/people-bulk.spec.ts
 pnpm --filter @cove/web test src/lib/dlab-sso.spec.ts
 pnpm e2e:dlab "$@"

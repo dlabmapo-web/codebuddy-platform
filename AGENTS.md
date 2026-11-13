@@ -42,3 +42,15 @@ does (Prisma `log: [{ emit: "event", level: "query" }]` and `$on("query")`),
 against a disposable Docker PostgreSQL through `COVE_INTEGRATION_DATABASE_URL`,
 never the shared Supabase databases. State the count in the commit message when
 it changes.
+
+# Clean up development servers after implementation
+
+After implementation and verification, stop any remaining Cove API processes
+on port **4000**, including orphaned Node children and Nest watchers. Leave
+this port free so the user can start the API themselves, unless they explicitly
+ask to keep it running. Also stop other temporary servers started for the task.
+
+For `EADDRINUSE`, inspect the listener's working directory and process identity
+before stopping it; only terminate the relevant Cove processes, not unrelated
+services. Prefer graceful termination, stop a respawning watcher as needed,
+and verify that port 4000 has no listener before handing back the work.

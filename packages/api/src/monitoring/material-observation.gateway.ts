@@ -100,7 +100,16 @@ export class MaterialObservationGateway {
   }
 
   @SubscribeMessage(observationEvents.stop)
-  async stop(@ConnectedSocket() socket: ObservationSocket) {
+  async stopRequest(@ConnectedSocket() socket: ObservationSocket) {
+    // A workspace can leave while authorization is still opening its watch.
+    // Queue the stop before the next student's start on this reused transport.
+    const operation = () => this.stop(socket);
+    const pending = (socket.data.observationStarts ?? Promise.resolve()).then(operation, operation);
+    socket.data.observationStarts = pending;
+    return pending;
+  }
+
+  async stop(socket: ObservationSocket) {
     const timer = this.timers.get(socket.id); if (timer) clearInterval(timer); this.timers.delete(socket.id);
     const current = socket.data.observation; delete socket.data.observation;
     if (!current) return;

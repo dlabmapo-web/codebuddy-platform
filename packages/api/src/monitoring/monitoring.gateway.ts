@@ -804,14 +804,13 @@ export class MonitoringGateway
     @ConnectedSocket() socket: MonitoringSocket,
     @MessageBody() body: unknown,
   ): Promise<MonitoringAck<{ ended: true }>> {
-    const eventId = eventIdOf(body);
-    const parsed = watchStopPayloadSchema.safeParse(body);
-    const identity = parsed.success ? parsed.data.identity : undefined;
-    const watch = socket.data?.teacher?.watch;
-    if (watch && identity && matchesWatch(watch, identity)) {
-      await this.endWatch(socket, "TEACHER_LEFT");
-    }
-    return { ok: true, eventId, data: { ended: true } };
+    return this.command(socket, monitoringClientEvents.watchStop, watchStopPayloadSchema, body, async payload => {
+      const watch = socket.data?.teacher?.watch;
+      const matches = watch && ((payload.identity && matchesWatch(watch, payload.identity))
+        || (payload.sessionId && watch.sessionId === payload.sessionId));
+      if (matches) await this.endWatch(socket, "TEACHER_LEFT");
+      return { ended: true as const };
+    });
   }
 
   /**

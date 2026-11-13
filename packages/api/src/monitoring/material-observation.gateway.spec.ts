@@ -133,3 +133,19 @@ describe('material observation authority', () => {
     expect(result.ok).toBe(false); expect(s.watches.register).not.toHaveBeenCalled();
   });
 });
+
+it('queues observation cleanup after an opening watch and before its successor', async () => {
+  const s = setup();
+  let authorize!: () => void;
+  s.access.requireFeature.mockImplementationOnce(() => new Promise<void>(resolve => { authorize = resolve; }));
+  const first = s.gateway.start(s.socket as never, { ...s.scope, sessionId: randomUUID(), version: 1 });
+  await Promise.resolve(); await Promise.resolve();
+  const stop = s.gateway.stopRequest(s.socket as never);
+  authorize();
+  await first; await stop;
+  expect((s.socket.data as { observation?: unknown }).observation).toBeUndefined();
+  expect(s.watches.end).toHaveBeenCalledTimes(1);
+  await s.gateway.start(s.socket as never, { ...s.scope, membershipId: randomUUID(), sessionId: randomUUID(), version: 1 });
+  expect((s.socket.data as { observation?: unknown }).observation).toBeDefined();
+  await s.gateway.stopRequest(s.socket as never); s.gateway.onModuleDestroy();
+});

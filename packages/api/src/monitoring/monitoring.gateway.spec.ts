@@ -1114,6 +1114,29 @@ describe("terminalResync", () => {
 });
 
 describe("watchStop", () => {
+  it('stops an in-flight replacement from the same departing component session', async () => {
+    const { gateway, documents } = createGateway();
+    const current = { ...watchState(), generation: 2 };
+    const socket = createSocket({ teacher: { claims: new Map(), watch: current } });
+    await gateway.watchStop(socket, { eventId: visitId, identity, sessionId: current.sessionId });
+    expect(documents.endWatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('ends an opening session in order and does not retire a different successor', async () => {
+    const { gateway, documents } = createGateway();
+    const opening = watchState();
+    const socket = createSocket({ teacher: { claims: new Map(), watch: null } });
+    let finish!: () => void;
+    socket.data.watchStarts = new Promise<void>(resolve => { finish = () => { socket.data.teacher!.watch = opening; resolve(); }; });
+    const stop = gateway.watchStop(socket, { eventId: visitId, sessionId: opening.sessionId });
+    expect(documents.endWatch).not.toHaveBeenCalled();
+    finish(); await stop;
+    expect(documents.endWatch).toHaveBeenCalledTimes(1);
+    socket.data.teacher!.watch = { ...watchState(), sessionId: '60000000-0000-4000-8000-000000000099' };
+    await gateway.watchStop(socket, { eventId: visitId, sessionId: opening.sessionId });
+    expect(documents.endWatch).toHaveBeenCalledTimes(1);
+  });
+
   it("clears the teacher's pointer and caret for the student left behind", async () => {
     const { gateway, emissions, documents } = createGateway();
     const socket = createSocket({

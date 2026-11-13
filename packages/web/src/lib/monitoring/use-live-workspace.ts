@@ -495,6 +495,7 @@ export function useLiveWorkspace({
         monitoringClientEvents.watchStop,
         {
           eventId: crypto.randomUUID(),
+          sessionId: sessionIdRef.current,
           ...(current ? { identity: identityOf(current) } : {}),
         },
         () => undefined,

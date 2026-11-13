@@ -154,6 +154,8 @@ export const studentBindingFetchSchema = commandBase.extend({ academyId: z.uuid(
 /** Stopping names the watch to stop, so a stale tab cannot close a live one. */
 export const watchStopPayloadSchema = commandBase.extend({
   identity: watchIdentitySchema.optional(),
+  /** Stop a watch still opening when its workspace unmounts. */
+  sessionId: z.uuid().optional(),
 });
 
 /**

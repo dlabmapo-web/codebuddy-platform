@@ -1,5 +1,6 @@
 import { test, expect, webkit, type Page, type APIRequestContext } from '@playwright/test';
 import { resolve } from 'node:path';
+import { routes } from '../../packages/web/src/lib/routes';
 test.beforeEach(async ({ context }) => { await context.route('https://os.dlabcampus.com/**', route => route.abort()); });
 const fixtureOrigin = `http://127.0.0.1:${Number(process.env.COVE_DLAB_TEST_PROVIDER_PORT ?? 4320)}`;
 const apiOrigin = `http://127.0.0.1:${Number(process.env.COVE_DLAB_TEST_API_PORT ?? 4319)}`;
@@ -640,7 +641,7 @@ for (const engine of ['chromium','webkit']) test(`directory sync: manager assign
     expect(staff.lastSignInAt).toBeNull(); expect(staff.memberships[0].role).toBe('TEACHER');
     const page = await managerContext.newPage(); await enter(page,manager);
     await expect(page).toHaveURL(landing(manager.academy.slug,'MANAGER'));
-    await page.goto(`/academy/${manager.academy.slug}/people`);
+    await page.goto(routes.academyPeople(manager.academy.slug));
     await expect(page.getByText('Directory Student',{exact:true})).toBeVisible();
     await expect(page.getByText('Directory Teacher',{exact:true})).toBeVisible();
     const created = await rpc(page,request,'academyClasses/create',{academyId:manager.academy.id,name:'Pre-login assigned class'});
@@ -657,7 +658,7 @@ for (const engine of ['chromium','webkit']) test(`directory sync: manager assign
     await page.reload(); await expect(page.getByText('Directory Student',{exact:true})).toBeVisible();
     const learner=await studentContext.newPage();await enter(learner,student);
     await expect(learner).toHaveURL(landing(student.academy.slug,'STUDENT'));
-    await learner.goto(`/academy/${student.academy.slug}/learn/classes`);
+    await learner.goto(routes.academyLearnClasses(student.academy.slug));
     await expect(learner.getByText('Pre-login assigned class',{exact:true})).toBeVisible();
     const after=await (await request.get(fixtureOrigin+'/fixtures/'+student.id)).json();
     expect(after.userId).toBe(before.userId);expect(after.memberships).toEqual(before.memberships);expect(after.lastSignInAt).not.toBeNull();

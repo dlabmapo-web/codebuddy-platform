@@ -288,8 +288,8 @@ export function canReviewContent(roles: readonly AcademyRole[]): boolean {
  * Whether to offer the Excel importer.
  *
  * A UI convenience and nothing more: every server operation checks
- * `content.import` for itself, so hiding the action saves a Manager a dead end
- * rather than protecting anything. It is a separate gate from
+ * `content.import` for itself, so hiding the action spares readers a dead end
+ * when they lack that permission. It is a separate gate from
  * `canManageContent` because it grants something that one does not — the
  * current-course workbook contains hidden test inputs and expected outputs.
  */
@@ -298,9 +298,8 @@ export function canImportContent(roles: readonly AcademyRole[]): boolean {
 }
 
 /**
- * Class structure and enrollment are deliberately separate gates: a Team Lead
- * arranges what a class learns, but only a Manager decides who sits in it,
- * because that changes a student's access.
+ * Class structure and enrollment use separate permissions. Managers and Team
+ * Leads inherit both; assigned Teachers retain delivery access only.
  */
 export function canManageClasses(roles: readonly AcademyRole[]): boolean {
   return rolesHavePermission(roles, 'classes.manage');

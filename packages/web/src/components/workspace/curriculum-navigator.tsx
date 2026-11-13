@@ -1,4 +1,5 @@
 'use client';
+import { useClassroom } from '@/components/classroom/classroom-context';
 import { MaterialIdentity } from './material-identity';
 
 import type {
@@ -51,7 +52,7 @@ const statusIcons: Record<
   SOLVED: { className: 'text-success', Icon: CheckCircle2 },
 };
 
-export function WorkspaceCurriculumNavigator({
+function OrdinaryCurriculumNavigator({
   context,
   allowPdfNavigation = true,
   resourceHref,
@@ -482,4 +483,9 @@ function ExerciseRow({
       </button>
     </li>
   );
+}
+
+export function WorkspaceCurriculumNavigator(props: React.ComponentProps<typeof OrdinaryCurriculumNavigator>) {
+  const classroom = useClassroom();
+  return classroom ? null : <OrdinaryCurriculumNavigator {...props} />;
 }

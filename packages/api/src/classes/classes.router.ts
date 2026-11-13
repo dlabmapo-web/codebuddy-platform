@@ -10,6 +10,9 @@ export function createClassesRouters(os: ORPCImplementer, deps: ORPCDeps) {
 
   return {
     academyClasses: {
+      getClassroom: os.academyClasses.getClassroom
+        .use(access.authenticated)
+        .handler(({ context, input }) => deps.classroomService.get(context.identity, input)),
       list: os.academyClasses.list
         .use(access.authenticated)
         .handler(({ context, input }) =>

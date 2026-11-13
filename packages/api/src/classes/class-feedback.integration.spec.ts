@@ -12,6 +12,7 @@ import { SupportGrantResolver } from '../authorization/support-grant.resolver.js
 import { AuditService } from '../academies/audit.service.js';
 import { MonitoringAccessService } from '../monitoring/monitoring-access.service.js';
 import { MonitoringService } from '../monitoring/monitoring.service.js';
+import { ClassroomService } from './classroom.service.js';
 import { ClassesService } from './classes.service.js';
 
 const databaseUrl = process.env.COVE_INTEGRATION_DATABASE_URL;
@@ -21,6 +22,7 @@ describe.skipIf(!databaseUrl)('class feedback against disposable PostgreSQL', ()
   const prisma = client as unknown as PrismaService;
   const access = new AcademyAccessService(prisma, new SupportGrantResolver(prisma));
   const media = { signMany: vi.fn().mockResolvedValue([]) } as never;
+  const classroom = new ClassroomService(prisma, access);
   const classes = new ClassesService(prisma, access, new AuditService(), {} as never, media);
   const monitoring = new MonitoringService(prisma, new MonitoringAccessService(prisma, access), {} as never, {} as never, new AuditService(), media);
   const academyId = randomUUID();
@@ -59,6 +61,7 @@ describe.skipIf(!databaseUrl)('class feedback against disposable PostgreSQL', ()
       teachingList: () => monitoring.listAssignedClasses(identity, { academyId }),
       teachingRoster: () => monitoring.getClassRoster(identity, { academyId, classId }),
       managementDetail: () => classes.get(identity, { academyId, classId }),
+      classroomEntry: () => Promise.all([classroom.get(identity, { academyId, classId }), monitoring.getClassRoster(identity, { academyId, classId })]),
     };
     const measure = async () => {
       const counts: Record<string, number> = {};
@@ -80,7 +83,7 @@ describe.skipIf(!databaseUrl)('class feedback against disposable PostgreSQL', ()
     evidence.counts = { small, large, classes: [1, 13], students: [1, 21] };
     expect(large).toEqual(small);
     // Pin measured service budgets after establishing the disposable baseline.
-    expect(small).toEqual({ teachingList: 4, teachingRoster: 13, managementDetail: 26 });
+    expect(small).toEqual({ teachingList: 4, teachingRoster: 13, managementDetail: 26, classroomEntry: 17 });
   });
 
   it.each(['MANAGER', 'TEAM_LEAD'] as const)('%s edits the complete timetable and records its audit', async role => {
@@ -102,9 +105,90 @@ describe.skipIf(!databaseUrl)('class feedback against disposable PostgreSQL', ()
     await expect(classes.setSchedule(identity, { academyId, classId, slots: [], expectedUpdatedAt: new Date().toISOString() })).rejects.toMatchObject({ code: 'PERMISSION_DENIED' });
   });
 
+  it('reads the published class outline in four statements regardless of lesson count', async () => {
+    const owner = people.get('MANAGER')!;
+    const course = await client.course.create({ data: { academyId, title: 'Teaching course', createdByUserId: owner.userId, isVisible: true } });
+    await client.classCourse.create({ data: { classId, courseId: course.id, assignedByUserId: owner.userId } });
+    const module = await client.courseModule.create({ data: { courseId: course.id, externalKey: randomUUID(), title: 'Module', position: 1, isVisible: true } });
+    const lecture = await client.lecture.create({ data: { courseModuleId: module.id, externalKey: randomUUID(), title: 'Lecture', position: 1, isVisible: true } });
+    await client.material.create({ data: { lectureId: lecture.id, title: 'Visible', position: 1, type: 'EXPLANATION', isVisible: true, explanationMaterial: { create: { body: '<p>Visible lesson</p>' } } } });
+    statements = 0;
+    const small = await classroom.get(owner.identity, { academyId, classId });
+    const smallCount = statements;
+    statements = 0;
+    await Promise.all([classroom.get(owner.identity, { academyId, classId }), monitoring.getClassRoster(owner.identity, { academyId, classId })]);
+    const entrySmall = statements;
+    expect(small.courses[0].modules[0].lectures[0].materials).toHaveLength(1);
+    const expandedMaterials = Array.from({ length: 40 }, (_, i) => ({ id: randomUUID(), lectureId: lecture.id, title: 'Lesson ' + i, position: i + 2, type: 'PROGRAMMING_EXERCISE' as const, isVisible: true }));
+    await client.material.createMany({ data: expandedMaterials });
+    await client.programmingExercise.createMany({ data: expandedMaterials.map(material => ({ materialId: material.id, externalKey: randomUUID(), difficulty: 'EASY' as const })) });
+    await client.material.create({ data: { lectureId: lecture.id, title: 'Hidden', position: 42, type: 'EXPLANATION', isVisible: false } });
+    const hiddenModule = await client.courseModule.create({ data: { courseId: course.id, externalKey: randomUUID(), title: 'Hidden module', position: 2, isVisible: false } });
+    await client.lecture.create({ data: { courseModuleId: hiddenModule.id, externalKey: randomUUID(), title: 'Hidden lecture', position: 1, isVisible: true } });
+    const unassigned = await client.course.create({ data: { academyId, title: 'Unassigned', createdByUserId: owner.userId, isVisible: true } });
+    const supplementaryAsset = randomUUID(), pendingAsset = randomUUID();
+    await client.pdfAsset.createMany({ data: [supplementaryAsset, pendingAsset].map((id, i) => ({
+      id, objectKey: randomUUID() + '.pdf', originalFilename: 'reference.pdf', byteSize: 100,
+      checksumSha256: 'fixture', pageCount: 1, state: i === 0 ? 'READY' as const : 'PENDING' as const,
+      uploaderUserId: owner.userId, academyId, courseId: course.id, lectureId: lecture.id,
+    })) });
+    const supplementaryMaterial = randomUUID(), pendingMaterial = randomUUID();
+    await client.material.createMany({ data: [supplementaryMaterial, pendingMaterial].map((id, i) => ({
+      id, lectureId: lecture.id, title: 'Not a main lesson', position: 43 + i, type: 'PDF_DOCUMENT' as const, isVisible: true,
+    })) });
+    await client.pdfDocument.createMany({ data: [
+      { materialId: supplementaryMaterial, assetId: supplementaryAsset, placement: 'SUPPLEMENTARY' },
+      { materialId: pendingMaterial, assetId: pendingAsset, placement: 'MAIN' },
+    ] });
+    const extraCourses = Array.from({ length: 5 }, (_, i) => ({ id: randomUUID(), academyId, title: 'ZZ additional ' + i, createdByUserId: owner.userId, isVisible: true }));
+    await client.course.createMany({ data: extraCourses });
+    await client.classCourse.createMany({ data: extraCourses.map(course => ({ classId, courseId: course.id, assignedByUserId: owner.userId })) });
+    const extraModules = extraCourses.map(course => ({ id: randomUUID(), courseId: course.id, externalKey: randomUUID(), title: 'Another module', position: 1, isVisible: true }));
+    await client.courseModule.createMany({ data: extraModules });
+    const extraLectures = extraModules.map(module => ({ id: randomUUID(), courseModuleId: module.id, externalKey: randomUUID(), title: 'Another lecture', position: 1, isVisible: true }));
+    await client.lecture.createMany({ data: extraLectures });
+    const extraMaterials = extraLectures.map(lecture => ({ id: randomUUID(), lectureId: lecture.id, title: 'Another lesson', type: 'EXPLANATION' as const, position: 1, isVisible: true }));
+    await client.material.createMany({ data: extraMaterials });
+    await client.explanationMaterial.createMany({ data: extraMaterials.map(material => ({ materialId: material.id, body: '<p>Another lesson</p>' })) });
+    statements = 0;
+    const large = await classroom.get(owner.identity, { academyId, classId });
+    const largeCount = statements;
+    statements = 0;
+    await Promise.all([classroom.get(owner.identity, { academyId, classId }), monitoring.getClassRoster(owner.identity, { academyId, classId })]);
+    const entryLarge = statements;
+    expect(entryLarge).toBe(entrySmall);
+    expect(entrySmall).toBe(22);
+    expect(largeCount).toBe(smallCount);
+    expect(smallCount).toBe(4);
+    expect(large.courses.map(course => course.id)).not.toContain(unassigned.id);
+    expect(large.courses).toHaveLength(6);
+    expect(large.courses[0].modules).toHaveLength(1);
+    expect(large.courses[0].modules[0].lectures[0].materials).toHaveLength(41);
+    expect(Object.keys(large.courses[0].modules[0].lectures[0].materials[0]).sort()).toEqual(['id', 'title', 'type']);
+    evidence.classroom = { small: smallCount, large: largeCount, entrySmall, entryLarge, courses: [1, 6], modules: [1, 6], lectures: [1, 6], lessons: [1, 46] };
+  });
+
+  it('inherits teaching scope for single-role Managers and Team Leads, scopes Teachers, and works without monitoring', async () => {
+    const unassigned = await client.class.create({ data: { academyId, name: 'Unassigned', createdByUserId: people.get('MANAGER')!.userId } });
+    await client.academyFeatureFlag.update({ where: { academyId_feature: { academyId, feature: 'TEACHER_LIVE_MONITORING' } }, data: { isEnabled: false } });
+    for (const role of ['MANAGER', 'TEAM_LEAD'] as const) {
+      expect((await classroom.get(people.get(role)!.identity, { academyId, classId: unassigned.id })).class.id).toBe(unassigned.id);
+    }
+    const teacher = people.get('TEACHER')!;
+    expect((await classroom.get(teacher.identity, { academyId, classId })).class.id).toBe(classId);
+    await expect(classroom.get(teacher.identity, { academyId, classId: unassigned.id })).rejects.toMatchObject({ code: 'MONITORING_ACCESS_DENIED' });
+    await client.classAssistantTeacher.create({ data: { classId: unassigned.id, membershipId: teacher.membershipId } });
+    expect((await classroom.get(teacher.identity, { academyId, classId: unassigned.id })).class.id).toBe(unassigned.id);
+    await expect(classroom.get(people.get('STUDENT')!.identity, { academyId, classId })).rejects.toBeDefined();
+    await expect(classroom.get(teacher.identity, { academyId: otherAcademyId, classId })).rejects.toBeDefined();
+    await client.class.update({ where: { id: unassigned.id }, data: { status: 'ARCHIVED' } });
+    await expect(classroom.get(people.get('MANAGER')!.identity, { academyId, classId: unassigned.id })).rejects.toMatchObject({ code: 'MONITORING_ACCESS_DENIED' });
+  });
+
   it('uses additional roles and rejects foreign, archived and suspended scopes', async () => {
     const teacher = people.get('TEACHER')!;
     await client.academyMembershipRole.create({ data: { membershipId: teacher.membershipId, role: 'TEAM_LEAD' } });
+    const activeClass = await client.class.create({ data: { academyId, name: 'Active during suspension', createdByUserId: people.get('MANAGER')!.userId } });
     const before = await classes.get(teacher.identity, { academyId, classId });
     await classes.setSchedule(teacher.identity, { academyId, classId, slots: [], expectedUpdatedAt: before.updatedAt });
     await expect(classes.setSchedule(teacher.identity, { academyId: otherAcademyId, classId, slots: [], expectedUpdatedAt: before.updatedAt })).rejects.toBeDefined();
@@ -113,5 +197,6 @@ describe.skipIf(!databaseUrl)('class feedback against disposable PostgreSQL', ()
     await expect(classes.setSchedule(teacher.identity, { academyId, classId, slots: [], expectedUpdatedAt: archived.updatedAt })).rejects.toMatchObject({ code: 'CLASS_ARCHIVED' });
     await client.academyMembership.update({ where: { id: teacher.membershipId }, data: { status: 'SUSPENDED' } });
     await expect(classes.setSchedule(teacher.identity, { academyId, classId, slots: [], expectedUpdatedAt: archived.updatedAt })).rejects.toBeDefined();
+    await expect(classroom.get(teacher.identity, { academyId, classId: activeClass.id })).rejects.toBeDefined();
   });
 });

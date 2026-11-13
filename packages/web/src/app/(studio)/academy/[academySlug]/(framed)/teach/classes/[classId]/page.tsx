@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { Presentation } from 'lucide-react';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import type { MonitoringClassRoster } from '@cove/shared';
 import { notFound } from 'next/navigation';
@@ -27,7 +29,7 @@ export default async function LiveClassPage({
   const { academySlug, classId } = await params;
   const { academyId, roles } = await requireAcademyRoute(academySlug);
   // The back link names its destination with the sidebar's own word for it.
-  const { t: tNav } = await getServerTranslation(['nav', 'monitoring']);
+  const { t: tNav } = await getServerTranslation(['nav', 'monitoring', 'classroom']);
   let roster: MonitoringClassRoster | null = null;
   try {
     roster = await createServerORPCClient().monitoring.getClassRoster({
@@ -44,12 +46,17 @@ export default async function LiveClassPage({
       academyId={academyId}
       initialRoster={roster}
       serverReadToken={crypto.randomUUID()}
-      actions={canManageClasses(roles) ? (
+      actions={<>
+        <Link href={routes.academyClassroom(academySlug, classId)} prefetch={false}
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-on-brand transition-colors hover:bg-brand-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+          <Presentation aria-hidden className="size-4" />{tNav('classroom:enter')}
+        </Link>
+        {canManageClasses(roles) ? (
         <ClassManagementLink
           href={`${routes.academyClass(academySlug, classId)}?from=teaching`}
           label={tNav('monitoring:roster.edit_class')}
         />
-      ) : null}
+      ) : null}</>}
       back={
         <BackLink
           href={backTo.academyTeachClass(academySlug)}

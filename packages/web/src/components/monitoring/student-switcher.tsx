@@ -1,5 +1,6 @@
 "use client";
 
+import { useClassLive } from '@/components/classroom/class-live-provider';
 import { monitoringServerEvents, type AccessRevokedEvent } from "@cove/shared";
 import * as Popover from "@radix-ui/react-popover";
 import { useQuery } from "@tanstack/react-query";
@@ -27,16 +28,24 @@ type Props = {
   membershipId: string;
   name: string;
   className: string;
+  classroom?: boolean;
   prepare?: () => Promise<boolean>;
   cancel?: () => void;
 };
 
 export function StudentSwitcher(props: Props) {
   const { t } = useTranslation("monitoring");
+  const { t: ct } = useTranslation("classroom");
   const router = useRouter();
+  const classLive = useClassLive(props.academyId, props.classId);
   const tutoring = React.useContext(HistoryPresentationContext);
-  const selectedName = tutoring?.selectedStudent?.name ?? props.name;
+  const selectedName = props.classroom ? ct('teaching') : classLive ? props.name : tutoring?.selectedStudent?.name ?? props.name;
   const participants = useParticipants(props.academyId, props.classId);
+  const liveCounts = classLive ? ct('live_counts', {
+    online: classLive.presence.snapshotReady ? classLive.counts.online : '—',
+    offline: classLive.presence.snapshotReady ? classLive.counts.total - classLive.counts.online : '—',
+    solving: classLive.presence.snapshotReady ? classLive.counts.solving : '—',
+  }) : null;
   const [open, setOpen] = React.useState(false);
   const [destination, setDestination] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState<"idle" | "waiting" | "failed">(
@@ -77,30 +86,33 @@ export function StudentSwitcher(props: Props) {
         setOpen(value);
       }}
     >
-      <Popover.Trigger asChild>
-        <button
-          ref={trigger}
-          type="button"
-          aria-label={t("switcher.trigger", { name: selectedName })}
-          className={`flex min-h-10 min-w-0 max-w-64 items-center gap-2.5 rounded-lg px-2 py-1 text-left hover:bg-canvas data-[state=open]:bg-canvas ${focusStyle}`}
-        >
-          <span
-            aria-hidden
-            className="grid size-8 shrink-0 place-items-center rounded-full bg-peer-soft text-[13px] font-bold text-peer"
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 sm:flex-nowrap">
+        <Popover.Trigger asChild>
+          <button
+            ref={trigger}
+            type="button"
+            aria-label={t("switcher.trigger", { name: selectedName })}
+            className={`flex min-h-10 min-w-0 max-w-64 items-center gap-2.5 rounded-lg px-2 py-1 text-left hover:bg-canvas data-[state=open]:bg-canvas ${focusStyle}`}
           >
-            {[...selectedName][0]?.toUpperCase() ?? "?"}
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-bold">
-              {selectedName}
+            <span
+              aria-hidden
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-peer-soft text-[13px] font-bold text-peer"
+            >
+              {[...selectedName][0]?.toUpperCase() ?? "?"}
             </span>
-            <span className="block truncate text-xs text-sub">
-              {props.className}
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-bold">
+                {selectedName}
+              </span>
+              <span className="block truncate text-xs text-sub">
+                {props.className}
+              </span>
             </span>
-          </span>
-          <ChevronDown aria-hidden className="size-4 shrink-0 text-sub" />
-        </button>
-      </Popover.Trigger>
+            <ChevronDown aria-hidden className="size-4 shrink-0 text-sub" />
+          </button>
+        </Popover.Trigger>
+        {liveCounts ? <span data-testid="classroom-live-counts" className="shrink-0 whitespace-nowrap text-xs font-medium tabular-nums text-sub">{liveCounts}</span> : null}
+      </div>
       <Popover.Portal>
         <Popover.Content
           align="start"
@@ -112,7 +124,13 @@ export function StudentSwitcher(props: Props) {
           <div className="border-b border-border px-4 py-3">
             <h2 className="text-sm font-bold">{t("switcher.title")}</h2>
             <p className="truncate text-xs text-sub">{props.className}</p>
+            {classLive ? <p className="mt-1 text-xs tabular-nums text-sub">{ct('students_count', { count: classLive.counts.total })} · {liveCounts}</p> : null}
           </div>
+          {classLive ? <button type="button" aria-current={props.classroom ? 'page' : undefined}
+            className="mx-3 mt-3 rounded-lg border border-brand/20 bg-brand-soft px-3 py-2 text-left text-sm font-semibold text-brand focus-visible:outline-2 focus-visible:outline-brand"
+            onClick={() => { if (props.classroom) { if (tutoring?.prepareMaterialChange?.() === false) return; stay(); setOpen(false); } else void select(classLive.classroomHref); }}>
+            {ct('teach_class')}
+          </button> : null}
           {status !== "idle" ? (
             <div
               role="status"
@@ -149,6 +167,7 @@ export function StudentSwitcher(props: Props) {
               data={participants}
               onSelect={(href) => void select(href)}
               onCurrent={() => {
+                if (classLive && tutoring?.prepareMaterialChange?.() === false) return;
                 stay();
                 setOpen(false);
               }}
@@ -205,6 +224,7 @@ function Participants({
 }
 
 function useParticipants(academyId: string, classId: string) {
+  const shared = useClassLive(academyId, classId);
   const presence = useClassPresence({ academyId, classId });
   // Keep this workspace-scoped authorized roster and presence subscription alive
   // across popover opens, without borrowing another workspace or actor cache.
@@ -212,17 +232,19 @@ function useParticipants(academyId: string, classId: string) {
   const query = useQuery({
     queryKey: ["academy", academyId, "switcher-roster", classId, requestId],
     queryFn: () => orpc.monitoring.getClassRoster({ academyId, classId }),
-    retry: false,
+    enabled: !shared, retry: false,
     gcTime: 0,
-    refetchInterval: 30_000,
+    refetchInterval: shared ? false : 30_000,
   });
-  const refetch = query.refetch;
+  const effectiveQuery = shared?.query ?? query;
+  const refetch = effectiveQuery.refetch;
   const retry = () => {
     presence.refresh();
     void refetch();
   };
   const [revoked, setRevoked] = React.useState<Set<string>>(() => new Set());
   React.useEffect(() => {
+    if (shared) return;
     const onRevoked = (event: AccessRevokedEvent) => {
       if (event.classId !== classId || !event.studentMembershipId) return;
       setRevoked((old) => new Set([...old, event.studentMembershipId!]));
@@ -232,7 +254,7 @@ function useParticipants(academyId: string, classId: string) {
     return () => {
       presence.socket?.off(monitoringServerEvents.accessRevoked, onRevoked);
     };
-  }, [classId, presence.socket, refetch]);
+  }, [classId, presence.socket, refetch, shared]);
   const rows = query.data
     ? mergeRoster(
         query.data.students.filter((row) => !revoked.has(row.membershipId)),
@@ -240,7 +262,7 @@ function useParticipants(academyId: string, classId: string) {
         query.data.exercises,
       )
     : [];
-  return { presence, query, retry, rows };
+  return { presence, query: effectiveQuery, retry, rows: shared?.rows ?? rows };
 }
 
 function ParticipantRows({
@@ -265,6 +287,7 @@ function ParticipantRows({
 }) {
   const { t } = useTranslation("monitoring");
   const { t: historyT } = useTranslation("teach");
+  const classLive = useClassLive(undefined, classId);
   const tutoring = React.useContext(HistoryPresentationContext);
   const { presence, query, retry, rows } = data;
   const [order, setOrder] = React.useState<string[]>([]);
@@ -327,7 +350,7 @@ function ParticipantRows({
         {visible.map((row) => {
           const current =
             row.membershipId ===
-            (tutoring?.selectedStudent?.membershipId ?? membershipId);
+            (classLive ? membershipId : tutoring?.selectedStudent?.membershipId ?? membershipId);
           const name = row.displayName ?? row.email ?? row.membershipId;
           const href = routes.academyTeachStudentLive(
             slug,
@@ -338,7 +361,7 @@ function ParticipantRows({
           // Keep live switching when this student is on the displayed problem.
           // Offline/other-material students still open their work for this problem.
           const reviewable = Boolean(
-            tutoring?.materialId &&
+            !classLive && tutoring?.materialId &&
             row.active &&
             (!available ||
               row.exercise?.materialId !== tutoring.materialId ||
@@ -417,6 +440,7 @@ function ParticipantRows({
                 <Link
                   prefetch={false}
                   href={href}
+                  data-classroom-navigation={classLive ? true : undefined}
                   className={`${primary} hover:bg-canvas`}
                   onClick={(event) => {
                     if (
@@ -439,6 +463,7 @@ function ParticipantRows({
               {row.active ? (
                 <Link
                   data-tutoring-navigation
+                  data-classroom-navigation={classLive ? true : undefined}
                   href={historyHref}
                   prefetch={false}
                   aria-label={`${historyT("history.title")} · ${name}`}

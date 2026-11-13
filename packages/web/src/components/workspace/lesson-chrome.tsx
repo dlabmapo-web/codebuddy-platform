@@ -1,5 +1,6 @@
 'use client';
 
+import { useClassroom, ClassroomLessonFooter } from '@/components/classroom/classroom-context';
 import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
@@ -17,6 +18,8 @@ export function LessonHeader({ curriculum, courseTitle, lectureTitle, title, bad
   badge?: ReactNode; children?: ReactNode; leaveHref?: string;
 }) {
   const { t } = usePracticeTranslation();
+  const classroom = useClassroom();
+  if (classroom) return null;
   return <header {...surfaceProps('header')} className="flex min-h-16 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card px-4 py-2.5">
     {curriculum}
     <div className="min-w-0 flex-1 basis-40">
@@ -36,6 +39,8 @@ export function LessonFooter({ previous, next, index, total, disabled = false, o
 }) {
   const { t } = useLayoutTranslation('learn');
   const { t: pt } = usePracticeTranslation();
+  const classroom = useClassroom();
+  if (classroom) return <ClassroomLessonFooter disabled={disabled} />;
   function navigation(direction: 'previous' | 'next', item: typeof previous) {
     const label = t(`workspace.${direction}`);
     const contents = <>{direction === 'previous' ? <ChevronLeft aria-hidden className="size-4" /> : null}<span>{label}</span>{direction === 'next' ? <ChevronRight aria-hidden className="size-4" /> : null}</>;

@@ -1,0 +1,16 @@
+{
+  "enter": "강의실 입장",
+  "teaching": "강의 화면",
+  "lessons": "수업 자료",
+  "exit": "반으로 돌아가기",
+  "fullscreen": "전체 화면",
+  "previous": "이전 자료",
+  "next": "다음 자료",
+  "empty": "표시할 수업 자료가 없습니다. 반에 공개된 코스를 추가해 주세요.",
+  "saveFailed": "작업을 저장하지 못했습니다. 이동하기 전에 다시 시도해 주세요.",
+  "notice": "시연 작업은 강사 개인에게만 저장됩니다. 학생들은 프로젝터나 화면 공유로 수업을 볼 수 있습니다.",
+  "live_counts": "접속 {{online}}명 · 미접속 {{offline}}명 · 풀이 중 {{solving}}명",
+  "teach_class": "강의 화면으로 돌아가기",
+  "closeOutline": "수업 자료 닫기",
+  "students_count": "학생 {{count}}명"
+}

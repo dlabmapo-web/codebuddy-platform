@@ -19,11 +19,11 @@ type Context = {
 };
 const actionClass = lessonAction;
 
-export function StaffSolutionDialog(props: Context & { lectureId: string }) {
+export function StaffSolutionDialog(props: Context & { lectureId: string; label?: string }) {
   const { t } = useTranslation('practice');
   const { open, setOpen, portalContainer } = useWorkspaceDialog();
   return <Modal open={open} onOpenChange={setOpen}>
-    <ModalTrigger className={actionClass} type="button"><CircleCheck aria-hidden className="size-4 shrink-0" />{t('solutions')}</ModalTrigger>
+    <ModalTrigger className={actionClass} type="button"><CircleCheck aria-hidden className="size-4 shrink-0" />{props.label ?? t('solutions')}</ModalTrigger>
     <ModalContent title={t('solutions')} description={t('solution_description')} className="max-w-4xl" portalContainer={portalContainer}>
       <div className="min-h-0 flex-1 overflow-y-auto p-6">{open ? <SolutionContents {...props} /> : null}</div>
       <DialogFooter close={() => setOpen(false)} />

@@ -1,3 +1,4 @@
+import type { ClassroomService } from "../classes/classroom.service.js";
 import type { ProgrammingReviewService } from "../learn/programming-review.service.js";
 import type { StudentWorkHistoryService } from "../teach/student-work-history.service.js";
 import type { StaffPracticeService } from "../learn/staff-practice.service.js";
@@ -93,6 +94,7 @@ export type ORPCDeps = {
   courseService: CourseService;
   contentImportService: ContentImportService;
   classesService: ClassesService;
+  classroomService: ClassroomService;
   answerRecordsService: AnswerRecordsService;
   learnClassService: LearnClassService;
   learnService: LearnService;

@@ -1,5 +1,6 @@
 'use client';
 
+import { useClassLive } from '@/components/classroom/class-live-provider';
 import { type HelpRequest } from '@cove/shared';
 import * as Popover from '@radix-ui/react-popover';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -43,10 +44,11 @@ function useQueueGroup(academyId: string, classId: string, status: 'WAITING' | '
 
 /** Standalone live-workspace subscription; it never owns or closes the live watch. */
 export function LiveHelpQueue(props: Pick<Props, 'academyId' | 'classId' | 'prepare' | 'cancel' | 'currentMembershipId'>) {
+  const shared = useClassLive(props.academyId, props.classId);
   const presence = useClassPresence(props);
-  const roster = useQuery({ queryKey: ['academy', props.academyId, 'help-roster', props.classId], queryFn: () => orpc.monitoring.getClassRoster(props), retry: false, gcTime: 0, refetchInterval: 30_000 });
-  const rows = roster.data ? mergeRoster(roster.data.students, presence.entries, roster.data.exercises) : [];
-  return <HelpQueue {...props} popover socket={presence.socket} rows={rows} presenceReady={presence.snapshotReady && !roster.isError} revoked={presence.state === 'revoked' || helpAccessDenied(roster.error)} />;
+  const roster = useQuery({ queryKey: ['academy', props.academyId, 'help-roster', props.classId], queryFn: () => orpc.monitoring.getClassRoster(props), enabled: !shared, retry: false, gcTime: 0, refetchInterval: shared ? false : 30_000 });
+  const rows = shared?.rows ?? (roster.data ? mergeRoster(roster.data.students, presence.entries, roster.data.exercises) : []);
+  return <HelpQueue {...props} popover socket={presence.socket} rows={rows} presenceReady={presence.snapshotReady && !(shared?.query ?? roster).isError} revoked={presence.state === 'revoked' || helpAccessDenied((shared?.query ?? roster).error)} />;
 }
 
 export function HelpQueue({ academyId, classId, socket, rows, presenceReady, revoked, popover, currentMembershipId, prepare, cancel }: Props) {

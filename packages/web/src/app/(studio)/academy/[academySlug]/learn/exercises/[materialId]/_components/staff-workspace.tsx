@@ -1,4 +1,7 @@
 'use client';
+import { ClassroomWorkspaceActions, useClassroom, useClassroomNavigationGuard } from '@/components/classroom/classroom-context';
+import { MonitoringProblemEditLink } from '@/components/monitoring/problem-edit-link';
+import { STATEMENT_PANE } from '@/lib/workspace/statement-canvas';
 import { SubmissionSummary } from '@/components/workspace/submission-summary';
 import { isPdfRunOnly } from '@/components/pdf/pdf-practice-mode';
 import * as React from 'react';
@@ -35,6 +38,8 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   academyId: string; bootstrap: LearnExerciseBootstrap; userId: string;
 }) {
   const { t } = useTranslation('practice');
+  const { t: monitoringT } = useTranslation('monitoring');
+  const classroom = useClassroom();
   const slug = useAcademySlug();
   const router = useRouter();
   const { workspace, access } = bootstrap;
@@ -65,7 +70,8 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   } : undefined;
   const { open: panelOpen, toggle: togglePanel, close: closePanel, panelId, triggerRef } = useNavigatorPanel('staff-practice-curriculum');
   const { size, containerRef, dividerProps } = useSplitPane({
-    axis: 'horizontal', initial: exercise.hasReferencePdf ? 45 : 40, min: 25, max: 65,
+    axis: 'horizontal', initial: classroom ? STATEMENT_PANE.initialPercent : exercise.hasReferencePdf ? 45 : 40,
+    min: classroom ? STATEMENT_PANE.minPercent : 25, max: classroom ? STATEMENT_PANE.maxPercent : 65,
   });
   const draft = useDraftAutosave({
     academyId, materialId: exercise.materialId, classId: 'staff-practice',
@@ -78,7 +84,12 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   const latestCode = React.useRef(draft.code);
   React.useEffect(() => { latestCode.current = draft.code; }, [draft.code]);
   const busy = runner.running || submission.submitting || testing || navigating || sampleRunner.serverCheck.active || runner.serverInputWaiting;
-  const coursePath = `${routes.academy(slug)}/learn/courses/${breadcrumb.course.id}`;
+  useClassroomNavigationGuard(async () => {
+    if (busy) return false;
+    await draft.flushWithoutPromoting();
+    return true;
+  });
+  const coursePath = classroom?.exitHref ?? `${routes.academy(slug)}/learn/courses/${breadcrumb.course.id}`;
   const editPath = `${routes.academy(slug)}/content/courses/${breadcrumb.course.id}/lectures/${breadcrumb.lecture.id}/exercises/${exercise.materialId}${preview ? "?practicePreview=true" : "?practice=true"}`;
   const ordered = workspaceMaterialSequence(bootstrap.navigator);
   const position = ordered.findIndex((item) => item.materialId === exercise.materialId) + 1;
@@ -98,6 +109,7 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
     router.push(href);
   }
   async function navigate(id: string) {
+    if (classroom) { await classroom.navigate(classroom.materialHref(id)); return; }
     if (busy) return;
     if (beforeStudentChange.current && !await beforeStudentChange.current()) return;
     setNavigating(true);
@@ -134,6 +146,10 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   function submit() { draft.flushNow(); setTab('result'); void submission.submit(draft.code); }
   React.useEffect(() => () => { runningBatch.current = false; }, []);
   return <div ref={rootRef} className="relative flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
+    <ClassroomWorkspaceActions exercise={workspace}>
+      <MonitoringProblemEditLink canEdit={Boolean(access?.canAuthor)} exercise={workspace} />
+      {access?.canViewSolutions ? <StaffSolutionDialog academyId={academyId} courseId={breadcrumb.course.id} lectureId={breadcrumb.lecture.id} materialId={exercise.materialId} userId={userId} language={exercise.language} label={monitoringT('answer.show')} /> : null}
+    </ClassroomWorkspaceActions>
     <LessonHeader courseTitle={breadcrumb.course.title} lectureTitle={breadcrumb.lecture.title} title={exercise.title}
       curriculum={<CurriculumTrigger compact ref={triggerRef} onToggle={togglePanel} open={panelOpen} panelId={panelId} path={bootstrap.navigator.path} />}>
       <span className="hidden items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-semibold text-brand sm:inline-flex"><Code2 className="size-3.5" />{t(selectedStudent ? 'tutoring' : 'label')}</span>
@@ -146,13 +162,13 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
 
       <Link href={coursePath} onClick={(event) => void leaveTo(coursePath, event)} className={lessonPrimary}><LogOut className="size-3.5" />{t('leave')}</Link>
     </LessonHeader>
-    <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand" role="note">
-      <span className="font-bold sm:hidden">{t('label')}</span><span>{t(selectedStudent ? 'tutoring_notice' : 'notice')}</span>
+    {!classroom || draft.saveState === 'error' || draft.saveState === 'conflict' ? <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand" role="note">
+      <span className="font-bold sm:hidden">{classroom?.labels.teaching ?? t('label')}</span><span>{classroom?.labels.notice ?? t(selectedStudent ? 'tutoring_notice' : 'notice')}</span>
       <span className="ml-auto" aria-live="polite">{draft.saveState !== 'idle' ? t(`save.${draft.saveState}`) : null}</span>
       {(draft.saveState === 'error' || draft.saveState === 'conflict') ? <button className="underline" type="button" onClick={() => {
         const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([draft.code], { type: 'text/plain' })); link.download = sourceFileName(exercise.language); link.click(); URL.revokeObjectURL(link.href);
       }}>{t('download')}</button> : null}
-    </div>
+    </div> : null}
     {workspace.draft?.gradingRevision !== undefined && workspace.draft.gradingRevision !== exercise.gradingRevision ? <p role="status" className="border-b border-warning/25 bg-warning/5 px-4 py-2 text-xs text-warning">{t('revision_changed')}</p> : null}
     {preview ? <p role="status" className="border-b border-warning/25 bg-warning/5 px-4 py-2 text-xs font-semibold text-warning">{t('preview')}</p> : null}
     {historyOpen ? <section className="max-h-44 shrink-0 overflow-auto border-b border-border bg-card px-4 py-3" aria-label={t('history')}>
@@ -178,7 +194,7 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
         <section className={`@container min-w-0 overflow-y-auto bg-card md:block md:flex-none ${mobile === 'problem' ? 'flex-1' : 'hidden'}`} style={{ flexBasis: `${size}%` }}>
           <GradingNotice exercise={exercise} />
           <ExerciseReferencePane key={exercise.materialId} academyId={academyId} exercise={exercise} teacher preview={preview}>
-            <ProblemStatement exercise={exercise} revealedHints={hints} onRevealHint={() => setHints((count) => Math.min(count + 1, exercise.hints.length))} />
+            <ProblemStatement collaborating={Boolean(classroom)} exercise={exercise} revealedHints={hints} onRevealHint={() => setHints((count) => Math.min(count + 1, exercise.hints.length))} />
           </ExerciseReferencePane>
         </section>
         <div aria-hidden className="hidden w-1 shrink-0 cursor-col-resize bg-border hover:bg-brand/40 md:block" {...dividerProps} />

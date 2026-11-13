@@ -188,6 +188,10 @@ export const routes = {
     query?: Record<string, QueryValue>,
   ) => withQuery(`${academyRoot(academySlug)}/learn/exercises/${segment(materialId)}`, query),
   academyTeachManual:(academySlug:string,classId:string,materialId:string)=>`${academyRoot(academySlug)}/teach/classes/${segment(classId)}/manual/${segment(materialId)}`,
+  academyClassroom: (academySlug: string, classId: string) =>
+    `${academyRoot(academySlug)}/teach/classes/${segment(classId)}/classroom`,
+  academyClassroomMaterial: (academySlug: string, classId: string, materialId: string) =>
+    `${academyRoot(academySlug)}/teach/classes/${segment(classId)}/classroom/${segment(materialId)}`,
   academyTeachClasses: (academySlug: string) =>
     `${academyRoot(academySlug)}/teach/classes`,
   academyTeachClass: (academySlug: string, classId: string) =>

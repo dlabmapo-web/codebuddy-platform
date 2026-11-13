@@ -1,3 +1,4 @@
+import type classroom from '@cove/i18n/locales/en/classroom.json';
 import type practice from '@cove/i18n/locales/en/practice.json';
 import type submissionSummary from '@cove/i18n/locales/en/submission-summary.json';
 import type pdfPractice from '@cove/i18n/locales/en/pdf-practice.json';
@@ -95,6 +96,7 @@ declare module 'i18next' {
       'member-detail': typeof memberDetail;
       members: typeof members;
       monitoring: typeof monitoring;
+      classroom: typeof classroom;
       nav: typeof nav;
       notifications: typeof notifications;
       'people-ops': typeof peopleOps;

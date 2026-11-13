@@ -1,3 +1,4 @@
+import { readClassWorkspaceRoster } from '@/lib/class-workspace-server';
 import { StudentSwitcher } from '@/components/monitoring/student-switcher';
 import { routes } from '@/lib/routes';
 import { requireAcademyRoute } from '@/lib/academy-route';
@@ -87,7 +88,7 @@ async function StudentUnavailable({
   classId: string;
 }) {
   const { t } = await getServerTranslation(['monitoring']);
-  const roster = await createServerORPCClient().monitoring.getClassRoster({ academyId, classId });
+  const roster = await readClassWorkspaceRoster(academyId, classId);
 
   return (
     <main className="grid min-h-dvh place-items-center bg-canvas px-6">

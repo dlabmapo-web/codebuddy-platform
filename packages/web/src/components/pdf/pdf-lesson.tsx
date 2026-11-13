@@ -1,5 +1,8 @@
 'use client';
 
+import { useState } from 'react';
+import type { PdfReadResult } from '@cove/shared';
+import { claimServerRead, SERVER_READ_FRESH_MS } from '@/lib/server-read';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
@@ -15,14 +18,15 @@ import { PdfResourceLink } from './pdf-resource-link';
 import { PdfReader } from './pdf-reader';
 import { useMaterialObservation, StudentObservationIndicator } from '@/lib/monitoring/use-material-observation';
 
-export function PdfLesson({ academyId, materialId, classId, permissions }: {
-  academyId: string; materialId: string; classId?: string; permissions?: MediaStaffPermissions;
+export function PdfLesson({ academyId, materialId, classId, permissions, initial }: {
+  academyId: string; materialId: string; classId?: string; permissions?: MediaStaffPermissions; initial?: { data: PdfReadResult; token: string };
 }) {
   const { t } = useTranslation('content');
   const { t: lt } = useLayoutTranslation('learn');
+  const [seed] = useState(() => claimServerRead(initial?.token) ? initial?.data : undefined);
   const query = useQuery({
     queryKey: ['pdf', academyId, materialId, false],
-    queryFn: () => pdfApi.read({ academyId, materialId }), retry: false, staleTime: 0,
+    queryFn: () => pdfApi.read({ academyId, materialId }), retry: false, initialData: seed, staleTime: seed ? SERVER_READ_FRESH_MS : 0,
   });
   const data = query.data;
   useMaterialObservation({ materialId, classId, courseId: data?.course.id, enabled: !permissions?.canTutor });

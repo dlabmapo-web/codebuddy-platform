@@ -5,7 +5,7 @@ import { useMonitoringSocket } from './use-monitoring-socket';
 
 export function useObservationWatch(scope: { academyId: string; classId: string; membershipId: string }) {
   const { academyId, classId, membershipId } = scope;
-  const { socket, state, report } = useMonitoringSocket({ classId: scope.classId, studentMembershipId: scope.membershipId });
+  const { socket, state, report } = useMonitoringSocket({ classId: scope.classId, studentMembershipId: scope.membershipId }, { channel: 'observation' });
   const [snapshot, setSnapshot] = React.useState<ObservationSnapshot | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const scopeKey = `${academyId}:${classId}:${membershipId}`;

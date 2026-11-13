@@ -1,5 +1,6 @@
 'use client';
 
+import { ClassroomWorkspaceActions, useClassroom, useClassroomNavigationGuard } from '@/components/classroom/classroom-context';
 import { TerminalLines } from './terminal-lines';
 import { anchorProps, surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import { Send, Save, BookOpen, History, MessageSquareText, ListChecks, FileCode2, Play, Square, Terminal, Turtle, Expand } from 'lucide-react';
@@ -135,6 +136,7 @@ export function ManualWorkspace({
       const link = (event.target as Element).closest?.("a[href]");
       if (
         !link ||
+        link.hasAttribute("data-classroom-navigation") ||
         event.defaultPrevented ||
         event.ctrlKey ||
         event.metaKey ||
@@ -269,14 +271,20 @@ export function ManualWorkspace({
   });
   const navigation = useMaterialNavigation({ academyId, materialId, classId: selectedClass, preview, courseId: data?.course.id, materials: data?.materials });
   const { open: panelOpen, panelId, triggerRef, toggle: togglePanel, close: closePanel } = useNavigatorPanel('material-course-outline', Boolean(data && data.type !== 'TURTLE_EXERCISE'), Boolean(data));
-  async function navigateMaterial(id?: string, href?: string) {
-    if (busy) return;
-    if (dirty && explicit && !window.confirm(mt('discard_answer'))) return;
-    if (dirty && !explicit && !await save()) return;
+  async function prepareNavigation() {
+    if (busy) return false;
+    if (dirty && explicit && !window.confirm(mt('discard_answer'))) return false;
+    if (dirty && !explicit && !await save()) return false;
     if (active.current) {
       try { await manualApi.stop(active.current); active.current = null; }
-      catch (error) { setError(error instanceof Error ? error.message : mt('stop_failed')); return; }
+      catch (error) { setError(error instanceof Error ? error.message : mt('stop_failed')); return false; }
     }
+    return true;
+  }
+  const classroom = useClassroom();
+  useClassroomNavigationGuard(prepareNavigation);
+  async function navigateMaterial(id?: string, href?: string) {
+    if (!await prepareNavigation()) return;
     if (href) router.push(href); else if (id) navigation.navigate(id);
   }
   const presenceCourseId = !preview && !data?.practice ? data?.course.id : undefined;
@@ -526,6 +534,7 @@ export function ManualWorkspace({
           ) : null}</>;
   return (
     <main className="relative flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
+      <ClassroomWorkspaceActions><ManualStaffActions academyId={academyId} data={data} classId={selectedClass} includeTutoring={false} runDisabled={busy || Boolean(running)} /></ClassroomWorkspaceActions>
       <LessonHeader courseTitle={data.course.title} lectureTitle={navigation.context?.path.lecture.title} title={data.title}
         leaveHref={navigation.courseHref}
         curriculum={<CurriculumTrigger compact ref={triggerRef} open={panelOpen} panelId={panelId} onToggle={togglePanel} path={navigation.context?.path ?? null} />}>
@@ -534,7 +543,7 @@ export function ManualWorkspace({
         <ManualStaffActions academyId={academyId} data={data} classId={selectedClass} onRunSolution={preview && drawing ? () => void run(true) : undefined} runDisabled={busy || Boolean(running)} />
       </LessonHeader>
       {preview ? <p role="note" className={`flex shrink-0 items-center gap-2 border-b border-brand/15 bg-brand-soft px-5 text-brand ${drawing ? "py-1.5 text-xs" : "py-3 text-sm"}`}><BookOpen aria-hidden className="size-4 shrink-0" />{mt(data.practice ? "ui.preview_practice_notice" : "ui.preview_notice")}</p> : null}
-      {data.practice ? <p role="note" className="border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand"><strong>{pt("label")}</strong> · {pt("notice")}</p> : null}
+      {data.practice && !classroom ? <p role="note" className="border-b border-brand/15 bg-brand-soft px-4 py-2 text-xs text-brand"><strong>{pt("label")}</strong> · {pt("notice")}</p> : null}
       {/* Assigned when a draft loads, alongside state that re-renders. */}
       {/* eslint-disable-next-line react-hooks/refs */}
       {loadedContentRevision.current !== undefined && loadedContentRevision.current !== data.config.revision ? (

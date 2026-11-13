@@ -1,5 +1,6 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
+import { classroomSchema } from "../../classes/classroom.js";
 
 import {
   addClassStudentsSchema,
@@ -26,6 +27,7 @@ import {
  * returned only its own slice would leave the page inconsistent.
  */
 export const academyClassesContract = {
+  getClassroom: oc.input(classIdInputSchema).output(classroomSchema),
   list: oc
     .input(listClassesSchema)
     .output(z.object({ classes: z.array(classSummarySchema) })),
@@ -40,7 +42,7 @@ export const academyClassesContract = {
   delete: oc.input(deleteClassSchema).output(z.object({ classId: z.uuid() })),
   setCourses: oc.input(setClassCoursesSchema).output(classDetailSchema),
   /**
-   * When the class meets. §8.1 — the whole timetable at once, `MANAGER` only,
+   * When the class meets. §8.1 — the whole timetable at once, for Managers and Team Leads,
    * and the only thing in this contract that attendance points depend on.
    */
   setSchedule: oc.input(setClassScheduleSchema).output(classDetailSchema),

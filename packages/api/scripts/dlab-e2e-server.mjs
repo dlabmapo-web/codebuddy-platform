@@ -143,7 +143,7 @@ const server = createServer(async (req, res) => {
       const module = await db.courseModule.create({ data: { courseId: course.id, title: 'Python basics', externalKey: randomUUID(), position: 1, isVisible: true } });
       const lecture = await db.lecture.create({ data: { courseModuleId: module.id, title: 'Addition lesson', externalKey: randomUUID(), position: 1, isVisible: true } });
       const material = await db.material.create({ data: { lectureId: lecture.id, title: 'Add two numbers', type: 'PROGRAMMING_EXERCISE', position: 1, isVisible: true,
-        programmingExercise: { create: { externalKey: randomUUID(), difficulty: 'EASY', description: '<p>Read two numbers and print their sum.</p>', inputFormat: 'Two integers separated by a space.', outputFormat: 'One integer: their sum.', constraints: 'Each integer is between 0 and 100.', starterCode: 'a, b = map(int, input().split())\nprint(a + b)', solutionCode: 'print(sum(map(int, input().split())))', testCases: { create: { position: 1, input: '2 3', expectedOutput: '5', visibility: 'SAMPLE' } } } },
+        programmingExercise: { create: { externalKey: randomUUID(), difficulty: 'EASY', description: '<p>Read two numbers and print their sum.</p>', inputFormat: 'Two integers separated by a space.', outputFormat: 'One integer: their sum.', constraints: 'Each integer is between 0 and 100.', starterCode: 'a, b = map(int, input().split())\nprint(a + b)', solutionCode: 'print(sum(map(int, input().split())))', solutions: { create: { position: 0, title: 'Reference answer', code: 'print(sum(map(int, input().split())))' } }, testCases: { create: { position: 1, input: '2 3', expectedOutput: '5', visibility: 'SAMPLE' } } } },
       } });
       const written = await db.material.create({ data: { lectureId: lecture.id, title: 'Explain your addition', type: 'WRITTEN_RESPONSE', position: 2, isVisible: true,
         manualMaterial: { create: { description: 'Explain how your program adds two numbers.', includeInScore: true } },
@@ -189,6 +189,11 @@ const server = createServer(async (req, res) => {
           manualMaterial: { create: { description: 'Draw a red square and print a message.', runtimeVersion: health.runtimeVersion,
             width: 640, height: 480, files: { 'main.py': "import turtle\nt = turtle.Turtle()\nt.color('red')\nt.begin_fill()\nfor _ in range(4):\n    t.forward(90)\n    t.left(90)\nt.end_fill()\nprint('MONITORED TURTLE', flush=True)\nturtle.mainloop()" } } } } });
         turtleMaterialId = drawing.id;
+      }
+      if (input.includeExplanation) {
+        await db.material.create({ data: { lectureId: lecture.id, title: 'How addition works', type: 'EXPLANATION', position: 8, isVisible: true,
+          explanationMaterial: { create: { body: '<h2>Addition lesson</h2><p>Add the two inputs and display their sum.</p>' } },
+        } });
       }
       const classes = [];
       for (const name of ['Assigned Python class', 'Other Python class']) {

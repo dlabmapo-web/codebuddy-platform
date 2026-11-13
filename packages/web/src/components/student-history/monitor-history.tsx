@@ -34,7 +34,7 @@ export function MonitorHistoryHost({
   children: React.ReactNode;
   academyId: string;
   classId: string;
-  membershipId: string;
+  membershipId?: string;
   name: string;
 }) {
   const { t } = useTranslation("teach"),
@@ -148,10 +148,9 @@ export function MonitorHistoryHost({
       }
       void (async () => {
         if (!(await beforeNavigate())) return;
-        const p = new URLSearchParams({
-          view: "students",
-          student: student?.membershipId ?? scope.membershipId,
-        });
+        const p = new URLSearchParams({ view: "students" });
+        const membershipId = student?.membershipId ?? scope.membershipId;
+        if (membershipId) p.set('student', membershipId);
         if (material.courseId) p.set("course", material.courseId);
         router.push(routes.academyTeachProgress(slug, scope.classId) + "?" + p);
       })();
@@ -269,7 +268,7 @@ export function MonitorHistoryHost({
                         classId={scope.classId}
                         materialId={material.id}
                         queryScope={nonce}
-                        selectedId={student?.membershipId ?? scope.membershipId}
+                        selectedId={student?.membershipId ?? scope.membershipId ?? ''}
                         onSelect={selectStudent}
                       />
                     ) : null}

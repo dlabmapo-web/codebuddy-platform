@@ -11,6 +11,7 @@ import {
 import * as React from 'react';
 import type { Socket } from 'socket.io-client';
 
+import { ClassPresenceContext } from './class-monitoring-context';
 import { nextPresenceDeadline } from './presence-deadline';
 import { monitoringAck } from './types';
 import { useMonitoringSocket } from './use-monitoring-socket';
@@ -30,7 +31,9 @@ export function useClassPresence({
   academyId: string;
   classId: string;
 }) {
-  const { socket, state, report } = useMonitoringSocket({ classId });
+  const inherited = React.useContext(ClassPresenceContext);
+  const shared = inherited?.academyId === academyId && inherited.classId === classId ? inherited.presence : null;
+  const { socket, state, report } = useMonitoringSocket({ classId }, { enabled: !shared });
   const [presence, setPresence] = React.useState<{
     entries: PresenceEntry[];
     version: number;
@@ -136,7 +139,7 @@ export function useClassPresence({
     else socket?.connect();
   }, [requestSnapshot, socket]);
 
-  return {
+  return shared ?? {
     refresh,
     snapshotReady: snapshotReady && state === 'live' && denied === null,
     entries: presence.entries,

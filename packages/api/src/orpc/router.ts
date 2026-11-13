@@ -1,3 +1,4 @@
+import { ClassroomService } from "../classes/classroom.service.js";
 import { ProgrammingReviewService } from "../learn/programming-review.service.js";
 import { StudentWorkHistoryService } from "../teach/student-work-history.service.js";
 import { createStudentWorkHistoryRouter } from "../teach/student-work-history.router.js";
@@ -134,6 +135,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     courseService: app.get(CourseService, { strict: false }),
     contentImportService: app.get(ContentImportService, { strict: false }),
     classesService: app.get(ClassesService, { strict: false }),
+    classroomService: app.get(ClassroomService, { strict: false }),
     answerRecordsService: app.get(AnswerRecordsService, { strict: false }),
     learnClassService: app.get(LearnClassService, { strict: false }),
     learnService: app.get(LearnService, { strict: false }),

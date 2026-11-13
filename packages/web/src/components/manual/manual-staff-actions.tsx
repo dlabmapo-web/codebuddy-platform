@@ -63,7 +63,7 @@ function SolutionReference({ config, academyId, materialId }: {
 }
 
 /** Shared assessment actions. Visibility is a server capability, never a role-mode cookie. */
-export function ManualStaffActions({ academyId, data, classId, reviewing = false, allowNavigate = () => true, onRunSolution, runDisabled }: {
+export function ManualStaffActions({ academyId, data, classId, reviewing = false, allowNavigate = () => true, onRunSolution, runDisabled, includeTutoring = true }: {
   academyId: string;
   data: ManualWorkspace;
   classId?: string;
@@ -71,6 +71,7 @@ export function ManualStaffActions({ academyId, data, classId, reviewing = false
   allowNavigate?: () => boolean;
   onRunSolution?: () => void;
   runDisabled?: boolean;
+  includeTutoring?: boolean;
 }) {
   const { t } = useManualTranslation();
   const slug = useAcademySlug();
@@ -104,7 +105,7 @@ export function ManualStaffActions({ academyId, data, classId, reviewing = false
         : reference.isError ? <p role="alert" className="text-danger">{t('ui.reference_unavailable')}</p>
         : reference.data ? <SolutionReference config={reference.data.config} academyId={academyId} materialId={data.materialId} /> : null}
     </AssessmentDrawer> : null}
-    {staff.canTutor ? <AssessmentDrawer
+    {staff.canTutor && includeTutoring ? <AssessmentDrawer
       title={t('ui.tutoring')}
       trigger={<button type="button" aria-pressed={reviewing}
         className={`${assessmentAction} aria-pressed:border-brand/30 aria-pressed:bg-brand-soft aria-pressed:text-brand`}>

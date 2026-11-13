@@ -4,6 +4,7 @@ import { AcademiesModule } from "../academies/academies.module.js";
 import { AuthorizationModule } from "../authorization/authorization.module.js";
 import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.module.js";
 import { MediaModule } from "../profile/media.module.js";
+import { ClassroomService } from "./classroom.service.js";
 import { ClassesService } from "./classes.service.js";
 
 /**
@@ -19,7 +20,7 @@ import { ClassesService } from "./classes.service.js";
     MediaModule,
     MonitoringRevocationModule,
   ],
-  providers: [ClassesService],
-  exports: [ClassesService],
+  providers: [ClassesService, ClassroomService],
+  exports: [ClassesService, ClassroomService],
 })
 export class ClassesModule {}

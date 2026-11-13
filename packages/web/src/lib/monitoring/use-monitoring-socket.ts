@@ -3,6 +3,8 @@
 import * as React from 'react';
 import type { Socket } from 'socket.io-client';
 
+import { ClassTransportContext } from './class-monitoring-context';
+import type { MonitoringChannel } from './class-transport-pool';
 import { createMonitoringSocket } from './socket';
 import {
   nextConnectionState,
@@ -11,20 +13,18 @@ import {
   type MonitoringConnectionState,
 } from './connection';
 
-/**
- * One monitoring socket, scoped to the component that needs it.
- *
- * Deliberately not a global singleton: the roster page and the live workspace
- * have different lifetimes, and a shared connection would keep a class room
- * joined after the teacher navigated away from it. Each page opens and closes
- * its own.
- */
-export function useMonitoringSocket(scope?: { classId: string; studentMembershipId?: string }): {
+/** Local state per watch; transports belong to the mounted class layout when available. */
+export function useMonitoringSocket(scope?: { classId: string; studentMembershipId?: string }, options?: { enabled?: boolean; channel?: MonitoringChannel }): {
   socket: Socket | null;
   state: MonitoringConnectionState;
   /** Lets a page report its own synchronization progress. */
   report: (event: ConnectionEvent) => void;
 } {
+  const shared = React.useContext(ClassTransportContext);
+  const sharing = Boolean(shared && scope && shared.classId === scope.classId);
+  const pool = sharing ? shared!.pool : undefined;
+  const enabled = options?.enabled !== false && (!sharing || pool !== null);
+  const channel = options?.channel ?? (scope?.studentMembershipId ? 'workspace' : 'class');
   const scopeRef = React.useRef(scope);
   React.useEffect(() => { scopeRef.current = scope; }, [scope]);
   const [socket, setSocket] = React.useState<Socket | null>(null);
@@ -37,36 +37,42 @@ export function useMonitoringSocket(scope?: { classId: string; studentMembership
   }, []);
 
   React.useEffect(() => {
+    if (!enabled) return;
     let active = true;
     let created: Socket | null = null;
     let networkListeners:
       | { onOffline: () => void; onOnline: () => void }
       | undefined;
 
-    void createMonitoringSocket().then((instance) => {
+    let detach: (() => void) | undefined;
+    void (pool ? pool.get(channel) : createMonitoringSocket()).then((instance) => {
       if (!active) {
-        instance.close();
+        if (!pool) instance.close();
         return;
       }
       created = instance;
       setSocket(instance);
 
-      instance.on('connect', () => {
-        // `recovered` means the server restored the rooms and buffered
-        // packets; anything else has to resynchronize before claiming to be
-        // live, which is what stops a stale roster from looking current.
-        report({ type: instance.recovered ? 'recovered' : 'connect' });
-      });
-      instance.on('disconnect', () => report({ type: 'disconnect' }));
-      instance.on('connect_error', () => report({ type: 'disconnect' }));
-      instance.on('server.degraded', (payload: { degraded: boolean }) => {
-        if (payload.degraded) report({ type: 'degraded' });
-      });
-      instance.on('access.revoked', (event: { classId?: string; studentMembershipId?: string | null }) => {
-        const current = scopeRef.current;
-        if (!monitoringRevocationApplies(current, event)) return;
-        report({ type: 'revoked' });
-      });
+      const onConnect = () => report({ type: instance.recovered ? 'recovered' : 'connect' });
+      const onDisconnect = () => report({ type: 'disconnect' });
+      const onDegraded = (payload: { degraded: boolean }) => { if (payload.degraded) report({ type: 'degraded' }); };
+      const onRevoked = (event: { classId?: string; studentMembershipId?: string | null }) => {
+        if (monitoringRevocationApplies(scopeRef.current, event)) report({ type: 'revoked' });
+      };
+      instance.on('connect', onConnect);
+      instance.on('disconnect', onDisconnect);
+      instance.on('connect_error', onDisconnect);
+      instance.on('server.degraded', onDegraded);
+      instance.on('access.revoked', onRevoked);
+      // A reused transport may already be connected; the watch still needs its own snapshot.
+      if (instance.connected) onConnect();
+      detach = () => {
+        instance.off('connect', onConnect);
+        instance.off('disconnect', onDisconnect);
+        instance.off('connect_error', onDisconnect);
+        instance.off('server.degraded', onDegraded);
+        instance.off('access.revoked', onRevoked);
+      };
 
       // Browsers can enter offline mode without immediately closing an
       // established WebSocket. Reflect the browser's network signal instead
@@ -83,7 +89,7 @@ export function useMonitoringSocket(scope?: { classId: string; studentMembership
       globalThis.addEventListener('offline', onOffline);
       globalThis.addEventListener('online', onOnline);
       networkListeners = { onOffline, onOnline };
-    });
+    }).catch(() => { if (active) report({ type: 'degraded' }); });
 
     return () => {
       active = false;
@@ -91,10 +97,10 @@ export function useMonitoringSocket(scope?: { classId: string; studentMembership
         globalThis.removeEventListener('offline', networkListeners.onOffline);
         globalThis.removeEventListener('online', networkListeners.onOnline);
       }
-      created?.removeAllListeners();
-      created?.close();
+      detach?.();
+      if (!pool) { created?.removeAllListeners(); created?.close(); }
     };
-  }, [report]);
+  }, [report, pool, channel, enabled]);
 
   return { socket, state, report };
 }

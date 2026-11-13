@@ -1,4 +1,7 @@
 "use client";
+import { useClassroom } from '@/components/classroom/classroom-context';
+import type { VideoReadResult } from '@cove/shared';
+import { claimServerRead, SERVER_READ_FRESH_MS } from '@/lib/server-read';
 import { LessonHeader, LessonFooter, lessonAction } from '@/components/workspace/lesson-chrome';
 import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
 import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-navigator';
@@ -9,7 +12,7 @@ import { useLayoutTranslation } from '@/i18n';
 import { PrivateImageContext } from "@/components/editor/private-image-context";
 import { videoMediaBase } from "@/lib/video-api";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -29,12 +32,14 @@ export function VideoLesson({
   classId,
   preview = false,
   permissions,
+  initial,
 }: {
   academyId: string;
   materialId: string;
   classId?: string;
   preview?: boolean;
   permissions?: MediaStaffPermissions;
+  initial?: { data: VideoReadResult; token: string };
 }) {
   const { t } = useVideoTranslation(),
     slug = useAcademySlug(),
@@ -42,35 +47,44 @@ export function VideoLesson({
   const [chosen, setChosen] = useState(classId),
     [showHistory, setShowHistory] = useState(false),
     [countdown, setCountdown] = useState<number | null>(null);
+  const classroom = useClassroom();
+  const [seed] = useState(() => claimServerRead(initial?.token) ? initial?.data : undefined);
   const query = useQuery({
     queryKey: ["video", academyId, materialId, chosen, preview],
     queryFn: () =>
       videoApi.read({ academyId, materialId, classId: chosen, preview }),
+    initialData: seed, ...(seed ? { staleTime: SERVER_READ_FRESH_MS } : {}),
     retry: retryVideoRead,
     retryDelay: videoReadRetryDelay,
   });
-  const data = query.data;
+  // Projection never starts a learner watch session, including mixed-role accounts.
+  const data = classroom && query.data
+    ? { ...query.data, canTrack: false, progress: null, classes: [] }
+    : query.data;
   useMaterialObservation({ materialId, classId: chosen, courseId: data?.course.id, enabled: !preview && Boolean(data?.canTrack) });
   const { t: lt } = useLayoutTranslation('learn');
   const navigation = useMaterialNavigation({ academyId, materialId, classId: chosen, preview, courseId: data?.course.id, materials: data?.materials });
   const { open: panelOpen, panelId, triggerRef, toggle: togglePanel, close: closePanel } = useNavigatorPanel('material-course-outline');
   useEffect(() => {
-    if (!chosen && data?.classes.length === 1)
+    if (!classroom && !chosen && data?.classes.length === 1)
       // A single-class learner has nothing to choose; adopt it once the read arrives.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setChosen(data.classes[0].classId);
-  }, [chosen, data?.classes]);
+  }, [classroom, chosen, data?.classes]);
   const index =
       data?.materials.findIndex((m) => m.materialId === materialId) ?? -1,
-    next = data?.materials[index + 1];
-  const path = (row: { materialId: string; type: string }) =>
+    next = classroom
+      ? classroom.materials.slice(classroom.materials.findIndex(item => item.id === materialId) + 1).map(item => ({ materialId: item.id, type: item.type }))[0]
+      : data?.materials[index + 1];
+  const path = useCallback((row: { materialId: string; type: string }) =>
     routes.academyLearnMaterial(slug, row.materialId, row.type, {
       classId: chosen,
-    });
+    }), [slug, chosen]);
   useEffect(() => {
     if (countdown === null || !next) return;
     if (countdown === 0) {
-      router.push(path(next));
+      if (classroom) void classroom.navigate(classroom.materialHref(next.materialId));
+      else router.push(path(next));
       return;
     }
     const timer = setTimeout(
@@ -78,7 +92,7 @@ export function VideoLesson({
       1000,
     );
     return () => clearTimeout(timer);
-  }, [countdown, next?.materialId]);
+  }, [countdown, next, path, router, classroom]);
   if (!data)
     return (
       <main role={query.isError ? "alert" : "status"} className="p-6">

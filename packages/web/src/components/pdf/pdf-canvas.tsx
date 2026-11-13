@@ -16,6 +16,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { pdfApi } from '@/lib/pdf-api';
+import { useClassroom } from '@/components/classroom/classroom-context';
+import { SERVER_READ_FRESH_MS } from '@/lib/server-read';
 import { useStudentPresence } from '@/lib/monitoring/student-presence';
 import 'react-pdf/dist/Page/TextLayer.css';
 // Keep the searchable/selectable text layer available on Safari as well as canvas rendering.
@@ -52,13 +54,15 @@ export function PdfCanvas({
   observing?: boolean;
 }) {
   const { t } = useTranslation('content');
+  const classroom = useClassroom();
   const root = useRef<HTMLDivElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const query = useQuery({
     queryKey: ['pdf', academyId, materialId, preview, ...(exerciseMaterialId ? [exerciseMaterialId] : [])],
     queryFn: () => pdfApi.read({ academyId, materialId, preview, exerciseMaterialId }),
     retry: false,
-    staleTime: 0,
+    staleTime: classroom ? SERVER_READ_FRESH_MS : 0,
+    refetchOnMount: classroom ? false : true,
   });
   const data = query.data;
   const [error, setError] = useState<string>();
@@ -71,8 +75,8 @@ export function PdfCanvas({
     if (initialPage) setPage(initialPage);
   }
   useEffect(() => {
-    if (!observing && !preview && !exerciseMaterialId && data) publishObservation(materialId, { pdfPage: page });
-  }, [observing, preview, exerciseMaterialId, materialId, page, data, publishObservation]);
+    if (!classroom && !observing && !preview && !exerciseMaterialId && data) publishObservation(materialId, { pdfPage: page });
+  }, [classroom, observing, preview, exerciseMaterialId, materialId, page, data, publishObservation]);
   const [zoom, setZoom] = useState(100);
   const [fit, setFit] = useState<'width' | 'page' | null>('width');
   const [size, setSize] = useState({ width: 800, height: 600 });

@@ -1,0 +1,20 @@
+# Classroom teaching and live monitoring
+
+Date: 2026-11-13
+Status: implementation requested with the existing live workspace as the visual reference.
+
+The classroom uses the same two-row header, top-left class/student selector and left curriculum panel as the existing live monitor. It opens in the instructor's private teaching mode. Selecting an available student opens the existing live monitor and its authorized grading/tutoring/history controls. The selector includes a return to teaching and live enrolled/online/solving counts. Teaching mode does not write student progress or broadcast lessons to student devices.
+
+Keep the original compact header height: the selector trigger has only the person/view name and class name. Display online, offline and solving totals in a single line beside the trigger, outside the button. The totals may wrap beside the control on narrow screens; they must not add a third line inside the selector. The dropdown continues to show the enrolled total and live counts.
+
+Teaching and live entry share the full toolbar. Teaching uses the existing history/tutoring host without requiring a student identity: Student history opens the class history, Tutoring opens the selected lesson's student roster, and Grade submission opens that roster to choose a saved student submission. The actual submission workspace retains its existing grading capabilities and guards. Each teaching workspace mounts its permission-gated edit/reference actions into the shared header, so hiding the inner lesson header cannot hide those controls. Coding displays the same difficulty badge and statement canvas proportions as monitoring. Keep the teaching privacy explanation on the status tooltip and fullscreen in the footer to preserve working space. The instructor's draft remains mounted underneath tutoring; returning to teaching closes that local layer without changing the draft or opening a student socket.
+
+A shared route-group layout wraps classroom and live-student pages without changing their URLs. It server-renders the authorized roster once and owns class presence for the lifetime of that class workspace. The class-room snapshot and deltas update counts and selector rows even when the dropdown is closed. Existing shared roster merge rules determine enrollment, availability and counts. One 30-second durable-roster refresh replaces the existing duplicate switcher/help refreshes; realtime presence stays socket-driven.
+
+Keep a lazy, class-scoped pool of authenticated transports: class presence/help, material observation, and collaborative coding have separate channels because they have different watch lifecycles. Reuse each channel across lesson/student navigation. Only leaving the class workspace closes the transports. Network interruption still uses existing reconnect/token renewal, fresh snapshots and revocation checks. No global singleton or unbounded per-student sockets.
+
+Serialize watch-stop messages with starts. Coding stops name either their confirmed watch identity or the opening session ID, so leaving during authorization cannot strand a watch or retire a successor. Observation stop requests join the existing start queue. Each consumer removes only its own event listeners when unmounting.
+
+Managers and Team Leads retain academy-wide scope; Teachers need an active homeroom/assistant assignment. Every material, roster and student read remains authorized by the existing API. The shared layout reads the roster during server rendering and hands it to the client; outline metadata still uses the narrow classroom reader. Query counts must stay constant as the class grows. Tests use disposable Docker PostgreSQL only.
+
+Verify all three roles, zero/online/solving counts, student arrival/departure, closed/reopened dropdowns, class-to-student-to-class and student-to-student navigation, live updates after switching, bounded transport creation and cleanup, reconnect/revocation, private drafts and pending-edit guards, English/Korean and narrow layouts. Stop temporary services and free Cove API port 4000 at completion.

@@ -1,5 +1,6 @@
 'use client';
 
+import { useClassroom } from '@/components/classroom/classroom-context';
 import { useQuery } from '@tanstack/react-query';
 import { toNavigatorContext, workspaceMaterialSequence, type LearnCourseOutline } from '@cove/shared';
 import { useRouter } from 'next/navigation';
@@ -12,14 +13,25 @@ export function useMaterialNavigation({ academyId, courseId, materialId, classId
   initialOutline?: LearnCourseOutline;
   materials?: ReadonlyArray<{ materialId: string; title: string; type: string }>;
 }) {
+  const classroom = useClassroom();
   const slug = useAcademySlug();
   const router = useRouter();
   const query = useQuery({
     queryKey: ['material-navigation', academyId, courseId, classId, Boolean(preview)],
     queryFn: () => orpc.learn.getCourseOutline({ academyId, courseId: courseId!, classId, preview: preview || undefined }),
     initialData: initialOutline,
-    enabled: Boolean(courseId), retry: false, staleTime: 30_000,
+    enabled: !classroom && Boolean(courseId), retry: false, staleTime: 30_000,
   });
+  if (classroom) {
+    const index = classroom.materials.findIndex(item => item.id === materialId);
+    return { context: null, failed: false, unavailable: false, retry: () => undefined,
+      courseHref: classroom.exitHref,
+      previous: index > 0 ? { href: classroom.materialHref(classroom.materials[index - 1].id) } : null,
+      next: index >= 0 && index + 1 < classroom.materials.length ? { href: classroom.materialHref(classroom.materials[index + 1].id) } : null,
+      index: index + 1, total: classroom.materials.length,
+      navigate: (id: string) => { if (classroom.materials.some(item => item.id === id)) void classroom.navigate(classroom.materialHref(id)); },
+    };
+  }
   const context = query.data ? toNavigatorContext(query.data, materialId) : null;
   const unavailable = Boolean(query.data && !context);
   const sequence = context ? workspaceMaterialSequence(context) : materials;

@@ -148,3 +148,30 @@ export function readClassHistoryMaterials(db: Pick<PrismaService, "$queryRaw">, 
     ORDER BY cm.course_id,cm.position,l.position,m.position,m.id
   `;
 }
+
+/** Classroom picker projection: assigned visible hierarchy, with no lesson bodies or student data. */
+export async function readClassroomCurricula(
+  db: Pick<PrismaService, '$queryRaw'>,
+  academyId: string,
+  classId: string,
+): Promise<import('@cove/shared').ClassroomCourse[]> {
+  return db.$queryRaw<import('@cove/shared').ClassroomCourse[]>(Prisma.sql`
+    SELECT c.id, c.title, coalesce((SELECT json_agg(json_build_object(
+      'id', cm.id, 'title', cm.title,
+      'lectures', coalesce((SELECT json_agg(json_build_object(
+        'id', l.id, 'title', l.title,
+        'materials', coalesce((SELECT json_agg(json_build_object(
+          'id', m.id, 'title', m.title, 'type', m.type
+        ) ORDER BY m.position, m.id) FROM materials m
+          WHERE m.lecture_id=l.id AND m.is_visible
+            AND (m.type <> 'PDF_DOCUMENT' OR EXISTS (SELECT 1 FROM pdf_documents p JOIN pdf_assets a ON a.id=p.asset_id WHERE p.material_id=m.id AND p.placement <> 'SUPPLEMENTARY' AND a.state='READY'))
+            AND (m.type <> 'VIDEO_LESSON' OR EXISTS (SELECT 1 FROM video_lessons v JOIN video_assets a ON a.id=v.asset_id WHERE v.material_id=m.id AND v.placement <> 'SUPPLEMENTARY' AND a.state='READY'))), '[]'::json)
+      ) ORDER BY l.position, l.id) FROM lectures l
+        WHERE l.course_module_id=cm.id AND l.is_visible), '[]'::json)
+    ) ORDER BY cm.position, cm.id) FROM course_modules cm
+      WHERE cm.course_id=c.id AND cm.is_visible), '[]'::json) AS modules
+    FROM courses c JOIN class_courses cc ON cc.course_id=c.id
+    WHERE cc.class_id=${classId}::uuid AND c.academy_id=${academyId}::uuid AND c.is_visible
+    ORDER BY c.title, c.id
+  `);
+}

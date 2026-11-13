@@ -1,0 +1,16 @@
+{
+  "enter": "Enter Classroom",
+  "teaching": "Teaching view",
+  "lessons": "Lessons",
+  "exit": "Back to class",
+  "fullscreen": "Fullscreen",
+  "previous": "Previous lesson",
+  "next": "Next lesson",
+  "empty": "No lessons are available. Add a published course to this class to start teaching.",
+  "saveFailed": "Your work could not be saved. Please try again before leaving.",
+  "notice": "Your demonstration work is private. Students see the screen you project or share.",
+  "live_counts": "{{online}} online · {{offline}} offline · {{solving}} solving",
+  "teach_class": "Teach this class",
+  "closeOutline": "Close lessons",
+  "students_count": "Students · {{count}}"
+}

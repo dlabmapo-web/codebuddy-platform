@@ -35,7 +35,6 @@ import { courseAccent, courseAccentClasses } from '@/lib/course-accent';
  * something to show. A finished one gets a check and stops measuring.
  */
 export function CourseCard({
-  academyId,
   classId,
   course,
 }: {
@@ -62,7 +61,8 @@ export function CourseCard({
   return (
     <Link
       className="group relative flex flex-col overflow-hidden rounded-card border border-border bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-      href={`${routes.academy(academySlug)}/learn/courses/${course.courseId}${classId ? `?classId=${classId}` : ''}`}
+      prefetch={false}
+      href={routes.academyLearnCourse(academySlug, course.courseId, { classId })}
     >
       {/* The spine. Widens on hover the way a book tips out of a shelf — the
           one piece of motion here that is about this card rather than about

@@ -5,6 +5,7 @@ import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
 import { getLocale } from '@/i18n/server/get-locale';
 import { routes } from '@/lib/routes';
+import { backTo } from '@/lib/back-to';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import type { LearnCourseOutlineResult } from '@cove/shared';
 import { notFound } from 'next/navigation';
@@ -31,6 +32,7 @@ export default async function LearnCoursePage({
     return <StaffCoursePage params={Promise.resolve({ academySlug, courseId })} />;
   }
   const requestedClassId = single(search.classId);
+  if (search.classId !== undefined && (Array.isArray(search.classId) || !isUuid(requestedClassId))) notFound();
   const { t } = await getServerTranslation(['learn']);
   let outline: LearnCourseOutlineResult | null = null;
   try {
@@ -55,8 +57,8 @@ export default async function LearnCoursePage({
     <StudioPage
       back={
         <BackLink
-          href={`${routes.academy(academySlug)}/learn/courses`}
-          label={t('outline.back')}
+          href={backTo.academyLearnCourse(academySlug, outline.classContext.classId)}
+          label={outline.classContext.classes.find(item => item.classId === outline.classContext.classId)?.name ?? t('classes.back')}
         />
       }
       bleed

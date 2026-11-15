@@ -13,7 +13,7 @@ async function enter(page: Page, fixture: Fixture) {
   const target = new URL(response.headers().location!);
   target.searchParams.set('fixture', fixture.id);
   await page.goto(provider + '/os/authorize?' + target.searchParams);
-  await expect(page).toHaveURL(new RegExp('/academy/' + fixture.academy.slug + '/(?:classes|teach/classes|learn/courses)$'));
+  await expect(page).toHaveURL(new RegExp('/academy/' + fixture.academy.slug + '/(?:classes|teach/classes|learn/classes)$'));
 }
 async function rpc(page: Page, method: string, input: object) {
   const parts = (await page.context().cookies()).filter(cookie => /auth-token(?:\.\d+)?$/.test(cookie.name)).sort((a, b) => a.name.localeCompare(b.name));

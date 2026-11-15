@@ -39,7 +39,7 @@ export function useMaterialNavigation({ academyId, courseId, materialId, classId
   const href = (item: { materialId: string; type: string }) => routes.academyLearnMaterial(slug, item.materialId, item.type, { classId, preview: preview || undefined });
   return {
     context, failed: query.isError || unavailable, unavailable, retry: () => void query.refetch(),
-    courseHref: courseId ? routes.academyLearnCourse(slug, courseId, { classId }) : routes.academyLearnCourses(slug),
+    courseHref: courseId ? routes.academyLearnCourse(slug, courseId, { classId }) : routes.academyLearnClasses(slug),
     previous: index > 0 ? { href: href(sequence[index - 1]) } : null,
     next: index >= 0 && index + 1 < sequence.length ? { href: href(sequence[index + 1]) } : null,
     index: index + 1, total: sequence.length,

@@ -211,4 +211,6 @@ it('gives teaching entry a separate label from student classes', () => {
   expect(staff.find(({ href }) => href === '/academy/cove-development/classes')?.labelKey).toBe('link.classes');
   const student = studioNavGroups({ ...options, isStudent: true }).flatMap(({ items }) => items);
   expect(student.find(({ href }) => href.endsWith('/learn/classes'))?.labelKey).toBe('link.my_classes');
+  expect(student.some(({ href }) => href.endsWith('/learn/courses'))).toBe(false);
+  expect(student.find(({ href }) => href.endsWith('/learn/classes'))?.alsoCurrentOn).toContain('/academy/cove-development/learn/courses');
 });

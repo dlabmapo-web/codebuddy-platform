@@ -306,7 +306,7 @@
     },
     "empty_title": "아직 제출한 답안이 없습니다",
     "empty_body": "제출한 답안이 결과와 풀이에 걸린 시간과 함께 여기에 표시됩니다.",
-    "empty_action": "내 코스로 가기",
+    "empty_action": "내 반으로 가기",
     "no_results": "조건에 맞는 기록이 없습니다.",
     "unavailable_title": "제출 기록을 불러오지 못했습니다",
     "unavailable_body": "페이지를 새로고침하거나 잠시 후 다시 시도해 주세요.",

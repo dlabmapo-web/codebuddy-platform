@@ -90,14 +90,14 @@ test('a manager sets up a second class for the same student', async ({
   expect(unregisteredClassId).not.toBe('');
 });
 
-test('a student lands on My Courses and finds both classes beside it', async ({
+test('a student lands on My Classes and finds both enrolled classes', async ({
   page,
 }) => {
   await signIn(page, STUDENT_EMAIL);
 
-  // Adding the second nav entry must not move where a student arrives.
+  // Students enter learning through their enrolled classes.
   await page.goto(routes.academy(academySlug));
-  await expect(page).toHaveURL(new RegExp(`${academySlug}/learn/courses$`));
+  await expect(page).toHaveURL(new RegExp(`${academySlug}/learn/classes$`));
 
   await page
     .getByRole('link', { name: /my classes|내 반/i })
@@ -136,19 +136,18 @@ test('a class detail names its courses and links to the existing course route', 
   // The course route is academy-level on purpose: access means access through
   // any eligible class, so no class-scoped curriculum URL is introduced.
   const href = await course.getAttribute('href');
-  expect(href).toMatch(/\/learn\/courses\/[0-9a-f-]+$/);
+  expect(href).toMatch(new RegExp('/learn/courses/[0-9a-f-]+\\?classId=' + secondClassId + '$'));
 
   await course.click();
   await expect(page.getByRole('heading', { name: E2E_COURSE })).toBeVisible();
 });
 
-test('My Courses still shows one card when two classes grant the course', async ({
-  page,
-}) => {
+test('the old student catalog index redirects to My Classes', async ({ page }) => {
   await signIn(page, STUDENT_EMAIL);
   await page.goto(routes.academyLearnCourses(academySlug));
-
-  await expect(page.getByRole('heading', { name: E2E_COURSE })).toHaveCount(1);
+  await expect(page).toHaveURL(classesUrl());
+  await expect(classCard(page, SEEDED_CLASS)).toBeVisible();
+  await expect(classCard(page, SECOND_CLASS)).toBeVisible();
 });
 
 test('removing the enrollment removes the class and its remembered URL', async ({

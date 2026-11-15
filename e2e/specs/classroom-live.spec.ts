@@ -11,7 +11,7 @@ async function enter(page: Page, fixture: Fixture) {
   const response = await page.request.get('/sso/start', { maxRedirects: 0, timeout: 90_000 });
   const target = new URL(response.headers().location!); target.searchParams.set('fixture', fixture.id);
   await page.goto(provider + '/os/authorize?' + target.searchParams);
-  await expect(page).toHaveURL(new RegExp('/academy/' + fixture.academy.slug + '/(?:classes|teach/classes|learn/courses)$'));
+  await expect(page).toHaveURL(new RegExp('/academy/' + fixture.academy.slug + '/(?:classes|teach/classes|learn/classes)$'));
 }
 async function visibleCode(page: Page, next?: string) {
   return page.evaluate(value => {

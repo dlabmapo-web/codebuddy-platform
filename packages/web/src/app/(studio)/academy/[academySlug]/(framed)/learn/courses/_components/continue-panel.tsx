@@ -108,7 +108,7 @@ export function ContinuePanel({
           const when = savedWhen(draft);
           return (
             <li
-              className="flex items-center gap-3 bg-card px-4 py-3"
+              className="flex items-center gap-3 bg-card px-4 py-3 sm:last:odd:col-span-2"
               key={draft.materialId}
             >
               <span
@@ -118,6 +118,7 @@ export function ContinuePanel({
                 <Code2 className="size-4" />
               </span>
               <TrackedExerciseLink
+                prefetch={false}
                 className="min-w-0 flex-1 outline-none focus-visible:underline"
                 href={routes.academyLearnExercise(academySlug, draft.materialId)}
               >

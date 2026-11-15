@@ -87,7 +87,7 @@ export function QuizWorkspace({
   const answer = feedback?.selectedChoiceId ?? draft.code;
   const coursePath =
     returnTo ??
-    `${routes.academy(slug)}/learn/courses/${workspace.breadcrumb.course.id}`;
+    routes.academyLearnCourse(slug, workspace.breadcrumb.course.id, { classId });
   async function navigate(materialId: string) {
     if (submission.submitting) return;
     await draft.flushWithoutPromoting();

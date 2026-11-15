@@ -62,7 +62,7 @@ describe('the way back from My Page', () => {
         isPlatformAdmin: false,
       }).href;
     expect(back('TEACHER')).toBe('/academy/mapo-dlab/teach/classes');
-    expect(back('STUDENT')).toBe('/academy/mapo-dlab/learn/courses');
+    expect(back('STUDENT')).toBe('/academy/mapo-dlab/learn/classes');
   });
 
   it('gives an operator with no membership the console', () => {

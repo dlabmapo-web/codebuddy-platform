@@ -13,6 +13,10 @@ const classId = 'a0000000-0000-4000-8000-000000000001';
  * that moves has to be moved here too, deliberately.
  */
 describe('backTo', () => {
+  it('returns a student course to its selected class or the class list', () => {
+    expect(backTo.academyLearnCourse(academy, classId)).toBe(`/academy/${academy}/learn/classes/${classId}`);
+    expect(backTo.academyLearnCourse(academy)).toBe(`/academy/${academy}/learn/classes`);
+  });
   it('sends a member profile to the directory it is a row in', () => {
     expect(backTo.academyPerson(academy)).toBe('/academy/dlab-mapo/people');
   });

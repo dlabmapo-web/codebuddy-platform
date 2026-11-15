@@ -8,7 +8,7 @@ export function academyEntryPath(academySlug: string, role: AcademyRole): string
     MANAGER: routes.academyClasses,
     TEAM_LEAD: routes.academyClasses,
     TEACHER: routes.academyTeachClasses,
-    STUDENT: routes.academyLearnCourses,
+    STUDENT: routes.academyLearnClasses,
   } satisfies Record<AcademyRole, (slug: string) => string>;
 
   return destinations[role](academySlug);

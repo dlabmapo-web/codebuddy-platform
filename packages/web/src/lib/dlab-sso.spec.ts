@@ -51,7 +51,7 @@ describe('DLAB browser start and callback', () => {
     expect(m.verify).toHaveBeenCalledWith({ token_hash: 'private-hash', type: 'email' });
     expect(fetcher.mock.calls[1]![1].headers.Authorization).toBe('Bearer fake-access');
     expect(m.begin).toHaveBeenCalledOnce(); expect(m.me).toHaveBeenCalledOnce();
-    expect(result.headers.get('location')).toBe('https://cs.coveedu.com/academy/dlab-mapo/learn/courses');
+    expect(result.headers.get('location')).toBe('https://cs.coveedu.com/academy/dlab-mapo/learn/classes');
     expect(result.headers.get('set-cookie')).toContain('Max-Age=0');
     expect(result.headers.get('location')).not.toMatch(/code|state|token|hash/);
   });

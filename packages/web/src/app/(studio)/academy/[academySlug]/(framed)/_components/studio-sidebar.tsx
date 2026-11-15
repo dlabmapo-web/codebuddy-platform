@@ -403,25 +403,19 @@ export function studioNavGroups({
   const groups: NavGroup[] = [];
 
   if (canLearn) {
-    const learning: NavLink[] = [
-      {
-        href: `${base}/learn/courses`,
-        labelKey: 'link.shared_courses',
-        icon: GraduationCap,
-        alsoCurrentOn: [`${base}/content/courses`],
-      },
-    ];
-    // My Courses stays first and stays the landing destination: it is the
-    // fastest route into work. My Classes is the context behind it, and it is
-    // a student's alone — staff hold `curriculum.read` so they can preview the
-    // curriculum they wrote, and that is not a class to belong to.
-    // Answer records is a student's own history and nothing else, so staff
-    // previewing curriculum do not gain it either.
+    const learning: NavLink[] = isStudent ? [] : [{
+      href: `${base}/learn/courses`,
+      labelKey: 'link.shared_courses',
+      icon: GraduationCap,
+      alsoCurrentOn: [`${base}/content/courses`],
+    }];
+    // Students enter courses through their enrolled classes. Staff keep the catalog.
     if (isStudent) {
       learning.push({
         href: `${base}/learn/classes`,
         labelKey: 'link.my_classes',
         icon: School,
+        alsoCurrentOn: [`${base}/learn/courses`],
       });
       learning.push({
         href: `${base}/learn/records`,

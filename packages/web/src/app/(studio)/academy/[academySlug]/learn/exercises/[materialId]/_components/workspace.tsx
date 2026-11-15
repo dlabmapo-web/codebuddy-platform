@@ -676,7 +676,7 @@ function ProgrammingWorkspace({
           displayedMaterialId={exercise.materialId}
           error={navigation.navigatorFailed}
           footer={{
-            href: returnTo ?? `${routes.academy(academySlug)}/learn/courses/${workspace.breadcrumb.course.id}`,
+            href: returnTo ?? routes.academyLearnCourse(academySlug, workspace.breadcrumb.course.id, { classId }),
             label: returnTo ? t('workspace.back_to_records') : t('navigator.footer_student'),
           }}
           onClose={closePanel}

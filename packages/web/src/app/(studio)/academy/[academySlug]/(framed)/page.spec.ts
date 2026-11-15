@@ -21,7 +21,7 @@ describe('academy root without Overview', () => {
     ['MANAGER', '/classes'],
     ['TEAM_LEAD', '/classes'],
     ['TEACHER', '/teach/classes'],
-    ['STUDENT', '/learn/courses'],
+    ['STUDENT', '/learn/classes'],
   ] as const)('redirects %s before loading dashboard data', async (role, suffix) => {
     mocks.guard.mockResolvedValue({ academySlug: 'cove-seoul', role, via: 'membership' });
     await expect(AcademyPage({ params: Promise.resolve({ academySlug: 'cove-seoul' }) }))

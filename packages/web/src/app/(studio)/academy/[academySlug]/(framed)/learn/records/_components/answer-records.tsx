@@ -566,7 +566,7 @@ function EmptyHistory({ academyId }: { academyId: string }) {
       </p>
       <Link
         className="mt-4 inline-flex h-9 items-center rounded-lg bg-brand px-4 text-[13.5px] font-bold text-on-brand transition-opacity hover:opacity-90"
-        href={`${routes.academy(academySlug)}/learn/courses`}
+        href={routes.academyLearnClasses(academySlug)}
       >
         {t('records.empty_action')}
       </Link>

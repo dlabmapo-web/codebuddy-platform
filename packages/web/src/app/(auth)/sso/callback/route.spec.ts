@@ -46,7 +46,7 @@ async function complete(destination: string, role: 'MANAGER' | 'TEAM_LEAD' | 'TE
 describe('SSO academy entry', () => {
   it.each([
     ['MANAGER', '/classes'], ['TEAM_LEAD', '/classes'],
-    ['TEACHER', '/teach/classes'], ['STUDENT', '/learn/courses'],
+    ['TEACHER', '/teach/classes'], ['STUDENT', '/learn/classes'],
   ] as const)('takes %s past the hidden Overview', async (role, suffix) => {
     const response = await complete('/academy/dlab-mapo', role);
     expect(response.headers.get('location')).toBe(`https://cove.test/academy/dlab-mapo${suffix}`);

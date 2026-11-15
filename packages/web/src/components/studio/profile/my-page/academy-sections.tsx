@@ -379,7 +379,7 @@ function LearningContextSection({
                 <li key={`${course.id}-${course.className}`}>
                   <Link
                     className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-[13px] font-semibold transition-colors hover:border-[color:var(--accent-hue)]/60 hover:text-ink"
-                    href={`${base}/learn/courses`}
+                    href={`${base}/learn/courses/${course.id}`}
                   >
                     <BookOpen
                       aria-hidden

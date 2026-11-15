@@ -54,9 +54,9 @@ export const backTo = {
   academyLearnClass: (academySlug: string) =>
     routes.academyLearnClasses(academySlug),
 
-  /** A course outline → the catalog, whichever class was used to reach it. */
-  academyLearnCourse: (academySlug: string) =>
-    routes.academyLearnCourses(academySlug),
+  /** A student course outline → its authorized class, or the class list. */
+  academyLearnCourse: (academySlug: string, classId?: string | null) =>
+    classId ? routes.academyLearnClass(academySlug, classId) : routes.academyLearnClasses(academySlug),
 
   /** The import wizard → the course it is importing into. */
   academyCourseImport: (academySlug: string, courseId: string) =>

@@ -298,7 +298,7 @@ describe('resolveAcademyAccessState', () => {
     const destination = authDestination(account({
       memberships: [{ academy, role: 'STUDENT', roles: ['STUDENT'], status: 'ACTIVE', imageUrl: null }],
     }));
-    expect(destination).toBe(`/academy/${academy.slug}/learn/courses`);
+    expect(destination).toBe(`/academy/${academy.slug}/learn/classes`);
   });
 
   it('resolves only active membership roles for the selected academy', () => {

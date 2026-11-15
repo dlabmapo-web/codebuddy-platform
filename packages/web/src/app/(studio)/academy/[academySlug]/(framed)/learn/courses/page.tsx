@@ -1,99 +1,15 @@
-import { StaffCoursesPage } from '../../content/courses/_components/staff-courses-page';
+import { redirect } from 'next/navigation';
 import { rolesHavePermission } from '@cove/shared';
+import { StaffCoursesPage } from '../../content/courses/_components/staff-courses-page';
 import { requireAcademyRoute } from '@/lib/academy-route';
-import type { LearnCourseSummary, LearnDraftSummary } from '@cove/shared';
+import { routes } from '@/lib/routes';
 
-import { getServerTranslation } from '@/i18n/server/get-server-translation';
-import { toApiError } from '@/lib/api-errors';
-import { logoutAction } from '@/app/(auth)/actions';
-import { createServerORPCClient } from '@/lib/orpc-server';
-
-import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
-import { CourseCatalog } from './_components/course-catalog';
-
-export default async function LearnCoursesPage({
-  params,
-}: {
-  params: Promise<{ academySlug: string }>;
-}) {
+/** Keep staff courses and redirect the old student catalog before any catalog read. */
+export default async function LearnCoursesPage({ params }: { params: Promise<{ academySlug: string }> }) {
   const { academySlug } = await params;
-  const { academyId, roles } = await requireAcademyRoute(academySlug);
+  const { roles } = await requireAcademyRoute(academySlug);
   if (rolesHavePermission(roles, 'practice.own.create')) {
     return <StaffCoursesPage params={Promise.resolve({ academySlug })} />;
   }
-  const { t } = await getServerTranslation(['learn', 'errors', 'auth', 'nav']);
-
-  let courses: LearnCourseSummary[] | null = null;
-  let drafts: LearnDraftSummary[] = [];
-  // A lapsed learning session is not a membership problem, and telling a
-  // student to ask their manager about one sends them to a person who cannot
-  // help. The two states are distinguished here rather than collapsed.
-  let sessionEnded = false;
-
-  try {
-    const client = createServerORPCClient();
-    // Drafts are supplementary: a failure there must not cost the student their
-    // course list, so the two are settled independently.
-    const [courseResult, draftResult] = await Promise.allSettled([
-      client.learn.listCourses({ academyId }),
-      client.learn.listDrafts({ academyId }),
-    ]);
-    if (courseResult.status === 'rejected') throw courseResult.reason;
-    courses = courseResult.value.courses;
-    if (draftResult.status === 'fulfilled') drafts = draftResult.value.drafts;
-  } catch (error) {
-    const { code } = toApiError(error);
-    sessionEnded =
-      code === 'STUDENT_SESSION_EXPIRED' ||
-      code === 'STUDENT_SESSION_UNAVAILABLE';
-  }
-
-  return (
-    <StudioPage
-      bleed
-      description={t('catalog.description')}
-      title={rolesHavePermission(roles, 'practice.own.create') ? t('nav:link.shared_courses') : t('catalog.title')}
-    >
-      {courses ? (
-        <CourseCatalog
-          academyId={academyId}
-          initialCourses={courses}
-          initialDrafts={drafts}
-        />
-      ) : sessionEnded ? (
-        /*
-         * Reached only by a student whose inactivity lease lapsed between the
-         * countdown and this render. Staff never see it: the policy is theirs
-         * alone, and the API no longer asks a non-student for a lease.
-         *
-         * The action signs out rather than linking to `/login`. That link was
-         * the bug that made this state a dead end — the auth session is still
-         * valid at this point, so `/login` sent the reader straight back to
-         * their overview and the button appeared to do nothing at all.
-         */
-        <div className="rounded-card border border-border bg-card p-5">
-          <p className="text-[14px] leading-6 text-sub">
-            {t('errors:STUDENT_SESSION_EXPIRED')}
-          </p>
-          <form action={logoutAction}>
-            <button
-              className="mt-3 inline-flex items-center rounded-lg bg-brand px-3.5 py-2 text-[13px] font-semibold text-on-brand transition-opacity hover:opacity-90"
-              type="submit"
-            >
-              {t('auth:login.submit')}
-            </button>
-          </form>
-        </div>
-      ) : (
-        <div className="rounded-card border border-danger/25 bg-danger/5 p-5">
-          <h2 className="text-[15px] font-bold text-danger">
-            {t('catalog.forbidden_title')}
-          </h2>
-          <p className="mt-1.5 text-[14px] leading-6 text-sub">
-            {t('catalog.forbidden_body')}
-          </p>
-        </div>
-      )}
-    </StudioPage>
-  );
+  redirect(routes.academyLearnClasses(academySlug));
 }

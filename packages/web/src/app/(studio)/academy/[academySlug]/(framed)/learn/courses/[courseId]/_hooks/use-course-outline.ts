@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
 import { orpc } from '@/lib/orpc';
+import { SERVER_READ_FRESH_MS } from '@/lib/server-read';
 
 import {
   filterCourseModules,
@@ -41,6 +42,7 @@ export function useCourseOutline({
         ...(classId ? { classId, mode: "student" as const } : {}),
       }),
     initialData: initialOutline,
+    staleTime: SERVER_READ_FRESH_MS,
     retry: false,
   });
 

@@ -14,7 +14,7 @@ const entry = {
   STUDENT: { path: '/learn/courses', heading: 'My courses' },
 } as const;
 const landing = (slug: string, role: keyof typeof entry) => new RegExp('/academy/' + slug + entry[role].path + '$');
-const inAcademy = (slug: string) => new RegExp('/academy/' + slug + '/(?:classes|teach/classes|learn/courses)$');
+const inAcademy = (slug: string) => new RegExp('/academy/' + slug + '/(?:classes|teach/classes|learn/classes)$');
 
 for (const engine of ['chromium', 'webkit']) for (const role of ['lab_head', 'edu_manager', 'tutor', 'student']) {
   test(`new HQ campus: ${role} first and repeated login stays isolated in ${engine}`, async ({ browser, request }) => {

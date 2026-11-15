@@ -126,6 +126,7 @@ export function useStudentMonitoring({
     setOpenMaterial,
     socket,
     state,
+    report,
   } = useStudentPresence();
   const [indicator, setIndicator] = React.useState<StudentIndicatorState>('NONE');
   /**
@@ -289,7 +290,11 @@ export function useStudentMonitoring({
       pointerIdentity: { draftId: current.draftId, material: current.materialId },
     });
     publish({ ...current, phase: 'bound' });
-  }, [publish]);
+    // The presence socket starts as resynchronizing. A validated document and
+    // editor binding complete that handshake; otherwise the student's pointer
+    // eligibility guard hides every teacher marker despite receiving packets.
+    if (socket?.connected) report({ type: 'synchronized' });
+  }, [publish, report, socket]);
 
   // Whichever of the three preconditions settles last completes the binding.
   React.useEffect(() => {

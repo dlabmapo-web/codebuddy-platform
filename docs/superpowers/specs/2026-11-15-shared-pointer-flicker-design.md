@@ -1,7 +1,7 @@
 # Shared mouse pointer flicker
 
 Date: 2026-11-15
-Status: Proposed design; implementation and localhost verification remain to be done.
+Status: Implemented and verified on localhost. See the [verification report and screenshots](../../research/2026-11-15-shared-pointer-flicker-verification.md).
 
 ## Problem and evidence
 

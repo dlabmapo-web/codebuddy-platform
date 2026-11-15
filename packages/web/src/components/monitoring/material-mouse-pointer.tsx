@@ -7,7 +7,9 @@ import { projectSnapshotPointer } from '@/lib/monitoring/awareness/snapshot-poin
 import { RemotePointer } from './remote-pointer';
 function MaterialMousePointerContent({ awareness, materialId, name }: { awareness: Pick<ObservationAwareness, 'pointer' | 'editor' | 'materialId'>; materialId: string | null; name: string }) {
   const project = useCallback(() => projectSnapshotPointer(awareness.editor), [awareness.editor]);
-  return <RemotePointer name={name} materialId={materialId} sourceMaterialId={awareness.materialId} pointer={awareness.pointer} project={awareness.pointer?.surface === 'editor' ? project : undefined} />;
+  return <RemotePointer name={name} materialId={materialId} sourceMaterialId={awareness.materialId} pointer={awareness.pointer}
+    projectionContext={awareness.pointer?.surface === 'editor' ? awareness.editor?.file : null}
+    project={awareness.pointer?.surface === 'editor' ? project : undefined} />;
 }
 
 export function MaterialMousePointer(props: React.ComponentProps<typeof MaterialMousePointerContent>) { const covered = useHistoryCovered(); return covered ? null : <MaterialMousePointerContent {...props} />; }

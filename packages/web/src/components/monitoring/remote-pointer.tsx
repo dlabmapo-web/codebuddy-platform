@@ -30,7 +30,7 @@ import {
  * material. Other materials are hidden before this component mounts.
  */
 type Placement = {
-  /** The pointer this measurement belongs to. */
+  /** The context in which this placement is safe to retain before measurement. */
   key: string;
   view:
     | { kind: 'arrow'; left: number; top: number }
@@ -38,8 +38,30 @@ type Placement = {
     | { kind: 'elsewhere' };
 };
 
-const placementKey = (pointer: CollaborationPointer) =>
-  `${pointer.surface}:${pointer.space}:${pointer.material ?? ''}:${pointer.x}:${pointer.y}:${JSON.stringify(pointer.code)}:${JSON.stringify(pointer.anchor)}`;
+const placementContext = (pointer: CollaborationPointer, projectionContext?: string | null) =>
+  JSON.stringify([pointer.surface, pointer.space, pointer.material, pointer.code?.draftId, projectionContext]);
+
+function samePlacement(previous: Placement | null, next: Placement): boolean {
+  if (!previous || previous.key !== next.key || previous.view.kind !== next.view.kind) return false;
+  if (previous.view.kind === 'arrow' && next.view.kind === 'arrow') {
+    return previous.view.left === next.view.left && previous.view.top === next.view.top;
+  }
+  return previous.view.kind !== 'direction' ||
+    (next.view.kind === 'direction' && previous.view.direction === next.view.direction);
+}
+
+// Body/ancestor observation must not react to the overlay's own insertion,
+// removal or movement, including another peer's marker.
+function isOverlayNode(node: Node): boolean {
+  const element = node instanceof Element ? node : node.parentElement;
+  return !!element?.closest('[data-peer-pointer-overlay]');
+}
+
+function changesGeometry(mutation: MutationRecord): boolean {
+  if (isOverlayNode(mutation.target)) return false;
+  return mutation.type !== 'childList' ||
+    [...mutation.addedNodes, ...mutation.removedNodes].some(node => !isOverlayNode(node));
+}
 
 const noStore = () => () => undefined;
 
@@ -77,6 +99,7 @@ function RemotePointerContent({
   pointer,
   position,
   project,
+  projectionContext,
 }: {
   /** The peer, as this reader is allowed to know them. */
   name: string;
@@ -84,54 +107,89 @@ function RemotePointerContent({
   /** A snapshot editor projects its own model; the marker presentation is shared. */
   position?: { left: number; top: number } | null;
   project?: () => { left: number; top: number } | null;
+  /** Snapshot file identity; coordinates and content revisions can change within it. */
+  projectionContext?: string | null;
 }) {
   const { t } = useTranslation('monitoring');
   const [placement, setPlacement] = React.useState<Placement | null>(null);
   const hydrated = useHydrated();
+  const latest = React.useRef({ pointer, position, project, projectionContext });
+  const context = pointer ? placementContext(pointer, projectionContext) : null;
+  const anchored = !!pointer?.anchor;
 
-  React.useEffect(() => {
-    if (!pointer) return;
-    const key = placementKey(pointer);
+  const measureLatest = React.useCallback(() => {
+    const { pointer: current, position: point, project: projectPoint, projectionContext: scope } = latest.current;
+    if (!current) return;
+    const projected = projectPoint ? projectPoint() : point;
+    const next: Placement = {
+      key: placementContext(current, scope),
+      view: projected === undefined ? measure(current)
+        : projected ? { kind: 'arrow', ...projected } : { kind: 'elsewhere' },
+    };
+    setPlacement(previous => samePlacement(previous, next) ? previous : next);
+  }, []);
 
+  // Keep the eligible arrow in the tree while coordinates change, then commit
+  // the validated new projection before paint. A passive effect plus RAF left
+  // a painted blank frame and recreated the arrow on every movement packet.
+  React.useLayoutEffect(() => {
+    latest.current = { pointer, position, project, projectionContext };
+    measureLatest();
+  }, [pointer, position, project, projectionContext, measureLatest]);
+
+  React.useLayoutEffect(() => {
+    if (!context) return;
     let frame = 0;
+    let disposed = false;
+    let surface: HTMLElement | null | undefined;
+    let canvas: HTMLElement | null | undefined;
     const place = () => {
-      cancelAnimationFrame(frame);
       // One placement per frame: scroll and resize fire far faster than the
-      // screen can show, and `getBoundingClientRect` forces layout.
+      // screen can show. Read committed inputs, never a queued old packet.
+      if (frame || disposed) return;
       frame = requestAnimationFrame(() => {
-        const projected = project ? project() : position;
-        setPlacement({ key, view: projected === undefined ? measure(pointer) : projected ? { kind: 'arrow', ...projected } : { kind: 'elsewhere' } });
+        frame = 0;
+        if (disposed) return;
+        observeTargets();
+        measureLatest();
       });
     };
-
-    place();
-    window.addEventListener(codeGeometryEvent, place);
-    const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(place);
+    const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(records => {
+      if (records.some(changesGeometry)) place();
+    });
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place);
-    // Ancestors cover sibling-driven movement as well as the pane's own size.
-    let element: HTMLElement | null = findCanvasElement(pointer.surface) ?? findSurfaceElement(pointer.surface);
-    if (!element) {
-      // A PDF/player may mount after its first awareness frame arrives.
-      // Observe the containing document until that surface exists as well.
-      mutations?.observe(document.body, { childList: true, subtree: true });
-      observer?.observe(document.body);
-    }
-    while (element) {
-      observer?.observe(element);
-      mutations?.observe(element, { attributes: true, attributeFilter: ['class', 'style'], childList: true });
-      element = element.parentElement;
-    }
-    // An anchored row moves with things inside the pane — a chapter expanding
-    // above it, a terminal line arriving — which no ancestor observer sees.
-    const anchorSurface = pointer.anchor ? findSurfaceElement(pointer.surface) : null;
-    if (anchorSurface) {
-      mutations?.observe(anchorSurface, { attributes: true, attributeFilter: ['class', 'style', 'data-state'], childList: true, subtree: true });
-    }
+    const observeTargets = () => {
+      const current = latest.current.pointer;
+      if (!current) return;
+      const nextSurface = findSurfaceElement(current.surface);
+      const nextCanvas = findCanvasElement(current.surface);
+      if (surface === nextSurface && canvas === nextCanvas) return;
+      surface = nextSurface; canvas = nextCanvas;
+      observer?.disconnect(); mutations?.disconnect();
+      // Ancestors cover sibling-driven movement and surface replacement.
+      let element: HTMLElement | null = canvas ?? surface;
+      if (!element) {
+        // A PDF/player may mount after its first awareness frame arrives.
+        mutations?.observe(document.body, { childList: true, subtree: true });
+        observer?.observe(document.body);
+      }
+      while (element) {
+        observer?.observe(element);
+        mutations?.observe(element, { attributes: true, attributeFilter: ['class', 'style'], childList: true });
+        element = element.parentElement;
+      }
+      if (anchored && surface) {
+        mutations?.observe(surface, { attributes: true, attributeFilter: ['class', 'style', 'data-state'], childList: true, subtree: true });
+      }
+    };
+    observeTargets();
+    window.addEventListener(codeGeometryEvent, place);
     window.addEventListener('resize', place);
     // Capture: the panes scroll, not the window, and a listener on the window
     // alone would never fire for them.
     window.addEventListener('scroll', place, true);
     return () => {
+      disposed = true;
       cancelAnimationFrame(frame);
       observer?.disconnect();
       mutations?.disconnect();
@@ -139,20 +197,20 @@ function RemotePointerContent({
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-  }, [pointer, position, project]);
+  }, [context, anchored, measureLatest]);
 
-  // The portal target only exists in the browser, and a placement is only ever
-  // drawn for the pointer it was measured from — which is why nothing has to
-  // be cleared when the peer moves: a stale measurement simply stops matching.
+  // Context changes and explicit clears still suppress stale presentation in
+  // render. Coordinates alone do not remove the portal between measurements.
   if (!hydrated || !pointer) return null;
   const current =
-    placement && placement.key === placementKey(pointer) ? placement : null;
+    placement && placement.key === context ? placement : null;
   if (!current) return null;
 
   if (current.view.kind === 'elsewhere') {
     return createPortal(
       <p
         aria-hidden
+        data-peer-pointer-overlay
         data-testid="peer-pointer-elsewhere"
         className="pointer-events-none fixed left-1/2 top-3 z-[95] -translate-x-1/2 rounded-full border border-peer/30 bg-card px-3 py-1 text-[12px] font-semibold text-peer shadow-md"
       >
@@ -171,6 +229,7 @@ function RemotePointerContent({
     // useful action is to go there. Keyboard readers get the same offer.
     return createPortal(
       <button
+        data-peer-pointer-overlay
         className={`fixed left-1/2 z-[95] -translate-x-1/2 rounded-full border border-peer/30 bg-card px-3 py-1 text-[12px] font-semibold text-peer shadow-md ${
           direction === 'above' ? 'top-3' : 'bottom-3'
         }`}
@@ -193,6 +252,7 @@ function RemotePointerContent({
   return createPortal(
     <span
       aria-hidden
+      data-peer-pointer-overlay
       data-peer-surface={pointer.surface}
       data-testid="peer-pointer"
       className="pointer-events-none fixed z-[95] block motion-safe:transition-[left,top] motion-safe:duration-100 motion-safe:ease-linear"

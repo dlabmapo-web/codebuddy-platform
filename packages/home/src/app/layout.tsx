@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Space_Grotesk } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { getLocale } from "@/i18n/server/get-locale";
 
@@ -8,12 +8,12 @@ import { getLocale } from "@/i18n/server/get-locale";
  * nothing else. Korean and all body copy stay in Pretendard, which globals.css
  * imports as a self-hosted subset.
  *
- * `next/font` self-hosts at build time, so this costs no runtime request to
- * Google and leaks no visitor IP to it.
+ * The same variable font is vendored locally, so builds and visitors do not
+ * depend on Google Fonts responses. See ../fonts/README.md for provenance.
  */
-const grotesk = Space_Grotesk({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
+const grotesk = localFont({
+  src: "../fonts/SpaceGrotesk-Variable.ttf",
+  weight: "500 700",
   variable: "--font-grotesk",
   display: "swap",
 });

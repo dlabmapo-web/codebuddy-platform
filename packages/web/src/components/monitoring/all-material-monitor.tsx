@@ -222,7 +222,7 @@ function MonitorContent(props: {
     >
       <ObservationPresence
         awareness={watch.awareness}
-        materialId={id}
+        materialId={shown?.materialId ?? null}
         name={
           context.student.displayName ?? context.student.email ?? membershipId
         }

@@ -690,6 +690,9 @@ export function useStudentMonitoring({
      * helped by whoever is typing.
      */
     peers,
+    /** Source identity is valid only for the synchronized, currently displayed session. */
+    pointerMaterialId: state === 'live' && session.phase === 'bound' && session.classId === classId &&
+      session.materialId === materialId ? session.materialId : null,
     /** Handed to the editor so collaboration can bind to the live model. */
     registerEditor: React.useCallback(
       (instance: MonacoCodeEditor) => {

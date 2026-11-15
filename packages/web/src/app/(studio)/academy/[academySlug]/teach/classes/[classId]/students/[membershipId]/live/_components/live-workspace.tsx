@@ -114,6 +114,7 @@ export function LiveWorkspace({
     academyId,
     classId,
     studentMembershipId: membershipId,
+    displayedMaterialId: selectedMaterialId ?? context.exercise?.exercise.materialId ?? null,
     autoEdit: true,
     availableCode: selectedCodeIsCurrent && observation.source && observation.materialId &&
       observation.state !== 'OFFLINE' && observation.state !== 'RECONNECTING'
@@ -244,18 +245,23 @@ export function LiveWorkspace({
   }, [onRegisterTransition, live.prepareStudentSwitch]);
   const requestedPreviewRef = React.useRef<string | null>(null);
   const { displayedMaterialId: displayedForNavigation, select: selectForNavigation,
-    following: followingForNavigation, previewing: previewingForNavigation } = display;
+    resumeWatched: resumeWatchedForNavigation, following: followingForNavigation, previewing: previewingForNavigation } = display;
   React.useEffect(() => {
     // The watch acknowledgement announces this material in the display hook.
     // Do not race that announcement with a saved preview of the same problem.
     if (!selectedMaterialId || followingForNavigation || previewingForNavigation) return;
     if (!live.session && (!observation || observation.type === 'PROGRAMMING_EXERCISE')) return;
-    if (selectedMaterialId === live.session?.materialId || (selectedMaterialId === displayedForNavigation && display.display?.mode === 'preview')) return;
+    if (selectedMaterialId === live.session?.materialId) {
+      requestedPreviewRef.current = null;
+      if (live.canEdit && display.display?.mode === 'preview') resumeWatchedForNavigation();
+      return;
+    }
+    if (selectedMaterialId === displayedForNavigation && display.display?.mode === 'preview') return;
     const request = `${selectedMaterialId}:${live.session?.visitId ?? 'saved'}`;
     if (requestedPreviewRef.current === request) return;
     requestedPreviewRef.current = request;
     selectForNavigation(selectedMaterialId);
-  }, [selectedMaterialId, live.session, displayedForNavigation, selectForNavigation, followingForNavigation, previewingForNavigation, observation, display.display?.mode]);
+  }, [selectedMaterialId, live.session, live.canEdit, displayedForNavigation, selectForNavigation, resumeWatchedForNavigation, followingForNavigation, previewingForNavigation, observation, display.display?.mode]);
   // Destructured rather than kept as an object: reading `.open` off a hook
   // result that also carries a ref is a ref access as far as the React
   // compiler is concerned, and it is right to flag it.
@@ -273,6 +279,9 @@ export function LiveWorkspace({
   // exactly; what differs is where the payload came from and what may be done
   // with it.
   const shown = previewed ?? liveExercise ?? (lastExercise?.exercise.materialId === selectedMaterialId ? lastExercise : null);
+  const pointerSourceMaterialId = live.canEdit && (!observation || (observationConnection === 'live' &&
+    observation.type === 'PROGRAMMING_EXERCISE' && observation.materialId === live.session?.materialId &&
+    observation.state !== 'OFFLINE' && observation.state !== 'RECONNECTING')) ? live.session?.materialId ?? null : null;
   const historyPresentation = React.useContext(HistoryPresentationContext);
   const setHistoryMaterial = historyPresentation?.setMaterial;
   React.useEffect(() => {setHistoryMaterial?.(selectedMaterialId ?? materialId ?? context.exercise?.exercise.materialId ?? null,
@@ -377,11 +386,15 @@ export function LiveWorkspace({
 
   const note = useFeedbackDraft(feedbackScope(teacherMembershipRef, academyId, classId, membershipId, selectedMaterialId ?? materialId ?? null));
   return (
-    <div className={`flex h-dvh flex-col bg-canvas ${gradingOpen ? "xl:pr-[440px]" : ""}`}>
+    <div className={`flex h-dvh flex-col bg-canvas ${gradingOpen ? "xl:pr-[440px]" : ""}`}
+      data-testid="programming-monitor" data-displayed-material={shown?.exercise.materialId}
+      data-display-mode={display.display?.mode} data-pointer-source-material={pointerSourceMaterialId}>
       {/* The student's mouse, drawn wherever this teacher's layout puts the
           pane it is over. */}
-      <ObservationPresence awareness={observationAwareness ?? null} materialId={selectedMaterialId ?? materialId ?? null} name={student} />
-      <RemotePointer name={student} pointer={observation && observation.type !== 'PROGRAMMING_EXERCISE' ? null : live.remote.pointer} />
+      <ObservationPresence awareness={observationAwareness ?? null} materialId={shown?.exercise.materialId ?? null} name={student} />
+      <RemotePointer name={student} materialId={shown?.exercise.materialId ?? null}
+        sourceMaterialId={pointerSourceMaterialId}
+        pointer={live.remote.pointer} />
 
       <div className="shrink-0" {...surfaceProps('header')}>
         <LiveHeader

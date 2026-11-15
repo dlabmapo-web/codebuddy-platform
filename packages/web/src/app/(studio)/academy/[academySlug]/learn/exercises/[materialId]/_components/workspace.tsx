@@ -580,6 +580,8 @@ function ProgrammingWorkspace({
         <RemotePointer
           key={peer.peerId}
           name={peer.label ?? tm('peer.teacher')}
+          materialId={exercise.materialId}
+          sourceMaterialId={monitoring.pointerMaterialId}
           pointer={peer.pointer}
         />
       ))}

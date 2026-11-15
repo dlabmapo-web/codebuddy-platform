@@ -12,13 +12,13 @@ const setup = vi.hoisted(() => {
   const socket = { connected: true, on: vi.fn((name: string, fn: (value: unknown) => void) => { if (!handlers.has(name)) handlers.set(name, new Set()); handlers.get(name)!.add(fn); }),
     off: vi.fn((name: string, fn: (value: unknown) => void) => handlers.get(name)?.delete(fn)), timeout: vi.fn(), emit: vi.fn() };
   socket.timeout.mockReturnValue(socket);
-  return { academyId, classId, materialId, draftId, handlers, socket, binding: vi.fn((..._args: unknown[]) => ({ destroy: vi.fn() })), open: vi.fn(() => () => {}), mark: vi.fn() };
+  return { academyId, classId, materialId, draftId, handlers, socket, connection: 'live' as 'live' | 'reconnecting', binding: vi.fn((..._args: unknown[]) => ({ destroy: vi.fn() })), open: vi.fn(() => () => {}), mark: vi.fn() };
 });
-vi.mock('./student-presence', () => ({ useStudentPresence: () => ({ socket: setup.socket, academyId: setup.academyId, state: 'live', setOpenMaterial: setup.open, markActive: setup.mark }) }));
+vi.mock('./student-presence', () => ({ useStudentPresence: () => ({ socket: setup.socket, academyId: setup.academyId, state: setup.connection, setOpenMaterial: setup.open, markActive: setup.mark }) }));
 vi.mock('./awareness/use-awareness', () => ({ useAwareness: () => ({ peers: [], remote: { pointer: null, cursor: null } }) }));
 vi.mock('./yjs-monaco', () => ({ bindYTextToMonaco: setup.binding }));
 vi.mock('./use-terminal-mirror-publisher', () => ({ useTerminalMirrorPublisher: () => {} }));
-afterEach(() => { setup.handlers.clear(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { setup.connection = 'live'; setup.handlers.clear(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 it.each([false, true])('reacquires a restored coding page and preserves only an unsaved handoff (%s)', async hasLocalEdits => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const serverDoc = new Y.Doc(); serverDoc.getText('code').insert(0, 'print(42)');
@@ -34,11 +34,17 @@ it.each([false, true])('reacquires a restored coding page and preserves only an 
   function Harness() {
     const state = useStudentMonitoring({ classId: setup.classId, courseId: setup.academyId, materialId: setup.materialId, ready: true, hasLocalEdits, teacherLabel: 'Teacher', terminal });
     useEffect(() => state.registerEditor(editor as never), [state.registerEditor]);
-    return <button onClick={state.retire}>{state.phase}</button>;
+    return <button data-pointer-material={state.pointerMaterialId} onClick={state.retire}>{state.phase}</button>;
   }
   try {
     await act(() => root.render(<Activity mode="visible"><Harness /></Activity>));
     expect(host.textContent).toBe('bound'); expect(setup.binding).toHaveBeenCalledTimes(1);
+    expect(host.querySelector('button')?.getAttribute('data-pointer-material')).toBe(setup.materialId);
+    setup.connection = 'reconnecting';
+    await act(() => root.render(<Activity mode="visible"><Harness /></Activity>));
+    expect(host.querySelector('button')?.getAttribute('data-pointer-material')).toBeNull();
+    setup.connection = 'live';
+    await act(() => root.render(<Activity mode="visible"><Harness /></Activity>));
     expect(setup.binding.mock.calls[0]?.[2]).toMatchObject({ seed: hasLocalEdits ? 'model' : 'text' });
     await act(() => host.querySelector('button')!.click());
     await act(() => root.render(<Activity mode="hidden"><Harness /></Activity>));

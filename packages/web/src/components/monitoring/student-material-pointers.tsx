@@ -27,5 +27,5 @@ export function StudentMaterialPointers({ materialId, classId }: { materialId: s
     socket.on(observationEvents.teacherAwareness, receive); socket.on('disconnect', clear);
     return () => { clear(); socket.off(observationEvents.teacherAwareness, receive); socket.off('disconnect', clear); };
   }, [socket, academyId, classId, materialId]);
-  return <>{Object.values(peers).filter(peer => peer.materialId === materialId && peer.classId === classId).map(peer => <MaterialMousePointer key={peer.peerId} awareness={peer} name={t('peer.teacher')} />)}</>;
+  return <>{Object.values(peers).filter(peer => peer.materialId === materialId && peer.classId === classId).map(peer => <MaterialMousePointer key={peer.peerId} awareness={peer} materialId={materialId} name={t('peer.teacher')} />)}</>;
 }

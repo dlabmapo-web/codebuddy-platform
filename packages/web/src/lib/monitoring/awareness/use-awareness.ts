@@ -105,6 +105,7 @@ export function useAwareness({
   remoteCursor,
   remotePointer,
   socket,
+  publishEnabled = true,
 }: {
   /** Null until a shared document exists; publishing is off until then. */
   draftId: string | null;
@@ -126,6 +127,8 @@ export function useAwareness({
   /** Whether the peer's arrow fades on silence or waits to be cleared. */
   remotePointer: RemoteAwarenessLifecycle;
   socket: Socket | null;
+  /** Keep receiving the live document while a different lesson is displayed. */
+  publishEnabled?: boolean;
 }): {
   /**
    * The peer to render when there can only be one.
@@ -141,9 +144,9 @@ export function useAwareness({
   peers: PeerAwarenessState[];
   publishCursor: (cursor: CollaborationCursor | null) => void;
 } {
-  const covered = useHistoryCovered();
-  const coveredRef = React.useRef(covered);
-  React.useEffect(() => { coveredRef.current = covered; }, [covered]);
+  const suppressed = useHistoryCovered() || !publishEnabled;
+  const suppressedRef = React.useRef(suppressed);
+  React.useEffect(() => { suppressedRef.current = suppressed; }, [suppressed]);
   const [received, setReceived] = React.useState<PeerAwarenessMap>(noPeers);
 
   // Handlers outlive the render that created them, so the parts that change
@@ -242,9 +245,9 @@ export function useAwareness({
       channel.emit(monitoringClientEvents.awarenessUpdate, {
         draftId: currentDraft,
         sequence: nextAwarenessSequence(socket),
-        cursor: coveredRef.current ? null : cursorRef.current,
-        pointer: coveredRef.current || pointerRef.current?.code ? null : pointerRef.current,
-        editorPointer: !coveredRef.current && pointerRef.current?.code ? pointerRef.current : null,
+        cursor: suppressedRef.current ? null : cursorRef.current,
+        pointer: suppressedRef.current || pointerRef.current?.code ? null : pointerRef.current,
+        editorPointer: !suppressedRef.current && pointerRef.current?.code ? pointerRef.current : null,
         ...(identityRef.current ? { identity: identityRef.current } : {}),
       });
     },
@@ -252,8 +255,8 @@ export function useAwareness({
   );
 
   React.useEffect(() => {
-    if (covered) { pointerRef.current = null; cursorRef.current = null; cancelCursorFlush(); cancelPointerFlush(); send(true); }
-  }, [covered, send, cancelCursorFlush, cancelPointerFlush]);
+    if (suppressed) { pointerRef.current = null; cursorRef.current = null; cancelCursorFlush(); cancelPointerFlush(); send(true); }
+  }, [suppressed, send, cancelCursorFlush, cancelPointerFlush]);
   /* ------------------------------------------------------------- outgoing */
 
   const publishCursor = React.useCallback(
@@ -333,7 +336,7 @@ export function useAwareness({
   }, [send, socket]);
 
   React.useEffect(() => {
-    if (covered || !socket || !draftId || typeof document === 'undefined') return;
+    if (suppressed || !socket || !draftId || typeof document === 'undefined') return;
 
     const publishPoint = (
       point: PointerViewportPoint,
@@ -399,7 +402,7 @@ export function useAwareness({
       stopObservingFrames();
       document.removeEventListener('pointermove', onPointerMove, true);
     };
-  }, [covered, draftId, publishPointer, socket]);
+  }, [suppressed, draftId, publishPointer, socket]);
 
   React.useEffect(() => {
     if (!socket || !draftId) return;

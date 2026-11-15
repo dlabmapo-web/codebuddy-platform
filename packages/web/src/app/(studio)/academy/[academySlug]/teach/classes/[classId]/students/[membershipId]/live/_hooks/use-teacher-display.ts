@@ -192,9 +192,9 @@ export function useTeacherDisplay({
   /**
    * The one command a row click produces.
    *
-   * Selecting the LIVE row is following, not previewing: the teacher is asking
-   * to be beside the student again, and that has to go through a fresh
-   * authorization rather than loading a read-only copy of the same exercise.
+   * Selecting the LIVE row resumes the already-authorized watch when it still
+   * names that material. Following a student to a different material needs a
+   * fresh authorization rather than a read-only copy of their exercise.
    */
   const select = React.useCallback(
     (materialId: string) => {
@@ -202,20 +202,36 @@ export function useTeacherDisplay({
         return;
       }
       if (state.live.available && materialId === state.live.materialId) {
+        if (materialId === liveMaterialId && !watchDenied && !watchEnded) {
+          dispatch({ type: 'watched', materialId, path: livePath });
+          return;
+        }
         dispatch({ type: 'follow_requested', token: nextToken() });
         followWatch();
         return;
       }
       void preview(materialId);
     },
-    [followWatch, nextToken, preview, state],
+    [followWatch, nextToken, preview, state, liveMaterialId, livePath, watchDenied, watchEnded],
   );
 
   const returnToLive = React.useCallback(() => {
     if (!canReturnToLive(state)) return;
+    if (liveMaterialId && state.live.materialId === liveMaterialId && !watchDenied && !watchEnded) {
+      dispatch({ type: 'watched', materialId: liveMaterialId, path: livePath });
+      return;
+    }
     dispatch({ type: 'follow_requested', token: nextToken() });
     followWatch();
-  }, [followWatch, nextToken, state]);
+  }, [followWatch, nextToken, state, liveMaterialId, livePath, watchDenied, watchEnded]);
+
+  // The outer all-material selector may return to a document whose watch
+  // survived a preview or has just resynchronized. Its caller also requires
+  // live.canEdit, so this only presents an existing synchronized watch.
+  const resumeWatched = React.useCallback(() => {
+    if (!liveMaterialId || watchDenied || watchEnded) return;
+    dispatch({ type: 'watched', materialId: liveMaterialId, path: livePath });
+  }, [liveMaterialId, livePath, watchDenied, watchEnded]);
 
   const retryPreview = React.useCallback(() => {
     if (!state.previewFailedMaterialId) return;
@@ -262,6 +278,7 @@ export function useTeacherDisplay({
     previewing: state.pending !== null,
     pendingMaterialId: state.pending?.materialId ?? null,
     returnToLive,
+    resumeWatched,
     retryPreview,
     select,
     setFeedbackDraft,

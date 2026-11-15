@@ -38,7 +38,7 @@ function StudentSession({ academyId, materialId, userId, student, context, start
   const { t: th } = useTranslation('teach');
   const slug=useAcademySlug(),router=useRouter();
   const historyHref=`${routes.academyTeachProgress(slug,student.classId)}?view=students&student=${student.membershipId}`;
-  const live = useLiveWorkspace({ academyId, classId: student.classId, studentMembershipId: student.membershipId, autoEdit: true });
+  const live = useLiveWorkspace({ academyId, classId: student.classId, studentMembershipId: student.membershipId, displayedMaterialId: materialId, autoEdit: true });
   const language = context.exercise?.exercise?.language;
   // A staff member's own Run is browser Python; C and C++ have none in this phase.
   const compiled = isCompiledLanguage(language ?? 'PYTHON');
@@ -67,7 +67,7 @@ function StudentSession({ academyId, materialId, userId, student, context, start
   const savedCode = context.exercise?.draftCode ?? starterCode;
   const canRun = !compiled && runner.ready && !runner.running;
   return <div className="flex h-full min-h-0 flex-col bg-card">
-    <RemotePointer name={student.displayName} pointer={exact ? live.remote.pointer : null} />
+    <RemotePointer name={student.displayName} materialId={materialId} sourceMaterialId={live.canEdit ? live.session?.materialId ?? null : null} pointer={live.remote.pointer} />
     <div className="grid shrink-0 grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-card px-4 py-3 sm:flex sm:flex-wrap">
       <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-soft font-bold text-brand">{[...student.displayName][0]}</span>
       <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{student.displayName}</p><p className="truncate text-xs text-sub">{student.identifier}</p></div>

@@ -26,9 +26,8 @@ import {
  *
  * `arrow` is the exact place. `direction` is exact but off the visible pane,
  * so the reader is told which way rather than having the arrow pinned to an
- * edge. `elsewhere` is everything that cannot be placed at all — the pane is
- * not on this screen, or the position was measured in a space or against a
- * document this reader is not rendering.
+ * edge. `elsewhere` names an unavailable position on a verified matching
+ * material. Other materials are hidden before this component mounts.
  */
 type Placement = {
   /** The pointer this measurement belongs to. */
@@ -313,4 +312,21 @@ function scrollPointerIntoView(pointer: CollaborationPointer): void {
   });
 }
 
-export function RemotePointer(props: React.ComponentProps<typeof RemotePointerContent>) { const covered = useHistoryCovered(); return covered ? null : <RemotePointerContent {...props} />; }
+export function RemotePointer({
+  materialId,
+  sourceMaterialId,
+  ...props
+}: React.ComponentProps<typeof RemotePointerContent> & {
+  /** The content actually rendered, including an independent preview. */
+  materialId: string | null;
+  /** Material established by the accepted watch/session or awareness envelope. */
+  sourceMaterialId: string | null;
+}) {
+  const covered = useHistoryCovered();
+  // Eligibility precedes geometry: a failed projection on another lesson must
+  // not become a "looking at code" banner. Unmounting also cancels old frames
+  // and observers immediately when the displayed content changes.
+  if (covered || !materialId || materialId !== sourceMaterialId ||
+    (props.pointer?.material != null && props.pointer.material !== sourceMaterialId)) return null;
+  return <RemotePointerContent key={materialId} {...props} />;
+}

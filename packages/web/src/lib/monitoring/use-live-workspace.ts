@@ -75,6 +75,7 @@ export function useLiveWorkspace({
   studentMembershipId,
   autoEdit = false,
   availableCode,
+  displayedMaterialId,
 }: {
   academyId: string;
   classId: string;
@@ -82,6 +83,8 @@ export function useLiveWorkspace({
   autoEdit?: boolean;
   /** Selected-code availability is advisory; every retry is authorized by the server. */
   availableCode?: { materialId: string; source: string } | null;
+  /** Independent lesson selection; suppress outgoing awareness while reading elsewhere. */
+  displayedMaterialId?: string | null;
 }) {
   const { socket, state, report } = useMonitoringSocket({ classId, studentMembershipId });
   const [pendingUpdates] = React.useState(() => new PendingTeacherUpdates());
@@ -807,6 +810,7 @@ export function useLiveWorkspace({
     remoteCursor: staysUntilCleared,
     remotePointer: staysUntilCleared,
     socket,
+    publishEnabled: displayedMaterialId === undefined || displayedMaterialId === session?.materialId,
   });
 
   /* ---------------------------------------------------------------- actions */

@@ -76,6 +76,39 @@ it('reattaches after a late matching availability hint, then waits for the exact
   expect(starts()).toBe(5); expect(current.canEditCode).toBe(true);
 });
 
+it('reauthorizes when the student enters the previewed lesson and fences its new document sync', async () => {
+  grant = true; await render(available); await act(() => syncReply!());
+  const firstDoc = current.doc, staleSync = syncReply!;
+  await render(null); // Staff previews B while the student remains on A.
+  expect(starts()).toBe(1);
+  const nextMaterialId = '10000000-0000-4000-8000-000000000006';
+  const nextDraftId = '10000000-0000-4000-8000-000000000007';
+  const nextServer = new Y.Doc(); nextServer.getText('code').insert(0, 'print("lesson B")');
+  setup.socket.emit.mockImplementation((event: string, payload: { sessionId: string; eventId: string }, reply?: (ack: unknown) => void) => {
+    if (event === monitoringClientEvents.watchStart) reply?.({ ok: true, eventId: payload.eventId,
+      data: { draftId: nextDraftId, materialId: nextMaterialId, visitId: crypto.randomUUID(), sessionId: payload.sessionId, generation: starts(), mode: 'HELPING' } });
+    if (event === monitoringClientEvents.documentSync) syncReply = () => reply?.({ ok: true, eventId: payload.eventId,
+      data: { draftId: nextDraftId, update: Y.encodeStateAsUpdate(nextServer), stateVector: Y.encodeStateVector(nextServer) } });
+  });
+  try {
+    const nextAvailable = { materialId: nextMaterialId, source: 'student-source-2' };
+    await render(nextAvailable);
+    expect(starts()).toBe(2);
+    expect(current.canEditCode).toBe(false);
+    expect(current.session?.materialId).toBe(nextMaterialId);
+    await act(() => staleSync());
+    expect(current.canEditCode).toBe(false);
+    await render({ ...nextAvailable }); expect(starts()).toBe(2);
+    await act(() => syncReply!());
+    expect(current.canEditCode).toBe(true);
+    expect(current.text.toString()).toBe('print("lesson B")');
+    expect(firstDoc.isDestroyed).toBe(true);
+    await render({ ...nextAvailable, source: 'fresh-snapshot-same-lesson' });
+    await render(null); await render(nextAvailable); await advance(60000);
+    expect(starts()).toBe(2);
+  } finally { nextServer.destroy(); }
+});
+
 it('bounds recovery for an already available target and rearms only on a new source or return', async () => {
   await render(available); await advance(7001); await advance(7001); expect(starts()).toBe(8);
   await render({ ...available }); await advance(60000); expect(starts()).toBe(8);

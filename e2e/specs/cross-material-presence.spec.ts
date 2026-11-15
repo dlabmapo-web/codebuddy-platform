@@ -24,10 +24,15 @@ async function code(page: Page, value?: string) {
     return model?.getValue();
   }, value);
 }
+const pointerOffsets = new WeakMap<Page, number>();
 async function moveOverCode(page: Page) {
   const lines = page.locator('.monaco-editor .view-lines').first();
   await expect(lines).toBeVisible(); const box = await lines.boundingBox();
-  expect(box).not.toBeNull(); await page.mouse.move(box!.x + 60, box!.y + 10);
+  // Each call must end at a new eligible point. Returning to the same pixel
+  // can be coalesced into a no-op by the pointer publisher.
+  const offset = pointerOffsets.get(page) === 60 ? 100 : 60;
+  pointerOffsets.set(page, offset);
+  expect(box).not.toBeNull(); await page.mouse.move(box!.x + offset, box!.y + 10, { steps: 4 });
 }
 const markers = '[data-testid="peer-pointer"], [data-testid="peer-pointer-elsewhere"], [data-testid="peer-pointer-direction"]';
 
@@ -99,7 +104,7 @@ for (const [role, locale] of [['lab_head', 'en'], ['instructor', 'ko'], ['tutor'
       await expect(page.locator(markers)).toHaveCount(0);
       // Same title, different IDs: neither the title nor mouse movement can imply a match.
       const beforeMovement = pointerFrames;
-      await moveOverCode(learner); await learner.mouse.move(900, 500);
+      await moveOverCode(learner);
       await expect.poll(() => pointerFrames).toBeGreaterThan(beforeMovement);
       await page.setViewportSize({ width: 1400, height: 1000 });
       await expect(page.locator(markers)).toHaveCount(0);
@@ -115,6 +120,40 @@ for (const [role, locale] of [['lab_head', 'en'], ['instructor', 'ko'], ['tutor'
       await moveOverCode(learner); await expect(page.getByTestId('peer-pointer').first()).toBeVisible();
       expect(transport()).toEqual(stable);
       await capture(page, '05-return-live-updates-and-pointer');
+
+      // Production regression: the student catches up to the lesson staff
+      // already previewed. Observation alone must not stand in for rebinding
+      // the authorized collaborative document.
+      await selectB();
+      const beforeHandoff = transport();
+      await learner.goto(routes.academyLearnMaterial(slug, data.secondProgrammingMaterialId, 'PROGRAMMING_EXERCISE', { classId }));
+      await expect.poll(() => code(learner), { timeout: 90_000 }).toContain('DIFFERENT CHAPTER');
+      await code(learner, '# STUDENT CAUGHT UP TO PREVIEW B\nprint(202)\n');
+      await expect.poll(() => code(page), { timeout: 15_000 }).toContain('CAUGHT UP TO PREVIEW B');
+      await expect(page.getByTestId('observation-connection')).toContainText(locale === 'ko' ? '실시간' : 'Live');
+      await expect(page.getByTestId('programming-monitor')).toHaveAttribute('data-display-mode', 'live');
+      await moveOverCode(learner); await expect(page.getByTestId('peer-pointer').first()).toBeVisible();
+      expect(transport()).toEqual({ ...beforeHandoff, starts: beforeHandoff.starts + 1 });
+      await code(page, '# DIFFERENT CHAPTER\n# TEACHER LIVE AFTER PREVIEW HANDOFF\nprint(203)\n');
+      await expect.poll(() => code(learner)).toContain('TEACHER LIVE AFTER PREVIEW HANDOFF');
+      await moveOverCode(page); await expect(learner.getByTestId('peer-pointer').first()).toBeVisible();
+      await capture(page, '05b-student-enters-previewed-lesson-live');
+      // Repeat through the student's in-app outline, preserving its providers
+      // and sockets as in the production reproduction.
+      await panel.locator(`[data-collab-anchor="exercise:${data.materialId}"]`).click();
+      await expect.poll(() => code(page)).toContain('UPDATED WHILE PREVIEWING');
+      const beforeClientHandoff = transport();
+      const learnerPanel = learner.getByRole('complementary');
+      const firstLecture = learnerPanel.getByRole('button', { name: /Addition lesson/ });
+      if (await firstLecture.getAttribute('aria-expanded') === 'false') await firstLecture.click();
+      await learnerPanel.locator(`[data-collab-anchor="exercise:${data.materialId}"]`).click();
+      await expect(page.getByText(locale === 'ko' ? 'Add two numbers 실시간' : 'Live on Add two numbers', { exact: true })).toBeVisible();
+      await expect.poll(() => code(page)).toContain('UPDATED WHILE PREVIEWING');
+      await expect(page.getByTestId('programming-monitor')).toHaveAttribute('data-display-mode', 'live');
+      await expect(page.getByTestId('observation-connection')).toContainText(locale === 'ko' ? '실시간' : 'Live');
+      await moveOverCode(learner); await expect(page.getByTestId('peer-pointer').first()).toBeVisible();
+      expect(transport()).toEqual({ ...beforeClientHandoff, starts: beforeClientHandoff.starts + 1 });
+      await capture(page, '05c-student-client-navigation-handoff-live');
 
       await learner.goto(routes.academyLearnMaterial(slug, data.writtenMaterialId, 'WRITTEN_RESPONSE', { classId }));
       await learner.locator('textarea').first().fill('LIVE WRITTEN RESPONSE');

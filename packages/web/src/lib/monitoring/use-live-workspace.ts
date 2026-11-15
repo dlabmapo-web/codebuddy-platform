@@ -519,8 +519,11 @@ export function useLiveWorkspace({
     if (state === 'revoked' || refreshRequired) cancelWatchRef.current?.();
   }, [state, refreshRequired]);
 
-  // A settled refusal may precede the student's return to coding. Repeated
-  // observation heartbeats must not replace a healthy watch or loop forever.
+  // Availability describes the selected lesson only when the student is on
+  // it. If they enter a lesson we already previewed, the old watch still
+  // authorizes another draft: follow through the same fenced sync flow rather
+  // than borrowing observation's readiness. Ordinary previews have no hint.
+  // A settled refusal may also precede the student's return to coding.
   const recoveredAvailabilityRef = React.useRef<string | null>(null);
   const availableMaterialId = availableCode?.materialId;
   const availableSource = availableCode?.source;
@@ -530,12 +533,14 @@ export function useLiveWorkspace({
       return;
     }
     const key = `${academyId}:${classId}:${studentMembershipId}:${availableMaterialId}:${availableSource}`;
+    const needsHandoff = !denied && !ended && session !== null &&
+      session.materialId !== availableMaterialId;
     if (!socket?.connected || state === 'revoked' || refreshRequired || switching || pendingRecovery ||
-      denied !== 'MONITORING_STUDENT_UNAVAILABLE' || recoveredAvailabilityRef.current === key) return;
+      (!needsHandoff && denied !== 'MONITORING_STUDENT_UNAVAILABLE') || recoveredAvailabilityRef.current === key) return;
     recoveredAvailabilityRef.current = key;
     follow();
   }, [academyId, classId, studentMembershipId, availableMaterialId, availableSource, denied,
-    socket, state, refreshRequired, switching, pendingRecovery, follow]);
+    socket, state, refreshRequired, switching, pendingRecovery, follow, session, ended]);
 
   /* ---------------------------------------------------------- the document */
 

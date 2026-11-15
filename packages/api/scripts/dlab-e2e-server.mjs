@@ -145,6 +145,14 @@ const server = createServer(async (req, res) => {
       const material = await db.material.create({ data: { lectureId: lecture.id, title: 'Add two numbers', type: 'PROGRAMMING_EXERCISE', position: 1, isVisible: true,
         programmingExercise: { create: { externalKey: randomUUID(), difficulty: 'EASY', description: '<p>Read two numbers and print their sum.</p>', inputFormat: 'Two integers separated by a space.', outputFormat: 'One integer: their sum.', constraints: 'Each integer is between 0 and 100.', starterCode: 'a, b = map(int, input().split())\nprint(a + b)', solutionCode: 'print(sum(map(int, input().split())))', solutions: { create: { position: 0, title: 'Reference answer', code: 'print(sum(map(int, input().split())))' } }, testCases: { create: { position: 1, input: '2 3', expectedOutput: '5', visibility: 'SAMPLE' } } } },
       } });
+      let secondProgrammingMaterialId;
+      if (input.includeSecondProgramming) {
+        const otherLecture = await db.lecture.create({ data: { courseModuleId: module.id, title: 'Another chapter', externalKey: randomUUID(), position: 2, isVisible: true } });
+        const other = await db.material.create({ data: { lectureId: otherLecture.id, title: material.title, type: 'PROGRAMMING_EXERCISE', position: 1, isVisible: true,
+          programmingExercise: { create: { externalKey: randomUUID(), difficulty: 'EASY', description: '<p>Different chapter: print a greeting.</p>', starterCode: '# DIFFERENT CHAPTER\nprint("Hello")', solutionCode: 'print("Hello")' } },
+        } });
+        secondProgrammingMaterialId = other.id;
+      }
       const written = await db.material.create({ data: { lectureId: lecture.id, title: 'Explain your addition', type: 'WRITTEN_RESPONSE', position: 2, isVisible: true,
         manualMaterial: { create: { description: 'Explain how your program adds two numbers.', includeInScore: true } },
       } });
@@ -240,7 +248,7 @@ const server = createServer(async (req, res) => {
       }
       if (!input.emptyWork) await db.exerciseDraft.create({ data: { userId: student.userId, materialId: material.id, sourceMaterialId: material.id, courseId: course.id, code: 'print(2 + 3)' } });
       await db.academyFeatureFlag.upsert({ where: { academyId_feature: { academyId: fixture.academy.id, feature: 'TEACHER_LIVE_MONITORING' } }, create: { academyId: fixture.academy.id, feature: 'TEACHER_LIVE_MONITORING', isEnabled: true }, update: { isEnabled: true } });
-      return json(res, { reviewStudentMembershipId, turtleMaterialId, pdfMaterialId, videoMaterialId, courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, shortMaterialId: short.id, quizMaterialId: quiz.id, studentMembershipId: student.id, classes });
+      return json(res, { secondProgrammingMaterialId, reviewStudentMembershipId, turtleMaterialId, pdfMaterialId, videoMaterialId, courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, shortMaterialId: short.id, quizMaterialId: quiz.id, studentMembershipId: student.id, classes });
     }
     if (path.startsWith('/fixtures/') && req.method === 'PUT') {
       const id = path.split('/')[2], fixture = fixtures.get(id), input = await body(req);

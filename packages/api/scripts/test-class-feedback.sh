@@ -36,6 +36,10 @@ SQL
 DATABASE_URL="$COVE_DLAB_TEST_DATABASE_URL" DIRECT_URL="$COVE_DLAB_TEST_DATABASE_URL" pnpm --filter @cove/api db:migrate:deploy
 pnpm --filter @cove/shared build
 pnpm --filter @cove/i18n build
-pnpm --filter @cove/api build
+if [[ -n "${COVE_DLAB_API_BUILD_DIR:-}" ]]; then
+  pnpm --filter @cove/api exec tsc -p tsconfig.build.json --outDir "${COVE_DLAB_API_BUILD_DIR#file://}" --incremental false --declaration false --sourceMap false
+else
+  pnpm --filter @cove/api build
+fi
 pnpm --filter @cove/api exec vitest run src/classes/class-feedback.integration.spec.ts
 pnpm exec playwright test --config e2e/class-feedback.playwright.config.ts "$@"

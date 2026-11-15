@@ -1,7 +1,7 @@
 # Tutoring presence across different lessons
 
 Date: 2026-11-15
-Status: Proposed specification; implementation has not started.
+Status: Implemented and verified on localhost. See the [verification and screenshots](../../research/2026-11-15-cross-material-tutoring-presence-verification.md).
 
 ## Problem and intended behavior
 

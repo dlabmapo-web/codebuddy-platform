@@ -285,6 +285,7 @@ export function ContentRecordModal({
                   options: {
                     PYTHON: { title: library('language.options.PYTHON.title'), description: library('language.options.PYTHON.description') },
                     C_CPP: { title: library('language.options.C_CPP.title'), description: library('language.options.C_CPP.description') },
+                    WEB: { title: library('language.options.WEB.title'), description: library('language.options.WEB.description') },
                   },
                 }}
                 onChange={setLanguage}

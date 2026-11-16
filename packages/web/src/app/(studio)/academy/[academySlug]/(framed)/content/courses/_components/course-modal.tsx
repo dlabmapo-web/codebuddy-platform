@@ -80,6 +80,7 @@ export function CourseModal({ manager }: { manager: CoursesManagerState }) {
                 options: {
                   PYTHON: { title: grading('language.options.PYTHON.title'), description: grading('language.options.PYTHON.description') },
                   C_CPP: { title: grading('language.options.C_CPP.title'), description: grading('language.options.C_CPP.description') },
+                  WEB: { title: grading('language.options.WEB.title'), description: grading('language.options.WEB.description') },
                 },
               }}
               locked={editing && manager.languageLocked}
@@ -93,7 +94,7 @@ export function CourseModal({ manager }: { manager: CoursesManagerState }) {
                   t('path.course'),
                   t('path.module'),
                   t('path.lecture'),
-                  t('path.problem'),
+                  t(manager.language === 'WEB' ? 'path.material' : 'path.problem'),
                 ]}
                 title={t('create.next_step')}
               />

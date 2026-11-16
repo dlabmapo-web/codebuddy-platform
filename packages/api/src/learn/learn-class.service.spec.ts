@@ -22,6 +22,8 @@ vi.mock("./curriculum-read.js", () => ({
 }));
 
 vi.mock('./manual-assessment-read.js', () => ({
+  readManualOutlineResults: async (db: { manualSubmission: { findMany: () => Promise<Array<{ materialId: string; includeInScore: boolean; maximumHundredths: number; reviews: Array<{completed: boolean; scoreHundredths: number}>; shortAnswerAssessment?: {completed: boolean; scoreHundredths: number; status: string}; multipleChoiceAssessment?: {completed: boolean; scoreHundredths: number; status: string} }>> } }) => (await db.manualSubmission.findMany()).map(a => { const result = a.reviews[0] ?? (a.multipleChoiceAssessment?.status === 'GRADED' ? a.multipleChoiceAssessment : a.shortAnswerAssessment?.status === 'GRADED' ? a.shortAnswerAssessment : null); return { materialId: a.materialId, includeInScore: a.includeInScore, maximumHundredths: a.maximumHundredths, completed: result?.completed ?? null, scoreHundredths: result?.scoreHundredths ?? null }; }),
+  readVideoOutlineResults: async (db: { videoWatchProgress: { findMany: () => Promise<unknown[]> } }) => db.videoWatchProgress.findMany(),
   readAssessmentRevisions: (db: {programmingExercise: {findMany: () => Promise<unknown>}}) => db.programmingExercise.findMany(),
 }));
 

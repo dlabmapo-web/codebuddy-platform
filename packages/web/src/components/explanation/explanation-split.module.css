@@ -1,0 +1,67 @@
+.workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}
+.panes {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.instructions,
+.reference {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 0 12px;
+}
+.instructions > article,
+.reference > article {
+  flex: 1 0 auto;
+}
+.instructions {
+  width: var(--instruction-share);
+  flex-shrink: 0;
+}
+.reference {
+  flex: 1;
+}
+.tabs {
+  display: none;
+}
+@media (max-width: 767px) {
+  .tabs {
+    display: flex;
+    flex-shrink: 0;
+    gap: 4px;
+    padding: 8px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+  }
+  .tabs button {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    color: var(--sub);
+  }
+  .tabs button[aria-selected="true"] {
+    background: var(--brand-soft);
+    color: var(--brand);
+    font-weight: 700;
+  }
+  .instructions,
+  .reference {
+    display: none;
+    width: 100%;
+  }
+  .instructions[data-active="true"],
+  .reference[data-active="true"] {
+    display: flex;
+    flex: 1;
+  }
+}

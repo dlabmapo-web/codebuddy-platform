@@ -1,5 +1,6 @@
 'use client';
 
+import { useReadingView } from '@/components/workspace/use-reading-view';
 import { useState } from 'react';
 import type { PdfReadResult } from '@cove/shared';
 import { claimServerRead, SERVER_READ_FRESH_MS } from '@/lib/server-read';
@@ -29,6 +30,7 @@ export function PdfLesson({ academyId, materialId, classId, permissions, initial
     queryFn: () => pdfApi.read({ academyId, materialId }), retry: false, initialData: seed, staleTime: seed ? SERVER_READ_FRESH_MS : 0,
   });
   const data = query.data;
+  useReadingView({ academyId, materialId, classId, enabled: Boolean(data) && !permissions?.canTutor });
   useMaterialObservation({ materialId, classId, courseId: data?.course.id, enabled: !permissions?.canTutor });
   const navigation = useMaterialNavigation({ academyId, materialId, classId, courseId: data?.course.id, materials: data?.materials });
   const { open: panelOpen, panelId, triggerRef, toggle: togglePanel, close: closePanel } = useNavigatorPanel('material-course-outline');

@@ -22,7 +22,7 @@ import { MoveAnywhereModal } from './move-anywhere-modal';
 import { RenameModal } from './rename-modal';
 import { RowMenu } from './row-menu';
 import { NewMaterialDialog } from './new-material-dialog';
-import { availableMaterialKinds, type MaterialCreationKind } from '../_lib/material-creation';
+import { availableMaterialKinds, unavailableMaterialKinds, type MaterialCreationKind } from '../_lib/material-creation';
 
 function formatMaterialSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -352,7 +352,7 @@ export function LectureRow({
   const contentPaths = useContentBasePath();
   const [pdfAdding, setPdfAdding] = useState(false);
   const router = useRouter();
-  const materialKinds = availableMaterialKinds({ ...publicConfig, editable: builder.editable, exerciseEditable: builder.exerciseEditable });
+  const materialKinds = availableMaterialKinds({ ...publicConfig, courseLanguage: builder.tree.course.language, editable: builder.editable, exerciseEditable: builder.exerciseEditable });
   function chooseMaterial(kind: MaterialCreationKind) {
     switch (kind) {
       case 'explanation': router.push(contentPaths.explanation(builder.target.courseId, lecture.id, 'new')); break;
@@ -461,7 +461,7 @@ export function LectureRow({
                 : ''}
             </span>
           </div>
-          <NewMaterialDialog kinds={materialKinds} lectureTitle={lecture.title} onChoose={chooseMaterial} />
+          <NewMaterialDialog kinds={materialKinds} lectureTitle={lecture.title} onChoose={chooseMaterial} unavailable={unavailableMaterialKinds(builder.tree.course.language)} unavailableReason={t('material-picker:unavailable_web')} />
           {visibilityIsReal ? (
             <RowVisibility
               busy={builder.visibilityPending(lecture.id)}

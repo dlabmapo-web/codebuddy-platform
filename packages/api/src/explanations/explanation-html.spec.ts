@@ -34,3 +34,9 @@ it('keeps legacy code-only language metadata readable', () => {
   const body = sanitizeExplanation('<pre><code class="language-cpp">int x = 10;</code></pre>');
   expect(body).toBe('<pre><code class="language-cpp">int x = 10;</code></pre>');
 });
+
+it('allows only known banner tones and safe file labels', () => {
+  expect(sanitizeExplanation('<div data-callout="practice" class="evil" style="color:#fff" onclick="bad()">Try it</div><pre data-filename="src/index.html" data-language="html"><code>&lt;h1&gt;Hello&lt;/h1&gt;</code></pre>')).toBe('<div data-callout="practice">Try it</div><pre data-language="html" data-filename="src/index.html"><code class="language-plaintext">&lt;h1&gt;Hello&lt;/h1&gt;</code></pre>');
+  expect(sanitizeExplanation('<div data-callout="unknown" style="color:#fff">Note</div><pre data-filename="&quot; onmouseover=bad()"><code>x</code></pre>')).not.toMatch(/data-callout|data-filename|style|onmouseover/);
+  expect(sanitizeExplanation(`<pre data-filename="${'a'.repeat(81)}"><code>x</code></pre>`)).not.toContain('data-filename');
+});

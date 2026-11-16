@@ -44,5 +44,20 @@
   "copy_code": "Copy code",
   "copied": "Copied",
   "copy_failed": "Copy failed",
-  "plain_text": "Plain text"
+  "plain_text": "Plain text",
+  "code_filename": "File name",
+  "insert_banner": "Insert banner",
+  "banner_tone": "Banner tone",
+  "banner_practice": "Practice",
+  "banner_mission": "Mission",
+  "banner_note": "Note",
+  "banner_warning": "Warning",
+  "practice_template": "Practice page",
+  "mission_template": "Mission page",
+  "practice_prompt": "Try the code in your own editor.",
+  "mission_prompt": "Build the page shown below.",
+  "expected_result": "Expected result",
+  "image_placeholder": "Upload an image of the expected result here.",
+  "mission_question": "Your mission",
+  "add_file": "Add file"
 }

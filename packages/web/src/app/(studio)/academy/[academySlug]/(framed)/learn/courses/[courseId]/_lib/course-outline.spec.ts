@@ -94,3 +94,7 @@ describe('lectureProgress', () => {
     ).toBe(0);
   });
 });
+
+it('counts every navigable Web material including PDFs placed in both locations', () => {
+  expect(lectureProgress({ exercises: [], explanations: [{status: 'SOLVED'}], documents: [{status: 'SOLVED', pdf: {placement: 'MAIN'}}, {status: 'NOT_STARTED', pdf: {placement: 'BOTH'}}, {status: 'SOLVED', pdf: {placement: 'SUPPLEMENTARY'}}], videos: [{status: 'NOT_STARTED', video: {includeInScore: false}}], manualMaterials: [{status: 'SOLVED', includeInScore: false}] }, 'WEB')).toEqual({ total: 5, solved: 3, percent: 60 });
+});

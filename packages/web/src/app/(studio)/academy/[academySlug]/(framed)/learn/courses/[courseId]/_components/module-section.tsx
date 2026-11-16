@@ -31,6 +31,7 @@ export function ModuleSection({
   onToggle,
   onToggleLecture,
   requestedLectureId,
+  courseLanguage,
 }: {
   academyId: string;
   classId: string;
@@ -40,6 +41,7 @@ export function ModuleSection({
   onToggle: () => void;
   onToggleLecture: (lectureId: string) => void;
   requestedLectureId: string | null;
+  courseLanguage?: string;
 }) {
   const { t: pdfT } = useTranslation('pdf-practice');
   const {t:mt}=useManualTranslation();
@@ -47,7 +49,7 @@ export function ModuleSection({
   const slug = useAcademySlug();
   const { t } = useLayoutTranslation('learn');
   const exerciseCount = module.lectures.reduce(
-    (total, lecture) => total + lecture.exercises.length,
+    (total, lecture) => total + (courseLanguage === "WEB" ? (lecture.explanations?.length ?? 0) + (lecture.manualMaterials?.length ?? 0) + (lecture.videos?.length ?? 0) + (lecture.documents?.filter(d => d.pdf.placement !== "SUPPLEMENTARY").length ?? 0) : lecture.exercises.length),
     0,
   );
 
@@ -147,7 +149,7 @@ export function ModuleSection({
                                 </span>
                               ) : null}
                             </span>
-                            <LectureProgress lecture={lecture} />
+                            <LectureProgress lecture={lecture} courseLanguage={courseLanguage} />
                           </span>
                         </button>
                       </Collapsible.Trigger>
@@ -192,7 +194,7 @@ export function ModuleSection({
                         ]
                           .sort((a, b) => a.position - b.position)
                           .map((row, index) =>
-                            row.kind === 'explanation' ? <li key={row.explanation.materialId}><MaterialLink title={row.explanation.title} type="EXPLANATION" href={routes.academyLearnMaterial(slug, row.explanation.materialId, 'EXPLANATION', { classId })} /></li> : row.kind === 'video' ? (<li key={row.video.materialId}><MaterialLink title={row.video.title} type="VIDEO_LESSON" href={routes.academyLearnVideo(slug,row.video.materialId,{classId})}>{row.video.status==='SOLVED'?vt('completed'):vt(row.video.video.includeInScore?'include_score':'excluded')}</MaterialLink></li>) : row.kind === 'manual' ? (<li key={row.manual.materialId}><MaterialLink title={row.manual.title} type={row.manual.type} href={routes.academyLearnAssessment(slug,row.manual.materialId,row.manual.type,{classId})}>{row.manual.type === "MULTIPLE_CHOICE" ? `${mt("automatic_graded")} · ` : row.manual.type === "TURTLE_EXERCISE" ? `${mt("teacher_graded")} ` : ""}{row.manual.pending?'Awaiting review':row.manual.status==='SOLVED'?'Completed':row.manual.includeInScore?'Included in score':'Excluded from score'}</MaterialLink></li>) : row.kind === 'exercise' ? (
+                            row.kind === 'explanation' ? <li key={row.explanation.materialId}><MaterialLink title={row.explanation.title} type="EXPLANATION" href={routes.academyLearnMaterial(slug, row.explanation.materialId, 'EXPLANATION', { classId })}>{row.explanation.status === 'SOLVED' ? <span className="text-success">✓</span> : null}</MaterialLink></li> : row.kind === 'video' ? (<li key={row.video.materialId}><MaterialLink title={row.video.title} type="VIDEO_LESSON" href={routes.academyLearnVideo(slug,row.video.materialId,{classId})}>{row.video.status==='SOLVED'?vt('completed'):vt(row.video.video.includeInScore?'include_score':'excluded')}</MaterialLink></li>) : row.kind === 'manual' ? (<li key={row.manual.materialId}><MaterialLink title={row.manual.title} type={row.manual.type} href={routes.academyLearnAssessment(slug,row.manual.materialId,row.manual.type,{classId})}>{row.manual.type === "MULTIPLE_CHOICE" ? `${mt("automatic_graded")} · ` : row.manual.type === "TURTLE_EXERCISE" ? `${mt("teacher_graded")} ` : ""}{row.manual.pending?'Awaiting review':row.manual.status==='SOLVED'?'Completed':row.manual.includeInScore?'Included in score':'Excluded from score'}</MaterialLink></li>) : row.kind === 'exercise' ? (
                               <ExerciseRow
                                 academyId={academyId}
                                 classId={classId}
@@ -214,7 +216,7 @@ export function ModuleSection({
                                     { classId },
                                   )}
                                 >
-                                  {row.doc.pdf.pageCount ? pdfT('page_count', { count: row.doc.pdf.pageCount }) : null}
+                                  {row.doc.status === 'SOLVED' ? <span className="mr-2 text-success">✓</span> : null}{row.doc.pdf.pageCount ? pdfT('page_count', { count: row.doc.pdf.pageCount }) : null}
                                 </MaterialLink>
                               </li>
                             ),
@@ -260,15 +262,15 @@ export function ModuleSection({
  * width alone is not a number, and a bar is the first thing to become
  * unreadable at narrow widths or in high contrast.
  */
-function LectureProgress({ lecture }: { lecture: Module['lectures'][number] }) {
+function LectureProgress({ lecture, courseLanguage }: { lecture: Module['lectures'][number]; courseLanguage?: string }) {
   const { t } = useLayoutTranslation('learn');
-  const progress = lectureProgress(lecture);
+  const progress = lectureProgress(lecture, courseLanguage);
   if (progress.percent === null) return null;
 
   return (
     <span className="flex shrink-0 items-center gap-2 sm:w-44">
       <span className="whitespace-nowrap text-[12px] font-semibold text-sub">
-        {t('outline.progress', {
+        {courseLanguage === 'WEB' ? `${progress.solved} / ${progress.total}` : t('outline.progress', {
           solved: progress.solved,
           total: progress.total,
         })}

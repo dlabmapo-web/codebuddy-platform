@@ -26,7 +26,7 @@ import {
 } from "./choice-options";
 import { useManualTranslation } from "./use-manual-translation";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { effectiveManualResult, type ManualSession, type ManualWorkspace as ManualWorkspaceData } from "@cove/shared";
 import { manualApi } from "@/lib/manual-api";
 import { claimServerRead, SERVER_READ_FRESH_MS } from "@/lib/server-read";
@@ -65,6 +65,7 @@ export function ManualWorkspace({
   const [serverRead] = useState(() =>
     initialWorkspace && claimServerRead(initialWorkspace.token) ? initialWorkspace.workspace : undefined);
   const target = { academyId, materialId };
+  const cache = useQueryClient();
   const query = useQuery({
     queryKey: ["manual", userId, academyId, materialId, preview, deliveryClass],
     queryFn: () =>
@@ -370,6 +371,9 @@ export function ManualWorkspace({
         requestKey: pendingSubmit.current.key,
       });
       pendingSubmit.current = null;
+      // The lesson outline is cached across materials; refresh it so this
+      // material's tick and the lecture count follow the submission.
+      void cache.invalidateQueries({ queryKey: ["material-navigation", academyId] });
       if (explicit) {
         setChoiceSelected([]);
         setDirty(false);

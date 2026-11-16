@@ -22,7 +22,7 @@ export function Providers({
   const pathname = usePathname();
   // Floating debug controls otherwise cover actions in fullscreen workspaces.
   const fullscreenWorkspace =
-    pathname === routes.turtle || /\/teach\/classes\/[^/]+\/classroom(?:\/|$)/.test(pathname) || /\/learn\/(?:exercises|documents|turtle|quizzes|videos)\//.test(pathname) ||
+    pathname === routes.turtle || /\/teach\/classes\/[^/]+\/classroom(?:\/|$)/.test(pathname) || /\/learn\/(?:exercises|explanations|documents|turtle|quizzes|videos)\//.test(pathname) ||
     /\/teach\/classes\/[^/]+\/students\/[^/]+\/(?:work|submissions|live)(?:\/|$)/.test(pathname);
   const academyPage = pathname.startsWith('/academy/');
   useEffect(() => academyPage ? installHorizontalScrollBoundary(document) : undefined, [academyPage]);

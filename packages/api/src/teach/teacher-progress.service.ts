@@ -3,6 +3,7 @@ import { quizFeedback } from "@cove/shared";
 import { programExit } from "../judge/program-exit.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
+  type ReadingProgressInput, type ReadingProgressResult, type ReadingMaterialStudentsInput, type ReadingMaterialStudentsResult,
   TEACHER_ATTEMPTS_PAGE_SIZE,
   TEACHER_EXERCISE_PAGE_SIZE,
   TEACHER_PROBLEM_STUDENTS_PAGE_SIZE,
@@ -84,14 +85,56 @@ export class TeacherProgressService {
     private readonly repository: TeacherProgressRepository,
   ) {}
 
+  async page(identity: SupabaseIdentity, input: ListTeacherStudentsInput & { lens: "students" | "curriculum" }) {
+    const scope = await this.access.requireClassScope(identity, input);
+    const selected = input.courseIds?.length === 1 ? scope.courses.find(c => c.id === input.courseIds![0]) : scope.courses.length === 1 ? scope.courses[0] : null;
+    if (selected?.language === "WEB") return { coding: null, reading: await this.readingProgress(identity, { academyId: input.academyId, classId: input.classId, courseId: selected.id, lens: input.lens }, scope) };
+    return { coding: await this.listStudents(identity, input, scope), reading: null };
+  }
+  async readingProgress(identity: SupabaseIdentity, input: ReadingProgressInput, resolvedScope?: TeacherClassScope): Promise<ReadingProgressResult> {
+    const scope = resolvedScope ?? await this.access.requireClassScope(identity, input);
+    // Every assigned course is listed, so a class that mixes coding and web
+    // courses can switch back from this report; only a web course has one.
+    const courses = scope.courses.map(({ id, title, language }) => ({ id, title, web: language === "WEB" }));
+    const web = courses.filter(c => c.web);
+    const course = input.courseId ? web.find(c => c.id === input.courseId) : web[0];
+    if (input.courseId && !course) throw new AppException("TEACHER_PROGRESS_NOT_FOUND", 404);
+    if (!course) return { className: scope.className, courses, courseId: null, students: [], materials: [] };
+    const common = { userIds: scope.studentUserIds, classId: scope.classId };
+    const materials = await this.repository.readingMaterials({ ...common, courseId: course.id });
+    if (input.lens === "curriculum") return { className: scope.className, courses, courseId: course.id, students: [], materials };
+    const quizIds = materials.filter(m => m.type === "MULTIPLE_CHOICE").map(m => m.materialId);
+    const [activity, quizzes] = await Promise.all([
+      this.repository.readingStudents({ ...common, materialIds: materials.map(m => m.materialId) }),
+      this.repository.readingQuizzes({ ...common, materialIds: quizIds }),
+    ]);
+    const byUser = new Map(activity.map(row => [row.userId, row]));
+    const quizByUser = new Map(quizzes.map(row => [row.userId, row]));
+    return { className: scope.className, courses, courseId: course.id, materials, students: scope.students.map(student => {
+      const row = byUser.get(student.userId), quiz = quizByUser.get(student.userId);
+      const times = [row?.lastActivityAt, quiz?.lastActivityAt].filter((v): v is Date => Boolean(v));
+      return { membershipId: student.membershipId, displayName: student.displayName, viewed: row?.viewed ?? 0, total: materials.length,
+        quizCorrect: quiz?.correct ?? 0, quizTotal: quizIds.length, lastActivityAt: times.length ? new Date(Math.max(...times.map(t => t.getTime()))).toISOString() : null };
+    }) };
+  }
+  async readingMaterialStudents(identity: SupabaseIdentity, input: ReadingMaterialStudentsInput): Promise<ReadingMaterialStudentsResult> {
+    const scope = await this.access.requireClassScope(identity, input);
+    // Resolve once through the same assigned-course and current-visibility boundary.
+    const courseIds = scope.courses.filter(c => c.language === "WEB").map(c => c.id);
+    const result = await this.repository.readingMaterialStudents({ ...input, courseIds, students: scope.students });
+    if (!result) throw new AppException("TEACHER_PROGRESS_NOT_FOUND", 404);
+    return { ...result, page: input.page, pageSize: 25 };
+  }
+
   /* ------------------------------------------------------- by student */
 
   async listStudents(
     identity: SupabaseIdentity,
     input: ListTeacherStudentsInput,
+    resolvedScope?: TeacherClassScope,
   ): Promise<TeacherStudentsResult> {
     const now = new Date();
-    const scope = await this.access.requireClassScope(identity, input);
+    const scope = resolvedScope ?? await this.access.requireClassScope(identity, input);
     const exercises = filterExercises(automaticExercises(scope), {
       courseIds: input.courseIds,
     });

@@ -1,17 +1,24 @@
+import { ReadingProgressWorkspace } from "./_components/reading-progress-workspace";
 import { HistoryWorkspace } from "@/components/student-history/history-workspace";
-import { requireAcademyRoute } from '@/lib/academy-route';
-import type { TeacherStudentsResult } from '@cove/shared';
-import { notFound } from 'next/navigation';
+import { requireAcademyRoute } from "@/lib/academy-route";
+import type {
+  ReadingProgressResult,
+  TeacherStudentsResult,
+} from "@cove/shared";
+import { notFound } from "next/navigation";
 
-import { getServerTranslation } from '@/i18n/server/get-server-translation';
-import { isExplicitAccessDeniedError } from '@/lib/api-errors';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { getServerTranslation } from "@/i18n/server/get-server-translation";
+import { isExplicitAccessDeniedError } from "@/lib/api-errors";
+import { createServerORPCClient } from "@/lib/orpc-server";
 
-import { BackLink } from '@/components/studio/back-link';
-import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
-import { backTo } from '@/lib/back-to';
-import { ProgressWorkspace } from './_components/progress-workspace';
-import { parseProgressQuery, serializeProgressQuery } from './_lib/progress-url';
+import { BackLink } from "@/components/studio/back-link";
+import { StudioPage } from "@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page";
+import { backTo } from "@/lib/back-to";
+import { ProgressWorkspace } from "./_components/progress-workspace";
+import {
+  parseProgressQuery,
+  serializeProgressQuery,
+} from "./_lib/progress-url";
 
 /**
  * Solution status for one assigned class.
@@ -36,11 +43,14 @@ export default async function ClassProgressPage({
   const { academySlug, classId } = await params;
   const { academyId } = await requireAcademyRoute(academySlug);
   const query = parseProgressQuery(await searchParams);
-  const { t } = await getServerTranslation(['teach']);
+  const { t } = await getServerTranslation(["teach"]);
+  const { t: readingT } = await getServerTranslation(["reading-progress"]);
 
   let students: TeacherStudentsResult | null = null;
+  let reading: ReadingProgressResult | null = null;
   try {
-    students = await createServerORPCClient().teacherProgress.listStudents({
+    const result = await createServerORPCClient().teacherProgress.page({
+      lens: query.view === "students" ? "students" : "curriculum",
       academyId,
       classId,
       ...(query.q ? { q: query.q } : {}),
@@ -50,6 +60,8 @@ export default async function ClassProgressPage({
       ...(query.sort ? { sort: query.sort, direction: query.direction } : {}),
       page: query.page,
     });
+    students = result.coding;
+    reading = result.reading;
   } catch (error) {
     // Only an expected access/scope answer is a 404. Transport, validation,
     // and server faults belong to the route error boundary and observability.
@@ -57,7 +69,8 @@ export default async function ClassProgressPage({
     students = null;
   }
 
-  const className = students?.summary.className ?? t('progress.title');
+  const className =
+    reading?.className ?? students?.summary.className ?? t("progress.title");
 
   return (
     <StudioPage
@@ -71,18 +84,48 @@ export default async function ClassProgressPage({
         />
       }
       bleed
-      description={query.view === 'students' ? t('history.dashboard_description') : t('progress.description')}
-      title={students ? `${className} · ${t(query.view === 'students' ? 'history.title' : 'progress.title')}` : className}
+      description={
+        reading
+          ? readingT("reading.description")
+          : query.view === "students"
+            ? t("history.dashboard_description")
+            : t("progress.description")
+      }
+      title={
+        reading
+          ? `${className} · ${readingT("reading.title")}`
+          : students
+            ? `${className} · ${t(query.view === "students" ? "history.title" : "progress.title")}`
+            : className
+      }
     >
-      {query.view === 'students' ? <div className="h-[calc(100dvh-180px)] min-h-[560px] overflow-hidden rounded-xl border border-border"><HistoryWorkspace academyId={academyId} classId={classId} standalone /></div> : <ProgressWorkspace
-        academyId={academyId}
-        classId={classId}
-        className={className}
-        initialData={students}
-        // The exact state the server rendered for. Anything else refetches
-        // rather than showing one query's rows under another query's filters.
-        initialKey={serializeProgressQuery({ ...query, membershipId: null })}
-      />}
+      {reading ? (
+        <ReadingProgressWorkspace
+          key={reading.courseId}
+          academyId={academyId}
+          classId={classId}
+          initial={reading}
+          initialLens={query.view === "students" ? "students" : "curriculum"}
+        />
+      ) : query.view === "students" ? (
+        <div className="h-[calc(100dvh-180px)] min-h-[560px] overflow-hidden rounded-xl border border-border">
+          <HistoryWorkspace
+            academyId={academyId}
+            classId={classId}
+            standalone
+          />
+        </div>
+      ) : (
+        <ProgressWorkspace
+          academyId={academyId}
+          classId={classId}
+          className={className}
+          initialData={students}
+          // The exact state the server rendered for. Anything else refetches
+          // rather than showing one query's rows under another query's filters.
+          initialKey={serializeProgressQuery({ ...query, membershipId: null })}
+        />
+      )}
     </StudioPage>
   );
 }

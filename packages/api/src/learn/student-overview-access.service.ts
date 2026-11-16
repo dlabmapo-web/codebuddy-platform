@@ -39,6 +39,7 @@ import { withCurricula } from "./curriculum-read.js";
 
 /** One exercise the student may reach, with the coordinate it prints under. */
 export type StudentExercise = {
+  materialType?: string;
   materialId: string;
   title: string;
   outlineNumber: string | null;

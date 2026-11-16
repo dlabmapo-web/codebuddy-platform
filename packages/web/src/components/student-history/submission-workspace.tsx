@@ -48,6 +48,7 @@ import { GradingNotice } from "@/components/pdf/grading-notice";
 import { ExerciseReferencePane } from "@/components/pdf/exercise-reference-pane";
 import { FontSizeControls } from "@/components/workspace/font-size-controls";
 import { useEditorPreferences } from "@/lib/workspace/use-editor-preferences";
+import { WorkspaceColumnDivider } from "@/components/workspace/workspace-column-divider";
 import { useSplitPane } from "@/lib/workspace/use-split-pane";
 import { useAcademySlug } from "@/components/studio/academy-route-provider";
 import { ExerciseImageProvider, ManualImageProvider } from "@/components/studio/lesson-image-providers";
@@ -793,19 +794,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
               </p>
             ) : null}
           </div>
-          <div
-            role="separator"
-            aria-label={rt("resize_description")}
-            aria-orientation="vertical"
-            aria-valuemin={25} aria-valuemax={70} aria-valuenow={Math.round(statementWidth)}
-            tabIndex={manualReview ? 0 : undefined}
-            onKeyDown={event => {
-              if (!manualReview || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
-              event.preventDefault(); resizeStatement(event.key === "ArrowLeft" ? -2 : 2);
-            }}
-            className="hidden w-1 shrink-0 cursor-col-resize bg-border hover:bg-brand/40 lg:block"
-            {...dividerProps}
-          />
+          <WorkspaceColumnDivider label={rt("resize_description")} size={statementWidth} resizeBy={resizeStatement} dividerProps={dividerProps} keyboard={manualReview} className="hidden w-1 shrink-0 cursor-col-resize bg-border hover:bg-brand/40 lg:block" />
           {noWork ? (
             <section
               data-testid="history-no-work"

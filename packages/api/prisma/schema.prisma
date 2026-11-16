@@ -256,6 +256,7 @@ enum SubmissionPolicy {
 enum CourseLanguage {
   PYTHON
   C_CPP
+  WEB
 }
 
 enum GradingProfileMode {
@@ -391,6 +392,7 @@ enum ExerciseProgressStatus {
 }
 
 model User {
+  materialViews StudentMaterialView[]
   staffPracticeDrafts StaffPracticeDraft[]
   staffPracticeAttempts StaffPracticeAttempt[]
   dlabIdentity DlabIdentity?
@@ -1601,6 +1603,7 @@ model Lecture {
 }
 
 model Material {
+  views StudentMaterialView[]
   staffPracticeDrafts StaffPracticeDraft[]
   staffPracticeAttempts StaffPracticeAttempt[]
   videoLesson       VideoLesson?
@@ -2861,7 +2864,19 @@ model StaffPracticeAttempt {
   @@map("staff_practice_attempts")
 }
 
+model StudentMaterialView {
+  userId String @map("user_id") @db.Uuid
+  materialId String @map("material_id") @db.Uuid
+  firstViewedAt DateTime @default(now()) @map("first_viewed_at") @db.Timestamptz(6)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  @@id([userId, materialId])
+  @@index([materialId])
+  @@map("student_material_views")
+}
+
 model ExplanationMaterial {
+  sideBody String? @map("side_body") @db.Text
   materialId String @id @map("material_id") @db.Uuid
   body String @db.Text
   revision Int @default(1)

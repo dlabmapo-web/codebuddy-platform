@@ -693,3 +693,16 @@ export function teacherOutlineNumber(input: {
   if (problemPosition <= 0) return null;
   return `${modulePosition}-${lecturePosition}-${problemPosition}`;
 }
+
+/** Reading reports use membership ids and never inherit coding-only metrics. */
+export const readingProgressInputSchema = z.object({ academyId: z.uuid(), classId: z.uuid(), courseId: z.uuid().optional(), lens: z.enum(["students", "curriculum"]).default("students") });
+export const readingStudentRowSchema = z.object({ membershipId: z.uuid(), displayName: z.string(), viewed: z.number().int(), total: z.number().int(), quizCorrect: z.number().int(), quizTotal: z.number().int(), lastActivityAt: z.string().nullable() });
+export const readingMaterialRowSchema = z.object({ materialId: z.uuid(), title: z.string(), type: z.enum(["EXPLANATION", "PDF_DOCUMENT", "MULTIPLE_CHOICE", "VIDEO_LESSON", "WRITTEN_RESPONSE"]), position: z.number().int(), lectureId: z.uuid(), lectureTitle: z.string(), lecturePosition: z.number().int(), modulePosition: z.number().int(), viewed: z.number().int(), total: z.number().int() });
+export const readingProgressResultSchema = z.object({ className: z.string(), courses: z.array(z.object({ id: z.uuid(), title: z.string(), web: z.boolean() })), courseId: z.uuid().nullable(), students: z.array(readingStudentRowSchema), materials: z.array(readingMaterialRowSchema) });
+export const readingMaterialStudentsInputSchema = z.object({ academyId: z.uuid(), classId: z.uuid(), materialId: z.uuid(), q: z.string().max(200).default(""), filter: z.enum(["all", "viewed", "notViewed"]).default("all"), page: z.number().int().min(1).default(1) });
+export const readingMaterialStudentsResultSchema = z.object({ title: z.string(), total: z.number().int(), page: z.number().int(), pageSize: z.literal(25), rows: z.array(z.object({ membershipId: z.uuid(), displayName: z.string(), firstViewedAt: z.string().nullable() })) });
+export type ReadingProgressInput = z.infer<typeof readingProgressInputSchema>;
+export type ReadingProgressResult = z.infer<typeof readingProgressResultSchema>;
+export type ReadingMaterialRow = z.infer<typeof readingMaterialRowSchema>;
+export type ReadingMaterialStudentsInput = z.infer<typeof readingMaterialStudentsInputSchema>;
+export type ReadingMaterialStudentsResult = z.infer<typeof readingMaterialStudentsResultSchema>;

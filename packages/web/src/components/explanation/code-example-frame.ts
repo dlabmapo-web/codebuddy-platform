@@ -1,4 +1,5 @@
 import {
+  explanationFilename,
   explanationCodeLanguage,
   explanationCodeLanguages,
 } from '@cove/shared';
@@ -38,6 +39,8 @@ export function enhanceCodeExamples(
       language === 'plaintext'
         ? labels.plainText
         : explanationCodeLanguages.find((item) => item.id === language)!.label;
+    const filename = explanationFilename(pre.dataset.filename);
+    if (filename) label.textContent = `${filename} · ${label.textContent}`;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'cove-code-copy';

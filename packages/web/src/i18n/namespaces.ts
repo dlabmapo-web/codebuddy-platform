@@ -76,6 +76,7 @@ export const teachNamespaces = [
   "sample-check",
   "monitoring",
   "teach",
+  "reading-progress",
   // §5.1 of the student points design: staff see the identical board their
   // students see, inside the class page they already open — which means this
   // route needs the board's own vocabulary rather than a second copy of it.

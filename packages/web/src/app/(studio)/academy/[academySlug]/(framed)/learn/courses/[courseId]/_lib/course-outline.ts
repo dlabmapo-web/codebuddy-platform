@@ -13,6 +13,7 @@ export function filterCourseModules(
       lectures: module.lectures
         .map((lecture) => ({
           ...lecture,
+          explanations: lecture.explanations?.filter(e => e.title.toLocaleLowerCase().includes(needle)),
           videos:lecture.videos?.filter(v=>v.title.toLowerCase().includes(query.toLowerCase())),
           manualMaterials:lecture.manualMaterials?.filter(m=>m.title.toLowerCase().includes(query.toLowerCase())),
           documents: lecture.documents?.filter((document) =>
@@ -24,7 +25,7 @@ export function filterCourseModules(
         }))
         .filter(
           (lecture) =>
-            lecture.exercises.length > 0 || (lecture.manualMaterials?.length??0)>0 ||
+            (lecture.explanations?.length ?? 0) > 0 || lecture.exercises.length > 0 || (lecture.manualMaterials?.length??0)>0 ||
             (lecture.documents?.length ?? 0) > 0 || (lecture.videos?.length??0)>0,
         ),
     }))
@@ -69,11 +70,13 @@ export function formatProblemOutlineNumber(
  * 0% complete, and drawing an empty bar for it would say it is.
  */
 export function lectureProgress(lecture: {
+  explanations?: ReadonlyArray<{ status?: string }>;
+  documents?: ReadonlyArray<{ status?: string; pdf: { placement: string } }>;
   exercises: ReadonlyArray<{ status: string; submissionPolicy?: string; manualAssessment?: {includeInScore: boolean} }>;
   videos?:ReadonlyArray<{status:string;video:{includeInScore:boolean}}>;
   manualMaterials?:ReadonlyArray<{status:string;includeInScore:boolean}>;
-}): { total: number; solved: number; percent: number | null } {
-  const assessed=[...lecture.exercises.filter(exercise => exercise.submissionPolicy !== 'PRACTICE_ONLY' && (exercise.submissionPolicy !== 'MANUAL_REVIEW' || exercise.manualAssessment?.includeInScore)),...(lecture.videos??[]).filter(v=>v.video.includeInScore),...(lecture.manualMaterials??[]).filter(m=>m.includeInScore)];
+}, language?: string): { total: number; solved: number; percent: number | null } {
+  const assessed = language === "WEB" ? [...(lecture.explanations ?? []), ...(lecture.documents ?? []).filter(d => d.pdf.placement !== "SUPPLEMENTARY"), ...(lecture.videos ?? []), ...(lecture.manualMaterials ?? [])] : [...lecture.exercises.filter(exercise => exercise.submissionPolicy !== 'PRACTICE_ONLY' && (exercise.submissionPolicy !== 'MANUAL_REVIEW' || exercise.manualAssessment?.includeInScore)),...(lecture.videos??[]).filter(v=>v.video.includeInScore),...(lecture.manualMaterials??[]).filter(m=>m.includeInScore)];
   const total = assessed.length;
   const solved = assessed.filter(
     (exercise) => exercise.status === 'SOLVED',

@@ -33,6 +33,8 @@ import {
   CurriculumOutlineService,
   courseSummaryFor,
   exerciseMaterialIds,
+  navigableMaterialIds,
+  readingMaterialIds,
   nonemptyModules,
   type ProgressByMaterial,
 } from "./curriculum-outline.service.js";
@@ -114,7 +116,8 @@ export class StudentOverviewService {
         // The code-only list remains the scope for code history and its ledger.
         () => this.curriculum.statusByMaterial(
           scope.userId,
-          scope.courses.flatMap(exerciseMaterialIds),
+          scope.courses.flatMap(navigableMaterialIds),
+          undefined, scope.courses.flatMap(readingMaterialIds),
         ),
         new Map() as ProgressByMaterial,
       ),
@@ -319,7 +322,7 @@ export class StudentOverviewService {
     }
 
     if (targets.length < STUDENT_MAX_CONTINUE_ROWS) {
-      const next = scope.exercises.find(
+      const next = [...scope.exercises, ...webReadingMaterials(scope.courses)].find(
         (exercise) =>
           !seen.has(exercise.materialId) &&
           statuses.get(exercise.materialId)?.status !== "SOLVED",
@@ -357,7 +360,7 @@ export class StudentOverviewService {
     return scope.courses
       .flatMap((course): StudentCourseProgress[] => {
         const modules = nonemptyModules(course);
-        const exercises = scope.exercises.filter(
+        const exercises = [...scope.exercises, ...webReadingMaterials(scope.courses)].filter(
           (exercise) => exercise.courseId === course.id,
         );
         if (modules.length === 0 || exercises.length === 0) return [];
@@ -386,6 +389,7 @@ export class StudentOverviewService {
             percent: progress.total === 0 ? 0 : Math.round((progress.solved / progress.total) * 100),
             lastLectureLabel,
             nextMaterialId: next?.materialId ?? null,
+            nextMaterialType: next?.materialType,
             nextTitle: next?.title ?? null,
             lastActivityAt: null,
           },
@@ -497,6 +501,7 @@ function targetFor(
   return {
     ...extra,
     materialId: exercise.materialId,
+    materialType: exercise.materialType,
     title: exercise.title,
     courseId: exercise.courseId,
     courseTitle: exercise.courseTitle,
@@ -599,4 +604,14 @@ function settler(unavailable: StudentOverviewSection[], logger: Logger) {
       return fallback;
     }
   };
+}
+
+function webReadingMaterials(courses: StudentOverviewScopeInternal["courses"]): StudentExercise[] {
+  return courses.filter(c => c.language === "WEB").flatMap(course => {
+    const ids = new Set(navigableMaterialIds(course));
+    return course.modules.flatMap(module => module.lectures.flatMap(lecture => lecture.materials.filter(m => ids.has(m.id)).map(m => ({
+      materialId: m.id, materialType: m.type, title: m.title, courseId: course.id, courseTitle: course.title,
+      moduleTitle: module.title, lectureId: lecture.id, lectureTitle: lecture.title, outlineNumber: `${module.position}-${lecture.position}-${m.position}`,
+    }))));
+  });
 }

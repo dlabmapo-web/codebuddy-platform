@@ -444,6 +444,7 @@ export class ContentImportService {
         if (!current) {
           throw new AppException("COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
         }
+        if (current.language === "WEB") throw new AppException("CONTENT_VALIDATION_FAILED", 400, "Problems are not part of web courses.");
         if (current.contentRevision !== session.capturedContentRevision) {
           throw new AppException(
             "CONTENT_IMPORT_REVISION_CONFLICT",
@@ -674,7 +675,7 @@ export class ContentImportService {
             academyId: input.academyId,
             actorUserId: input.actorUserId,
             requestId: input.requestId,
-            language: defaultExerciseLanguage(input.course.language),
+            language: input.course.language === "WEB" ? (() => { throw new AppException("CONTENT_VALIDATION_FAILED", 400, "Problems are not part of web courses."); })() : defaultExerciseLanguage(input.course.language),
           });
           materialIdsByKey.set(problem.key, materialId);
           entities.push({
@@ -1174,6 +1175,7 @@ export class ContentImportService {
     if (!course) {
       throw new AppException("COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
     }
+    if (course.language === "WEB") throw new AppException("CONTENT_VALIDATION_FAILED", 400, "Problems are not part of web courses.");
     return course;
   }
 

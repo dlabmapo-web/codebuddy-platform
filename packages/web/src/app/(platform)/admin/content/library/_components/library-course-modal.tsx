@@ -160,6 +160,7 @@ export function LibraryCourseModal({
                 options: {
                   PYTHON: { title: t('language.options.PYTHON.title'), description: t('language.options.PYTHON.description') },
                   C_CPP: { title: t('language.options.C_CPP.title'), description: t('language.options.C_CPP.description') },
+                  WEB: { title: t('language.options.WEB.title'), description: t('language.options.WEB.description') },
                 },
               }}
               locked={languageLocked}
@@ -173,7 +174,7 @@ export function LibraryCourseModal({
                   courses('path.course'),
                   courses('path.module'),
                   courses('path.lecture'),
-                  courses('path.problem'),
+                  courses(language === 'WEB' ? 'path.material' : 'path.problem'),
                 ]}
                 title={courses('create.next_step')}
               />

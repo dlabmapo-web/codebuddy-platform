@@ -149,7 +149,7 @@ export async function copyCourseTree(
                 !material.manualMaterial?.multipleChoice,
         });
 
-        if (material.explanationMaterial) explanations.push({ materialId, body: material.explanationMaterial.body, revision: 1 });
+        if (material.explanationMaterial) explanations.push({ materialId, body: material.explanationMaterial.body, sideBody: material.explanationMaterial.sideBody, revision: 1 });
         if (material.videoLesson) {
           const {
             assetId,

@@ -1,4 +1,5 @@
 'use client';
+import { useReadingView } from '@/components/workspace/use-reading-view';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createContentPaths } from '@/components/studio/content-paths';
@@ -27,6 +28,7 @@ export function ExplanationLesson({ academyId, materialId, classId, preview, can
   const slug = useAcademySlug();
   const query = useQuery({ queryKey: ['explanation', academyId, materialId, classId, Boolean(preview)], queryFn: () => explanationApi.read({ academyId, materialId, classId, preview }), initialData: seed, staleTime: SERVER_READ_FRESH_MS, retry: false, refetchOnWindowFocus: false });
   const data = query.data;
+  useReadingView({ academyId, materialId, classId, enabled: Boolean(data) && !staff && !preview });
   const navigation = useMaterialNavigation({ academyId, materialId, courseId: data?.course.id, classId, preview, initialOutline: data?.outline });
   useMaterialObservation({ materialId, classId, courseId: data?.course.id, enabled: !staff && !preview });
   const { open, panelId, triggerRef, toggle, close } = useNavigatorPanel('explanation-course-outline');
@@ -45,7 +47,7 @@ export function ExplanationLesson({ academyId, materialId, classId, preview, can
     </LessonHeader>
     <div className="relative flex min-h-0 flex-1">
       <WorkspaceCurriculumNavigator context={navigation.context} displayedMaterialId={materialId} open={open} panelId={panelId} onClose={close} onSelect={navigation.navigate} error={navigation.failed} onRetry={navigation.retry} footer={{ href: navigation.courseHref, label: lt('navigator.footer_student') }} />
-      <div className="min-w-0 flex-1 overflow-y-auto px-3 sm:px-6"><ExplanationContent title={data.title} body={data.body} images={data.images} lectureTitle={data.lecture.title} onRetry={() => void query.refetch()} /></div>
+      <div className={data.sideBody ? "min-h-0 min-w-0 flex-1" : "min-w-0 flex-1 overflow-y-auto px-3 sm:px-6"}><ExplanationContent title={data.title} body={data.body} sideBody={data.sideBody} images={data.images} lectureTitle={data.lecture.title} onRetry={() => void query.refetch()} /></div>
     </div>
     <LessonFooter previous={navigation.previous} next={navigation.next} index={navigation.index} total={navigation.total} />
   </main>;

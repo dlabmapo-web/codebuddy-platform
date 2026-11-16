@@ -196,6 +196,10 @@
      clears 4.5:1 on `card` and its `-soft` tints a badge behind it. The
      `-on-editor` shades read on the editor chrome, which is dark in both
      themes, so `.dark` repeats them unchanged. */
+  --lang-web: #C45D21;
+  --lang-web-soft: #FFF0E5;
+  --lesson-practice: #FC5004;
+  --lesson-mission: #F6CC44;
   --lang-python: #1D6FA8;
   --lang-python-soft: #E7F1FA;
   --lang-c: #0F766E;
@@ -312,6 +316,8 @@
   --course-d-soft: #33162A;
   --on-course: #0B1017;
 
+  --lang-web: #FFB57D;
+  --lang-web-soft: #392519;
   --lang-python: #7CC0F5;
   --lang-python-soft: #10263A;
   --lang-c: #2DD4BF;
@@ -400,6 +406,10 @@
   --color-course-d-soft: var(--course-d-soft);
   --color-on-course: var(--on-course);
 
+  --color-lang-web: var(--lang-web);
+  --color-lang-web-soft: var(--lang-web-soft);
+  --color-lesson-practice: var(--lesson-practice);
+  --color-lesson-mission: var(--lesson-mission);
   --color-lang-python: var(--lang-python);
   --color-lang-python-soft: var(--lang-python-soft);
   --color-lang-c: var(--lang-c);

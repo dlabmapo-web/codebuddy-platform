@@ -28,6 +28,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 export const explanationApi = {
   read: (input: ExplanationRead) => request<ExplanationReadResult>('?' + new URLSearchParams(Object.entries(input).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)]))),
+  view: (input: ExplanationRead) => request<{ viewed: boolean }>('/view', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }),
   save: (input: SaveExplanation) => request<{ materialId: string; revision: number }>('', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }),
   mutate: (input: { academyId: string; courseId: string; lectureId: string; materialId: string; isVisible?: boolean }) => request(input.isVisible === undefined ? '' : '/visibility', { method: input.isVisible === undefined ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }),
 };

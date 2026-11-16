@@ -10,6 +10,7 @@ export function hasExplanationContent(html: string): boolean {
 export const explanationTargetSchema = z.object({ academyId: z.uuid(), courseId: z.uuid(), lectureId: z.uuid() });
 export const saveExplanationSchema = explanationTargetSchema.extend({
   materialId: z.uuid().optional(), expectedRevision: z.number().int().positive().optional(),
+  sideBody: z.string().max(explanationBodyMaxLength).nullable().optional(),
   title: z.string().trim().min(1).max(200), body: z.string().max(explanationBodyMaxLength),
   isVisible: z.boolean().default(true),
 }).strict().refine(value => !value.materialId || value.expectedRevision !== undefined, { path: ["expectedRevision"], message: "Load the saved explanation before editing." });
@@ -17,7 +18,7 @@ export type SaveExplanation = z.infer<typeof saveExplanationSchema>;
 export const explanationReadSchema = z.object({ academyId: z.uuid(), materialId: z.uuid(), classId: z.uuid().optional(), preview: z.enum(["true", "false"]).optional().transform(v => v === "true") });
 export type ExplanationRead = { academyId: string; materialId: string; classId?: string; preview?: boolean };
 export type ExplanationDocument = {
-  materialId: string; title: string; body: string; revision: number; isVisible: boolean;
+  materialId: string; title: string; body: string; sideBody?: string | null; revision: number; isVisible: boolean;
   course: { id: string; title: string }; lecture: { id: string; title: string };
   images: Record<string, string | null>;
 };
@@ -34,4 +35,9 @@ export const explanationCodeLanguages = [
 ] as const;
 export function explanationCodeLanguage(value: unknown): string {
   return explanationCodeLanguages.find(item => item.id === value)?.id ?? "plaintext";
+}
+
+export const lessonCalloutTones = ["practice", "mission", "note", "warning"] as const;
+export function explanationFilename(value: unknown): string {
+  return typeof value === "string" && value.length <= 80 && /^[a-zA-Z0-9._/-]+$/.test(value) ? value : "";
 }

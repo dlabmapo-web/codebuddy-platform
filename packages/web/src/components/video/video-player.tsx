@@ -3,6 +3,7 @@ import { surfaceProps, anchorProps } from '@/lib/monitoring/awareness/surfaces';
 
 import Hls from "hls.js";
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
 import { VideoPlayerControls } from "./video-player-controls";
 import { useVideoTranslation } from "./use-video-translation";
@@ -66,6 +67,15 @@ export function VideoPlayer({
     },
     data.progress,
   );
+  // The lesson outline is cached across materials, so a video that has just
+  // been completed must refresh it or its tick and the count stay stale.
+  const cache = useQueryClient();
+  const wasCompleted = useRef(Boolean(data.progress?.completed));
+  const completed = Boolean(watch.progress?.completed);
+  useEffect(() => {
+    if (completed && !wasCompleted.current) void cache.invalidateQueries({ queryKey: ["material-navigation", academyId] });
+    wasCompleted.current = completed;
+  }, [completed, cache, academyId]);
   const ready =
     preview ||
     !data.canTrack ||

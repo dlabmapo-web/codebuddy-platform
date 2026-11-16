@@ -176,6 +176,7 @@ export function RichTextFrame({
 const framePalettes = {
   light: {
     scheme: 'light',
+    warning: '#B45309',
     text: '#16181d',
     link: '#1b64da',
     codeBackground: '#f1f5f9',
@@ -185,6 +186,7 @@ const framePalettes = {
   },
   dark: {
     scheme: 'dark',
+    warning: '#E3A008',
     text: '#e6e9ef',
     link: '#5b93f5',
     codeBackground: '#1e2532',
@@ -210,7 +212,12 @@ export function previewDocument(
   const body = content.trim().length > 0 ? withAnonymousImageCors(content) : '';
   const palette = framePalettes[theme];
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-:root{color-scheme:${palette.scheme}}
+:root{color-scheme:${palette.scheme};--lesson-practice:#fc5004;--lesson-mission:#f6cc44;--warning:${palette.warning}}
+div[data-callout]{margin:1em 0;padding:6px 16px;border-radius:6px;text-align:center;font-size:1.25em;font-weight:500;line-height:1.5}
+div[data-callout="practice"]{background:var(--lesson-practice);color:white}
+div[data-callout="mission"]{background:var(--lesson-mission);color:white}
+div[data-callout="note"]{background:${palette.tableHeader};color:${palette.text}}
+div[data-callout="warning"]{background:color-mix(in srgb,var(--warning) 14%,transparent);color:${palette.text}}
 *{box-sizing:border-box}
 html,body{margin:0;background:transparent}
 body{padding:0;font-family:"Pretendard Variable",Pretendard,system-ui,sans-serif;color:${palette.text};font-size:14.5px;line-height:1.75;letter-spacing:-0.006em;word-break:break-word}

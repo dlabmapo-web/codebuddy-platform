@@ -43,6 +43,10 @@ export class ExplanationController {
   async read(@Query() query: unknown, @Headers("authorization") header?: string) {
     return this.service.read(await this.identify(header), parse(explanationReadSchema, query));
   }
+  @Post("view")
+  async view(@Body() body: unknown, @Headers("authorization") header?: string) {
+    return this.service.view(await this.identify(header), parse(explanationReadSchema, body));
+  }
   @Post()
   async save(@Body() body: unknown, @Headers("authorization") header?: string) {
     return this.service.save(await this.identify(header), parse(saveExplanationSchema, body));

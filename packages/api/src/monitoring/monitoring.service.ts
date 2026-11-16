@@ -342,7 +342,7 @@ export class MonitoringService {
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         select: { answer: true, files: true, createdAt: true },
       }) : null,
-      row.explanationMaterial ? this.lessonImages?.imageDataUrls(lessonImageIds(row.explanationMaterial.body)) : undefined,
+      row.explanationMaterial ? this.lessonImages?.imageDataUrls(lessonImageIds(row.explanationMaterial.body, row.explanationMaterial.sideBody)) : undefined,
     ]);
     const config = row.manualMaterial;
     const choice = config?.multipleChoice ? publicChoiceSchema.parse(config.multipleChoice) : null;
@@ -357,6 +357,7 @@ export class MonitoringService {
     return {
       materialId: row.id, type: row.type, title: row.title,
       explanationImages,
+      sideBody: row.explanationMaterial?.sideBody,
       description: row.explanationMaterial?.body ?? config?.description ?? row.videoLesson?.description ?? row.programmingExercise?.description ?? '',
       question: config?.shortAnswer && typeof config.shortAnswer === 'object' && 'question' in config.shortAnswer
         ? String(config.shortAnswer.question) : choice?.question ?? null,

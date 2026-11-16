@@ -43,5 +43,11 @@
   "copied": "Copied",
   "copy_failed": "Could not copy. Select the code and copy it manually.",
   "plain_text": "Plain text",
-  "ready": "Ready to write"
+  "ready": "Ready to write",
+  "instructions": "Instructions",
+  "reference": "Reference",
+  "resize_panes": "Resize instructions and reference",
+  "side_pane": "Side pane",
+  "remove_side_pane": "Remove the side pane? Its content will be removed.",
+  "reference_placeholder": "Add reference code or supporting content…"
 }

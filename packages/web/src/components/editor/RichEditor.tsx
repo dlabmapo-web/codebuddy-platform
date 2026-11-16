@@ -1,5 +1,7 @@
 'use client';
 
+import { hasExplanationContent, lessonCalloutTones } from '@cove/shared';
+import { LessonCallout } from './lesson-callout';
 import { CodeExample } from './code-example';
 import { ChoiceSelector } from '@/components/studio/choice-selector';
 import { useEditorTranslation } from './use-editor-translation';
@@ -204,7 +206,7 @@ export function RichEditor({ value, onChange, onImageUpload, onImageUploadStateC
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ link: false, underline: false, ...(codeExamples ? { codeBlock: false } : {}) }),
-      ...(codeExamples ? [CodeExample] : []),
+      ...(codeExamples ? [CodeExample, LessonCallout] : []),
       Underline,
       TextStyle,
       Color,
@@ -370,6 +372,8 @@ export function RichEditor({ value, onChange, onImageUpload, onImageUploadStateC
 
         <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title={t('bullet_list')}><List size={14} /></ToolBtn>
         <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title={t('numbered_list')}><ListOrdered size={14} /></ToolBtn>
+        {codeExamples ? <><Divider /><select aria-label={t('insert_banner')} value="" disabled={!editable} className="max-w-36 rounded border border-border bg-card px-2 py-1 text-xs text-ink" onChange={event => { const tone = lessonCalloutTones.find(tone => tone === event.target.value); if (tone) editor.chain().focus().insertContent({ type: 'lessonCallout', attrs: { tone }, content: [{ type: 'text', text: t(`banner_${tone}`) }] }).run(); }}><option value="">{t('insert_banner')}</option>{lessonCalloutTones.map(tone => <option key={tone} value={tone}>{t(`banner_${tone}`)}</option>)}</select>
+        <button type="button" title={t('add_file')} disabled={!editable} className="h-7 shrink-0 whitespace-nowrap rounded border border-border bg-card px-2 text-xs text-ink hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-35" onMouseDown={event => { event.preventDefault(); if (editable) editor.chain().focus().insertContent('<pre data-language="javascript" data-filename="script.js"><code class="language-javascript">// JavaScript</code></pre><p></p>').run(); }}>{t('add_file')}</button></> : null}
         {codeExamples ? <ToolBtn onClick={toggleCodeExample} active={editor.isActive('codeBlock')} title={t('code_example')}><Code2 size={16} /></ToolBtn> : null}
         <ToolBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title={t('divider')}><Minus size={14} /></ToolBtn>
         <Divider />
@@ -446,11 +450,19 @@ export function RichEditor({ value, onChange, onImageUpload, onImageUploadStateC
       {uploadError ? <div role="alert" className="flex items-center gap-3 bg-danger/10 px-4 py-3 text-sm text-danger"><p className="flex-1">{uploadError}</p><button type="button" onClick={() => { setUploadError(''); onImageUploadStateChange?.({ pending: pendingUploads.current > 0, error: false }); }} className="font-semibold underline">{t('dismiss_error')}</button></div> : null}
       {onImageUpload && <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp,image/svg+xml,.png,.jpg,.jpeg,.gif,.webp,.avif,.bmp,.svg" className="hidden" onChange={handleImageChange} />}
 
+      {codeExamples && !hasExplanationContent(value) ? <div className="flex flex-wrap gap-2 border-b border-border bg-canvas p-3">
+        <button type="button" disabled={!editable} className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-brand" onClick={() => editor.commands.setContent(`<div data-callout="practice">${t('practice_prompt')}</div><pre data-language="html" data-filename="index.html"><code class="language-html">&lt;h1&gt;Hello, web!&lt;/h1&gt;</code></pre><h2>${t('expected_result')}</h2><p>${t('image_placeholder')}</p>`)}>{t('practice_template')}</button>
+        <button type="button" disabled={!editable} className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-brand" onClick={() => editor.commands.setContent(`<div data-callout="mission">${t('mission_prompt')}</div><h2>${t('mission_question')}</h2><p></p><h2>${t('expected_result')}</h2><p>${t('image_placeholder')}</p>`)}>{t('mission_template')}</button>
+      </div> : null}
       <div className="bg-card">
         <EditorContent editor={editor} />
       </div>
 
       <style>{`
+        .tiptap [data-callout="practice"] { background: var(--lesson-practice); color: white; }
+        .tiptap [data-callout="mission"] { background: var(--lesson-mission); color: white; }
+        .tiptap [data-callout="note"] { background: var(--canvas); color: var(--ink); }
+        .tiptap [data-callout="warning"] { background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--ink); }
         /* ── editor typography ─────────────────────────── */
         .tiptap p { margin: 0.4em 0; }
         .tiptap h1 { font-size: 1.6em; font-weight: 700; margin: 0.8em 0 0.4em; }

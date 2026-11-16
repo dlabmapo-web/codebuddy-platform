@@ -18,7 +18,9 @@ export function useSplitPane({
   min,
   minPx,
   max,
+  storageKey,
 }: {
+  storageKey?: string;
   axis: 'horizontal' | 'vertical';
   /** Percent for horizontal, pixels for vertical. */
   initial: number;
@@ -36,6 +38,20 @@ export function useSplitPane({
   max: number;
 }) {
   const [size, setSize] = React.useState(initial);
+  // Only a resize the user made is saved. Saving on mount would overwrite the
+  // stored size with the default before the stored value has been applied.
+  const resized = React.useRef(false);
+  React.useEffect(() => {
+    if (!storageKey) return;
+    // The stored size is read after mount so the server and first client
+    // render agree on the default; the frame keeps the update out of the
+    // effect body.
+    const frame = requestAnimationFrame(() => {
+      try { const stored = localStorage.getItem(storageKey); const value = Number(stored); if (stored && Number.isFinite(value)) setSize(Math.max(min, Math.min(max, value))); } catch { /* Browser storage is optional. */ }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [storageKey, min, max]);
+  React.useEffect(() => { if (storageKey && resized.current) { try { localStorage.setItem(storageKey, String(size)); } catch { /* Browser storage is optional. */ } } }, [size, storageKey]);
   const [dragging, setDragging] = React.useState(false);
   // Pointer movement can arrive before React commits the visual dragging
   // state. A ref becomes true synchronously on pointer-down, so the first few
@@ -78,6 +94,7 @@ export function useSplitPane({
           ? Math.max(min, Math.min(max, (minPx / rect.width) * 100))
           : min;
 
+      resized.current = true;
       setSize(Math.max(floor, Math.min(ceiling, next)));
     },
     [axis, max, min, minPx],
@@ -133,6 +150,7 @@ export function useSplitPane({
         ? Math.min(max, Math.max(min, rect.height - MIN_OPPOSITE_PX)) : max;
       const floor = axis === 'horizontal' && minPx && rect?.width
         ? Math.max(min, Math.min(max, (minPx / rect.width) * 100)) : min;
+      resized.current = true;
       setSize(current => Math.max(floor, Math.min(ceiling, current + delta)));
     },
     dragging,

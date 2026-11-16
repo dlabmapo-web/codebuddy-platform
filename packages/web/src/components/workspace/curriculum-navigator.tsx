@@ -192,7 +192,7 @@ function OrdinaryCurriculumNavigator({
           </p>
           {context ? (
             <p className="text-[11.5px] text-sub">
-              {t('outline.progress', {
+              {context.course.language === 'WEB' ? `${context.course.progress.solved} / ${context.course.progress.total}` : t('outline.progress', {
                 solved: context.course.progress.solved,
                 total: context.course.progress.total,
               })}
@@ -371,7 +371,7 @@ function ModuleBranch({
                                 onClick={() => onSelect(item.materialId)}>
                                 <MaterialIdentity compact title={item.title} number={materialNumbers.get(item.materialId)} type={row.kind === 'explanation' ? 'EXPLANATION' : row.kind === 'video' ? 'VIDEO_LESSON' : row.kind === 'pdf' ? 'PDF_DOCUMENT' : row.manual.type} />
                                 {liveMaterialId === item.materialId ? <span className="shrink-0 rounded-full bg-danger/10 px-1.5 py-0.5 text-[9.5px] font-bold uppercase text-danger">{t('navigator.live')}</span> : null}
-                                {busy ? <LoaderCircle aria-hidden className="size-4 shrink-0 animate-spin text-brand" /> : <ChevronRight aria-hidden className="size-3.5 shrink-0 text-sub" />}
+                                {item.status === "SOLVED" ? <CheckCircle2 aria-hidden className="size-4 shrink-0 text-success" /> : busy ? <LoaderCircle aria-hidden className="size-4 shrink-0 animate-spin text-brand" /> : <ChevronRight aria-hidden className="size-3.5 shrink-0 text-sub" />}
                               </button>;
                             })()}
                           </li>

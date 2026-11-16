@@ -1,3 +1,4 @@
+import { AppException } from "../common/app-exception.js";
 import { ManualPracticeService } from "./manual-practice.service.js";
 import type { AcademyAccess } from "../authorization/academy-access.service.js";
 import { randomInt } from "node:crypto";
@@ -215,7 +216,9 @@ export class ManualService {
         ? await this.gui.runtimeVersion()
         : "manual-response-v1";
     return this.db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM courses WHERE id = ${input.courseId}::uuid FOR UPDATE`;
+      const [course] = await tx.$queryRaw<Array<{ language: string }>>`SELECT language::text AS language FROM courses WHERE id = ${input.courseId}::uuid FOR UPDATE`;
+      // Turtle is code. Quizzes, short answers and written responses are not.
+      if (course?.language === "WEB" && input.type === "TURTLE_EXERCISE") throw new AppException("CONTENT_VALIDATION_FAILED", 400, "Turtle exercises are not part of web courses.");
       if (
         !(await tx.lecture.findFirst({
           where: {

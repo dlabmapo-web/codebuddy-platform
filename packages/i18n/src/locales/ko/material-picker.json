@@ -5,6 +5,7 @@
   "close": "자료 선택 닫기",
   "cancel": "취소",
   "next": "다음",
+  "unavailable_web": "웹 코스에서는 사용 불가",
   "types": {
     "python": {
       "title": "코딩 실습",

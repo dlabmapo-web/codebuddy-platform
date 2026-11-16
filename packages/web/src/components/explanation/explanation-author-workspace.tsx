@@ -52,6 +52,9 @@ export function ExplanationAuthorWorkspace({
   const cache = useQueryClient();
   const [title, setTitle] = useState(initial?.title ?? '');
   const [body, setBody] = useState(initial?.body ?? '');
+  const [sideBody, setSideBody] = useState(initial?.sideBody ?? '');
+  const [sideEnabled, setSideEnabled] = useState(Boolean(initial?.sideBody));
+  const [sideImageState, setSideImageState] = useState({ pending: false, error: false });
   // New explanations start visible, as all new content does.
   const [isVisible, setVisible] = useState(initial?.isVisible ?? true);
   const [revision, setRevision] = useState(initial?.revision);
@@ -60,6 +63,7 @@ export function ExplanationAuthorWorkspace({
     JSON.stringify([
       initial?.title ?? '',
       initial?.body ?? '',
+      initial?.sideBody ?? '',
       initial?.isVisible ?? true,
     ]),
   );
@@ -73,7 +77,7 @@ export function ExplanationAuthorWorkspace({
   const [localImages, setImages] = useState<Record<string, string>>({});
   const urls = useRef<string[]>([]);
   const inputId = useId();
-  const dirty = JSON.stringify([title, body, isVisible]) !== baseline;
+  const dirty = JSON.stringify([title, body, sideBody, isVisible]) !== baseline;
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => {
@@ -131,7 +135,7 @@ export function ExplanationAuthorWorkspace({
   function back() {
     if (
       !saving &&
-      !imageState.pending &&
+      !(imageState.pending || sideImageState.pending) &&
       (!dirty || window.confirm(t('discard')))
     )
       router.push(backHref);
@@ -144,12 +148,12 @@ export function ExplanationAuthorWorkspace({
     return `cove-asset:${asset.assetId}`;
   }
   async function save() {
-    if (saving || !editable || imageState.pending || imageState.error) return;
+    if (saving || !editable || (imageState.pending || sideImageState.pending) || (imageState.error || sideImageState.error)) return;
     if (!title.trim() || !hasExplanationContent(body)) {
       setError(t('invalid'));
       return;
     }
-    if (body.length > explanationBodyMaxLength) {
+    if (body.length > explanationBodyMaxLength || sideBody.length > explanationBodyMaxLength) {
       setError(t('too_long'));
       return;
     }
@@ -164,12 +168,13 @@ export function ExplanationAuthorWorkspace({
         expectedRevision: revision,
         title,
         body,
+        sideBody: sideEnabled ? sideBody : null,
         isVisible,
       });
       persisted = true;
       setSavedId(result.materialId);
       setRevision(result.revision);
-      setBaseline(JSON.stringify([title, body, isVisible]));
+      setBaseline(JSON.stringify([title, body, sideBody, isVisible]));
       await Promise.all([
         cache.invalidateQueries({
           queryKey: ['academy', target.academyId, 'course', target.courseId],
@@ -210,7 +215,7 @@ export function ExplanationAuthorWorkspace({
             type="button"
             aria-label={t('back_to_course')}
             onClick={back}
-            disabled={saving || imageState.pending}
+            disabled={saving || (imageState.pending || sideImageState.pending)}
             className="grid size-10 shrink-0 place-items-center rounded-xl border border-border text-sub hover:bg-canvas focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-40"
           >
             <ArrowLeft aria-hidden className="size-4" />
@@ -236,8 +241,8 @@ export function ExplanationAuthorWorkspace({
               type="button"
               disabled={
                 saving ||
-                imageState.pending ||
-                imageState.error ||
+                (imageState.pending || sideImageState.pending) ||
+                (imageState.error || sideImageState.error) ||
                 !title.trim() ||
                 !hasExplanationContent(body)
               }
@@ -302,7 +307,7 @@ export function ExplanationAuthorWorkspace({
             <button
               role="tab"
               tabIndex={!preview && editable ? -1 : 0}
-              disabled={imageState.pending}
+              disabled={(imageState.pending || sideImageState.pending)}
               aria-selected={preview}
               aria-controls={`${inputId}-sheet`}
               type="button"
@@ -317,13 +322,13 @@ export function ExplanationAuthorWorkspace({
             role="status"
             className="flex items-center gap-1.5 text-xs text-sub"
           >
-            {imageState.pending ? (
+            {(imageState.pending || sideImageState.pending) ? (
               <LoaderCircle aria-hidden className="size-3 animate-spin" />
             ) : !dirty && Boolean(savedId) ? (
               <Check aria-hidden className="size-3" />
             ) : null}
             {t(
-              imageState.pending
+              (imageState.pending || sideImageState.pending)
                 ? 'uploading'
                 : dirty
                   ? 'unsaved'
@@ -354,12 +359,13 @@ export function ExplanationAuthorWorkspace({
               {t('preview_hint')}
             </p>
             {hasExplanationContent(body) ? (
-              <ExplanationContent
+              <div className={sideEnabled ? "h-[75dvh]" : undefined}><ExplanationContent
                 title={title || t('title')}
                 body={body}
+                sideBody={sideEnabled ? sideBody : null}
                 images={images}
                 lectureTitle={context.lecture.title}
-              />
+              /></div>
             ) : (
               <div className="mx-auto my-6 grid min-h-80 max-w-[1440px] place-content-center gap-3 rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sub">
                 <BookOpen aria-hidden className="mx-auto size-8 text-brand" />
@@ -389,7 +395,11 @@ export function ExplanationAuthorWorkspace({
               <BookOpen aria-hidden className="size-4 text-brand" />
               {t('content')}
             </div>
+            <label className="mb-4 flex items-center gap-2 text-sm font-semibold"><input type="checkbox" role="switch" checked={sideEnabled} disabled={saving} onChange={event => { if (!event.target.checked && hasExplanationContent(sideBody) && !window.confirm(t('remove_side_pane'))) return; setSideEnabled(event.target.checked); if (!event.target.checked) setSideBody(''); }} />{t('side_pane')}</label>
             <PrivateImageContext.Provider value={resolve}>
+            <div className={sideEnabled ? "grid min-w-0 gap-4 md:grid-cols-[42fr_58fr]" : undefined}>
+            <div className="min-w-0">
+            {sideEnabled ? <p className="mb-3 text-sm font-semibold text-sub">{t('instructions')}</p> : null}
               <RichEditor
                 value={body}
                 onChange={setBody}
@@ -400,6 +410,9 @@ export function ExplanationAuthorWorkspace({
                 onImageUploadStateChange={setImageState}
                 editable={!saving}
               />
+            </div>
+            {sideEnabled ? <div className="min-w-0"><p className="mb-3 text-sm font-semibold text-sub">{t('reference')}</p><RichEditor value={sideBody} onChange={setSideBody} codeExamples placeholder={t('reference_placeholder')} minHeight={480} onImageUpload={upload} onImageUploadStateChange={setSideImageState} editable={!saving} /></div> : null}
+            </div>
             </PrivateImageContext.Provider>
             <p className="mt-4 text-xs leading-6 text-sub">
               {t('code_help')}

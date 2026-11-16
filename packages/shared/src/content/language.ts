@@ -21,20 +21,23 @@ export function isCompiledLanguage(
 }
 
 /**
- * A course's language: Python, or C/C++. A C/C++ course mixes the two, each
- * problem choosing C or C++; a Python course's problems are all Python.
+ * A course's type: Python, C/C++ or Web. A C/C++ course mixes the two, each
+ * problem choosing C or C++; a Python course's problems are all Python. A Web
+ * course teaches HTML, CSS and JavaScript through reading, quizzes, written
+ * answers and videos, and counts every material towards progress. Students
+ * code in their own editor, so it holds no coding problem of any language.
  */
-export const courseLanguages = ["PYTHON", "C_CPP"] as const;
+export const courseLanguages = ["PYTHON", "C_CPP", "WEB"] as const;
 export const courseLanguageSchema = z.enum(courseLanguages);
 export type CourseLanguage = z.infer<typeof courseLanguageSchema>;
 
 /** The languages a course's coding problems may use. */
 export function exerciseLanguagesFor(course: CourseLanguage): readonly ExerciseLanguage[] {
-  return course === "C_CPP" ? ["C", "CPP"] : ["PYTHON"];
+  return course === "WEB" ? [] : course === "C_CPP" ? ["C", "CPP"] : ["PYTHON"];
 }
 
 /** What a new coding problem in the course starts in, until its author picks. */
-export function defaultExerciseLanguage(course: CourseLanguage): ExerciseLanguage {
+export function defaultExerciseLanguage(course: Exclude<CourseLanguage, "WEB">): ExerciseLanguage {
   return course === "C_CPP" ? "C" : "PYTHON";
 }
 

@@ -62,3 +62,12 @@ it('handles legacy code, unknown languages, literal markup, and clipboard failur
   );
   dispose();
 });
+
+it('displays the file label beside its language without adding the label to copied code', async () => {
+  document.body.innerHTML = '<pre data-language="html" data-filename="index.html"><code>&lt;h1&gt;Hello&lt;/h1&gt;</code></pre>';
+  const write = vi.fn().mockResolvedValue(undefined);
+  enhanceCodeExamples(document, labels, write);
+  expect(document.querySelector('.cove-code-header')?.textContent).toContain('index.html · HTML');
+  document.querySelector('button')!.click();
+  await vi.waitFor(() => expect(write).toHaveBeenCalledWith('<h1>Hello</h1>'));
+});

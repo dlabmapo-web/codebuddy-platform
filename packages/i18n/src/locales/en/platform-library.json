@@ -118,7 +118,7 @@
     "search": "Search academy courses"
   },
   "language": {
-    "label": "Programming language",
+    "label": "Course type",
     "locked": "The language is fixed once the course has problems.",
     "options": {
       "PYTHON": {
@@ -128,6 +128,10 @@
       "C_CPP": {
         "title": "C / C++",
         "description": "GCC 12. Each problem is C or C++; Run, Test and Submit compile on the server."
+      },
+      "WEB": {
+        "title": "Web",
+        "description": "HTML, CSS and JavaScript. Students code in their own editor, so coding practice is not offered."
       }
     }
   }

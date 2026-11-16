@@ -38,6 +38,7 @@ export function CourseOutline({
   const router = useRouter();
   const { t: tp } = usePracticeTranslation();
   const { t } = useLayoutTranslation('learn');
+  const { t: commonT } = useLayoutTranslation('common');
   const { markActive, setOpenMaterial } = useStudentPresence();
   // No class means staff are previewing rather than learning: there is no
   // enrollment to report progress or presence against.
@@ -90,7 +91,7 @@ export function CourseOutline({
         ) : (
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="tabular shrink-0 text-[13px] font-bold">
-              {t('outline.progress', {
+              {outline.course.language === 'WEB' ? `${outline.progress.solved} / ${outline.progress.total}` : t('outline.progress', {
                 solved: outline.progress.solved,
                 total: outline.progress.total,
               })}
@@ -121,7 +122,7 @@ export function CourseOutline({
           <Input
             className="pl-9 pr-9"
             onChange={(event) => outline.setQuery(event.target.value)}
-            placeholder={t('outline.search_placeholder')}
+            placeholder={outline.course.language === 'WEB' ? commonT('state.search_placeholder') : t('outline.search_placeholder')}
             type="search"
             value={outline.query}
           />
@@ -189,6 +190,7 @@ export function CourseOutline({
               expanded={outline.isExpanded(module.id)}
               key={module.id}
               module={module}
+              courseLanguage={outline.course.language}
               onToggle={() => outline.toggleModule(module.id)}
               isLectureExpanded={outline.isLectureExpanded}
               onToggleLecture={outline.toggleLecture}

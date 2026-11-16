@@ -65,7 +65,7 @@ export function BuilderHeader({
           hiding this saves a Manager a dead end rather than protecting
           anything.
         */}
-        {canImport ? (
+        {canImport && course.language !== 'WEB' ? (
           <Link
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-[13.5px] font-bold text-sub transition-colors hover:border-brand hover:text-brand"
             href={surface === 'academy' ? routes.academyCourseImport(academySlug, courseId) : `${contentPaths.course(courseId)}/imports/new`}

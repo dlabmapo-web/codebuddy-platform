@@ -64,7 +64,7 @@
     }
   },
   "language": {
-    "label": "프로그래밍 언어",
+    "label": "코스 유형",
     "locked": "문제가 있는 과목은 언어를 바꿀 수 없습니다.",
     "options": {
       "PYTHON": {
@@ -74,6 +74,10 @@
       "C_CPP": {
         "title": "C / C++",
         "description": "GCC 12. 문제마다 C 또는 C++를 고르며, 실행·테스트·제출 모두 채점 서버에서 컴파일합니다."
+      },
+      "WEB": {
+        "title": "Web",
+        "description": "HTML, CSS, JavaScript. 학생은 자신의 편집기에서 코딩하므로 코딩 실습은 제공하지 않습니다."
       }
     },
     "problem_label": "문제 언어",

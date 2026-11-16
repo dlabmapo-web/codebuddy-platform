@@ -1,11 +1,11 @@
-import { readAssessmentRevisions } from "./manual-assessment-read.js";
+import { readAssessmentRevisions, readManualOutlineResults, readVideoOutlineResults } from "./manual-assessment-read.js";
 import { programmingAssessment } from "./programming-assessment.js";
 import {videoMetadata} from "../videos/video-metadata.js";
-import { effectiveManualResult } from "@cove/shared";
 import { pdfMetadata } from "../documents/pdf-metadata.js";
 import { Injectable } from "@nestjs/common";
 import {
   progressStatusFromDraft,
+  type CourseLanguage,
   type ExerciseProgressStatus,
   type LearnCourseOutline,
   type LearnCourseSummary,
@@ -100,57 +100,23 @@ export class CurriculumOutlineService {
 
   /** The same fold, for a caller that already read the course graph. */
   async outlineFor(
-    course: Pick<VisibleCourse, "id" | "title" | "description" | "modules">,
+    course: Pick<VisibleCourse, "id" | "title" | "description" | "modules"> & { language?: CourseLanguage },
     userId: string,
     classId?: string,
     staffPractice = false,
   ): Promise<LearnCourseOutline> {
     const modules = nonemptyModules(course);
-    const materialIds = exerciseMaterialIds({ ...course, modules });
+    const materialIds = navigableMaterialIds({ ...course, modules });
     // One `userId + materialIds` query for the whole course. A per-row lookup
     // is what made v1's outline scale with the size of the curriculum.
-    const statuses = staffPractice ? new Map() : await this.statusByMaterial(userId, materialIds, classId);
-
-    const manualIds = modules.flatMap((module) =>
-      module.lectures.flatMap((lecture) =>
-        lecture.materials.filter((m) => m.manualMaterial).map((m) => m.id),
-      ),
-    );
-    const manualAttempts = !staffPractice && manualIds.length
-      ? await this.prisma.manualSubmission.findMany({
-          where: { userId, classId, materialId: { in: manualIds } },
-          orderBy: { createdAt: "desc" },
-          distinct: ["materialId"],
-          select: {
-            materialId: true,
-            includeInScore: true,
-            maximumHundredths: true,
-            shortAnswerAssessment: {select:{status:true, completed:true, scoreHundredths:true}},
-        multipleChoiceAssessment: {select:{status:true,completed:true,scoreHundredths:true}},
-        reviews: {
-              orderBy: { version: "desc" },
-              take: 1,
-              select: { completed: true, scoreHundredths: true },
-            },
-          },
-        })
-      : [];
-    const manualStatuses = new Map(
-      manualAttempts.map((a) => [a.materialId, a]),
-    );
-    const eligible = modules.flatMap((module) =>
-      module.lectures.flatMap((lecture) =>
-        lecture.materials
-          .filter((m) => m.manualMaterial?.includeInScore)
-          .map((m) => m.id),
-      ),
-    );
+    const statuses = staffPractice ? new Map() : await this.statusByMaterial(userId, materialIds, classId, readingMaterialIds({ ...course, modules }));
 
     return {
       course: {
         id: course.id,
         title: course.title,
         description: course.description,
+        language: course.language,
       },
       ...(staffPractice ? {} : { manualAssessment: manualGradeSummaryFor(course, statuses) }),
       progress: countProgress(gradedMaterialIds({ ...course, modules }), statuses),
@@ -166,8 +132,8 @@ export class CurriculumOutlineService {
           position: lecture.position,
           manualMaterials: lecture.materials.flatMap((material) => {
             if (!material.manualMaterial) return [];
-            const attempt = manualStatuses.get(material.id),
-              review = effectiveManualResult(attempt);
+            const attempt = statuses.get(material.id),
+              review = attempt?.manualResult;
             return [
               {
                 materialId: material.id,
@@ -189,7 +155,7 @@ export class CurriculumOutlineService {
             ];
           }),
           videos:lecture.materials.flatMap(material=>material.videoLesson?.asset.state==="READY"&&material.videoLesson.placement!=="SUPPLEMENTARY"?[{materialId:material.id,title:material.title,position:material.position,video:videoMetadata(material.videoLesson),status:statuses.get(material.id)?.status??"NOT_STARTED"}]:[]),
-          explanations: lecture.materials.filter(m => m.type === "EXPLANATION").map(m => ({ materialId: m.id, title: m.title, position: m.position })),
+          explanations: lecture.materials.filter(m => m.type === "EXPLANATION").map(m => ({ materialId: m.id, title: m.title, position: m.position, status: statuses.get(m.id)?.status === "SOLVED" ? "SOLVED" as const : "NOT_STARTED" as const })),
           documents: lecture.materials.flatMap((material) =>
             material.pdfDocument?.asset.state === "READY"
               ? [
@@ -198,6 +164,7 @@ export class CurriculumOutlineService {
                     title: material.title,
                     position: material.position,
                     pdf: pdfMetadata(material.pdfDocument),
+                    status: statuses.get(material.id)?.status === "SOLVED" ? "SOLVED" as const : "NOT_STARTED" as const,
                   },
                 ]
               : [],
@@ -228,28 +195,35 @@ export class CurriculumOutlineService {
     userId: string,
     materialIds: string[],
     classId?: string,
+    readingIds: string[] = [],
   ): Promise<ProgressByMaterial> {
     const statuses: ProgressByMaterial = new Map();
     if (materialIds.length === 0) return statuses;
-    const [drafts, progress, revisions] = await Promise.all([
-      this.prisma.exerciseDraft.findMany({
-        where: { userId, materialId: { in: materialIds }, material: { type: 'PROGRAMMING_EXERCISE' } },
+    const readingSet = new Set(readingIds);
+    const workIds = materialIds.filter(id => !readingSet.has(id));
+    const [drafts, progress, revisions, views, attempts, videos] = await Promise.all([
+      workIds.length ? this.prisma.exerciseDraft.findMany({
+        where: { userId, materialId: { in: workIds }, material: { type: 'PROGRAMMING_EXERCISE' } },
         select: { materialId: true },
-      }),
-      this.prisma.studentExerciseProgress.findMany({
-        where: { userId, materialId: { in: materialIds }, material: { type: 'PROGRAMMING_EXERCISE' } },
+      }) : Promise.resolve([]),
+      workIds.length ? this.prisma.studentExerciseProgress.findMany({
+        where: { userId, materialId: { in: workIds }, material: { type: 'PROGRAMMING_EXERCISE' } },
         select: {
           materialId: true,
           status: true,
           bestScore: true,
           gradingRevision: true,
         },
-      }),
+      }) : Promise.resolve([]),
       // What each problem grades against *now*. Without it this projection
       // cannot tell a current record from one an author's correction has
       // already invalidated — see the note on the skip below.
-      readAssessmentRevisions(this.prisma, materialIds, userId, classId),
+      workIds.length ? readAssessmentRevisions(this.prisma, workIds, userId, classId) : Promise.resolve([]),
+      readingIds.length ? this.prisma.studentMaterialView.findMany({ where: { userId, materialId: { in: readingIds } }, select: { materialId: true } }) : Promise.resolve([]),
+      readManualOutlineResults(this.prisma, workIds, userId, classId),
+      readVideoOutlineResults(this.prisma, workIds, userId, classId),
     ]);
+    for (const view of views) statuses.set(view.materialId, { status: "SOLVED", bestScore: 0 });
     const currentRevision = new Map(
       revisions.map((exercise) => [
         exercise.materialId,
@@ -290,38 +264,21 @@ export class CurriculumOutlineService {
         scoreHundredths: assessment.includeInScore ? assessment.scoreHundredths ?? undefined : undefined,
         maximumHundredths: assessment.maximumHundredths});
     }
-    const attempts = await this.prisma.manualSubmission.findMany({
-      where: { userId, classId, materialId: { in: materialIds } },
-      distinct: ["materialId"],
-      orderBy: { createdAt: "desc" },
-      select: {
-        materialId: true,
-        includeInScore: true,
-        maximumHundredths: true,
-        shortAnswerAssessment: {select:{status:true, completed:true, scoreHundredths:true}},
-        multipleChoiceAssessment: {select:{status:true,completed:true,scoreHundredths:true}},
-        reviews: {
-          orderBy: { version: "desc" },
-          take: 1,
-          select: { completed: true, scoreHundredths: true },
-        },
-      },
-    });
-    for (const attempt of attempts)
+    for (const attempt of attempts) {
+      const result = attempt.completed !== null && attempt.scoreHundredths !== null
+        ? { completed: attempt.completed, scoreHundredths: attempt.scoreHundredths } : null;
       statuses.set(attempt.materialId, {
-        status:
-          attempt.includeInScore && effectiveManualResult(attempt)?.completed
-            ? "SOLVED"
-            : "IN_PROGRESS",
-        bestScore: 0,
-        scoreHundredths: attempt.includeInScore
-          ? effectiveManualResult(attempt)?.scoreHundredths
-          : undefined,
+        status: result?.completed ? "SOLVED" : "IN_PROGRESS", bestScore: 0,
+        manualResult: result,
+        scoreHundredths: attempt.includeInScore ? result?.scoreHundredths : undefined,
         maximumHundredths: attempt.maximumHundredths,
       });
-    const videos = await this.prisma.videoWatchProgress.findMany({where:{userId,classId,materialId:{in:materialIds}},include:{material:{include:{videoLesson:true}}},orderBy:{updatedAt:"desc"}});
-    const seenVideos=new Set<string>();
-    for(const p of videos){if(seenVideos.has(p.materialId))continue;const lesson=p.material.videoLesson;if(lesson?.assetId!==p.assetId||!lesson.includeInScore||lesson.placement==="SUPPLEMENTARY")continue;seenVideos.add(p.materialId);statuses.set(p.materialId,{status:p.completed?"SOLVED":"IN_PROGRESS",bestScore:0,scoreHundredths:p.completed?p.maximumHundredths:0,maximumHundredths:p.maximumHundredths});}
+    }
+    for (const video of videos) statuses.set(video.materialId, {
+      status: video.completed ? "SOLVED" : "IN_PROGRESS", bestScore: 0,
+      scoreHundredths: video.includeInScore ? video.completed ? video.maximumHundredths : 0 : undefined,
+      maximumHundredths: video.maximumHundredths,
+    });
     return statuses;
   }
 }
@@ -333,6 +290,7 @@ export type ProgressByMaterial = Map<
     bestScore: number;
     scoreHundredths?: number;
     maximumHundredths?: number;
+    manualResult?: { completed: boolean; scoreHundredths: number } | null;
   }
 >;
 
@@ -363,6 +321,7 @@ export function courseSummaryFor(
     courseId: course.id,
     title: course.title,
     description: course.description,
+        language: course.language,
     counts: {
       modules: modules.length,
       lectures: modules.reduce(
@@ -386,7 +345,7 @@ export function courseSummaryFor(
       ),
     },
     manualAssessment: manualGradeSummaryFor(course, statuses),
-    progress: countProgress(gradedMaterialIds({ modules }), statuses),
+    progress: countProgress(gradedMaterialIds({ ...course, modules }), statuses),
   };
 }
 
@@ -423,7 +382,14 @@ export function exerciseMaterialIds(
 }
 
 /** Practice remains navigable but never increases the graded-progress denominator. */
-function gradedMaterialIds(course: Pick<VisibleCourse, "modules">): string[] {
+export function readingMaterialIds(course: Pick<VisibleCourse, "modules">): string[] {
+  return course.modules.flatMap(m => m.lectures.flatMap(l => l.materials.filter(row => row.type === "EXPLANATION" || (row.pdfDocument?.asset.state === "READY" && row.pdfDocument.placement !== "SUPPLEMENTARY")).map(row => row.id)));
+}
+export function navigableMaterialIds(course: Pick<VisibleCourse, "modules">): string[] {
+  return course.modules.flatMap(m => m.lectures.flatMap(l => l.materials.filter(row => row.type === "EXPLANATION" || row.programmingExercise || row.manualMaterial || (row.pdfDocument?.asset.state === "READY" && row.pdfDocument.placement !== "SUPPLEMENTARY") || (row.videoLesson?.asset.state === "READY" && row.videoLesson.placement !== "SUPPLEMENTARY")).map(row => row.id)));
+}
+function gradedMaterialIds(course: Pick<VisibleCourse, "modules"> & { language?: CourseLanguage }): string[] {
+  if (course.language === "WEB") return navigableMaterialIds(course);
   const practice = new Set(course.modules.flatMap(m => m.lectures.flatMap(l => l.materials.filter(row => row.type === 'PROGRAMMING_EXERCISE' && (row.programmingExercise?.submissionPolicy === "PRACTICE_ONLY" || (row.programmingExercise?.submissionPolicy === "MANUAL_REVIEW" && !row.programmingExercise.manualIncludeInScore))).map(row => row.id))));
   return exerciseMaterialIds(course).filter(id => !practice.has(id));
 }

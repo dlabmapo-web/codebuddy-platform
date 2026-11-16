@@ -3,6 +3,7 @@ import { programmingReviewInputSchema, programmingReviewViewSchema } from "../..
 import { oc } from "@orpc/contract";
 
 import {
+  readingProgressInputSchema, readingProgressResultSchema, readingMaterialStudentsInputSchema, readingMaterialStudentsResultSchema,
   getTeacherStudentDetailInputSchema,
   getTeacherSubmissionReviewInputSchema,
   listTeacherAttemptsInputSchema,
@@ -35,6 +36,9 @@ import {
  * See §12 of the teacher solution status design.
  */
 export const teacherProgressContract = {
+  page: oc.input(listTeacherStudentsInputSchema.extend({ lens: z.enum(["students", "curriculum"]).default("students") })).output(z.object({ coding: teacherStudentsResultSchema.nullable(), reading: readingProgressResultSchema.nullable() })),
+  readingProgress: oc.input(readingProgressInputSchema).output(readingProgressResultSchema),
+  readingMaterialStudents: oc.input(readingMaterialStudentsInputSchema).output(readingMaterialStudentsResultSchema),
   getProgrammingReview: oc.input(z.object({ academyId: z.uuid(), classId: z.uuid(), submissionId: z.uuid() })).output(programmingReviewViewSchema),
   publishProgrammingReview: oc.input(programmingReviewInputSchema).output(programmingReviewViewSchema),
   /** The roster page: class summary, student rows, facets, pagination. */

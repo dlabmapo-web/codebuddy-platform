@@ -71,7 +71,7 @@ export type TeacherClassScope = {
   className: string;
   students: ScopedStudent[];
   studentUserIds: string[];
-  courses: { id: string; title: string; description: string }[];
+  courses: { id: string; title: string; description: string; language?: string }[];
   /** Visible programming exercises of the assigned courses, in outline order. */
   exercises: ScopedExercise[];
 };
@@ -151,7 +151,7 @@ export class TeacherProgressAccessService {
           isVisible: true,
           classAssignments: { some: { classId: record.id } },
         },
-        select: { id: true, title: true, description: true },
+        select: { id: true, title: true, description: true, language: true },
         orderBy: [{ title: "asc" }, { id: "asc" }],
       }),
       this.prisma.material.findMany({

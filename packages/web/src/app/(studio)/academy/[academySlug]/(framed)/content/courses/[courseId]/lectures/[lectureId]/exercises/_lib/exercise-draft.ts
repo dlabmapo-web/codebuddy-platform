@@ -92,6 +92,7 @@ export function contextToDraft(
   context: ExerciseAuthoringContext,
   solutions: ExerciseSolutionEntry[] = [],
 ): ExerciseDraft {
+  if (context.course.language === 'WEB') throw new Error('Problems are not part of web courses.');
   const exercise = context.material?.programmingExercise;
   if (!exercise) {
     // A new problem is written in its course's language, from that

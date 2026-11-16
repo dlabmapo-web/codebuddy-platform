@@ -115,8 +115,8 @@ export async function libraryImportBlockers(
         invalid = true;
     }
     if (material.explanationMaterial) {
-      try { sanitizeExplanation(material.explanationMaterial.body); } catch { invalid = true; }
-      for (const id of lessonImageIds(material.explanationMaterial.body)) explanationImages.add(id);
+      try { sanitizeExplanation(material.explanationMaterial.body); if (material.explanationMaterial.sideBody) sanitizeExplanation(material.explanationMaterial.sideBody); } catch { invalid = true; }
+      for (const id of lessonImageIds(material.explanationMaterial.body, material.explanationMaterial.sideBody)) explanationImages.add(id);
     }
     if (material.videoLesson) {
       const config = videoConfigSchema.safeParse(material.videoLesson);
@@ -163,7 +163,7 @@ export async function libraryImportBlockers(
   const captions = new Map(captionRows.map((caption) => [caption.id, caption]));
   for (const material of materials) {
     const config = valid.get(material.id)!;
-    if (material.explanationMaterial && lessonImageIds(material.explanationMaterial.body).some(id => !assets.get(id)?.mimeType.startsWith("image/"))) blockers.push({ materialId: material.id, materialTitle: material.title, reason: "ASSET_MISSING" });
+    if (material.explanationMaterial && lessonImageIds(material.explanationMaterial.body, material.explanationMaterial.sideBody).some(id => !assets.get(id)?.mimeType.startsWith("image/"))) blockers.push({ materialId: material.id, materialTitle: material.title, reason: "ASSET_MISSING" });
     if (
       config.assets.some((asset) => {
         const stored = assets.get(asset.assetId);

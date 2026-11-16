@@ -44,3 +44,20 @@ it('cancels without opening an editor and resets the choice on reopening', async
   expect(button('next').disabled).toBe(true);
   expect(document.querySelector('input:checked')).toBeNull();
 });
+it('shows an unavailable kind greyed with its reason and never hands it on', async () => {
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host); roots.push(root);
+  const onChoose = vi.fn();
+  await act(() => root.render(<NewMaterialDialog kinds={['python', 'pdf']} lectureTitle="Lesson" onChoose={onChoose} unavailable={['python']} unavailableReason="Not in web courses" />));
+  await act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  const coding = document.querySelector<HTMLInputElement>('input[value=python]')!;
+  expect(coding.disabled).toBe(true);
+  expect(coding.closest('label')!.textContent).toContain('Not in web courses');
+  expect(document.querySelector<HTMLInputElement>('input[value=pdf]')!.closest('label')!.textContent).not.toContain('Not in web courses');
+  await act(() => coding.click());
+  expect(coding.checked).toBe(false);
+  expect(button('next').disabled).toBe(true);
+  await act(() => document.querySelector<HTMLInputElement>('input[value=pdf]')!.click());
+  await act(() => button('next').click());
+  await vi.waitFor(() => expect(onChoose).toHaveBeenCalledExactlyOnceWith('pdf'));
+});

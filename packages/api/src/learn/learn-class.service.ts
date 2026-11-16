@@ -24,6 +24,8 @@ import {
   courseSummaryFor,
   CurriculumOutlineService,
   exerciseMaterialIds,
+  navigableMaterialIds,
+  readingMaterialIds,
   nonemptyModules,
   visibleCurriculumInclude,
   type ProgressByMaterial,
@@ -181,8 +183,8 @@ export class LearnClassService {
     const statuses = await this.curriculum.statusByMaterial(
       userId,
       record.courseAssignments.flatMap((assignment) =>
-        exerciseMaterialIds({ modules: nonemptyModules(assignment.course) }),
-      ),classId,
+        navigableMaterialIds({ modules: nonemptyModules(assignment.course) }),
+      ),classId, record.courseAssignments.flatMap(assignment => readingMaterialIds({ modules: nonemptyModules(assignment.course) })),
     );
     const courses = availableCourses(record, statuses);
 

@@ -321,7 +321,7 @@ export class CourseService {
         // the course lock that exercise creation also takes.
         await lockCourse(tx, current.id);
         const problems = await tx.material.count({
-          where: { type: "PROGRAMMING_EXERCISE", lecture: { courseModule: { courseId: current.id } } },
+          where: { type: language === "WEB" ? { in: ["PROGRAMMING_EXERCISE", "TURTLE_EXERCISE"] } : "PROGRAMMING_EXERCISE", lecture: { courseModule: { courseId: current.id } } },
         });
         if (problems > 0)
           throw new AppException("CONTENT_VALIDATION_FAILED", HttpStatus.BAD_REQUEST, "The language is fixed once the course has problems.");
@@ -1292,6 +1292,7 @@ export class CourseService {
       // change cannot slip between the read and this exercise. A quiz has no
       // code and stays Python.
       const courseLanguage = await lockCourse(tx, input.courseId);
+      if (courseLanguage === "WEB") throw new AppException("CONTENT_VALIDATION_FAILED", 400, "Problems are not part of web courses.");
       const language = input.quiz ? "PYTHON" : exerciseLanguageIn(courseLanguage, input.language);
       assertLanguageGrading(input, language);
       // Created as the author set it, visible by default; a visible problem
@@ -2243,6 +2244,7 @@ async function lockCourse(tx: Prisma.TransactionClient, courseId: string): Promi
  * C or C++ in a C/C++ course, the course's default when none is chosen.
  */
 function exerciseLanguageIn(course: CourseLanguage, requested: ExerciseLanguage | undefined): ExerciseLanguage {
+  if (course === "WEB") throw new AppException("CONTENT_VALIDATION_FAILED", 400, "Problems are not part of web courses.");
   if (requested === undefined) return defaultExerciseLanguage(course);
   if (!exerciseLanguagesFor(course).includes(requested))
     throw new AppException(

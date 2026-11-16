@@ -1,6 +1,6 @@
 import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
 import { Injectable } from "@nestjs/common";
-import type { ExplanationDocument, ExplanationRead, ExplanationReadResult, SaveExplanation } from "@cove/shared";
+import { hasExplanationContent, type ExplanationDocument, type ExplanationRead, type ExplanationReadResult, type SaveExplanation } from "@cove/shared";
 import { PrismaService } from "../database/prisma.service.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { AuditService } from "../academies/audit.service.js";
@@ -16,7 +16,7 @@ import { bumpContentRevision, nextMaterialPosition, compactMaterialPositions } f
 import { sanitizeExplanation } from "./explanation-html.js";
 
 type Target = { academyId: string; courseId: string; lectureId: string; materialId: string };
-type DocumentRow = { materialId: string; title: string; isVisible: boolean; body: string; revision: number; courseId: string; courseTitle: string; lectureId: string; lectureTitle: string };
+type DocumentRow = { materialId: string; title: string; isVisible: boolean; body: string; sideBody: string | null; revision: number; courseId: string; courseTitle: string; lectureId: string; lectureTitle: string };
 @Injectable()
 export class ExplanationService {
   constructor(private readonly db: PrismaService, private readonly access: AcademyAccessService,
@@ -34,7 +34,7 @@ export class ExplanationService {
   }
   private async readDocumentRow(academyId: string, materialId: string): Promise<DocumentRow> {
     const [row] = await this.db.$queryRaw<DocumentRow[]>`
-      SELECT m.id AS "materialId", m.title, m.is_visible AS "isVisible", e.body, e.revision,
+      SELECT m.id AS "materialId", m.title, m.is_visible AS "isVisible", e.body, e.side_body AS "sideBody", e.revision,
         c.id AS "courseId", c.title AS "courseTitle", l.id AS "lectureId", l.title AS "lectureTitle"
       FROM materials m JOIN explanation_materials e ON e.material_id = m.id
       JOIN lectures l ON l.id = m.lecture_id JOIN course_modules cm ON cm.id = l.course_module_id
@@ -47,8 +47,8 @@ export class ExplanationService {
   async authorDocument(identity: SupabaseIdentity, input: { academyId: string; materialId: string }): Promise<ExplanationDocument> {
     await this.access.requirePermission(identity.authUserId, input.academyId, "curriculum.review");
     const row = await this.readDocumentRow(input.academyId, input.materialId);
-    const images = await this.images.imageDataUrls(lessonImageIds(row.body));
-    return { materialId: row.materialId, title: row.title, body: row.body, revision: row.revision, isVisible: row.isVisible,
+    const images = await this.images.imageDataUrls(lessonImageIds(row.body, row.sideBody));
+    return { materialId: row.materialId, title: row.title, body: row.body, sideBody: row.sideBody, revision: row.revision, isVisible: row.isVisible,
       course: { id: row.courseId, title: row.courseTitle }, lecture: { id: row.lectureId, title: row.lectureTitle }, images };
   }
   async read(identity: SupabaseIdentity, input: ExplanationRead): Promise<ExplanationReadResult> {
@@ -71,32 +71,47 @@ export class ExplanationService {
     if (!allowed) throw new AppException("EXERCISE_NOT_AVAILABLE", 404);
     const row = await this.readDocumentRow(input.academyId, allowed.id);
     const [images, outline] = await Promise.all([
-      this.images.imageDataUrls(lessonImageIds(row.body)),
+      this.images.imageDataUrls(lessonImageIds(row.body, row.sideBody)),
       this.readOutline(row.courseId, actor.userId, input.classId, Boolean(input.preview), !roles.includes("STUDENT")),
     ]);
-    return { materialId: row.materialId, title: row.title, body: row.body, revision: row.revision, isVisible: row.isVisible,
+    return { materialId: row.materialId, title: row.title, body: row.body, sideBody: row.sideBody, revision: row.revision, isVisible: row.isVisible,
       course: { id: row.courseId, title: row.courseTitle }, lecture: { id: row.lectureId, title: row.lectureTitle }, images, outline };
   }
+  async view(identity: SupabaseIdentity, input: ExplanationRead) {
+    const actor = await this.access.requirePermission(identity.authUserId, input.academyId, input.preview ? "curriculum.review" : "curriculum.read");
+    const roles = actor.roles ?? [actor.role];
+    if (input.preview || !roles.includes("STUDENT") || roles.some(role => role !== "STUDENT")) return { viewed: false };
+    const scope = learningScopeFor(input.academyId, actor);
+    const material = await this.db.material.findFirst({ where: { id: input.materialId, AND: [
+      effectivelyVisibleActivityWhere(input.academyId), scope.material,
+      { OR: [{ type: "EXPLANATION" }, { type: "PDF_DOCUMENT", pdfDocument: { placement: { not: "SUPPLEMENTARY" }, asset: { state: "READY" } } }] },
+      ...(input.classId ? [{ lecture: { courseModule: { course: { classAssignments: { some: { class: { id: input.classId, ...enrolledClassWhere(input.academyId, actor.userId) } } } } } } }] : []),
+    ] }, select: { id: true } });
+    if (!material) throw new AppException("EXERCISE_NOT_AVAILABLE", 404);
+    await this.db.studentMaterialView.createMany({ data: [{ userId: actor.userId, materialId: material.id }], skipDuplicates: true });
+    return { viewed: true };
+  }
   private async readOutline(courseId: string, userId: string, classId: string | undefined, preview: boolean, staff: boolean) {
-    const course = await this.db.course.findUniqueOrThrow({ where: { id: courseId }, select: { id: true, title: true, description: true } });
+    const course = await this.db.course.findUniqueOrThrow({ where: { id: courseId }, select: { id: true, title: true, description: true, language: true } });
     return this.outlines.outlineFor(await withCurriculum(this.db, course, preview), userId, classId, preview || staff);
   }
   async save(identity: SupabaseIdentity, input: SaveExplanation) {
     const actor = await this.access.requirePermission(identity.authUserId, input.academyId, "curriculum.manage");
     const body = sanitizeExplanation(input.body);
+    const sideBody = input.sideBody && hasExplanationContent(input.sideBody) ? sanitizeExplanation(input.sideBody) : null;
     const saved = await this.db.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM courses WHERE id = ${input.courseId}::uuid FOR UPDATE`;
       const lecture = await tx.lecture.findFirst({ where: { id: input.lectureId, courseModule: { courseId: input.courseId, course: { academyId: input.academyId } } }, select: { id: true } });
       if (!lecture) throw new AppException("CONTENT_PARENT_MISMATCH", 404);
-      const previous = input.materialId ? await tx.explanationMaterial.findFirst({ where: { materialId: input.materialId, material: { lectureId: input.lectureId, type: "EXPLANATION" } }, select: { materialId: true, body: true, revision: true } }) : null;
+      const previous = input.materialId ? await tx.explanationMaterial.findFirst({ where: { materialId: input.materialId, material: { lectureId: input.lectureId, type: "EXPLANATION" } }, select: { materialId: true, body: true, sideBody: true, revision: true } }) : null;
       if (input.materialId && !previous) throw new AppException("EXERCISE_NOT_AVAILABLE", 404);
       if (previous && previous.revision !== input.expectedRevision) throw new AppException("CONTENT_EDIT_CONFLICT", 409);
-      await assertLessonImages(tx, { ...input, html: body, previousHtml: previous?.body });
+      await assertLessonImages(tx, { ...input, html: body + (sideBody ?? ""), previousHtml: (previous?.body ?? "") + (previous?.sideBody ?? "") });
       const material = previous ? await tx.material.update({ where: { id: previous.materialId }, data: {
-        title: input.title, isVisible: input.isVisible, explanationMaterial: { update: { body, revision: { increment: 1 } } },
+        title: input.title, isVisible: input.isVisible, explanationMaterial: { update: { body, sideBody, revision: { increment: 1 } } },
       }, select: { id: true } }) : await tx.material.create({ data: {
         lectureId: input.lectureId, type: "EXPLANATION", title: input.title, isVisible: input.isVisible, isRequired: false,
-        position: await nextMaterialPosition(tx, input.lectureId), explanationMaterial: { create: { body } },
+        position: await nextMaterialPosition(tx, input.lectureId), explanationMaterial: { create: { body, sideBody } },
       }, select: { id: true } });
       await bumpContentRevision(tx, input.courseId);
       await this.audit.write(tx, { actorUserId: actor.userId, academyId: input.academyId, action: previous ? "content.explanation.updated" : "content.explanation.created", targetType: "Material", targetId: material.id, after: { title: input.title, revision: (previous?.revision ?? 0) + 1 } });

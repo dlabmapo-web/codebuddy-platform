@@ -132,9 +132,10 @@ export function CourseProgress({
                         'transition-colors hover:bg-success/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                         isStale && 'pointer-events-none opacity-50',
                       )}
-                      href={routes.academyLearnExercise(
+                      href={routes.academyLearnMaterial(
                         academySlug,
                         course.nextMaterialId,
+                        course.nextMaterialType ?? "PROGRAMMING_EXERCISE",
                       )}
                     >
                       {t('courses.next')}

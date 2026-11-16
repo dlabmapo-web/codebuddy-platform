@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import {
+  type ReadingMaterialRow, type ReadingMaterialStudentsInput, type ReadingMaterialStudentsResult,
   LONG_SOLVE_SECONDS,
   REPEATED_FAILURE_ATTEMPTS,
   STALLED_AFTER_DAYS,
@@ -80,6 +81,59 @@ export type ExerciseProgressRecord = {
 @Injectable()
 export class TeacherProgressRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  /** One statement, including ready-asset and all-ancestor visibility checks. */
+  async readingMaterials(input: { courseId: string; userIds: string[]; classId: string }): Promise<ReadingMaterialRow[]> {
+    return this.prisma.$queryRaw<ReadingMaterialRow[]>`
+      WITH ${readingCompletions(input)}
+      SELECT m.id AS "materialId", m.title, m.type::text AS type, m.position,
+        l.id AS "lectureId", l.title AS "lectureTitle", l.position AS "lecturePosition", cm.position AS "modulePosition",
+        COUNT(DISTINCT done.user_id)::int AS viewed, ${input.userIds.length}::int AS total
+      FROM materials m JOIN lectures l ON l.id = m.lecture_id JOIN course_modules cm ON cm.id = l.course_module_id
+      LEFT JOIN pdf_documents pdf ON pdf.material_id = m.id LEFT JOIN pdf_assets pa ON pa.id = pdf.asset_id
+      LEFT JOIN video_lessons video ON video.material_id = m.id LEFT JOIN video_assets va ON va.id = video.asset_id
+      LEFT JOIN done ON done.material_id = m.id
+      WHERE cm.course_id = ${input.courseId}::uuid AND cm.is_visible AND l.is_visible AND m.is_visible
+        AND (m.type IN ('EXPLANATION', 'MULTIPLE_CHOICE', 'WRITTEN_RESPONSE')
+          OR (m.type = 'PDF_DOCUMENT' AND pdf.placement <> 'SUPPLEMENTARY' AND pa.state = 'READY') OR (m.type = 'VIDEO_LESSON' AND video.placement <> 'SUPPLEMENTARY' AND va.state = 'READY'))
+      GROUP BY m.id, l.id, cm.id ORDER BY cm.position, l.position, m.position, m.id`;
+  }
+  /** One grouped completion/activity read for the whole roster. */
+  async readingStudents(input: { materialIds: string[]; userIds: string[]; classId: string }) {
+    return this.prisma.$queryRaw<Array<{ userId: string; viewed: number; lastActivityAt: Date | null }>>`
+      WITH ${readingCompletions(input)}
+      SELECT user_id AS "userId", COUNT(DISTINCT material_id)::int AS viewed, MAX(at) AS "lastActivityAt"
+      FROM done WHERE material_id = ANY(${input.materialIds}::uuid[]) GROUP BY user_id`;
+  }
+  /** The latest attempt is the same attempt used by manual quiz reports. */
+  async readingQuizzes(input: { materialIds: string[]; userIds: string[]; classId: string }) {
+    if (!input.materialIds.length) return [];
+    return this.prisma.$queryRaw<Array<{ userId: string; correct: number; lastActivityAt: Date | null }>>`
+      WITH latest AS (SELECT DISTINCT ON (s.user_id, s.material_id) s.user_id, s.created_at, COALESCE(r.completed, CASE WHEN a.status = 'GRADED' THEN a.completed END) AS completed, COALESCE(r.score_hundredths, CASE WHEN a.status = 'GRADED' THEN a.score_hundredths END) AS score_hundredths, s.maximum_hundredths
+        FROM manual_submissions s LEFT JOIN multiple_choice_assessments a ON a.submission_id = s.id
+    LEFT JOIN LATERAL (SELECT completed, score_hundredths FROM manual_reviews r WHERE r.submission_id = s.id ORDER BY version DESC LIMIT 1) r ON true
+        WHERE s.class_id = ${input.classId}::uuid AND s.user_id = ANY(${input.userIds}::uuid[]) AND s.material_id = ANY(${input.materialIds}::uuid[])
+        ORDER BY s.user_id, s.material_id, s.created_at DESC, s.id DESC)
+      SELECT user_id AS "userId", COUNT(*) FILTER (WHERE completed AND score_hundredths = maximum_hundredths)::int AS correct, MAX(created_at) AS "lastActivityAt" FROM latest GROUP BY user_id`;
+  }
+  /** One paged statement, including a total even when the page is empty. */
+  async readingMaterialStudents(input: ReadingMaterialStudentsInput & { courseIds: string[]; students: Array<{ membershipId: string; userId: string; displayName: string }> }): Promise<Pick<ReadingMaterialStudentsResult, "title" | "total" | "rows"> | null> {
+    const [result] = await this.prisma.$queryRaw<Array<Pick<ReadingMaterialStudentsResult, "title" | "total" | "rows">>>`
+      WITH target AS (
+        SELECT m.title FROM materials m JOIN lectures l ON l.id = m.lecture_id JOIN course_modules cm ON cm.id = l.course_module_id
+        LEFT JOIN pdf_documents p ON p.material_id = m.id LEFT JOIN pdf_assets a ON a.id = p.asset_id
+        WHERE m.id = ${input.materialId}::uuid AND cm.course_id = ANY(${input.courseIds}::uuid[]) AND cm.is_visible AND l.is_visible AND m.is_visible
+          AND (m.type = 'EXPLANATION' OR (m.type = 'PDF_DOCUMENT' AND p.placement <> 'SUPPLEMENTARY' AND a.state = 'READY'))
+      ), filtered AS (
+        SELECT s."membershipId", s."displayName", v.first_viewed_at AS "firstViewedAt"
+        FROM jsonb_to_recordset(${JSON.stringify(input.students)}::jsonb) AS s("membershipId" text, "userId" text, "displayName" text)
+        LEFT JOIN student_material_views v ON v.user_id = s."userId"::uuid AND v.material_id = ${input.materialId}::uuid
+        WHERE POSITION(LOWER(${input.q}) IN LOWER(s."displayName")) > 0
+          AND (${input.filter} = 'all' OR (${input.filter} = 'viewed' AND v.user_id IS NOT NULL) OR (${input.filter} = 'notViewed' AND v.user_id IS NULL))
+      ), paged AS (SELECT * FROM filtered ORDER BY "displayName", "membershipId" LIMIT 25 OFFSET ${(input.page - 1) * 25})
+      SELECT target.title, (SELECT COUNT(*)::int FROM filtered) AS total, COALESCE((SELECT jsonb_agg(paged) FROM paged), '[]'::jsonb) AS rows FROM target`;
+    return result ?? null;
+  }
 
   /**
    * Counted attempts per student, over the exercises in scope.
@@ -511,4 +565,25 @@ function solvedScope(input: {
     AND p.status = 'SOLVED'
     AND p.grading_revision = e.grading_revision
   `;
+}
+
+/**
+ * Completion sources remain separate from exercise points and standing: a
+ * view for reading, the latest attempt for a quiz, short answer or written
+ * response, and a finished video.
+ */
+function readingCompletions(input: { userIds: string[]; classId: string }) {
+  return Prisma.sql`latest_quiz AS (
+    SELECT DISTINCT ON (s.user_id, s.material_id) s.user_id, s.material_id, s.created_at, COALESCE(r.completed, CASE WHEN a.status = 'GRADED' THEN a.completed END, CASE WHEN q.status = 'GRADED' THEN q.completed END) AS completed
+    FROM manual_submissions s LEFT JOIN multiple_choice_assessments a ON a.submission_id = s.id
+    LEFT JOIN short_answer_assessments q ON q.submission_id = s.id
+    LEFT JOIN LATERAL (SELECT completed, score_hundredths FROM manual_reviews r WHERE r.submission_id = s.id ORDER BY version DESC LIMIT 1) r ON true
+    WHERE s.user_id = ANY(${input.userIds}::uuid[]) AND s.class_id = ${input.classId}::uuid
+    ORDER BY s.user_id, s.material_id, s.created_at DESC, s.id DESC
+  ), done AS (
+    SELECT user_id, material_id, first_viewed_at AS at FROM student_material_views WHERE user_id = ANY(${input.userIds}::uuid[])
+    UNION ALL SELECT p.user_id, p.material_id, p.updated_at FROM video_watch_progress p JOIN video_lessons v ON v.material_id = p.material_id AND v.asset_id = p.asset_id
+      WHERE p.user_id = ANY(${input.userIds}::uuid[]) AND p.class_id = ${input.classId}::uuid AND p.completed
+    UNION ALL SELECT user_id, material_id, created_at FROM latest_quiz WHERE completed
+  )`;
 }

@@ -83,7 +83,7 @@ export type LearnExerciseSummary = z.infer<typeof learnExerciseSummarySchema>;
 
 export const learnManualSummarySchema=z.object({materialId:z.uuid(),title:titleSchema,position:positionSchema,type:z.enum(['TURTLE_EXERCISE','WRITTEN_RESPONSE','MULTIPLE_CHOICE']),includeInScore:z.boolean(),status:exerciseProgressStatusSchema,pending:z.boolean(),scoreHundredths:z.number().int().nullable(),maximumHundredths:z.number().int().positive()});
 export const learnLectureSchema = z.object({
-  explanations: z.array(z.object({ materialId: z.uuid(), title: titleSchema, position: positionSchema })).optional(),
+  explanations: z.array(z.object({ materialId: z.uuid(), title: titleSchema, position: positionSchema, status: z.enum(["NOT_STARTED", "SOLVED"]).optional() })).optional(),
   id: z.uuid(),
   title: titleSchema,
   description: descriptionSchema,
@@ -98,6 +98,7 @@ export const learnLectureSchema = z.object({
         title: titleSchema,
         position: positionSchema,
         pdf: pdfMetadataSchema,
+        status: z.enum(["NOT_STARTED", "SOLVED"]).optional(),
       }),
     )
     .optional(),
@@ -120,6 +121,7 @@ export type LearnCourseProgress = z.infer<typeof learnCourseProgressSchema>;
 
 export const manualGradeSummarySchema=z.object({maximumHundredths:z.number().int().nonnegative(),scoreHundredths:z.number().int().nonnegative(),reviewed:z.number().int().nonnegative(),pending:z.number().int().nonnegative()});
 export const learnCourseSummarySchema = z.object({
+  language: z.enum(["PYTHON", "C_CPP", "WEB"]).optional(),
   courseId: z.uuid(),
   title: titleSchema,
   description: descriptionSchema,
@@ -224,6 +226,7 @@ export const learnCourseOutlineSchema = z.object({
     id: z.uuid(),
     title: titleSchema,
     description: descriptionSchema,
+    language: z.enum(["PYTHON", "C_CPP", "WEB"]).optional(),
   }),
   progress: learnCourseProgressSchema,
   manualAssessment:manualGradeSummarySchema.optional(),
@@ -369,6 +372,7 @@ export const navigatorModuleSchema = z.object({
 export const workspaceNavigatorContextSchema = z.object({
   path: navigatorPathSchema,
   course: z.object({
+    language: z.enum(["PYTHON", "C_CPP", "WEB"]).optional(),
     id: z.uuid(),
     title: titleSchema,
     progress: learnCourseProgressSchema,
@@ -595,6 +599,7 @@ export function toNavigatorContext(
     course: {
       id: outline.course.id,
       title: outline.course.title,
+      ...(outline.course.language ? { language: outline.course.language } : {}),
       progress: outline.progress,
       modules: orderedModules(outline.modules).map((courseModule) => ({
         id: courseModule.id,
@@ -832,7 +837,7 @@ export function workspaceMaterialSequence(context: WorkspaceNavigatorContext | n
     ...(lecture.explanations ?? []).map((item) => ({ ...item, type: "EXPLANATION" })),
     ...lecture.exercises.map((item) => ({ materialId: item.materialId, title: item.title, position: item.position, type: "PROGRAMMING_EXERCISE" })),
     ...(lecture.videos ?? []).map((item) => ({ materialId: item.materialId, title: item.title, position: item.position, type: "VIDEO_LESSON" })),
-    ...(lecture.documents ?? []).filter((item) => item.pdf.placement !== "SUPPLEMENTARY").map((item) => ({ materialId: item.materialId, title: item.title, position: item.position, type: "PDF_DOCUMENT" })),
+    ...(lecture.documents ?? []).filter((item) => item.pdf.placement !== "SUPPLEMENTARY").map((item) => ({ materialId: item.materialId, title: item.title, position: item.position, type: "PDF_DOCUMENT", status: item.status })),
     ...(lecture.manualMaterials ?? []).map((item) => ({ materialId: item.materialId, title: item.title, position: item.position, type: item.type })),
   ].sort((left, right) => left.position - right.position)));
 }

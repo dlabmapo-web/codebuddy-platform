@@ -43,5 +43,11 @@
   "copied": "복사됨",
   "copy_failed": "복사하지 못했습니다. 코드를 선택해 직접 복사해 주세요.",
   "plain_text": "일반 텍스트",
-  "ready": "내용을 작성해 주세요"
+  "ready": "내용을 작성해 주세요",
+  "instructions": "안내",
+  "reference": "참고 자료",
+  "resize_panes": "안내 및 참고 자료 너비 조절",
+  "side_pane": "참고 자료 패널",
+  "remove_side_pane": "참고 자료 패널을 끄면 내용이 삭제됩니다. 계속할까요?",
+  "reference_placeholder": "참고 코드나 자료를 입력하세요…"
 }

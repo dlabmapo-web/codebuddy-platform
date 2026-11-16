@@ -5,6 +5,7 @@
   "close": "Close material picker",
   "cancel": "Cancel",
   "next": "Next",
+  "unavailable_web": "Not in web courses",
   "types": {
     "python": {
       "title": "Coding practice",

@@ -6,7 +6,8 @@ import type { Prisma } from "../generated/prisma/client.js";
 const reference = /\bsrc\s*=\s*["']cove-asset:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})["']/gi;
 
 /** The private lesson images an HTML statement shows, each once. */
-export function lessonImageIds(html: string | null | undefined): string[] {
+export function lessonImageIds(...bodies: (string | null | undefined)[]): string[] {
+  const html = bodies.filter(Boolean).join("\n");
   return [...new Set([...(html ?? "").matchAll(reference)].map((match) => match[1]!.toLowerCase()))];
 }
 

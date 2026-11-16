@@ -55,6 +55,7 @@ import type points from '@cove/i18n/locales/en/points.json';
 import type profile from '@cove/i18n/locales/en/profile.json';
 import type pythonErrors from '@cove/i18n/locales/en/python-errors.json';
 import type session from '@cove/i18n/locales/en/session.json';
+import type readingProgress from '@cove/i18n/locales/en/reading-progress.json';
 import type teach from '@cove/i18n/locales/en/teach.json';
 import type teaching from '@cove/i18n/locales/en/teaching.json';
 import type validation from '@cove/i18n/locales/en/validation.json';
@@ -120,6 +121,7 @@ declare module 'i18next' {
       'python-errors': typeof pythonErrors;
       session: typeof session;
       teach: typeof teach;
+      "reading-progress": typeof readingProgress;
       teaching: typeof teaching;
       validation: typeof validation;
     };

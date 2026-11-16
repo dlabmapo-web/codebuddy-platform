@@ -45,7 +45,7 @@ describe("student overview course progress", () => {
       { exerciseDraft: { findMany: async () => [] } } as never, { statusByMaterial } as never,
     );
     const result = await overview.get({ authUserId: "auth" } as never, { academyId: "academy" });
-    expect(statusByMaterial).toHaveBeenCalledWith("student", ["practice", "graded", "written"]);
+    expect(statusByMaterial).toHaveBeenCalledWith("student", ["practice", "graded", "written"], undefined, []);
     expect(result.courses[0]).toMatchObject({ total: 2, solved: 2, percent: 100 });
     expect(repository.work).toHaveBeenCalledWith(expect.objectContaining({ materialIds: ["practice", "graded"] }));
     expect(result.ledger.accepted).toMatchObject({ attempts: 2, passed: 1 });
@@ -67,4 +67,13 @@ describe("student overview course progress", () => {
       ["practice", { status: "IN_PROGRESS", bestScore: 0 }],
     ]))[0]).toMatchObject({ total: 0, solved: 0, started: 0, percent: 0, nextMaterialId: "practice" });
   });
+});
+
+it('resumes a Web course at the first unread material and keeps its progress out of code metrics', () => {
+  const service = new StudentOverviewService({} as never, {} as never, {} as never, {} as never);
+  const scope = { courses: [{ id: 'web', title: 'Web', description: '', language: 'WEB', modules: [{ id: 'module', title: 'HTML', position: 1, lectures: [{ id: 'lecture', title: 'Week 1', position: 1, materials: [{ id: 'read', title: 'Read', type: 'EXPLANATION', position: 1 }, { id: 'next', title: 'Try', type: 'EXPLANATION', position: 2 }] }] }] }], exercises: [], exerciseById: new Map(), materialIds: [] } as unknown as StudentOverviewScopeInternal;
+  const statuses: ProgressByMaterial = new Map([['read', { status: 'SOLVED', bestScore: 0 }]]);
+  expect(service['buildContinue'](scope, statuses, [])[0]).toMatchObject({ materialId: 'next', materialType: 'EXPLANATION' });
+  expect(service['buildCourses'](scope, statuses)[0]).toMatchObject({ total: 2, solved: 1, percent: 50, nextMaterialId: 'next', nextMaterialType: 'EXPLANATION' });
+  expect(scope.materialIds).toEqual([]);
 });

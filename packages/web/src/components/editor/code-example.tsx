@@ -9,6 +9,7 @@ import {
 } from '@tiptap/react';
 import { Check, Copy } from 'lucide-react';
 import {
+  explanationFilename,
   explanationCodeLanguage,
   explanationCodeLanguages,
 } from '@cove/shared';
@@ -55,6 +56,8 @@ function CodeExampleView({ node, updateAttributes, editor }: NodeViewProps) {
             </option>
           ))}
         </select>
+        <input aria-label={t('code_filename')} placeholder={t('code_filename')} value={node.attrs.filename ?? ''} maxLength={80} disabled={!editor.isEditable}
+          onChange={event => { const value = event.target.value; if (!value || explanationFilename(value)) updateAttributes({ filename: value }); }} className="min-w-0 flex-1 rounded border border-editor-border bg-editor-bg px-2 py-1 text-xs text-editor-text" />
         <button
           type="button"
           className={styles.copy}
@@ -99,6 +102,7 @@ export const CodeExample = CodeBlock.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
+      filename: { default: '', parseHTML: element => explanationFilename(element.getAttribute('data-filename')), renderHTML: attrs => attrs.filename ? { 'data-filename': explanationFilename(attrs.filename) } : {} },
       language: {
         default: 'python',
         parseHTML: (element) =>
@@ -118,7 +122,7 @@ export const CodeExample = CodeBlock.extend({
     const language = explanationCodeLanguage(node.attrs.language);
     return [
       'pre',
-      { 'data-language': language },
+      { 'data-language': language, ...(node.attrs.filename ? { 'data-filename': explanationFilename(node.attrs.filename) } : {}) },
       ['code', { class: `language-${language}` }, 0],
     ];
   },

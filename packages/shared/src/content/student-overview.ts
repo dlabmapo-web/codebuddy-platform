@@ -102,6 +102,7 @@ export type ContinueKind = z.infer<typeof continueKindSchema>;
 export const continueTargetSchema = z
   .object({
     kind: continueKindSchema,
+    materialType: z.string().optional(),
     materialId: z.uuid(),
     title: labelSchema,
     courseId: z.uuid(),
@@ -215,6 +216,7 @@ export const studentCourseProgressSchema = z
     lastLectureLabel: labelSchema.nullable(),
     /** The next unsolved exercise, or null when the course is finished. */
     nextMaterialId: z.uuid().nullable(),
+    nextMaterialType: z.string().optional(),
     nextTitle: labelSchema.nullable(),
     lastActivityAt: z.iso.datetime().nullable(),
   })

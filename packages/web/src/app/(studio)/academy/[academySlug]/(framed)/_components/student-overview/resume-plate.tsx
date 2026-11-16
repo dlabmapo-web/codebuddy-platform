@@ -72,7 +72,7 @@ export function ResumePlate({
     );
   }
 
-  const href = routes.academyLearnExercise(academySlug, primary.materialId);
+  const href = routes.academyLearnMaterial(academySlug, primary.materialId, primary.materialType ?? "PROGRAMMING_EXERCISE");
   const when = relativeDay(primary.lastTouchedAt);
 
   return (
@@ -149,9 +149,10 @@ export function ResumePlate({
                   'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
                   isStale && 'pointer-events-none opacity-50',
                 )}
-                href={routes.academyLearnExercise(
+                href={routes.academyLearnMaterial(
                   academySlug,
                   target.materialId,
+                  target.materialType ?? "PROGRAMMING_EXERCISE",
                 )}
               >
                 <OutlineChip tone="primary" value={target.outlineNumber} />

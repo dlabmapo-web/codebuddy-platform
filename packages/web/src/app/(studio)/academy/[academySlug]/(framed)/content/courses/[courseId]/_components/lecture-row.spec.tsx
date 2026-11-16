@@ -33,7 +33,7 @@ async function render(editable: boolean, coding = false, visible = true, type?: 
     programmingExercise: type === 'PROGRAMMING_EXERCISE' ? { difficulty: 'EASY', referencePdfMaterialId: linked ? 'pdf' : null } : null,
   }] as unknown as CourseLecture['materials'];
   const destination = { id: 'destination', title: 'Destination', materials: [] };
-  const builder = { editable, exerciseEditable: editable, isCollapsed: () => false, visibilityPending: () => false, tree: { modules: [{ id: 'module', lectures: [lecture, destination] }] }, clearReveal: vi.fn(), target: { academyId: 'academy', courseId: 'course' }, refresh: vi.fn(), movePending: false } as unknown as CourseBuilderState;
+  const builder = { editable, exerciseEditable: editable, isCollapsed: () => false, visibilityPending: () => false, tree: { course: { language: 'PYTHON' }, modules: [{ id: 'module', lectures: [lecture, destination] }] }, clearReveal: vi.fn(), target: { academyId: 'academy', courseId: 'course' }, refresh: vi.fn(), movePending: false } as unknown as CourseBuilderState;
   const host = document.createElement('div'); document.body.append(host);
   const root = createRoot(host); roots.push(root);
   await act(() => root.render(<ul><LectureRow builder={builder} exercisePath={() => '/exercise'} lecture={lecture} moduleId="module" moduleNumber={1} parentEffectivelyVisible /></ul>));

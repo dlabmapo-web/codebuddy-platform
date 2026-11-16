@@ -35,6 +35,8 @@ import {
   courseSummaryFor,
   CurriculumOutlineService,
   exerciseMaterialIds,
+  navigableMaterialIds,
+  readingMaterialIds,
   nonemptyModules,
   visibleCurriculumInclude,
 } from "./curriculum-outline.service.js";
@@ -109,8 +111,8 @@ export class LearnService {
       where: { ...scope.course, isVisible: true },
       orderBy: [{ title: "asc" }, { id: "asc" }],
     }));
-    const materialIds = courses.flatMap(exerciseMaterialIds);
-    const statuses = rolesHavePermission(roles ?? [role], "practice.own.create") ? new Map() : await this.curriculum.statusByMaterial(userId, materialIds);
+    const materialIds = courses.flatMap(navigableMaterialIds);
+    const statuses = rolesHavePermission(roles ?? [role], "practice.own.create") ? new Map() : await this.curriculum.statusByMaterial(userId, materialIds, undefined, courses.flatMap(readingMaterialIds));
 
     return {
       courses: courses.map((course) => courseSummaryFor(course, statuses)),

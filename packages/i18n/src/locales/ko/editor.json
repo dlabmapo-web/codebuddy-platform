@@ -44,5 +44,20 @@
   "copy_code": "코드 복사",
   "copied": "복사됨",
   "copy_failed": "복사 실패",
-  "plain_text": "일반 텍스트"
+  "plain_text": "일반 텍스트",
+  "code_filename": "파일 이름",
+  "insert_banner": "배너 삽입",
+  "banner_tone": "배너 종류",
+  "banner_practice": "실습",
+  "banner_mission": "미션",
+  "banner_note": "참고",
+  "banner_warning": "주의",
+  "practice_template": "실습 페이지",
+  "mission_template": "미션 페이지",
+  "practice_prompt": "자신의 편집기에서 코드를 작성해 보세요.",
+  "mission_prompt": "아래 결과와 같은 페이지를 만들어 보세요.",
+  "expected_result": "예상 결과",
+  "image_placeholder": "여기에 예상 결과 이미지를 업로드하세요.",
+  "mission_question": "미션 내용",
+  "add_file": "파일 추가"
 }

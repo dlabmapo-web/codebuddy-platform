@@ -6,6 +6,8 @@ import type { ManualConfig } from '@cove/shared';
 
 const mocks = vi.hoisted(() => ({ copy: vi.fn(), t: (key: string) => key }));
 vi.mock('./use-manual-translation', () => ({ useManualTranslation: () => ({ t: mocks.t }) }));
+// This file tests solution-file controls, not the authenticated lesson shell.
+vi.mock('@/components/workspace/lesson-chrome', () => ({ lessonAction: 'lesson-action' }));
 vi.mock('@/lib/manual-api', () => ({ manualApi: { read: vi.fn() } }));
 vi.mock('@/components/editor/code-editor', () => ({ CodeEditor: ({ code, readOnly }: { code: string; readOnly: boolean }) => <textarea aria-label="Solution code" value={code} readOnly={readOnly} /> }));
 import { solutionFileNames, TurtleSolutionFiles } from './turtle-solution-dialog';

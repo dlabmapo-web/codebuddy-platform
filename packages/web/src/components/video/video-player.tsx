@@ -89,14 +89,29 @@ export function VideoPlayer({
     preview ? "preview" : resource ? "resource" : "main",
     classId,
   );
-  const send = (
+  /** Mirrors the playhead to a watching teacher. Local presence, no database write. */
+  const observe = (
     isPlaying = Boolean(element.current && !element.current.paused),
-    seeking = false,
   ) => {
     const video = element.current;
     if (video && !observing && !preview && data.canTrack) publishObservation(data.materialId, {
       videoPosition: video.currentTime, videoState: video.ended ? 'ended' : isPlaying ? 'playing' : 'paused',
     });
+  };
+  /**
+   * Saves a watch checkpoint, which is one database transaction. Sent when
+   * playback changes (play, pause, seek, stall, end) and every ten seconds in
+   * between, never per frame: `timeupdate` fires several times a second, and
+   * saving on each one queued checkpoints faster than a distant database
+   * answers. The shown progress then trailed the video and the last
+   * checkpoints, the ones that complete it, were dropped from the full queue.
+   */
+  const send = (
+    isPlaying = Boolean(element.current && !element.current.paused),
+    seeking = false,
+  ) => {
+    const video = element.current;
+    observe(isPlaying);
     if (video)
       watch.checkpoint({
         positionMs: Math.round(video.currentTime * 1000),
@@ -278,7 +293,7 @@ export function VideoPlayer({
               if (ready && !preview && !resource && !observing)
                 void video.play().catch(() => undefined);
             }}
-            onTimeUpdate={() => { setPosition(element.current?.currentTime ?? 0); if (!observing) send(); }}
+            onTimeUpdate={() => { setPosition(element.current?.currentTime ?? 0); if (!observing) observe(); }}
             onVolumeChange={() => {
               if (element.current) {
                 setMuted(element.current.muted);

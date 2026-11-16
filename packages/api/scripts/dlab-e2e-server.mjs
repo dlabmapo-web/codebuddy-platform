@@ -70,7 +70,7 @@ const server = createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Headers', 'authorization, apikey, content-type, x-client-info, x-supabase-api-version');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
     if (req.method === 'OPTIONS') return res.end();
-    if (process.env.COVE_OBSERVATION_E2E === '1' && path.startsWith('/storage/v1/object/authenticated/course-videos/')) {
+    if ((process.env.COVE_OBSERVATION_E2E === '1' || process.env.COVE_WEB_COURSES_E2E === '1') && path.startsWith('/storage/v1/object/authenticated/course-videos/')) {
       const name = path.split('/').at(-1);
       if (!/^(master\.m3u8|playback\.mp4|poster\.jpg|segment-\d{3}\.ts)$/.test(name)) return json(res, {}, 404);
       const bytes = await readFile(join(process.env.COVE_OBSERVATION_MEDIA_DIR, name === 'playback.mp4' ? 'video.mp4' : name));
@@ -133,6 +133,24 @@ const server = createServer(async (req, res) => {
       }
       return json(res, { id, academy, campus });
     }
+    if (/^\/fixtures\/[^/]+\/companion-course$/.test(path) && req.method === 'POST' && process.env.COVE_WEB_COURSES_E2E === '1') {
+      const fixture = fixtures.get(path.split('/')[2]), input = await body(req);
+      if (!fixture) return json(res, { error: 'unknown_fixture' }, 404);
+      const classroom = await db.class.findFirst({ where: { id: input.classId, academyId: fixture.academy.id }, select: { id: true } });
+      if (!classroom) return json(res, { error: 'unknown_class' }, 404);
+      const owner = await db.dlabIdentity.findUniqueOrThrow({ where: { externalUserId: fixture.os.external_user_id } });
+      const course = await db.course.create({ data: {
+        academyId: fixture.academy.id, title: 'Python companion', language: 'PYTHON', isVisible: true, createdByUserId: owner.userId,
+        modules: { create: { title: 'Python basics', externalKey: randomUUID(), position: 1, isVisible: true, lectures: { create: {
+          title: 'Print a message', externalKey: randomUUID(), position: 1, isVisible: true, materials: { create: {
+            title: 'Hello Python', type: 'PROGRAMMING_EXERCISE', position: 1, isVisible: true,
+            programmingExercise: { create: { externalKey: randomUUID(), difficulty: 'EASY', description: '<p>Print a message.</p>', solutionCode: 'print("Hello")' } },
+          } },
+        } } } },
+        classAssignments: { create: { classId: classroom.id, assignedByUserId: owner.userId } },
+      } });
+      return json(res, { courseId: course.id });
+    }
     if (/^\/fixtures\/[^/]+\/classroom$/.test(path) && req.method === 'POST') {
       const id = path.split('/')[2], fixture = fixtures.get(id), input = await body(req);
       if (!fixture) return json(res, { error: 'unknown_fixture' }, 404);
@@ -181,7 +199,7 @@ const server = createServer(async (req, res) => {
         const video = await db.videoAsset.create({ data: {
           requestKey: randomUUID(), objectKey: 'fixture-video-' + randomUUID(), uploaderUserId: owner.userId,
           academyId: fixture.academy.id, courseId: course.id, lectureId: lecture.id,
-          filename: 'lesson.mp4', byteSize: 100n, durationMs: 10000, state: 'READY', outputs: process.env.COVE_OBSERVATION_E2E === '1'
+          filename: 'lesson.mp4', byteSize: 100n, durationMs: 10000, state: 'READY', outputs: (process.env.COVE_OBSERVATION_E2E === '1' || process.env.COVE_WEB_COURSES_E2E === '1')
             ? ['fixture/master.m3u8', 'fixture/playback.mp4', 'fixture/poster.jpg', 'fixture/segment-000.ts'] : [],
         } });
         const videoMaterial = await db.material.create({ data: {
@@ -248,6 +266,12 @@ const server = createServer(async (req, res) => {
       }
       if (!input.emptyWork) await db.exerciseDraft.create({ data: { userId: student.userId, materialId: material.id, sourceMaterialId: material.id, courseId: course.id, code: 'print(2 + 3)' } });
       await db.academyFeatureFlag.upsert({ where: { academyId_feature: { academyId: fixture.academy.id, feature: 'TEACHER_LIVE_MONITORING' } }, create: { academyId: fixture.academy.id, feature: 'TEACHER_LIVE_MONITORING', isEnabled: true }, update: { isEnabled: true } });
+      if (input.webCourse && process.env.COVE_WEB_COURSES_E2E === '1') {
+        await db.material.deleteMany({ where: { lectureId: lecture.id, type: { in: ['PROGRAMMING_EXERCISE', 'WRITTEN_RESPONSE', 'TURTLE_EXERCISE'] } } });
+        await db.course.update({ where: { id: course.id }, data: { language: 'WEB', title: 'DM-WB-1 · Web foundations' } });
+        await db.courseModule.update({ where: { id: module.id }, data: { title: 'HTML and CSS' } });
+        await db.lecture.update({ where: { id: lecture.id }, data: { title: '1주차 · HTML basics' } });
+      }
       return json(res, { secondProgrammingMaterialId, reviewStudentMembershipId, turtleMaterialId, pdfMaterialId, videoMaterialId, courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, shortMaterialId: short.id, quizMaterialId: quiz.id, studentMembershipId: student.id, classes });
     }
     if (path.startsWith('/fixtures/') && req.method === 'PUT') {

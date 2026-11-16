@@ -228,16 +228,16 @@ test('a course is Python or C/C++, and a C/C++ problem chooses C or C++', async 
   await expect.poll(() => page.evaluate(() => (window as any).monaco?.editor.getModels()[0]?.getValue())).toContain('#include <iostream>');
   await page.screenshot({ path: test.info().outputPath('cpp-authoring.png'), fullPage: true });
 
-  // Creating a course offers Python or C / C++, with no academy switch.
+  // Creating a course offers Python, C / C++ or Web, with no academy switch.
   await page.goto(routes.academyCourses(f.slug));
   await page.getByRole('button', { name: 'New course' }).click();
   await page.getByLabel('Course title').fill('Pointers in C');
-  const choices = page.getByRole('radio');
-  await expect(choices).toHaveCount(2);
-  await expect(page.getByRole('radio', { name: /Python/ })).toBeChecked();
-  // The radio is visually hidden inside its card: a person clicks the card.
-  await page.locator('label').filter({ hasText: 'C / C++' }).click();
-  await expect(page.getByRole('radio', { name: /C \/ C\+\+/ })).toBeChecked();
+  const courseType = page.getByRole('button', { name: /^Course type/ });
+  await expect(courseType).toContainText('Python');
+  await courseType.click();
+  await expect(page.getByRole('menuitemradio')).toHaveCount(3);
+  await page.getByRole('menuitemradio', { name: /C \/ C\+\+/ }).click();
+  await expect(courseType).toContainText('C / C++');
   await page.screenshot({ path: test.info().outputPath('course-language.png'), fullPage: true });
   await page.getByRole('button', { name: 'Create and open' }).click();
   await expect.poll(async () =>

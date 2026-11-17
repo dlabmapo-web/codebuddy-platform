@@ -201,6 +201,61 @@ localhost Redis port, and bypasses neither guest authorization nor real Docker
 execution. Browser tests cover the actual public page and BFF, not mocked Run
 responses. The generated helper bundle is also included in exported projects.
 
+## Many academies at the same hour
+
+Saturday classes put about 50 signed-out students per academy on `/turtle` at
+once, many on computers that have never opened it. Measured on production
+(v2.0.66, 17 November 2026), one class of 50 new computers arriving together
+left about one student in five on a page without a PIN box (the edge proxy
+answered 502 for page scripts) and the rest waiting 20–40 s. Measured cause:
+Caddy, capped at 0.35 CPU, compressed the 6.4 MB engine again for every new
+computer (≈ 34 Mbps, about 2.7 computers a second) and starved everything else
+it serves. Writing code and Run were never the bottleneck: one Run is two small
+requests and the drawing happens on the student's device.
+
+What keeps a class arrival working:
+
+- **Precompressed engine.** The runtime build writes brotli and gzip copies
+  (`packages/turtle-browser-runtime/scripts/encodings.mjs`, 1.48 MB → 1.07 MB
+  per new computer). The publisher verifies each copy against the approved
+  manifest (gzip by decompressing it) into `runtime/turtle-browser/precompressed/<id>`
+  and Caddy serves them as they are (`precompressed br gzip`). The plain
+  `runtime/turtle-browser/<id>` directories are unchanged, so the previous
+  release's publisher still verifies them on rollback.
+- **Caddy at 1.0 CPU** for TLS and the compression it still does for the site.
+- **Studio proxy retries.** `lb_try_duration 10s` holds a request through a
+  brief Studio stall instead of answering 502. Requests that never reached
+  Studio are retried; of those that did, only GET, so no POST runs twice.
+- **Self-recovering page.** An inline script on `/turtle` reloads a page that
+  has not come alive 8 s after loading (no PIN box because a script failed),
+  at most twice per tab and after a random 0.5–3 s, so a class does not retry
+  in lockstep.
+- **Engine time budget per step.** The engine had 10 s to download *and* start
+  Python. On a shared line it restarted mid-download, which downloaded again
+  and made the line slower for everyone. It now has 60 s to download and 10 s
+  to start. Local fixture, 10 new computers sharing a 3 Mbps line (about one
+  50-student class on 15 Mbps): before, 0 of 10 could draw and all showed
+  "Try browser Turtle again"; after, 10 of 10 drew with no restart. The new
+  budget covers a 50-student class on down to about 8 Mbps.
+
+The budget change gives the engine a new runtime ID, so its release must set
+`TURTLE_TRIAL_BROWSER_RUNTIME_ID` to the new image's manifest ID and keep the
+previous ID in `TURTLE_TRIAL_BROWSER_RETAINED_RUNTIME_IDS` for tabs and guest
+grants already open. Each computer downloads the engine once more after that.
+
+Check a release with real browsers before a Saturday, outside class hours (each
+browser enters as a guest of the PIN's academy and signs out at the end):
+
+```bash
+TURTLE_PIN=<class PIN> node deploy/load/public-turtle-class.mjs \
+  --base-url https://cs.coveedu.com --students 10 --extra-downloads 40 --write-seconds 60
+```
+
+It passes when every student draws, no "Try browser Turtle again" appears and
+the first stroke p95 is within 2 s of Run. Against the local browser fixture it
+runs with the synthetic PIN; `COVE_TURTLE_FIXTURE_LINE_KBPS` on the fixture's
+`local-server.mjs` makes every engine download share one line, like a room.
+
 ## Outages and rollback
 
 Redis, broker, or PIN-version/configuration failures reject new admission and

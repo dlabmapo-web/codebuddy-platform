@@ -10,6 +10,20 @@ const parentPort = product ? 3028 : 3128;
 const parentOrigin = 'http://localhost:' + parentPort, runtimeOrigin = 'http://127.0.0.1:4128';
 const config = await readFile(resolve(root, 'dist', manifest.id, 'config.mjs'), 'utf8');
 if (!config.includes(JSON.stringify(parentOrigin))) throw new Error('Build with COVE_TURTLE_BROWSER_LOCAL=1 and the selected fixture parent origin');
+// Optional: every runtime download shares one line of this many kilobits per
+// second, the way a class shares one academy connection (cold-room readiness).
+const lineKbps = Number(process.env.COVE_TURTLE_FIXTURE_LINE_KBPS ?? 0);
+let lineFree = 0;
+async function send(res, data) {
+  if (!(lineKbps > 0)) { res.end(data); return; }
+  for (let i = 0; i < data.length; i += 16384) {
+    const chunk = data.subarray(i, i + 16384), now = performance.now();
+    lineFree = Math.max(now, lineFree) + chunk.length * 8 / lineKbps;
+    await new Promise(resolve => setTimeout(resolve, lineFree - now));
+    if (!res.write(chunk)) await new Promise(resolve => res.once('drain', resolve));
+  }
+  res.end();
+}
 const types = { html: 'text/html', mjs: 'text/javascript', js: 'text/javascript', css: 'text/css', json: 'application/json' };
 for (const port of (product ? [4128] : [3128, 4128])) {
   const server = http.createServer(async (req, res) => {
@@ -40,7 +54,7 @@ for (const port of (product ? [4128] : [3128, 4128])) {
       res.setHeader('Content-Type', types[file.split('.').at(-1)] ?? 'application/octet-stream');
       res.setHeader('Cache-Control', 'no-store');
       if (encoded) { file += '.' + encoded[0]; res.setHeader('Content-Encoding', encoded[1]); }
-      await stat(file); res.end(await readFile(file));
+      await stat(file); await send(res, await readFile(file));
     } catch { res.writeHead(500); res.end('Local fixture error'); }
   });
   server.listen(port, '127.0.0.1', () => console.log(`Local-only ${port === parentPort ? parentOrigin : runtimeOrigin}`));

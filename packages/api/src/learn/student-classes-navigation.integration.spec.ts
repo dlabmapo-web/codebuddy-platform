@@ -73,7 +73,7 @@ describe.skipIf(!databaseUrl)('student class navigation on disposable PostgreSQL
     const large = await measure();
     evidence.budgets = { small, large, classes: [1, 13], courses: [1, 20], drafts: [1, 20] };
     expect(large).toEqual(small);
-    expect(small).toEqual({ classList: 11, classDetail: 21, drafts: 6, courseOutline: 14, home: 17 });
+    expect(small).toEqual({ classList: 11, classDetail: 16, drafts: 6, courseOutline: 9, home: 17 });
     expect((await classes.getClass(identity, { academyId, classId })).courses).toHaveLength(20);
     expect((await learn.listDrafts(identity, academyId)).drafts).toHaveLength(20);
   });

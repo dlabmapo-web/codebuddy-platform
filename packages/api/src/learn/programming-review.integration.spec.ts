@@ -259,7 +259,7 @@ describe.skipIf(!url)('manual programming assessment on disposable PostgreSQL', 
     ])});
     const expanded=await reads(); expect(expanded).toEqual(small);
     expect(small).toEqual({student_result:4,staff_review:6,student_history:12,teacher_attempts:13,
-      teacher_work_history:15,teacher_problem_students:23,teacher_student_materials:22,latest:6,learner_bootstrap:19});
+      teacher_work_history:15,teacher_problem_students:23,teacher_student_materials:22,latest:6,learner_bootstrap:14});
     counts.reads={small,expanded};
     // The v2 material metadata shape, measured against the same expanded fixture.
     sqlCount=0;

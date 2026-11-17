@@ -473,7 +473,15 @@ describe.skipIf(!databaseUrl)(
 
     it("previews all six types and hidden descendants without private answers", async () => {
       const preview = await service.preview(identity(admin), input());
-      expect(Object.values(preview.materialCounts)).toEqual([1, 1, 1, 1, 1, 1]);
+      expect(preview.materialCounts).toEqual({
+        PROGRAMMING_EXERCISE: 1,
+        EXPLANATION: 0,
+        PDF_DOCUMENT: 1,
+        VIDEO_LESSON: 1,
+        TURTLE_EXERCISE: 1,
+        WRITTEN_RESPONSE: 1,
+        MULTIPLE_CHOICE: 1,
+      });
       expect(preview.blockers).toEqual([]);
       expect(preview.modules[0]!.isVisible).toBe(false);
       expect(JSON.stringify(preview)).not.toMatch(/PRIVATE_|STUDENT_/);

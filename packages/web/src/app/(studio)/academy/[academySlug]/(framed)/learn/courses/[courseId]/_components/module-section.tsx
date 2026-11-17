@@ -10,7 +10,7 @@ import { routes } from '@/lib/routes';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import type { LearnCourseOutline } from '@cove/shared';
 import * as Collapsible from '@radix-ui/react-collapsible';
-import { ChevronDown } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 
 import { useLayoutTranslation } from '@/i18n';
 
@@ -194,7 +194,7 @@ export function ModuleSection({
                         ]
                           .sort((a, b) => a.position - b.position)
                           .map((row, index) =>
-                            row.kind === 'explanation' ? <li key={row.explanation.materialId}><MaterialLink title={row.explanation.title} type="EXPLANATION" href={routes.academyLearnMaterial(slug, row.explanation.materialId, 'EXPLANATION', { classId })}>{row.explanation.status === 'SOLVED' ? <span className="text-success">✓</span> : null}</MaterialLink></li> : row.kind === 'video' ? (<li key={row.video.materialId}><MaterialLink title={row.video.title} type="VIDEO_LESSON" href={routes.academyLearnVideo(slug,row.video.materialId,{classId})}>{row.video.status==='SOLVED'?vt('completed'):vt(row.video.video.includeInScore?'include_score':'excluded')}</MaterialLink></li>) : row.kind === 'manual' ? (<li key={row.manual.materialId}><MaterialLink title={row.manual.title} type={row.manual.type} href={routes.academyLearnAssessment(slug,row.manual.materialId,row.manual.type,{classId})}>{row.manual.type === "MULTIPLE_CHOICE" ? `${mt("automatic_graded")} · ` : row.manual.type === "TURTLE_EXERCISE" ? `${mt("teacher_graded")} ` : ""}{row.manual.pending?'Awaiting review':row.manual.status==='SOLVED'?'Completed':row.manual.includeInScore?'Included in score':'Excluded from score'}</MaterialLink></li>) : row.kind === 'exercise' ? (
+                            row.kind === 'explanation' ? <li key={row.explanation.materialId}><MaterialLink title={row.explanation.title} type="EXPLANATION" href={routes.academyLearnMaterial(slug, row.explanation.materialId, 'EXPLANATION', { classId })}>{row.explanation.status === 'SOLVED' ? <Check aria-hidden className="size-4 text-success" /> : null}</MaterialLink></li> : row.kind === 'video' ? (<li key={row.video.materialId}><MaterialLink title={row.video.title} type="VIDEO_LESSON" href={routes.academyLearnVideo(slug,row.video.materialId,{classId})}>{row.video.status==='SOLVED'?vt('completed'):vt(row.video.video.includeInScore?'include_score':'excluded')}</MaterialLink></li>) : row.kind === 'manual' ? (<li key={row.manual.materialId}><MaterialLink title={row.manual.title} type={row.manual.type} href={routes.academyLearnAssessment(slug,row.manual.materialId,row.manual.type,{classId})}>{row.manual.type === "MULTIPLE_CHOICE" ? `${mt("automatic_graded")} · ` : row.manual.type === "TURTLE_EXERCISE" ? `${mt("teacher_graded")} ` : ""}{row.manual.pending?'Awaiting review':row.manual.status==='SOLVED'?'Completed':row.manual.includeInScore?'Included in score':'Excluded from score'}</MaterialLink></li>) : row.kind === 'exercise' ? (
                               <ExerciseRow
                                 academyId={academyId}
                                 classId={classId}
@@ -216,7 +216,7 @@ export function ModuleSection({
                                     { classId },
                                   )}
                                 >
-                                  {row.doc.status === 'SOLVED' ? <span className="mr-2 text-success">✓</span> : null}{row.doc.pdf.pageCount ? pdfT('page_count', { count: row.doc.pdf.pageCount }) : null}
+                                  {row.doc.status === 'SOLVED' ? <Check aria-hidden className="mr-2 size-4 text-success" /> : null}{row.doc.pdf.pageCount ? pdfT('page_count', { count: row.doc.pdf.pageCount }) : null}
                                 </MaterialLink>
                               </li>
                             ),

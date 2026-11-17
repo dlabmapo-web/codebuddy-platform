@@ -33,25 +33,27 @@ export default async function SavedStudentWorkPage({
     requestedPage <= 100000
       ? requestedPage
       : 1;
-  let name: string;
+  let name: string | undefined;
   try {
     // Authorize the exact student and material before rendering even the identity.
     const attempts = await api.studentWorkHistory.listAttempts({
       ...scope,
       page: attemptPage,
     });
-    if (query.attempt && !attempts.attempts.some((a) => a.id === query.attempt))
-      return <MaterialReadFailure unavailable backHref={routes.academyTeachClasses(academySlug)} />;
-    const summary = await api.studentWorkHistory.getStudentSummary({
-      academyId,
-      classId: target.classId,
-      membershipId: target.membershipId,
-    });
-    name = summary.student.name;
+    if (!query.attempt || attempts.attempts.some((a) => a.id === query.attempt)) {
+      const summary = await api.studentWorkHistory.getStudentSummary({
+        academyId,
+        classId: target.classId,
+        membershipId: target.membershipId,
+      });
+      name = summary.student.name;
+    }
   } catch (error) {
     if (isMaterialUnavailable(error)) return <MaterialReadFailure unavailable backHref={routes.academyTeachClasses(academySlug)} />;
     throw error;
   }
+  if (name === undefined)
+    return <MaterialReadFailure unavailable backHref={routes.academyTeachClasses(academySlug)} />;
   return (
     <StudentWorkPage
       key={`${target.membershipId}:${target.materialId}:${query.attempt ?? "latest"}:${attemptPage}`}

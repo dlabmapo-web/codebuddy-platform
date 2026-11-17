@@ -35,7 +35,8 @@ describe('Turtle execution feedback', () => {
       ['IDLE', { ready: false }, 'preparing_your_turtle_loading'],
       ['ADMITTING', { pending: true }, 'connecting_loading'],
       ['RENDERING', { running: true }, 'running_your_code'],
-      ['UNSUPPORTED', { fullPython: true }, 'browser_unavailable'],
+      ['UNSUPPORTED', { fullPython: true }, 'browser_code_unsupported'],
+      ['IDLE', { fullPython: true }, 'browser_unavailable'],
     ] as const) {
       expect(turtleExecutionStatus({ ...defaults, browserMode: true, browser: { ...browser, ...patch, state } }).label).toBe(label);
     }

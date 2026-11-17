@@ -65,11 +65,13 @@ or the 120-second hard run deadline. A browser is not an execution attestation.
 No client result is used for official grading.
 
 A disabled browser grant retains its preferred-engine marker in bootstrap;
-refresh cannot silently turn its Run button into a source upload. Browser
-unsupported calls offer **Run with full Python**. That explicit click
-retires browser admission first, then submits source through the existing guest
-path. Preparation errors do not automatically upload source or allocate guests.
-Server capacity remains one; broad automatic fallback is intentionally absent.
+refresh cannot silently turn its Run button into a source upload. There is no
+full-Python fallback for a browser grant: unsupported calls and preparation
+errors are reported to the student, and the API refuses server runs from any
+grant issued with the browser profile (`BROWSER_ENGINE_ONLY`, 403), so a class
+can never queue behind the one server slot. Server sessions started before
+this rule remain recoverable. With the kill switch off, existing browser grants
+cannot run; students Exit and enter the PIN again to receive a server grant.
 
 ## Activation through the protected release
 

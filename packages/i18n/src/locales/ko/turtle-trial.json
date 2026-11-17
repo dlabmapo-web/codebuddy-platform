@@ -127,8 +127,8 @@
   "show_access_code": "코드 보기",
   "hide_access_code": "코드 숨기기",
   "ask_teacher_for_code": "코드를 모르겠다면 선생님께 물어보세요.",
-  "browser_unavailable": "브라우저 터틀을 사용할 수 없습니다. 전체 Python 실행을 선택해 주세요.",
-  "run_with_full_python": "전체 Python으로 실행",
+  "browser_unavailable": "브라우저 터틀을 사용할 수 없습니다. 페이지를 새로고침하거나 다른 브라우저를 사용해 주세요.",
+  "browser_code_unsupported": "브라우저 터틀에서 실행할 수 없는 코드예요. 출력 메시지를 확인해 주세요.",
   "retry_browser_turtle": "브라우저 터틀 다시 시도",
   "use_browser_turtle": "브라우저 터틀 사용"
 }

@@ -147,7 +147,12 @@ export class TrialService {
   }
   async start(token: string, input: TurtleRunInput) {
     const traceId = randomUUID(), began = performance.now();
-    const g = await this.grant(token); const unlock = await this.store.lock(g);
+    const g = await this.grant(token);
+    // A browser grant never falls back to the shared server slot: one slot
+    // cannot serve a class, so code the browser cannot run is reported instead.
+    // Server sessions started before this rule remain recoverable.
+    if (g.browserProfile === turtleBrowserProfileId) throw new HttpException('BROWSER_ENGINE_ONLY', 403);
+    const unlock = await this.store.lock(g);
     const authorizationMs = performance.now() - began;
     let reservationMs = 0;
     try {

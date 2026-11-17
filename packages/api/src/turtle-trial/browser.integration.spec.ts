@@ -172,7 +172,16 @@ describe.skipIf(!local)('browser admission with dedicated local Redis', () => {
   it('keeps browser IDs out of the legacy server-session path', async () => {
     const g = await enter(), run = await service.start(g.token, input());
     await expect(trial.session(g.token, run.id)).rejects.toMatchObject({ status: 404 });
-    await expect(trial.start(g.token, { source: 'print(1)', starterId: 'free', helperVersion: turtleHelperVersion, requestKey: randomUUID() })).rejects.toMatchObject({ status: 409 });
+    await expect(trial.start(g.token, { source: 'print(1)', starterId: 'free', helperVersion: turtleHelperVersion, requestKey: randomUUID() })).rejects.toMatchObject({ status: 403 });
     expect(remote.request).not.toHaveBeenCalled(); expect(remote.lookup).not.toHaveBeenCalled();
+  });
+  it('never sends a browser grant to the shared server slot, even when idle or disabled', async () => {
+    const g = await enter(), server = { source: 'input()', starterId: 'free' as const, helperVersion: turtleHelperVersion, requestKey: randomUUID() };
+    await expect(trial.start(g.token, server)).rejects.toMatchObject({ status: 403, message: 'BROWSER_ENGINE_ONLY' });
+    // The kill switch does not reopen the server path for grants issued as browser grants.
+    config.set('TURTLE_TRIAL_BROWSER_ADMISSION_ENABLED', false);
+    await expect(trial.start(g.token, { ...server, requestKey: randomUUID() })).rejects.toMatchObject({ status: 403 });
+    expect((await trial.grant(g.token)).active).toBe('');
+    expect(remote.ready).not.toHaveBeenCalled(); expect(remote.request).not.toHaveBeenCalled(); expect(remote.lookup).not.toHaveBeenCalled();
   });
 });

@@ -41,8 +41,9 @@ export function turtleExecutionStatus({ browserMode, browser, browserUnavailable
   if (browser.state === 'STOPPED') return nativeStates.STOPPED!;
   if (browser.state === 'EXPIRED') return nativeStates.TIMED_OUT!;
   if (browser.state === 'ERROR') return nativeStates.ERROR!;
-  if (browser.state === 'UNSUPPORTED' || browser.fullPython)
-    return { tone: 'warning', icon: 'alert', label: 'browser_unavailable' };
+  // There is no server fallback: unsupported code is the student's to change.
+  if (browser.state === 'UNSUPPORTED') return { tone: 'warning', icon: 'alert', label: 'browser_code_unsupported' };
+  if (browser.fullPython) return { tone: 'warning', icon: 'alert', label: 'browser_unavailable' };
   if (browser.pending || browser.state === 'ADMITTING')
     return { tone: 'active', icon: 'spinner', label: 'connecting_loading' };
   if (browser.running || browser.state === 'COMPUTING' || browser.state === 'RENDERING') return nativeStates.RUNNING!;

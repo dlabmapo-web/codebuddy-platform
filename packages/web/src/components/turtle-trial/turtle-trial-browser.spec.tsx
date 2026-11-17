@@ -32,10 +32,11 @@ it('does not silently upload browser-draft source after refresh with browser fla
   expect(run.disabled).toBe(true);
   expect(host.querySelector('iframe')).toBeNull();
   expect(mocks.request.mock.calls.some(([path]) => path === 'runs')).toBe(false);
-  const fallback = buttons().find(b => b.textContent === en.run_with_full_python)!;
-  expect(fallback).toBeTruthy();
-  await act(async () => fallback.click());
-  expect(mocks.request).toHaveBeenCalledWith('runs', 'POST', expect.objectContaining({ source: turtleStarters.drawing }));
+  // No server fallback is offered: the shared slot cannot serve a class.
+  expect(buttons().some(b => /full Python/i.test(b.textContent ?? ''))).toBe(false);
+  expect(host.textContent).toContain(en.browser_unavailable);
+  await act(async () => run.click());
+  expect(mocks.request.mock.calls.some(([path]) => path === 'runs')).toBe(false);
 });
 
 it('selects the editor theme explicitly without starting or clearing execution', async () => {

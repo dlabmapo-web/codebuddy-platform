@@ -122,6 +122,7 @@ export function TurtleTrial({ enabled, browserConfig }: { enabled: boolean; brow
       RATE_LIMITED: t('error_rate_limited'),
       RUN_ENDED: t('error_run_ended'),
       BROWSER_RUNTIME_UNAVAILABLE: t('browser_unavailable'),
+      BROWSER_ENGINE_ONLY: t('browser_unavailable'),
     };
     setError(messages[code] ?? t('error_connection'));
     if (e instanceof TurtleRequestError && e.retryAfter) setRetryUntil(Date.now() + e.retryAfter * 1000);
@@ -302,15 +303,6 @@ export function TurtleTrial({ enabled, browserConfig }: { enabled: boolean; brow
       download(await response.arrayBuffer(), 'cove-turtle.zip', 'application/zip');
     } catch (e) { handleError(e); }
   }
-  async function switchToFullPython() {
-    if (busy || changingMode.current) return;
-    changingMode.current = true; setBusy(true);
-    try {
-      if (!await browserExecution.stop()) return;
-      setFullPython(true); setRuntimeProfile(undefined); setSession(null); setError('');
-      await runServer();
-    } finally { changingMode.current = false; setBusy(false); }
-  }
   async function switchToBrowser() {
     if (busy || changingMode.current) return;
     changingMode.current = true; setBusy(true);
@@ -372,7 +364,6 @@ export function TurtleTrial({ enabled, browserConfig }: { enabled: boolean; brow
       theme={theme} onThemeChange={setTheme} status={executionStatus} browser={browserMode ? browserState : undefined}
       onRun={() => void run()} onStop={() => void stop()} onClear={() => void stop(true)}>
       {browserMode && browserState.runtimeFailed && runtimeProfile && <button type="button" disabled={busy} onClick={() => setRuntimeRetry(n => n + 1)}>{t('retry_browser_turtle')}</button>}
-      {browserMode && (browserState.fullPython || browserUnavailable) && <button type="button" disabled={busy} onClick={() => void switchToFullPython()}>{t('run_with_full_python')}</button>}
       {!browserMode && grantBrowser && <button type="button" disabled={busy} onClick={() => void switchToBrowser()}>{t('use_browser_turtle')}</button>}
     </TurtleToolbar>
     {error && <div className={styles.errorBar} role="alert">{error}{retry > 0 && ` (${retry}s)`}<button type="button" aria-label={t('dismiss')} onClick={() => setError('')}><X size={16} /></button></div>}

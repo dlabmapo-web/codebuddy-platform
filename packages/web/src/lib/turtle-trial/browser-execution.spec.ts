@@ -96,7 +96,7 @@ describe('browser execution authority and lifecycle', () => {
     execution.event({ kind: 'painted', generation: event.generation as string });
     expect(execution.state.firstStrokeMs).toBeGreaterThanOrEqual(0);
   });
-  it('offers full Python without starting a server run automatically', async () => {
+  it('reports unsupported code without starting a server run', async () => {
     const { execution, bridge, request } = setup(); await execution.run('input()', 'free');
     const event = bridge.send.mock.calls.find(([m]) => m.kind === 'run')![0];
     execution.event({ kind: 'unsupported', generation: event.generation as string, message: 'input() requires full Python' });

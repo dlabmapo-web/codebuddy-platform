@@ -1,6 +1,14 @@
 import { DrawingRenderer } from './renderer.mjs';
 import { encodedSize, limits } from './protocol.mjs';
 
+/**
+ * A class downloads the 1 MB engine over one shared connection, so the first
+ * download may take a while on a slow line; starting Python once it has
+ * arrived may not. A single 10 s budget for both restarted (and re-downloaded)
+ * the engine on every computer in a slow room at once.
+ */
+export const preparationBudgets = { downloadMs: 60000, startMs: 10000 };
+
 /** One active single-use worker and one clean spare. No admission authority here. */
 export class LocalTurtleRuntime {
   constructor(canvas, cursors, notify) {
@@ -33,14 +41,22 @@ export class LocalTurtleRuntime {
     worker.onerror = event => failed('Python worker preparation failed: ' + String(event.message).slice(0, 300));
     worker.onmessage = event => {
       if (event.data?.kind === 'bootstrap-failed') { failed(event.data.message); return; }
-      if (event.data?.kind === 'prepare-stage') { spare.stages[event.data.stage] = event.data.ms; this.send('prepare-progress', { stage: event.data.stage }); return; }
+      if (event.data?.kind === 'prepare-stage') {
+        spare.stages[event.data.stage] = event.data.ms;
+        if (event.data.stage === 'assets' && !spare.downloaded) {
+          spare.downloaded = true; clearTimeout(spare.timer);
+          spare.timer = setTimeout(() => failed('Python preparation timed out'), preparationBudgets.startMs);
+        }
+        this.send('prepare-progress', { stage: event.data.stage });
+        return;
+      }
       if (event.data?.kind !== 'ready' || event.data.version !== 1 || spare.ready) return;
       clearTimeout(spare.timer);
       if (this.disposed || this.spare !== spare) { worker.terminate(); return; }
       spare.ready = true; spare.resolve(worker);
       this.send('ready', { preparationMs: performance.now() - began, stages: spare.stages });
     };
-    spare.timer = setTimeout(() => failed('Python preparation timed out'), 10000);
+    spare.timer = setTimeout(() => failed('Python download timed out'), preparationBudgets.downloadMs);
   }
   async run(data) {
     if (this.disposed) return;

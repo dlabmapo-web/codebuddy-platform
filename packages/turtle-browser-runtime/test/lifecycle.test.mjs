@@ -102,3 +102,40 @@ test('compound fills consume segment budgets rather than hiding unlimited render
   assert.throws(() => renderer.accept(events(5, [fill])), /Drawing limit/);
   renderer.stop();
 });
+
+test('a slow shared connection gets time to download; a stalled Python start does not', async t => {
+  const { preparationBudgets } = await import('../src/runtime.mjs');
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  environment(); const notified = [];
+  const runtime = new LocalTurtleRuntime(canvas(), canvas(), m => notified.push(m));
+  const failures = () => notified.filter(m => m.kind === 'prepare-failed').map(m => m.message);
+  const worker = FakeWorker.all[0];
+  worker.event({ kind: 'prepare-stage', stage: 'worker-start', ms: 0 });
+  t.mock.timers.tick(30000); // The old single 10 s budget would have restarted the download by now.
+  assert.deepEqual(failures(), []); assert.equal(worker.dead, false);
+  worker.event({ kind: 'prepare-stage', stage: 'assets', ms: 30000 });
+  t.mock.timers.tick(preparationBudgets.startMs - 1);
+  assert.deepEqual(failures(), []);
+  t.mock.timers.tick(1);
+  assert.deepEqual(failures(), ['Python preparation timed out']); assert.equal(worker.dead, true);
+  runtime.dispose();
+});
+
+test('a download that never finishes is replaced, and a ready worker is never timed out', async t => {
+  const { preparationBudgets } = await import('../src/runtime.mjs');
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  environment(); const notified = [];
+  let runtime = new LocalTurtleRuntime(canvas(), canvas(), m => notified.push(m));
+  t.mock.timers.tick(preparationBudgets.downloadMs - 1);
+  assert.equal(notified.some(m => m.kind === 'prepare-failed'), false);
+  t.mock.timers.tick(1);
+  assert.deepEqual(notified.filter(m => m.kind === 'prepare-failed').map(m => m.message), ['Python download timed out']);
+  runtime.dispose();
+  environment(); notified.length = 0;
+  runtime = new LocalTurtleRuntime(canvas(), canvas(), m => notified.push(m));
+  FakeWorker.all[0].event({ kind: 'prepare-stage', stage: 'assets', ms: 900 });
+  FakeWorker.all[0].event({ kind: 'ready' });
+  t.mock.timers.tick(preparationBudgets.downloadMs * 2);
+  assert.deepEqual(notified.map(m => m.kind).filter(k => k !== 'prepare-progress'), ['ready']);
+  runtime.dispose();
+});

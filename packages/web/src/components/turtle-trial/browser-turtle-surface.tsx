@@ -10,10 +10,12 @@ export const runtimeRestartDelaysMs = [500, 2_000, 5_000];
 /** The frame must load and accept a port within this, or it is replaced. */
 const connectTimeoutMs = 12_000;
 /**
- * Once connected, the runtime reports ready or its own preparation failure
- * within its 10 s budget. This only catches a frame that falls silent.
+ * Once connected, the runtime reports ready or its own preparation failure:
+ * up to 60 s to download the engine over a class's shared connection, then
+ * 10 s to start Python. This only catches a frame that falls silent, so it
+ * must outlast both.
  */
-const readyTimeoutMs = 30_000;
+const readyTimeoutMs = 75_000;
 const runtimeKinds = ['connected', 'ready', 'prepare-failed', 'preparing', 'computing', 'painted', 'rendering', 'displaying', 'output', 'failed', 'unsupported', 'timed-out', 'lease-expired', 'stopped'];
 
 /** Separate host, no application credentials, no popups/navigation permissions. */

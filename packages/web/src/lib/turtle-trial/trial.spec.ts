@@ -27,6 +27,12 @@ describe('public turtle browser boundary', () => {
     await expect(trialBody(request)).rejects.toThrow('SOURCE_TOO_LARGE');
     expect(await trialBody(new Request('http://localhost', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"pin":"012345"}' }))).toBe('{"pin":"012345"}');
   });
+  it('opens on free practice with the helpers imported and the Coding Start banner', () => {
+    const d = initialTurtleDraft();
+    expect(d.starter).toBe('free');
+    expect(d.buffers.free).toBe('from random import *\nfrom shape import *\nfrom custom import *\n\n#############################\n######## Coding Start! ########\n#############################\n');
+    expect(parseTurtleDraft(null)).toEqual(d);
+  });
   it('restores per-starter code and rejects malformed or oversized local drafts', () => {
     const d = initialTurtleDraft(); d.buffers.race += 'BlueForward(20)\n';
     expect(parseTurtleDraft(JSON.stringify(d))).toEqual(d);

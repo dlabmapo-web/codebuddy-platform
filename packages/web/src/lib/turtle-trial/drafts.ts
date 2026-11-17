@@ -1,7 +1,7 @@
 import { turtleStarterIds, turtleStarters, type TurtleStarterId } from '@cove/shared';
 export const turtleDraftKey = 'cove:turtle:tab:v1';
 export type TurtleDraft = { starter: TurtleStarterId; buffers: Record<TurtleStarterId, string>; font: number };
-export function initialTurtleDraft(): TurtleDraft { return { starter: 'drawing', buffers: { ...turtleStarters }, font: 18 }; }
+export function initialTurtleDraft(): TurtleDraft { return { starter: 'free', buffers: { ...turtleStarters }, font: 18 }; }
 export function parseTurtleDraft(raw: string | null): TurtleDraft {
   if (!raw) return initialTurtleDraft();
   try {

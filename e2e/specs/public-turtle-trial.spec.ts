@@ -185,13 +185,16 @@ test('race helpers and infinite loops run in isolated stoppable sessions', async
 test('switching examples clears live and stopped results while preserving each code buffer', async ({ page }) => {
   await enter(page);
   const shapeSource = 'from custom import *\nspeed(0)\nTForward(80)\nprint("SHAPE_BUFFER")\n';
-  await code(page, shapeSource);
   const choose = async (name: RegExp) => {
     await page.getByRole('button', { name: /더 보기|More options/ }).click();
     await page.getByRole('button', { name: /기본 코드 선택|Choose a starter/ }).click();
     await page.getByRole('menuitemradio', { name }).click();
   };
   const closeOptions = () => page.getByRole('button', { name: /더 보기|More options/ }).click();
+  // The page opens on free practice; this scenario starts from the shapes example.
+  await choose(/도형 그리기|Draw shapes/);
+  await closeOptions();
+  await code(page, shapeSource);
   await choose(/거북이 경주|Turtle race/);
   await closeOptions();
   const raceSource = 'from custom import *\nReadyToRace()\nBlueForward(30)\nprint("RACE_BUFFER")\n';

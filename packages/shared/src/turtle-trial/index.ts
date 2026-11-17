@@ -12,7 +12,8 @@ export const turtleStarters: Record<TurtleStarterId, string> = {
   // The lesson introduces direct commands before teaching loops.
   drawing: turtlePreamble + 'TForward(100)\nTLeft(90)\nTForward(100)\nTLeft(90)\nTForward(100)\nTLeft(90)\nTForward(100)\nTLeft(90)\n',
   race: turtlePreamble + 'ReadyToRace()\n\n# 거북이를 움직여 보세요. / Move the turtles.\n',
-  free: turtlePreamble,
+  // The page opens here: helpers imported, students write below the banner.
+  free: turtlePreamble + '#############################\n######## Coding Start! ########\n#############################\n',
 };
 export const turtleSpiralExample = 'from custom import *\n\ncolor("blue")\nspeed(3)\n\nfor i in range(45):\n    TForward(i * 4)\n    TLeft(59)\n';
 export const turtleAccessSchema = z.object({ pin: z.string().trim().regex(/^[0-9]{6}$/) }).strict();

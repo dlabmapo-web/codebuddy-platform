@@ -8,6 +8,7 @@ import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import {
   navigatorPathFromBreadcrumb,
   toNavigatorContext,
+  workspaceMaterialSequence,
   type LearnExerciseBootstrap,
   type WorkspaceNavigatorContext,
 } from '@cove/shared';
@@ -177,16 +178,11 @@ export function useExerciseNavigation({
         // case costs no request at all.
         // Non-code materials have their own authenticated server routes.
         // Avoid signing/fetching them twice before the destination can render.
-        let materialType: string | undefined;
-        for (const courseModule of navigatorRef.current.course.modules) for (const lecture of courseModule.lectures) {
-          if (lecture.documents?.some(item => item.materialId === materialId)) materialType = 'PDF_DOCUMENT';
-          if (lecture.videos?.some(item => item.materialId === materialId)) materialType = 'VIDEO_LESSON';
-          const manual = lecture.manualMaterials?.find(item => item.materialId === materialId);
-          if (manual) materialType = manual.type;
-        }
-        if (materialType) {
+        const destination = workspaceMaterialSequence(navigatorRef.current)
+          .find(item => item.materialId === materialId);
+        if (destination && destination.type !== 'PROGRAMMING_EXERCISE') {
           beforeTransitionRef.current?.beforeCommit();
-          router.push(routes.academyLearnMaterial(academySlug, materialId, materialType, { classId }));
+          router.push(routes.academyLearnMaterial(academySlug, materialId, destination.type, { classId }));
           return;
         }
         const next = await fetchWorkspace(materialId);
@@ -345,17 +341,14 @@ export function useExerciseNavigation({
   React.useEffect(() => {
     // Prefetched into the same cache `commit` reads, so the neighbour lands
     // with the payload already in hand.
+    const materials = workspaceMaterialSequence(navigatorRef.current);
     for (const neighbor of [
       workspace.neighbors.previous,
       workspace.neighbors.next,
     ]) {
       if (
         !neighbor ||
-        navigatorRef.current.course.modules.some((m) =>
-          m.lectures.some((l) =>
-            l.videos?.some(v=>v.materialId===neighbor.materialId) || l.documents?.some((d) => d.materialId === neighbor.materialId) || l.manualMaterials?.some(m=>m.materialId===neighbor.materialId),
-          ),
-        )
+        materials.some(item => item.materialId === neighbor.materialId && item.type !== 'PROGRAMMING_EXERCISE')
       )
         continue;
       void queryClient.prefetchQuery({

@@ -16,7 +16,7 @@ for (const port of (product ? [4128] : [3128, 4128])) {
     try {
       const url = new URL(req.url, port === parentPort ? parentOrigin : runtimeOrigin);
       manifest = JSON.parse(await readFile(resolve(root, 'dist/manifest.json'), 'utf8'));
-      let file;
+      let file, encoded;
       res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
       res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
       res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Referrer-Policy', 'no-referrer');
@@ -28,6 +28,10 @@ for (const port of (product ? [4128] : [3128, 4128])) {
         const script = name === 'worker.js' ? "'self' 'unsafe-eval'" : "'self'";
         res.setHeader('Content-Security-Policy', `default-src 'none'; script-src ${script}; worker-src ${name === 'worker.js' ? "'none'" : runtimeOrigin + '/' + manifest.id + '/worker.js'}; connect-src 'none'; style-src 'self'; img-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${parentOrigin}`);
         if (name === 'worker.js' && url.searchParams.has('csp-child-probe')) { res.setHeader('Content-Type', 'text/javascript'); res.end('postMessage("CSP_ESCAPE")'); return; }
+        // Like production Caddy (`precompressed br gzip`): the built copies, as they are.
+        const accepted = String(req.headers['accept-encoding'] ?? '').split(',').map(v => v.trim().split(';')[0]);
+        encoded = [['br', 'br'], ['gz', 'gzip']].find(([suffix, token]) => manifest.encodings?.[name + '.' + suffix] && accepted.includes(token));
+        res.setHeader('Vary', 'Accept-Encoding');
       } else {
         if (!['/', '/fixture.mjs', '/fixture.css', '/manifest.json'].includes(url.pathname)) { res.writeHead(404); res.end(); return; }
         if (url.pathname === '/manifest.json') { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ...manifest, runtimeOrigin })); return; }
@@ -35,6 +39,7 @@ for (const port of (product ? [4128] : [3128, 4128])) {
       }
       res.setHeader('Content-Type', types[file.split('.').at(-1)] ?? 'application/octet-stream');
       res.setHeader('Cache-Control', 'no-store');
+      if (encoded) { file += '.' + encoded[0]; res.setHeader('Content-Encoding', encoded[1]); }
       await stat(file); res.end(await readFile(file));
     } catch { res.writeHead(500); res.end('Local fixture error'); }
   });

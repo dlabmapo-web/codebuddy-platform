@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
+import { encodeAssets } from './encodings.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sha = b => createHash('sha256').update(b).digest('hex');
 const files = {};
@@ -29,9 +30,12 @@ files['modules.js'] = Buffer.from('__BRYTHON__.update_VFS(' + JSON.stringify({
 const digest = sha(Object.keys(files).sort().map(k => k + ':' + sha(files[k])).join('\n'));
 const id = 'brython-3.15.0-' + digest.slice(0, 20);
 const dest = resolve(root, 'dist', id); await mkdir(dest, { recursive: true });
-for (const [name, data] of Object.entries(files)) await writeFile(resolve(dest, name), data);
+const encoded = encodeAssets(files);
+for (const [name, data] of Object.entries({ ...files, ...encoded.data })) await writeFile(resolve(dest, name), data);
 const manifest = { profile: 'cove-browser-turtle-v1', engine: 'brython', engineVersion: '3.15.0', protocol: 1,
   id, digest, files: Object.fromEntries(Object.entries(files).map(([name, data]) => [name, { sha256: sha(data), bytes: data.length, gzipBytes: gzipSync(data).length }])),
+  encodings: encoded.manifest,
 };
 await writeFile(resolve(root, 'dist/manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
-console.log(JSON.stringify({ id, gzipBytes: Object.values(manifest.files).reduce((n, f) => n + f.gzipBytes, 0) }));
+const brotliBytes = Object.keys(files).reduce((n, name) => n + (encoded.manifest[name + '.br']?.bytes ?? files[name].length), 0);
+console.log(JSON.stringify({ id, gzipBytes: Object.values(manifest.files).reduce((n, f) => n + f.gzipBytes, 0), brotliBytes }));

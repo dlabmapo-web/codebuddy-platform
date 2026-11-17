@@ -19,6 +19,7 @@ import { BrowserTurtleSurface } from './browser-turtle-surface';
 import { TurtlePinInput } from './turtle-pin-input';
 import { TurtleToolbar } from './turtle-toolbar';
 import { turtleExecutionStatus } from '@/lib/turtle-trial/execution-status';
+import { markTurtleBootReady } from '@/lib/turtle-trial/boot-recovery';
 import styles from './turtle-trial.module.css';
 
 // Runtime phase/output updates must not reconfigure Monaco on every message.
@@ -134,6 +135,8 @@ export function TurtleTrial({ enabled, browserConfig }: { enabled: boolean; brow
   }, [t, browserExecution, browserConfig]);
   useEffect(() => { browserError.current = handleError; }, [handleError]);
   useEffect(() => { browserExecution.activate(); return () => browserExecution.dispose(); }, [browserExecution]);
+  // The page's inline boot-recovery script reloads only a page that never got here.
+  useEffect(() => markTurtleBootReady(), []);
   const viewerError = useCallback((text: string) => setError(text), []);
   async function challenge() {
     try { await turtleRequest('challenge'); setNonceReady(true); setError(''); } catch (e) { handleError(e); }

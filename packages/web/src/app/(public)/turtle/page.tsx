@@ -4,6 +4,7 @@ import { getLocale } from '@/i18n/server/get-locale';
 import { initTranslations } from '@/i18n/init-translations';
 import { TurtleTrial } from '@/components/turtle-trial/turtle-trial';
 import { turtleBrowserConfig } from '@/lib/turtle-trial/browser-config';
+import { turtleBootRecoveryScript } from '@/lib/turtle-trial/boot-recovery';
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await initTranslations(await getLocale(), ['turtle-trial']);
@@ -11,5 +12,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export default async function TurtlePage() {
   await connection();
-  return <TurtleTrial enabled={process.env.NEXT_PUBLIC_TURTLE_TRIAL_ENABLED === 'true'} browserConfig={turtleBrowserConfig(process.env)} />;
+  return <>
+    {/* Before the app scripts: recovers a page whose scripts failed to arrive. */}
+    <script dangerouslySetInnerHTML={{ __html: turtleBootRecoveryScript }} />
+    <TurtleTrial enabled={process.env.NEXT_PUBLIC_TURTLE_TRIAL_ENABLED === 'true'} browserConfig={turtleBrowserConfig(process.env)} />
+  </>;
 }

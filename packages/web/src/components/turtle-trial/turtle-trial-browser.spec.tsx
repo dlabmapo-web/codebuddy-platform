@@ -14,6 +14,7 @@ vi.mock('@/components/manual/novnc-loader', () => ({ loadRfb: async () => undefi
 vi.mock('@/components/studio/language-control', () => ({ LanguageControl: () => <span /> }));
 vi.mock('./turtle-options', () => ({ TurtleOptions: () => <span /> }));
 import { TurtleTrial } from './turtle-trial';
+import { turtleBootReadyAttribute, turtleBootRetriesKey } from '@/lib/turtle-trial/boot-recovery';
 let host: HTMLDivElement, root: Root;
 beforeEach(() => {
   vi.stubGlobal('React', React); vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -37,6 +38,16 @@ it('does not silently upload browser-draft source after refresh with browser fla
   expect(host.textContent).toContain(en.browser_unavailable);
   await act(async () => run.click());
   expect(mocks.request.mock.calls.some(([path]) => path === 'runs')).toBe(false);
+});
+
+it('marks the page live for the boot-recovery script, before any network answer, and clears its retry budget', async () => {
+  sessionStorage.setItem(turtleBootRetriesKey, '1');
+  mocks.request.mockImplementation(() => new Promise(() => {}));
+  await act(async () => root.render(<TurtleTrial enabled />));
+  expect(document.documentElement.hasAttribute(turtleBootReadyAttribute)).toBe(true);
+  expect(sessionStorage.getItem(turtleBootRetriesKey)).toBeNull();
+  await act(() => root.unmount()); root = createRoot(host);
+  expect(document.documentElement.hasAttribute(turtleBootReadyAttribute)).toBe(false);
 });
 
 it('selects the editor theme explicitly without starting or clearing execution', async () => {

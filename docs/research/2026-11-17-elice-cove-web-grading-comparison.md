@@ -2,6 +2,8 @@
 
 Date: 2026-11-17. Branch: `feat/web-courses`.
 
+Follow-up: the user requested implementation of the audited differences. The code changes, content replacement, tests and screenshots are recorded in the [grading parity verification](assets/2026-11-17-web-grading-parity-localhost/README.md). The findings below describe the pre-fix baseline.
+
 The tested submission and review paths work. This is **not full Elice parity**: the imported HTML short answer has a different grading mode, some status labels contradict the effective result, and the live Elice account only provides a Manager identity. This audit did not submit all 348 source materials.
 
 ## Baseline and scope

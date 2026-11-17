@@ -109,8 +109,9 @@ export class TeacherProgressRepository {
   async readingQuizzes(input: { materialIds: string[]; userIds: string[]; classId: string }) {
     if (!input.materialIds.length) return [];
     return this.prisma.$queryRaw<Array<{ userId: string; correct: number; lastActivityAt: Date | null }>>`
-      WITH latest AS (SELECT DISTINCT ON (s.user_id, s.material_id) s.user_id, s.created_at, COALESCE(r.completed, CASE WHEN a.status = 'GRADED' THEN a.completed END) AS completed, COALESCE(r.score_hundredths, CASE WHEN a.status = 'GRADED' THEN a.score_hundredths END) AS score_hundredths, s.maximum_hundredths
+      WITH latest AS (SELECT DISTINCT ON (s.user_id, s.material_id) s.user_id, s.created_at, COALESCE(r.completed, CASE WHEN a.status = 'GRADED' THEN a.completed END, CASE WHEN q.status = 'GRADED' THEN q.completed END) AS completed, COALESCE(r.score_hundredths, CASE WHEN a.status = 'GRADED' THEN a.score_hundredths END, CASE WHEN q.status = 'GRADED' THEN q.score_hundredths END) AS score_hundredths, s.maximum_hundredths
         FROM manual_submissions s LEFT JOIN multiple_choice_assessments a ON a.submission_id = s.id
+    LEFT JOIN short_answer_assessments q ON q.submission_id = s.id
     LEFT JOIN LATERAL (SELECT completed, score_hundredths FROM manual_reviews r WHERE r.submission_id = s.id ORDER BY version DESC LIMIT 1) r ON true
         WHERE s.class_id = ${input.classId}::uuid AND s.user_id = ANY(${input.userIds}::uuid[]) AND s.material_id = ANY(${input.materialIds}::uuid[])
         ORDER BY s.user_id, s.material_id, s.created_at DESC, s.id DESC)

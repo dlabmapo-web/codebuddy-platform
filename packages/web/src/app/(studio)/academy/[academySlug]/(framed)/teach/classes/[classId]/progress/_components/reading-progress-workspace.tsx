@@ -116,7 +116,7 @@ export function ReadingProgressWorkspace({
   );
   const viewed = materials.reduce((n, m) => n + m.viewed, 0);
   const total = materials.reduce((n, m) => n + m.total, 0);
-  const hasQuiz = materials.some((m) => m.type === "MULTIPLE_CHOICE");
+  const hasQuiz = materials.some((m) => m.type === "MULTIPLE_CHOICE" || m.type === "WRITTEN_RESPONSE");
   const courses = initial.courses.map((c) => ({ id: c.id, name: c.title }));
   const sorts = [
     { id: "name", name: t("reading.sort_name") },

@@ -9,7 +9,7 @@ import { resolve } from "node:path";
 import { routes } from "../../packages/web/src/lib/routes";
 const provider = "http://127.0.0.1:4320",
   api = "http://127.0.0.1:4319/api";
-const shots = resolve("docs/research/assets/2026-11-16-web-courses-localhost");
+const shots = resolve(process.env.COVE_WEB_COURSES_SCREENSHOTS_DIR ?? "docs/research/assets/2026-11-16-web-courses-localhost");
 type Fixture = { id: string; academy: { id: string; slug: string } };
 async function fixture(
   request: APIRequestContext,
@@ -346,7 +346,21 @@ test("Web authoring, six-material student lecture and teacher reading reports on
   await submit.click();
   const submittedResponse = await submitted; expect(submittedResponse.ok(), await submittedResponse.text()).toBe(true);
   await expect(student.getByRole('button', { name: /Submitting|제출 중/ })).toHaveCount(0);
-  await expect(student.getByRole("radio").first()).toBeVisible();
+  await expect(student.getByRole("radio").first()).toBeChecked();
+  await student.reload();
+  await expect(student.getByRole("radio").first()).toBeChecked();
+  const delivery = student.getByRole('combobox', { name: 'Submission class', exact: true });
+  await student.getByRole('radio').last().check();
+  student.once('dialog', dialog => dialog.dismiss());
+  await delivery.selectOption(room.classes[1].id);
+  await expect(delivery).toHaveValue(classId);
+  await expect(student.getByRole('radio').last()).toBeChecked();
+  student.once('dialog', dialog => dialog.accept());
+  await delivery.selectOption(room.classes[1].id);
+  await expect(student.getByRole('radio').first()).not.toBeChecked();
+  await expect(student.getByRole('radio').last()).not.toBeChecked();
+  await delivery.selectOption(classId);
+  await expect(student.getByRole('radio').first()).toBeChecked();
   // The outline follows the submission without leaving the page.
   await expect(student.getByText("5 / 6", { exact: true }).first()).toBeVisible();
   await student.screenshot({
@@ -523,6 +537,64 @@ test("Web authoring, six-material student lecture and teacher reading reports on
   await expect(admin.locator('html')).toHaveClass(/dark/);
   await admin.screenshot({ path: resolve(shots, '26-admin-library-korean-dark.png'), fullPage: true, animations: 'disabled' });
   await adminContext.close();
+  // Live Elice parity: short answers share quiz accuracy, human reviews replace
+  // the pending status, and staff self-tests stay excluded from student scores.
+  await appearance(student, 'en', 'light');
+  const createShort = async (title: string, gradingMode: 'REGEX' | 'MANUAL') => {
+    const response = await request.post(api + '/manual', { headers, data: {
+      academyId, courseId: room.courseId, lectureId: room.lectureId, type: 'WRITTEN_RESPONSE', title,
+      files: {}, description: '<p>Write the full name of HTML.</p>', includeInScore: true,
+      shortAnswer: { version: 1, question: title, gradingMode, expectedAnswer: '', pattern: gradingMode === 'REGEX' ? 'hypertext markup language' : '', explanationEnabled: false, explanation: '' },
+    } });
+    expect(response.ok(), await response.text()).toBe(true);
+    const { materialId } = await response.json();
+    const visible = await request.post(api + '/manual/visibility', { headers, data: { academyId, materialId, isVisible: true } });
+    expect(visible.ok(), await visible.text()).toBe(true);
+    return materialId as string;
+  };
+  const automaticId = await createShort('HTML automatic quiz', 'REGEX');
+  const manualId = await createShort('HTML teacher-reviewed quiz', 'MANUAL');
+  await student.goto(routes.academyLearnManual(slug, automaticId, { classId }));
+  const answer = student.getByRole('textbox', { name: 'Your answer', exact: true });
+  await answer.fill('HTML');
+  await student.getByRole('button', { name: 'Submit', exact: true }).click();
+  await expect(student.getByRole('status').filter({ hasText: 'Incorrect' }).first()).toBeVisible();
+  await expect(answer).toHaveValue('HTML');
+  await answer.fill('hypertext markup language extra');
+  await student.getByRole('button', { name: 'Submit', exact: true }).click();
+  await expect(student.getByRole('status').filter({ hasText: 'Correct' }).first()).toContainText('100 / 100');
+  await student.reload();
+  await expect(answer).toHaveValue('hypertext markup language extra');
+  await student.screenshot({ path: resolve(shots, '27-short-answer-auto-result.png'), fullPage: true, animations: 'disabled' });
+  await student.goto(routes.academyLearnManual(slug, manualId, { classId }));
+  await answer.fill('hypertext markup language');
+  await student.getByRole('button', { name: 'Submit', exact: true }).click();
+  await expect(student.getByRole('status').filter({ hasText: /Awaiting teacher review/ }).first()).toBeVisible();
+  await teacher.goto(`${routes.academy(slug)}/teach/classes/${classId}/manual/${manualId}`);
+  await expect(teacher.getByRole('status').filter({ hasText: 'Awaiting review' })).toBeVisible();
+  await teacher.getByRole('spinbutton', { name: 'Score', exact: true }).fill('100');
+  await teacher.getByRole('checkbox').check();
+  await teacher.getByRole('textbox', { name: 'Feedback', exact: true }).fill('Correct expansion. Keep the lowercase spelling.');
+  await teacher.getByRole('button', { name: 'Publish review', exact: true }).click();
+  await expect(teacher.getByRole('status').filter({ hasText: /Reviewed.*100 \/ 100/ })).toBeVisible();
+  await expect(teacher.getByRole('status').filter({ hasText: 'Awaiting review' })).toHaveCount(0);
+  await teacher.reload();
+  await expect(teacher.getByRole('status').filter({ hasText: /Reviewed.*100 \/ 100/ })).toBeVisible();
+  await teacher.screenshot({ path: resolve(shots, '28-short-answer-reviewed-status.png'), fullPage: true, animations: 'disabled' });
+  await student.reload();
+  await expect(student.getByText('Correct expansion. Keep the lowercase spelling.', { exact: true }).first()).toBeVisible();
+  await expect(student.getByRole('status').filter({ hasText: /100 \/ 100.*Completed/ })).toBeVisible();
+  await student.screenshot({ path: resolve(shots, '29-student-reviewed-feedback.png'), fullPage: true, animations: 'disabled' });
+  await teacher.goto(`${routes.academy(slug)}/teach/classes/${classId}/progress?course=${room.courseId}`);
+  const progressRow = teacher.getByRole('row').filter({ hasText: 'Browser student' });
+  await expect(progressRow).toContainText('3 / 3');
+  await teacher.screenshot({ path: resolve(shots, '30-teacher-combined-quiz-accuracy.png'), fullPage: true, animations: 'disabled' });
+  await page.goto(routes.academyLearnManual(slug, automaticId, { classId }));
+  await expect(page.getByText(/Automatically graded.*Excluded from score/)).toBeVisible();
+  await page.getByRole('textbox', { name: 'Your answer', exact: true }).fill('hypertext markup language');
+  await page.getByRole('button', { name: 'Submit', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Correct' }).first()).toContainText('100 / 100');
+  await page.screenshot({ path: resolve(shots, '31-staff-practice-excluded-from-score.png'), fullPage: true, animations: 'disabled' });
   await context.close();
   await teacherContext.close();
 });

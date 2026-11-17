@@ -669,5 +669,55 @@ describe.skipIf(!url)(
         explanation.view(student, { academyId, materialId, classId }),
       ).rejects.toMatchObject({ status: 404 });
     });
+    it("counts short-answer quizzes using current class attempts and reviews in one statement", async () => {
+      await client.lecture.update({ where: { id: lectureId }, data: { isVisible: true } });
+      const ids = Array.from({ length: 5 }, () => randomUUID());
+      const [exact, regex, manual, pending] = ids;
+      const definition = (gradingMode: "EXACT" | "REGEX" | "MANUAL") => ({
+        version: 1, question: "Name the language", gradingMode,
+        expectedAnswer: "HTML", pattern: "HTML", explanationEnabled: false, explanation: "",
+      });
+      await client.material.createMany({ data: ids.map((id, index) => ({
+        id, lectureId, title: `Short answer ${index}`, type: "WRITTEN_RESPONSE", position: 40 + index, isVisible: true,
+      })) });
+      await client.manualMaterial.createMany({ data: ids.map((materialId, index) => ({
+        materialId, description: "Short quiz", shortAnswer: definition(index === 2 ? "MANUAL" : index === 1 ? "REGEX" : "EXACT"),
+      })) });
+      const otherClass = await client.class.create({ data: { academyId, name: "Another quiz class", createdByUserId: authorId } });
+      const attemptIds = Array.from({ length: 6 }, () => randomUUID());
+      const now = Date.now();
+      await client.manualSubmission.createMany({ data: [exact, regex, regex, manual, pending, exact].map((materialId, index) => ({
+        id: attemptIds[index], materialId, userId: readerId, classId: index === 5 ? otherClass.id : classId,
+        files: {}, answer: "HTML", profile: {}, revision: 1, maximumHundredths: 10000,
+        includeInScore: false, requestKey: randomUUID(), createdAt: new Date(now + index * 1000),
+      })) });
+      await client.shortAnswerAssessment.createMany({ data: attemptIds.map((submissionId, index) => ({
+        submissionId, definition: definition(index === 3 ? "MANUAL" : index === 1 || index === 2 ? "REGEX" : "EXACT"),
+        status: index === 3 ? "MANUAL" : index === 4 ? "EVALUATING" : "GRADED",
+        verdict: index === 3 || index === 4 ? null : index === 2 || index === 5 ? "INCORRECT" : "CORRECT",
+        completed: index === 3 || index === 4 ? null : index !== 2 && index !== 5,
+        scoreHundredths: index === 3 || index === 4 ? null : index === 2 || index === 5 ? 0 : 10000,
+        evaluatedAt: index === 3 || index === 4 ? null : new Date(),
+      })) });
+      await client.manualReview.createMany({ data: [1, 2].map(version => ({
+        submissionId: attemptIds[3], reviewerId: authorId, version,
+        scoreHundredths: version === 2 ? 10000 : 0, completed: version === 2, feedback: "Latest review wins",
+      })) });
+      const scope = { materialIds: ids, userIds: [readerId], classId };
+      const one = await measured(() => repository.readingQuizzes(scope));
+      const many = await measured(() => repository.readingQuizzes({ ...scope, userIds: [readerId, teacherId, authorId] }));
+      expect(one.statements).toBe(1);
+      expect(many.statements).toBe(1);
+      expect(one.data).toEqual(many.data);
+      expect(one.data[0].correct).toBe(2); // exact + reviewed manual; latest regex is wrong
+      const report = await reports.readingProgress(teacher, { academyId, classId, courseId, lens: "students" });
+      expect(report.students[0]).toMatchObject({ quizCorrect: 2, quizTotal: 6 });
+      await client.manualReview.create({ data: {
+        submissionId: attemptIds[0], reviewerId: authorId, version: 1,
+        scoreHundredths: 5000, completed: true, feedback: "Completed with partial credit",
+      } });
+      expect((await repository.readingQuizzes(scope))[0].correct).toBe(1);
+      console.info(`WEB_SQL teacherMixedQuizResults=${one.statements}/${many.statements}`);
+    });
   },
 );

@@ -323,21 +323,16 @@ export function ManualReviewWorkspace({
               {mt("view_learner_drawing_read_only")}
             </button>
           ) : null}
-          {attempt?.multipleChoiceAssessment ? <AssessmentStatus label={mt(attempt.multipleChoiceAssessment.completed?"correct":"incorrect")} completed={attempt.multipleChoiceAssessment.completed} /> : null}
-          {attempt?.shortAnswerAssessment ? (
-            <AssessmentStatus completed={effective?.completed} label={attempt.shortAnswerAssessment.status === "GRADED"
-                ? mt(
-                    attempt.shortAnswerAssessment.completed
-                      ? "correct"
-                      : "incorrect",
-                  )
-                : mt(
-                    attempt.shortAnswerAssessment.status === "ERROR"
-                      ? "evaluation_unavailable"
-                      : attempt.shortAnswerAssessment.status === "MANUAL"
-                        ? "awaiting_review"
-                        : "evaluating",
-                  )} />
+          {attempt && (attempt.multipleChoiceAssessment || attempt.shortAnswerAssessment) ? (
+            <AssessmentStatus completed={effective?.completed} label={review
+              ? `${mt("reviewed")} · ${review.scoreHundredths / 100} / ${attempt.maximumHundredths / 100}`
+              : effective
+                ? mt(effective.completed ? "correct" : "incorrect")
+                : mt(attempt.shortAnswerAssessment?.status === "ERROR"
+                  ? "evaluation_unavailable"
+                  : attempt.shortAnswerAssessment?.status === "MANUAL"
+                    ? "awaiting_review"
+                    : "evaluating")} />
           ) : null}
           {attempt ? (
             <>

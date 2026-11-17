@@ -103,7 +103,7 @@ export class TeacherProgressService {
     const common = { userIds: scope.studentUserIds, classId: scope.classId };
     const materials = await this.repository.readingMaterials({ ...common, courseId: course.id });
     if (input.lens === "curriculum") return { className: scope.className, courses, courseId: course.id, students: [], materials };
-    const quizIds = materials.filter(m => m.type === "MULTIPLE_CHOICE").map(m => m.materialId);
+    const quizIds = materials.filter(m => m.type === "MULTIPLE_CHOICE" || m.type === "WRITTEN_RESPONSE").map(m => m.materialId);
     const [activity, quizzes] = await Promise.all([
       this.repository.readingStudents({ ...common, materialIds: materials.map(m => m.materialId) }),
       this.repository.readingQuizzes({ ...common, materialIds: quizIds }),

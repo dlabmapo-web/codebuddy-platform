@@ -355,7 +355,7 @@ export function ManualWorkspace({
       });
       if (pendingSubmit.current?.content !== content)
         pendingSubmit.current = { content, key: crypto.randomUUID() };
-      await (data?.practice ? manualApi.submitPractice : manualApi.submit)({
+      const submission = {
         ...target,
         ...latest.current,
         ...(choice
@@ -365,20 +365,18 @@ export function ManualWorkspace({
             }
           : {}),
         contentRevision: loadedContentRevision.current ?? data!.config.revision,
-        ...(data?.practice ? { preview } : {}),
         revision: draftRevision.current,
-        classId: selectedClass!,
         requestKey: pendingSubmit.current.key,
-      });
+      };
+      if (data?.practice) await manualApi.submitPractice({ ...submission, preview });
+      else await manualApi.submit({ ...submission, classId: selectedClass! });
       pendingSubmit.current = null;
       // The lesson outline is cached across materials; refresh it so this
       // material's tick and the lecture count follow the submission.
       void cache.invalidateQueries({ queryKey: ["material-navigation", academyId] });
       if (explicit) {
-        setChoiceSelected([]);
         setDirty(false);
-        // A short answer stays in the box after Submit, as on Elice, so the
-        // learner can correct it and submit again.
+        // Submitted choices and short answers stay editable, as on Elice.
         if (!short) setAnswer("");
       }
       await query.refetch();
@@ -394,14 +392,26 @@ export function ManualWorkspace({
   }
   const latestAttempt = data?.practice ? data.attempts[0] : data?.attempts.find((a) => a.classId === selectedClass);
   const effective = effectiveManualResult(latestAttempt);
-  // Reopening a short-answer question shows the last submitted answer, as on
-  // Elice. Runs once, and never over text the learner has already typed.
-  const restoredAnswer = useRef(false);
+  // Restore once per delivery context, never over edits on a background read.
+  const restoredAnswer = useRef<string | null>(null);
   useEffect(() => {
-    if (!short || restoredAnswer.current || !latestAttempt) return;
-    restoredAnswer.current = true;
-    if (!dirty && !latest.current.answer) setAnswer(latestAttempt.answer);
-  }, [short, latestAttempt, dirty]);
+    if (!data || (!short && !choice) || dirty) return;
+    const context = `${materialId}:${selectedClass ?? "practice"}:${preview}`;
+    if (restoredAnswer.current === context) return;
+    restoredAnswer.current = context;
+    // Seed editable state from the server once when this delivery is opened.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (short) setAnswer(latestAttempt?.answer ?? "");
+    if (choice) {
+      const submitted = latestAttempt?.multipleChoiceAssessment;
+      const options = new Map(choice.options.map(option => [option.id, option]));
+      const ids = submitted?.selectedOptionIds ?? [];
+      setChoiceSelected(ids.every(id => options.has(id)) ? ids : []);
+      const order = submitted?.displayOrder;
+      if (order?.length === options.size && new Set(order).size === options.size && order.every(id => options.has(id)))
+        setLoadedChoice({ ...choice, options: order.map(id => options.get(id)!) });
+    }
+  }, [data, short, choice, latestAttempt, dirty, materialId, selectedClass, preview]);
   const explanation = useQuery({
     queryKey: [
       "short-answer-explanation",
@@ -576,7 +586,7 @@ export function ManualWorkspace({
           footer={{ href: navigation.courseHref, label: lt('navigator.footer_student') }} />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div role="status" className="flex shrink-0 items-center gap-2 border-b border-border bg-brand-soft/40 px-4 py-1.5 text-xs font-semibold text-brand">
-        <ListChecks aria-hidden className="size-4" />{mt(choice || (short && short.gradingMode !== 'MANUAL') ? 'automatic_graded' : 'teacher_graded').replace(/\s*·\s*$/, '')} · {mt(data.config.includeInScore ? 'included_in_score' : 'excluded_from_score')}
+        <ListChecks aria-hidden className="size-4" />{mt(choice || (short && short.gradingMode !== 'MANUAL') ? 'automatic_graded' : 'teacher_graded').replace(/\s*·\s*$/, '')} · {mt(!data.practice && data.config.includeInScore ? 'included_in_score' : 'excluded_from_score')}
       </div>
       <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${drawing ? "md:flex-row" : "gap-4 overflow-y-auto p-4 sm:p-6 md:flex-row md:overflow-hidden md:p-8"}`}>
         <aside {...surfaceProps('statement')}
@@ -722,7 +732,12 @@ export function ManualWorkspace({
                 aria-label={mt("submission_class")}
                 className="border border-border bg-card p-2"
                 value={selectedClass ?? ""}
-                onChange={(e) => setDeliveryClass(e.target.value)}
+                onChange={(e) => {
+                  if (dirty && !window.confirm(mt('discard_answer'))) return;
+                  setDirty(false);
+                  setSaved("");
+                  setDeliveryClass(e.target.value);
+                }}
               >
                 <option value="">{mt("choose_class")}</option>
                 {data.classes.map((c) => (

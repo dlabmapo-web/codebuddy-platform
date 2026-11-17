@@ -91,6 +91,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate deployment configuration
         run: bash deploy/scripts/validate-local.sh
+      - name: Verify the Studio proxy rides out a brief outage
+        run: python3 deploy/scripts/caddy-studio-retry.test.py
       - name: Verify scanner install rejects corrupt downloads
         run: python3 deploy/scripts/install-trivy.test.py
       - name: Test learning release and rollback selection

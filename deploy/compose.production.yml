@@ -68,7 +68,9 @@ services:
       retries: 3
       start_period: 10s
     mem_limit: 256m
-    cpus: 0.35
+    # TLS and on-the-fly compression for every site. At 0.35, a class of new
+    # computers arriving together starved it and studio requests failed (502).
+    cpus: 1.0
     pids_limit: 128
     logging:
       driver: json-file

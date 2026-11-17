@@ -104,6 +104,12 @@ cs.coveedu.com {
 	handle {
 		reverse_proxy studio:3000 {
 			header_up X-Cove-Client-IP {remote_host}
+			# A busy moment (a class opening the page together) must not turn a
+			# slow connection into a 502 that leaves a page without its scripts.
+			# Requests that never reached Studio are retried; of those that did,
+			# only GET (Caddy's default), so a POST is never sent twice.
+			lb_try_duration 10s
+			lb_try_interval 250ms
 			transport http {
 				read_timeout 10m
 				write_timeout 10m

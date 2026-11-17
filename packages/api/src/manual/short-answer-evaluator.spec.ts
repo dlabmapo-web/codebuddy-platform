@@ -24,9 +24,20 @@ describe("short-answer matching", () => {
         await evaluator.evaluate(definition("EXACT", expected), answer),
       ).toBe(result);
   });
-  it("matches regex search, anchors, alternatives and escaped literals", async () => {
+  it("matches regex from the start of the answer, with anchors, alternatives and escaped literals", async () => {
     for (const [pattern, answer, result] of [
       ["orbit", "orbital", true],
+      ["orbit", "an orbit", false],
+      ["orbit", " orbit", false],
+      ["aa|bb", "bb", true],
+      ["aa|bb", "bbx", true],
+      ["aa|bb", "xbb", false],
+      ["aa$", "aa ", false],
+      ["(?i)aa", "AA", true],
+      ["(?i)aa", "xAA", false],
+      ["(?m)b", "a\nb", false],
+      ["(?s)a.b", "a\nb", true],
+      ["a.b", "a\nb", false],
       ["^orbit$", "orbital", false],
       ["orbit", "ORBIT", false],
       ["^(red|blue)$", "blue", true],
@@ -37,10 +48,11 @@ describe("short-answer matching", () => {
         await evaluator.evaluate(definition("REGEX", pattern), answer),
       ).toBe(result);
   });
-  it("rejects malformed expressions and recovers after a bounded catastrophic match", async () => {
-    await expect(
-      evaluator.evaluate(definition("REGEX", "["), "x"),
-    ).rejects.toThrow("Invalid regular expression");
+  it("marks every answer wrong for a malformed expression and recovers after a bounded catastrophic match", async () => {
+    expect(await evaluator.evaluate(definition("REGEX", "["), "[")).toBe(false);
+    expect(await evaluator.evaluate(definition("REGEX", "a)(b"), "ab")).toBe(
+      false,
+    );
     await expect(
       evaluator.evaluate(definition("REGEX", "(a+)+$"), "a".repeat(4000) + "!"),
     ).rejects.toThrow("timed out");

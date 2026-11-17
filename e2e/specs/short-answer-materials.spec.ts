@@ -150,7 +150,7 @@ test("exact authoring, explicit input, private grading, explanation and teacher 
     await expect(student.getByText(/Incorrect · 0 \/ 100/).first()).toBeVisible(
       { timeout: 30000 },
     );
-    await expect(input).toHaveValue("");
+    await expect(input).toHaveValue("wrong");
     await expect(student.getByTestId("short-answer-explanation")).toHaveCount(
       0,
     );
@@ -179,7 +179,7 @@ test("exact authoring, explicit input, private grading, explanation and teacher 
     );
     await expect(student.getByTestId("short-answer-explanation")).toBeVisible();
     await student.reload();
-    await expect(input).toHaveValue("");
+    await expect(input).toHaveValue("SECRET_orbit");
     const history = await (
       await student.request.get(api, {
         headers: studentHeaders,

@@ -114,7 +114,7 @@
   "correct_answer": "Correct answer",
   "regular_expression": "Regular expression",
   "exact_help": "The answer must match exactly, including case and spaces.",
-  "regex_help": "Partial matches are allowed. Use ^ and $ for a whole answer; escape literal metacharacters.",
+  "regex_help": "The answer must start with the pattern; text after it is allowed. End with $ to require the whole answer; escape literal metacharacters.",
   "test_answer": "Test answer",
   "test_matching": "Test matching",
   "correct": "Correct",

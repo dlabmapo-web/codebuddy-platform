@@ -1,10 +1,21 @@
 import { Worker } from "node:worker_threads";
 import type { ShortAnswerDefinition } from "@cove/shared";
 const source = `const {parentPort, workerData} = require('node:worker_threads');
-try { const expression = new RegExp(workerData.pattern); parentPort.postMessage({correct: expression.test(workerData.answer)}); }
+try {
+  // Elice grades like Python's re.match: a leading (?i), (?m) or (?s) sets flags
+  // for the whole pattern, and the match must begin at the first character.
+  const inline = /^\\(\\?([ims]+)\\)/.exec(workerData.pattern);
+  const flags = inline ? [...new Set(inline[1])].join('') : '';
+  const body = inline ? workerData.pattern.slice(inline[0].length) : workerData.pattern;
+  new RegExp(body, flags);
+  const expression = new RegExp('(?:' + body + ')', flags + 'y');
+  parentPort.postMessage({correct: expression.test(workerData.answer)});
+}
 catch { parentPort.postMessage({invalid: true}); }`;
 export class MatchError extends Error {}
-/** Bounds compilation and matching outside the API event loop, including previews. */
+/** Bounds compilation and matching outside the API event loop, including previews.
+ * A pattern must match from the start of the answer and may leave text after
+ * it (as Elice grades, like Python's re.match); `$` requires the whole answer. */
 export class ShortAnswerEvaluator {
   private active = 0;
   private waiting: Array<() => void> = [];
@@ -56,12 +67,9 @@ export class ShortAnswerEvaluator {
         );
         worker.once("message", (result) => {
           clearTimeout(startup);
-          finish(
-            result.invalid
-              ? new MatchError("Invalid regular expression")
-              : undefined,
-            result.correct,
-          );
+          // As on Elice, a pattern that does not compile can be saved and
+          // simply matches no answer.
+          finish(undefined, result.invalid ? false : result.correct);
         });
         worker.once("error", () => {
           clearTimeout(startup);

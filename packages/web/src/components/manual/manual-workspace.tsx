@@ -377,7 +377,9 @@ export function ManualWorkspace({
       if (explicit) {
         setChoiceSelected([]);
         setDirty(false);
-        setAnswer("");
+        // A short answer stays in the box after Submit, as on Elice, so the
+        // learner can correct it and submit again.
+        if (!short) setAnswer("");
       }
       await query.refetch();
       setSaved(data?.practice ? pt("saved_result") :
@@ -392,6 +394,14 @@ export function ManualWorkspace({
   }
   const latestAttempt = data?.practice ? data.attempts[0] : data?.attempts.find((a) => a.classId === selectedClass);
   const effective = effectiveManualResult(latestAttempt);
+  // Reopening a short-answer question shows the last submitted answer, as on
+  // Elice. Runs once, and never over text the learner has already typed.
+  const restoredAnswer = useRef(false);
+  useEffect(() => {
+    if (!short || restoredAnswer.current || !latestAttempt) return;
+    restoredAnswer.current = true;
+    if (!dirty && !latest.current.answer) setAnswer(latestAttempt.answer);
+  }, [short, latestAttempt, dirty]);
   const explanation = useQuery({
     queryKey: [
       "short-answer-explanation",

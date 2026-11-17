@@ -1,7 +1,8 @@
 # Material loading reliability and reference PDF metadata
 
 Date: 2026-11-17 (Asia/Seoul)
-Status: Draft for user review; implementation and deployment have not started.
+Status: Approved and implemented; localhost verification passed. Not deployed.
+Verification: [implementation results and screenshots](../../research/2026-11-17-material-loading-implementation-verification.md).
 Branch: `feat/web-courses`, based on the current work at `b74da53e`.
 Evidence: [Material loading audit](../../research/2026-11-17-material-loading-audit.md).
 
@@ -68,7 +69,7 @@ Normalize errors on the read paths only. Leave unrelated upload, grading, billin
 
 Replace the exercise page's unconditional rejection-to-null and broad material-type catch with a settled read outcome that preserves the cause. Keep material-type and bootstrap reads concurrent. A Turtle redirect must not create an unhandled rejection from the unused bootstrap; settle both promises and propagate unexpected errors only from the branch whose result is required.
 
-Keep `redirect()` and `notFound()` outside broad catches: they use framework control flow. Read the installed Next documentation before implementation; this branch currently has Next 16.2.9. Its error-boundary guide recommends `unstable_retry()` for fetching/rendering fresh content and distinguishes it from `reset()`.
+Keep `redirect()` and `notFound()` outside broad catches: they use framework control flow. Read the installed Next documentation before implementation; this branch currently has Next 16.2.9. The web package actually resolves Next 16.4.1 (the root dependency copy is 16.2.9); its installed error-boundary guide exposes `retry()` for fetching/rendering fresh content. Use the web package’s API rather than resetting a failed cached payload.
 
 Only explicit inaccessible/missing content becomes an unavailable activity. Unexpected failures reach a recoverable boundary. Add material-scoped unavailable/error handling for fullscreen learning routes if needed so a missing exercise does not inherit academy-specific wording. The framed course-outline route needs the same unexpected-error distinction; retain its existing legitimate access denial behavior.
 
@@ -140,6 +141,6 @@ No schema migration, source payload change, account repair, role change, content
 
 Implementation is complete when the real SQL-to-output regression passes, the mixed-material and recovery matrix passes, measured statement counts meet the budget, and no expected access refusal becomes a successful read. Record the exact completed checks and any infrastructure-gated or browser gaps in a verification document.
 
-Stop temporary task servers after verification. Per `AGENTS.md`, inspect identities and working directories before stopping relevant Cove API/Nest processes and verify port 4000 is free unless the user explicitly asks to keep it running. No server was started for this documentation/audit task.
+Stop temporary task servers after verification. Per `AGENTS.md`, inspect identities and working directories before stopping relevant Cove API/Nest processes and verify port 4000 is free unless the user explicitly asks to keep it running. The implementation verification stops its temporary local servers before handoff.
 
-Deployment and live acceptance remain separate from implementation. This document specifies work for review; the confirmed production defect is still present.
+Deployment and live acceptance remain separate. The confirmed production defect remains until the implementation is released.

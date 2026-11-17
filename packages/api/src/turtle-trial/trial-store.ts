@@ -8,11 +8,17 @@ import type { OnModuleDestroy } from '@nestjs/common';
 export type BrowserGrantFields = { browserProfile: string; browserRuntimeId: string; browserOrigin: string };
 export type TrialGrant = { hash: string; version: string; expiresAt: number; active: string; academyId?: string } & Partial<BrowserGrantFields>;
 export type TrialRun = { requestKey: string; fingerprint: string; id?: string; settled?: string; reservedAt: string; engine?: string; leaseUntil?: string; deadline?: string; state?: string; profile?: string };
+// Each limit is [key, max, windowMs, increment]. Increment 0 only reads the
+// counter, so a class is not charged for attempts that were never wrong.
 const rateScript = `local wait=0
 for i,key in ipairs(KEYS) do
- local count=redis.call('INCR',key)
- if count==1 then redis.call('PEXPIRE',key,ARGV[i*2]) end
- if count>tonumber(ARGV[i*2-1]) then wait=math.max(wait,redis.call('PTTL',key)) end
+ local inc=tonumber(ARGV[i*3])
+ local count
+ if inc>0 then
+  count=redis.call('INCRBY',key,inc)
+  if count==inc then redis.call('PEXPIRE',key,ARGV[i*3-1]) end
+ else count=tonumber(redis.call('GET',key) or '0') end
+ if count>tonumber(ARGV[i*3-2]) then wait=math.max(wait,redis.call('PTTL',key)) end
 end
 return wait`;
 const reserveScript = `
@@ -24,10 +30,11 @@ if redis.call('EXISTS',KEYS[2])==1 then
 end
 local active=redis.call('HGET',KEYS[1],'active')
 if active and active~='' then return 'ACTIVE' end
-if tonumber(redis.call('HGET',KEYS[1],'used') or '0')+120>1800 then return 'BUDGET' end
-if tonumber(redis.call('GET',KEYS[3]) or '0')>=12 or tonumber(redis.call('GET',KEYS[4]) or '0')>=60 then return 'LIMIT' end
+local limits=cjson.decode(ARGV[6])
+if tonumber(redis.call('HGET',KEYS[1],limits.field) or '0')+120>limits.budget then return 'BUDGET' end
+if tonumber(redis.call('GET',KEYS[3]) or '0')>=limits.minute or tonumber(redis.call('GET',KEYS[4]) or '0')>=limits.hour then return 'LIMIT' end
 for i=3,4 do local n=redis.call('INCR',KEYS[i]); if n==1 then redis.call('EXPIRE',KEYS[i],i==3 and 60 or 3600) end end
-redis.call('HINCRBY',KEYS[1],'used',120)
+redis.call('HINCRBY',KEYS[1],limits.field,120)
 redis.call('HSET',KEYS[1],'active',ARGV[1])
 redis.call('HSET',KEYS[2],'requestKey',ARGV[1],'fingerprint',ARGV[2],'reservedAt',ARGV[4])
 if ARGV[5] and ARGV[5]~='' then
@@ -37,6 +44,15 @@ if ARGV[5] and ARGV[5]~='' then
 end
 redis.call('EXPIREAT',KEYS[2],ARGV[3])
 return 'NEW'`;
+// A server drawing occupies the shared guest slot, so its starts and drawing
+// time stay tightly bounded. A browser drawing runs on the student's own
+// device: it is bounded only against runaway clients, with its own counters
+// and drawing-time field,
+// so a busy lesson never uses up the full-Python allowance or the session.
+export const trialRunLimits = {
+  server: { minute: 12, hour: 60, budget: 1800, field: 'used' },
+  browser: { minute: 30, hour: 900, budget: 7200, field: 'browserUsed' },
+} as const;
 const settleScript = `
 if redis.call('EXISTS',KEYS[2])==0 or redis.call('HGET',KEYS[2],'settled')=='1' then return 0 end
 redis.call('HSET',KEYS[2],'settled','1')
@@ -67,9 +83,9 @@ export class TrialStore implements OnModuleDestroy {
   }
   grantKey(hash: string) { return trialPrefix + 'grant:' + hash; }
   runKey(hash: string, key: string) { return trialPrefix + 'run:' + hash + ':' + key; }
-  async limit(limits: Array<[string, number, number]>) {
+  async limit(limits: Array<[key: string, max: number, windowMs: number, increment?: 0 | 1]>) {
     const r = await this.client();
-    const wait = Number(await r.eval(rateScript, limits.length, ...limits.map(([key]) => trialPrefix + 'limit:' + key), ...limits.flatMap(([, count, ms]) => [count, ms])));
+    const wait = Number(await r.eval(rateScript, limits.length, ...limits.map(([key]) => trialPrefix + 'limit:' + key), ...limits.flatMap(([, count, ms, increment = 1]) => [count, ms, increment])));
     if (wait > 0) throw new HttpException({ message: 'RATE_LIMITED', retryAfter: Math.ceil(wait / 1000) }, 429);
   }
   async version(expected: string) {
@@ -101,10 +117,12 @@ export class TrialStore implements OnModuleDestroy {
   }
   async reserve(g: TrialGrant, key: string, fingerprint: string, browser?: { id: string; leaseUntil: number; deadline: number; profile: string }) {
     const r = await this.client();
-    const keys = [this.grantKey(g.hash), this.runKey(g.hash, key), trialPrefix + 'starts:minute:' + g.hash, trialPrefix + 'starts:hour:' + g.hash];
+    const starts = trialPrefix + (browser ? 'browser-starts:' : 'starts:');
+    const keys = [this.grantKey(g.hash), this.runKey(g.hash, key), starts + 'minute:' + g.hash, starts + 'hour:' + g.hash];
     if (browser) keys.push(trialPrefix + 'session:' + browser.id, trialPrefix + 'browser:draining');
     const result = await r.eval(reserveScript, keys.length, ...keys,
-      key, fingerprint, Math.ceil(g.expiresAt / 1000) + 600, Date.now(), browser ? JSON.stringify({ ...browser, binding: JSON.stringify({ hash: g.hash, key }) }) : '');
+      key, fingerprint, Math.ceil(g.expiresAt / 1000) + 600, Date.now(), browser ? JSON.stringify({ ...browser, binding: JSON.stringify({ hash: g.hash, key }) }) : '',
+      JSON.stringify(browser ? trialRunLimits.browser : trialRunLimits.server));
     if (result === 'ACTIVE' || result === 'CONFLICT') throw new HttpException('RUN_CONFLICT', 409);
     if (result === 'DISABLED') throw new ServiceUnavailableException('BROWSER_RUNTIME_UNAVAILABLE');
     if (result === 'EXPIRED') throw new HttpException('ACCESS_EXPIRED', 401);

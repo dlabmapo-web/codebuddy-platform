@@ -15,6 +15,14 @@ import { PrismaService } from '../database/prisma.service.js';
 import { TrialBrowserPolicy } from './browser-policy.js';
 import { TrialBrowserRuns } from './browser-runs.js';
 
+// Sized for every academy starting a 50-student class in the same minute
+// (35 academies, 1,750 students) with about three times that as headroom.
+export const trialEntryLimits = {
+  pageOpensPerIp: 1200, pageOpensPerMinute: 12000,
+  entriesPerIp: 600, entriesPerMinute: 6000, wrongPinsPerIp: 120,
+} as const;
+export const trialAcademyCacheMs = 10000;
+
 @Injectable()
 export class TrialService {
   private readonly logger = new Logger(TrialService.name);
@@ -28,7 +36,7 @@ export class TrialService {
   private owner(g: TrialGrant) { return 'trial:' + g.hash; }
   async challenge(ip: string) {
     this.enabled();
-    await this.store.limit([['challenge:ip:' + this.ipHash(ip), 240, 600000], ['challenge:all', 1200, 60000]]);
+    await this.store.limit([['challenge:ip:' + this.ipHash(ip), trialEntryLimits.pageOpensPerIp, 600000], ['challenge:all', trialEntryLimits.pageOpensPerMinute, 60000]]);
     const value = randomBytes(16).toString('hex') + '.' + Date.now();
     return { nonce: value + '.' + trialDigest(value, this.config.get<string>('BFF_SHARED_SECRET')!) };
   }
@@ -40,14 +48,26 @@ export class TrialService {
       !/^\d{13}$/.test(timestamp) || Number(timestamp) > Date.now() || Number(timestamp) < Date.now() - 600000 ||
       !trialEqual(signature, trialDigest(random + '.' + timestamp, this.config.get<string>('BFF_SHARED_SECRET')!)))
       throw new UnauthorizedException('CHALLENGE_EXPIRED');
+    // A whole academy enters from one Wi-Fi address, so correct entries are
+    // bounded loosely. Guessing is bounded by the wrong-PIN counter, which is
+    // only read here and charged below when a PIN is rejected.
+    const wrong: [string, number, number] = ['access:wrong:ip:' + this.ipHash(ip), trialEntryLimits.wrongPinsPerIp, 600000];
     await this.store.limit([
       ['access:nonce:' + trialHash(nonce), 10, 600000],
-      ['access:ip:' + this.ipHash(ip), 120, 600000], ['access:all', 600, 60000],
+      ['access:ip:' + this.ipHash(ip), trialEntryLimits.entriesPerIp, 600000], ['access:all', trialEntryLimits.entriesPerMinute, 60000],
+      [...wrong, 0],
     ]);
+    try { return await this.admit(pin); }
+    catch (error) {
+      if (error instanceof UnauthorizedException && error.message === 'INVALID_PIN') await this.store.limit([wrong]);
+      throw error;
+    }
+  }
+  private async admit(pin: unknown) {
     const normalized = typeof pin === 'string' ? pin.trim() : '';
     const managed = await this.pins?.resolve(normalized);
     if (managed) {
-      await this.academy(managed.academyId);
+      await this.academy(managed.academyId, true);
       const browser = this.browserPolicy?.issue(managed.academyId);
       if (!browser) await this.runtime.ready();
       return this.store.issue(managed.version, managed.academyId, browser);
@@ -70,10 +90,23 @@ export class TrialService {
     else if (this.config.get('TURTLE_TRIAL_LEGACY_PIN_ENABLED') !== true) throw new UnauthorizedException('ACCESS_EXPIRED');
     return g;
   }
-  private async academy(id: string) {
-    const academy = await this.prisma?.academy.findUnique({ where: { id }, select: { id: true, name: true, status: true } });
-    if (!academy || academy.status !== 'ACTIVE') throw new UnauthorizedException('ACCESS_EXPIRED');
-    return { id: academy.id, name: academy.name };
+  // Every guest request rechecks the academy. One read per academy per window
+  // replaces one per request, so a full class costs the same as one student.
+  // A suspension takes effect within the window, before the next lease renewal;
+  // PIN entry always reads the academy again, so no new student is admitted.
+  private readonly academies = new Map<string, { until: number; read: Promise<{ id: string; name: string }> }>();
+  private academy(id: string, fresh = false) {
+    const now = Date.now(), cached = this.academies.get(id);
+    if (!fresh && cached && cached.until > now) return cached.read;
+    const read = (async () => {
+      const academy = await this.prisma?.academy.findUnique({ where: { id }, select: { id: true, name: true, status: true } });
+      if (!academy || academy.status !== 'ACTIVE') throw new UnauthorizedException('ACCESS_EXPIRED');
+      return { id: academy.id, name: academy.name };
+    })();
+    this.academies.set(id, { until: now + trialAcademyCacheMs, read });
+    // Failures are never kept: a reactivated academy or a recovered database is seen at once.
+    read.catch(() => { if (this.academies.get(id)?.read === read) this.academies.delete(id); });
+    return read;
   }
   async bootstrap(token: string) {
     const g = await this.grant(token);

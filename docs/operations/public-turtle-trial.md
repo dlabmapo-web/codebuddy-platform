@@ -94,6 +94,20 @@ sixty per hour, and 1,800 admitted container seconds. Reservations/refunds and
 rate limits are atomic in Redis. An uncertain abandoned run is charged
 conservatively; a repeated request key does not execute a second copy.
 
+Those start and time bounds apply to server ("full Python") drawings only. A
+browser drawing runs on the student's device and is counted separately: 30
+starts per minute, 900 per hour and 7,200 seconds per grant, as a guard against
+runaway clients rather than a lesson limit (`trialRunLimits`).
+
+Entry is sized for 35 academies starting a 50-student class in the same minute
+(`trialEntryLimits`): 600 PIN entries and 1,200 page opens per address per ten
+minutes, 6,000 entries and 12,000 page opens per minute platform-wide. Guessing
+is bounded separately at 120 wrong PINs per address per ten minutes; past that
+the address waits, including for a correct PIN. The academy's active status is
+read at every PIN entry and otherwise at most once per academy per 10 seconds
+per API process, so a suspension reaches running students within one lease
+renewal.
+
 Set `GUI_SESSION_CAPACITY` from measured resources, not idle memory samples.
 A 20-student class needs at least 10 GiB of container memory reservation alone,
 plus broker/host/CPU headroom. A one-slot setup is for local testing only. Run

@@ -2,8 +2,8 @@ import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from 'vites
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import { turtleBrowserProfileId, turtleBrowserStartSchema, turtleHelperVersion } from '@cove/shared';
-import { TrialStore } from './trial-store.js';
-import { TrialService } from './trial.service.js';
+import { TrialStore, trialRunLimits } from './trial-store.js';
+import { TrialService, trialAcademyCacheMs, trialEntryLimits } from './trial.service.js';
 import { TrialBrowserPolicy } from './browser-policy.js';
 import { TrialBrowserRuns } from './browser-runs.js';
 import { TrialBrowserService } from './browser.service.js';
@@ -66,8 +66,8 @@ describe.skipIf(!local)('browser admission with dedicated local Redis', () => {
     const next = await service.start(g.token, input()); await service.request(g.token, run.id, 'stop');
     expect((await trial.grant(g.token)).active).toBe(next.requestKey);
     const grant = await trial.grant(g.token), redis = await store.client();
-    expect(Number(await redis.hget(store.grantKey(grant.hash), 'used'))).toBeGreaterThanOrEqual(120);
-    expect(Number(await redis.hget(store.grantKey(grant.hash), 'used'))).toBeLessThan(125);
+    expect(Number(await redis.hget(store.grantKey(grant.hash), 'browserUsed'))).toBeGreaterThanOrEqual(120);
+    expect(Number(await redis.hget(store.grantKey(grant.hash), 'browserUsed'))).toBeLessThan(125);
   });
   it('expires stale leases using server time and admits another run', async () => {
     const g = await enter(), request = input(); const run = await service.start(g.token, request), grant = await trial.grant(g.token);
@@ -76,14 +76,38 @@ describe.skipIf(!local)('browser admission with dedicated local Redis', () => {
     await expect(service.request(g.token, run.id, 'renew')).rejects.toMatchObject({ status: 409 });
     expect((await service.start(g.token, input())).state).toBe('ACTIVE');
   });
-  it('keeps minute and cumulative admission limits without allocating guests', async () => {
-    const g = await enter();
-    for (let i = 0; i < 12; i++) { const r = await service.start(g.token, input()); await service.request(g.token, r.id, 'stop'); }
+  it('bounds runaway browser starts and drawing time apart from the full-Python allowance', async () => {
+    const g = await enter(), redis = await store.client(), first = await trial.grant(g.token);
+    for (let i = 0; i < trialRunLimits.browser.minute; i++) { const r = await service.start(g.token, input()); await service.request(g.token, r.id, 'stop'); }
     await expect(service2.start(g.token, input())).rejects.toMatchObject({ status: 429 });
+    // A lesson's worth of browser drawings leaves the server counters and budget untouched.
+    expect(await redis.get(trialPrefix + 'starts:minute:' + first.hash)).toBeNull();
+    expect(Number(await redis.hget(store.grantKey(first.hash), 'used'))).toBe(0);
+    expect(Number(await redis.hget(store.grantKey(first.hash), 'browserUsed'))).toBeLessThan(trialRunLimits.browser.minute * 2);
     const b = await enter(), grant = await trial.grant(b.token);
-    await (await store.client()).hset(store.grantKey(grant.hash), 'used', 1790);
+    // Full-Python time already spent does not block the browser engine.
+    await redis.hset(store.grantKey(grant.hash), 'used', 1790);
+    const run = await service.start(b.token, input()); await service.request(b.token, run.id, 'stop');
+    await redis.hset(store.grantKey(grant.hash), 'browserUsed', trialRunLimits.browser.budget - 110);
     await expect(service.start(b.token, input())).rejects.toMatchObject({ status: 429 });
     expect(remote.request).not.toHaveBeenCalled();
+  });
+  it('lets a whole class enter from one address while wrong PINs stay bounded', async () => {
+    const ip = 'academy-wifi';
+    // Three classes of 50 on one Wi-Fi address, well past the old 120 per address.
+    const entered = await Promise.all(Array.from({ length: 150 }, async () => { const { nonce } = await trial.challenge(ip); return trial.access('012345', nonce, ip); }));
+    expect(entered).toHaveLength(150);
+    for (let i = 0; i < trialEntryLimits.wrongPinsPerIp; i += 10) {
+      const { nonce } = await trial.challenge(ip);
+      await Promise.all(Array.from({ length: 10 }, () => expect(trial.access('999999', nonce, ip)).rejects.toMatchObject({ status: 401 })));
+    }
+    const { nonce } = await trial.challenge(ip);
+    // The address is now over the wrong-PIN bound: one more guess is refused and charged...
+    await expect(trial.access('999999', nonce, ip)).rejects.toMatchObject({ status: 429 });
+    // ...after which even a correct PIN waits, while another address is unaffected.
+    await expect(trial.access('012345', nonce, ip)).rejects.toMatchObject({ status: 429 });
+    const elsewhere = await trial.challenge('other-wifi');
+    expect((await trial.access('012345', elsewhere.nonce, 'other-wifi')).token).toMatch(/^[a-f0-9]{64}$/);
   });
   it('kill switch denies renewal and reconciles active browser records', async () => {
     const g = await enter(), request = input(), run = await service.start(g.token, request);
@@ -113,9 +137,16 @@ describe.skipIf(!local)('browser admission with dedicated local Redis', () => {
     config.set('TURTLE_TRIAL_BROWSER_RUNTIME_ID', 'brython-3.15.0-bbbbbbbbbbbbbbbbbbbb');
     config.set('TURTLE_TRIAL_BROWSER_RETAINED_RUNTIME_IDS', [browser.browserRuntimeId]);
     expect((await managed.request(issued.token, active.id, 'renew') as { profile: unknown }).profile).toMatchObject({ runtimeId: browser.browserRuntimeId });
+    // The start and the renewal above shared one academy read.
+    expect(prisma.academy.findUnique).toHaveBeenCalledTimes(1);
     prisma.academy.findUnique.mockResolvedValue({ id: academyId, name: 'Synthetic pilot', status: 'SUSPENDED' });
+    // A suspension is enforced once the short academy window passes, before the next 15 s renewal.
+    const real = Date.now.bind(Date), clock = vi.spyOn(Date, 'now').mockImplementation(() => real() + trialAcademyCacheMs + 1);
     await expect(managed.request(issued.token, active.id, 'renew')).rejects.toMatchObject({ status: 401 });
+    // A refused academy is never cached: reactivation is seen on the next request.
     prisma.academy.findUnique.mockResolvedValue({ id: academyId, name: 'Synthetic pilot', status: 'ACTIVE' });
+    expect((await managedTrial.grant(issued.token)).academyId).toBe(academyId);
+    clock.mockRestore();
     await redis.set(trialPrefix + 'academy-pin:' + academyId, JSON.stringify({ version: 'managed-v2' }));
     await expect(managed.request(issued.token, active.id, 'renew')).rejects.toMatchObject({ status: 401 });
     expect(remote.request).not.toHaveBeenCalled();

@@ -17,7 +17,7 @@ local charged=120
 if start and lease and deadline then charged=math.max(0,math.min(120,math.ceil((math.min(tonumber(ARGV[2]),lease,deadline)-start)/1000))) end
 redis.call('HSET',KEYS[2],'settled','1','state',ARGV[3],'leaseUntil',ARGV[2])
 if redis.call('EXISTS',KEYS[1])==1 then
- redis.call('HINCRBY',KEYS[1],'used',-(120-charged))
+ redis.call('HINCRBY',KEYS[1],'browserUsed',-(120-charged))
  if redis.call('HGET',KEYS[1],'active')==ARGV[1] then redis.call('HSET',KEYS[1],'active','') end
 end
 return 1`;

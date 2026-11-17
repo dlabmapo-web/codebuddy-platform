@@ -65,6 +65,12 @@ class BrowserReleaseTests(unittest.TestCase):
             with self.subTest(patch=patch), self.assertRaises(ValueError):
                 helper.release_updates(encode(self.pilot | patch), self.current)
 
+    def test_all_academies_switch_replaces_the_pilot_list(self):
+        patch = {'TURTLE_TRIAL_BROWSER_PILOT_ACADEMY_IDS': '', 'TURTLE_TRIAL_BROWSER_ALL_ACADEMIES': 'true'}
+        self.assertEqual(helper.release_updates(encode(self.pilot | patch), self.current), self.pilot | patch)
+        with self.assertRaises(ValueError):
+            helper.release_updates(encode(self.pilot | patch | {'TURTLE_TRIAL_BROWSER_ALL_ACADEMIES': 'yes'}), self.current)
+
     def test_inactive_metadata_cannot_inject_shell_or_noncanonical_lists(self):
         for patch in (
             {'TURTLE_TRIAL_BROWSER_PARENT_ORIGIN': '$(touch /tmp/not-allowed)'},

@@ -51,6 +51,9 @@ both API and web through Compose:
 - `TURTLE_TRIAL_BROWSER_PILOT_ACADEMY_IDS`: comma-separated UUID allowlist.
   Empty means no managed production grant is selected. Legacy production PINs
   remain server mode. Local fixtures deliberately support their synthetic PIN.
+- `TURTLE_TRIAL_BROWSER_ALL_ACADEMIES=false`: `true` selects the browser engine
+  for every managed academy PIN, including academies created later, so the
+  allowlist no longer needs maintaining. Legacy PINs remain server mode.
 - `TURTLE_TRIAL_BROWSER_RETAINED_RUNTIME_IDS`: previous immutable IDs still
   serving live grants, at most 16. Grants pin their version for two hours.
 

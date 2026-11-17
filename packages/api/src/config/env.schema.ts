@@ -60,6 +60,7 @@ export const apiEnvironmentSchema = z.object({
   TURTLE_TRIAL_BROWSER_RUNTIME_ID: z.preprocess(v => v === '' ? undefined : v, z.string().regex(/^brython-\d+\.\d+\.\d+-[a-f0-9]{20}$/).optional()),
   TURTLE_TRIAL_BROWSER_RETAINED_RUNTIME_IDS: z.string().default('').transform(v => v.split(',').map(x => x.trim()).filter(Boolean)).pipe(z.array(z.string().regex(/^brython-\d+\.\d+\.\d+-[a-f0-9]{20}$/)).max(16)),
   TURTLE_TRIAL_BROWSER_PILOT_ACADEMY_IDS: z.string().default('').transform(v => v.split(',').map(x => x.trim()).filter(Boolean)).pipe(z.array(z.uuid()).max(1000)),
+  TURTLE_TRIAL_BROWSER_ALL_ACADEMIES: z.preprocess(v => v === 'true' || v === true, z.boolean()).default(false),
   TURTLE_TRIAL_PIN_DIGEST: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   TURTLE_TRIAL_LEGACY_PIN_ENABLED: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
   TURTLE_TRIAL_PIN_PEPPER: z.string().min(32).optional(),

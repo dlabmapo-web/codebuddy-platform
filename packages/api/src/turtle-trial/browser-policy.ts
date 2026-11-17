@@ -10,7 +10,8 @@ export class TrialBrowserPolicy {
   issue(academyId?: string) {
     if (!this.available()) return undefined;
     const pilot = this.config.get<string[]>('TURTLE_TRIAL_BROWSER_PILOT_ACADEMY_IDS') ?? [];
-    if (academyId ? !pilot.includes(academyId) : this.config.get('NODE_ENV') === 'production') return undefined;
+    // Every managed academy when the all-academies switch is on; otherwise the allowlist. Legacy PINs stay on the server.
+    if (academyId ? !(this.config.get('TURTLE_TRIAL_BROWSER_ALL_ACADEMIES') === true || pilot.includes(academyId)) : this.config.get('NODE_ENV') === 'production') return undefined;
     return { browserProfile: turtleBrowserProfileId, browserRuntimeId: this.config.get<string>('TURTLE_TRIAL_BROWSER_RUNTIME_ID')!, browserOrigin: this.config.get<string>('TURTLE_TRIAL_BROWSER_RUNTIME_ORIGIN')! };
   }
   profile(g: TrialGrant): TurtleBrowserProfile | undefined {

@@ -8,7 +8,7 @@ import uuid
 PREFIX = 'TURTLE_TRIAL_BROWSER_'
 KEYS = {PREFIX + name for name in (
     'ENABLED', 'ADMISSION_ENABLED', 'RUNTIME_ORIGIN', 'RUNTIME_ID',
-    'PARENT_ORIGIN', 'PILOT_ACADEMY_IDS', 'RETAINED_RUNTIME_IDS',
+    'PARENT_ORIGIN', 'PILOT_ACADEMY_IDS', 'RETAINED_RUNTIME_IDS', 'ALL_ACADEMIES',
 )}
 RUNTIME_ID = re.compile(r'brython-3\.15\.0-[a-f0-9]{20}')
 
@@ -27,7 +27,7 @@ def release_updates(encoded, current):
     if any(not isinstance(v, str) or any(c in v for c in '\r\n\x00') for v in updates.values()):
         raise ValueError('Browser release configuration requires single-line strings')
     effective = {**current, **updates}
-    for name in ('ENABLED', 'ADMISSION_ENABLED'):
+    for name in ('ENABLED', 'ADMISSION_ENABLED', 'ALL_ACADEMIES'):
         if effective.get(PREFIX + name, 'false') not in ('true', 'false'):
             raise ValueError('Browser switches must be true or false')
     enabled = effective.get(PREFIX + 'ENABLED') == 'true'
@@ -66,8 +66,8 @@ def release_updates(encoded, current):
     pilots = csv('PILOT_ACADEMY_IDS')
     if len(pilots) > 1000 or any(str(uuid.UUID(v)) != v for v in pilots):
         raise ValueError('Invalid browser pilot academy IDs')
-    if admission and not pilots:
-        raise ValueError('Browser admission requires an explicit academy pilot')
+    if admission and not pilots and effective.get(PREFIX + 'ALL_ACADEMIES') != 'true':
+        raise ValueError('Browser admission requires an academy pilot list or the all-academies switch')
     retained = csv('RETAINED_RUNTIME_IDS')
     if len(retained) > 16 or any(not RUNTIME_ID.fullmatch(v) for v in retained):
         raise ValueError('Invalid retained browser runtime IDs')

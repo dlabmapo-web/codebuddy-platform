@@ -62,6 +62,7 @@ function authUser(input) {
   return { id: input.id ?? randomUUID(), aud: 'authenticated', role: 'authenticated', email: input.email, email_confirmed_at: new Date().toISOString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString(), app_metadata: { provider: 'email', providers: ['email'], ...input.app_metadata }, user_metadata: input.user_metadata ?? {}, identities: [] };
 }
 const explanationAssets = new Map();
+let materialReadFault = null;
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, origin), path = url.pathname;
@@ -70,6 +71,24 @@ const server = createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Headers', 'authorization, apikey, content-type, x-client-info, x-supabase-api-version');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
     if (req.method === 'OPTIONS') return res.end();
+    // Faults live only in this isolated provider, never in the deployed API.
+    if (process.env.COVE_MATERIAL_LOADING_E2E === '1' && path === '/testing/failure' && req.method === 'POST') {
+      materialReadFault = await body(req);
+      return json(res, {ok: true});
+    }
+    if (process.env.COVE_MATERIAL_LOADING_E2E === '1' && path.startsWith('/testing-api/')) {
+      const chunks = []; for await (const chunk of req) chunks.push(chunk);
+      const bytes = Buffer.concat(chunks);
+      if (materialReadFault?.enabled && path.endsWith(materialReadFault.operation) && (bytes.toString().includes(materialReadFault.materialId) || url.search.includes(materialReadFault.materialId)))
+        return json(res, {error:'Injected local upstream failure'}, 500);
+      const forwarded = await fetch(api + '/api/' + path.slice('/testing-api/'.length) + url.search, {
+        method:req.method, headers: {'content-type':req.headers['content-type'] ?? 'application/json', authorization:req.headers.authorization ?? '', 'x-cove-bff-secret':req.headers['x-cove-bff-secret'] ?? '', 'x-cove-view-role':req.headers['x-cove-view-role'] ?? ''},
+        ...(bytes.length ? {body:bytes} : {}),
+      });
+      res.writeHead(forwarded.status, {'content-type':forwarded.headers.get('content-type') ?? 'application/json'});
+      return res.end(Buffer.from(await forwarded.arrayBuffer()));
+    }
+
     if ((process.env.COVE_OBSERVATION_E2E === '1' || process.env.COVE_WEB_COURSES_E2E === '1') && path.startsWith('/storage/v1/object/authenticated/course-videos/')) {
       const name = path.split('/').at(-1);
       if (!/^(master\.m3u8|playback\.mp4|poster\.jpg|segment-\d{3}\.ts)$/.test(name)) return json(res, {}, 404);
@@ -192,10 +211,11 @@ const server = createServer(async (req, res) => {
           uploaderUserId: owner.userId, academyId: fixture.academy.id, courseId: course.id, lectureId: lecture.id,
         } });
         const document = await db.material.create({ data: { lectureId: lecture.id, title: 'Lesson reference PDF', type: 'PDF_DOCUMENT', position: 3,
-          isVisible: true, pdfDocument: { create: { assetId: asset.id, placement: 'MAIN' } },
+          isVisible: true, pdfDocument: { create: { assetId: asset.id, placement: input.materialLoading ? 'BOTH' : 'MAIN' } },
         } });
         // Deliberately third, matching the reported sidebar click.
         pdfMaterialId = document.id;
+        if (input.materialLoading) await db.programmingExercise.update({where:{materialId:material.id},data:{referencePdfMaterialId:document.id}});
         const video = await db.videoAsset.create({ data: {
           requestKey: randomUUID(), objectKey: 'fixture-video-' + randomUUID(), uploaderUserId: owner.userId,
           academyId: fixture.academy.id, courseId: course.id, lectureId: lecture.id,
@@ -209,17 +229,19 @@ const server = createServer(async (req, res) => {
         videoMaterialId = videoMaterial.id;
       }
       let turtleMaterialId;
-      if (input.includeTurtle && process.env.COVE_OBSERVATION_E2E === '1') {
-        const health = await (await fetch('http://127.0.0.1:4029/health', { headers: { Authorization: 'Bearer local-observation-runtime-secret-never-production' } })).json();
+      if (input.includeTurtle && (process.env.COVE_OBSERVATION_E2E === '1' || process.env.COVE_MATERIAL_LOADING_E2E === '1')) {
+        const health = process.env.COVE_MATERIAL_LOADING_E2E === '1' ? {runtimeVersion:'local-read-only-runtime'} : await (await fetch('http://127.0.0.1:4029/health', { headers: { Authorization: 'Bearer local-observation-runtime-secret-never-production' } })).json();
         const drawing = await db.material.create({ data: { lectureId: lecture.id, title: 'Draw a red square', type: 'TURTLE_EXERCISE', position: 7, isVisible: true,
           manualMaterial: { create: { description: 'Draw a red square and print a message.', runtimeVersion: health.runtimeVersion,
             width: 640, height: 480, files: { 'main.py': "import turtle\nt = turtle.Turtle()\nt.color('red')\nt.begin_fill()\nfor _ in range(4):\n    t.forward(90)\n    t.left(90)\nt.end_fill()\nprint('MONITORED TURTLE', flush=True)\nturtle.mainloop()" } } } } });
         turtleMaterialId = drawing.id;
       }
+      let explanationMaterialId;
       if (input.includeExplanation) {
-        await db.material.create({ data: { lectureId: lecture.id, title: 'How addition works', type: 'EXPLANATION', position: 8, isVisible: true,
+        const explanation = await db.material.create({ data: { lectureId: lecture.id, title: 'How addition works', type: 'EXPLANATION', position: 8, isVisible: true,
           explanationMaterial: { create: { body: '<h2>Addition lesson</h2><p>Add the two inputs and display their sum.</p>' } },
         } });
+        explanationMaterialId = explanation.id;
       }
       const classes = [];
       for (const name of ['Assigned Python class', 'Other Python class']) {
@@ -272,7 +294,7 @@ const server = createServer(async (req, res) => {
         await db.courseModule.update({ where: { id: module.id }, data: { title: 'HTML and CSS' } });
         await db.lecture.update({ where: { id: lecture.id }, data: { title: '1주차 · HTML basics' } });
       }
-      return json(res, { secondProgrammingMaterialId, reviewStudentMembershipId, turtleMaterialId, pdfMaterialId, videoMaterialId, courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, shortMaterialId: short.id, quizMaterialId: quiz.id, studentMembershipId: student.id, classes });
+      return json(res, { explanationMaterialId, secondProgrammingMaterialId, reviewStudentMembershipId, turtleMaterialId, pdfMaterialId, videoMaterialId, courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, shortMaterialId: short.id, quizMaterialId: quiz.id, studentMembershipId: student.id, classes });
     }
     if (path.startsWith('/fixtures/') && req.method === 'PUT') {
       const id = path.split('/')[2], fixture = fixtures.get(id), input = await body(req);

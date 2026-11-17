@@ -1,3 +1,4 @@
+import { readMaterialResponse } from './material-read';
 import { Upload } from "tus-js-client";
 import type {
   VideoAssetSummary,
@@ -34,6 +35,7 @@ export async function videoRequest<T>(
     body: data === undefined ? undefined : JSON.stringify(data),
     cache: "no-store",
   });
+  if (method === 'GET') return readMaterialResponse<T>(response);
   const body = await response.json();
   if (!response.ok)
     throw Object.assign(new Error(body.message ?? "Video request failed"), {

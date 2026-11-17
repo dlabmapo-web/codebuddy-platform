@@ -1,3 +1,4 @@
+import { readMaterialResponse } from './material-read';
 import type { PdfReadResult, SavePdf } from '@cove/shared';
 import { publicConfig } from './config';
 import { createClient } from './supabase/client';
@@ -22,6 +23,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { ...(await headers()), ...init?.headers },
     cache: 'no-store',
   });
+  if (!init?.method || init.method === 'GET') return readMaterialResponse<T>(response);
   const data = await response.json();
   if (!response.ok) throw new Error(data.code ?? 'PDF_STORAGE_FAILED');
   return data as T;

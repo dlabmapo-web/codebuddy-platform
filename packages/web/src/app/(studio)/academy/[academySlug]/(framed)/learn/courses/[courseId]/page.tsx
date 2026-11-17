@@ -1,3 +1,5 @@
+import { MaterialReadFailure } from '@/components/workspace/material-read-failure';
+import { isMaterialUnavailable } from '@/lib/material-read';
 import { rolesHavePermission } from '@cove/shared';
 import { StaffCoursePage } from '../../../content/courses/[courseId]/_components/staff-course-page';
 import { canManageExercises } from '@/lib/academy-access-state';
@@ -42,10 +44,9 @@ export default async function LearnCoursePage({
       ...(single(search.mode) === "student" ? { mode: "student" as const } : {}),
       ...(isUuid(requestedClassId) ? { classId: requestedClassId } : {}),
     });
-  } catch {
-    // A hidden, missing, or out-of-academy course is indistinguishable to
-    // a student, and should be: all three are simply "not here".
-    notFound();
+  } catch (error) {
+    if (isMaterialUnavailable(error)) return <MaterialReadFailure unavailable backHref={routes.academyLearnClasses(academySlug)} />;
+    throw error;
   }
   if (!outline) notFound();
 

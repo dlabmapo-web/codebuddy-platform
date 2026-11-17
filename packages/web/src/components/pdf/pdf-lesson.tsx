@@ -1,4 +1,5 @@
 'use client';
+import { MaterialReadFailure } from '@/components/workspace/material-read-failure';
 
 import { useReadingView } from '@/components/workspace/use-reading-view';
 import { useState } from 'react';
@@ -34,7 +35,9 @@ export function PdfLesson({ academyId, materialId, classId, permissions, initial
   useMaterialObservation({ materialId, classId, courseId: data?.course.id, enabled: !permissions?.canTutor });
   const navigation = useMaterialNavigation({ academyId, materialId, classId, courseId: data?.course.id, materials: data?.materials });
   const { open: panelOpen, panelId, triggerRef, toggle: togglePanel, close: closePanel } = useNavigatorPanel('material-course-outline');
-  if (!data) return <main className="p-6" role={query.isError ? 'alert' : 'status'}>{t(query.isError ? 'pdf.unavailable' : 'pdf.loading')}</main>;
+  if (!data) return query.isError
+    ? <MaterialReadFailure error={query.error} retry={() => void query.refetch()} retrying={query.isFetching} backHref={navigation.courseHref} />
+    : <main className="p-6" role="status">{t('pdf.loading')}</main>;
   return <main className="relative flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
     <LessonHeader courseTitle={data.course.title} lectureTitle={data.lecture.title} title={data.title} leaveHref={navigation.courseHref}
       curriculum={<CurriculumTrigger compact ref={triggerRef} open={panelOpen} panelId={panelId} onToggle={togglePanel} path={navigation.context?.path ?? null} />}>

@@ -6,7 +6,9 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { PdfCanvas } from './pdf-canvas';
 import { pdfApi } from '@/lib/pdf-api';
 
+vi.mock('@/i18n', () => ({useLayoutTranslation:()=>({t:(key:string)=>key})}));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('@/components/classroom/classroom-context',()=>({useClassroom:()=>null}));
 vi.mock('@/lib/pdf-api', () => ({ pdfApi: { read: vi.fn() } }));
 vi.mock('@/lib/monitoring/student-presence', () => ({ useStudentPresence: () => ({ publishObservation: vi.fn() }) }));
 vi.mock('react-pdf', () => ({

@@ -1,0 +1,113 @@
+import { writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { ConfigService } from '@nestjs/config';
+import type { ApiEnvironment } from '../config/env.schema.js';
+import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
+import { learnExerciseBootstrapSchema } from '@cove/shared';
+import { PrismaClient } from '../generated/prisma/client.js';
+import type { PrismaService } from '../database/prisma.service.js';
+import type { SupabaseIdentity } from '../auth/auth.types.js';
+import { AcademyAccessService } from '../authorization/academy-access.service.js';
+import { SupportGrantResolver } from '../authorization/support-grant.resolver.js';
+import { SubmissionService } from './submission.service.js';
+import { StaffPracticeService } from './staff-practice.service.js';
+import { LearningClassContextService } from './learning-class-context.service.js';
+import { CurriculumOutlineService } from './curriculum-outline.service.js';
+import { LearnService } from './learn.service.js';
+import { readSubmissionAdmission } from './submission-admission-read.js';
+
+const url = process.env.COVE_INTEGRATION_DATABASE_URL;
+describe.skipIf(!url)('material loading on disposable PostgreSQL', () => {
+  const academyId=randomUUID(), courseId=randomUUID(), lectureId=randomUUID(), classId=randomUUID(), materialId=randomUUID(), pdfId=randomUUID();
+  const people=Object.fromEntries(['student','teacher','lead','manager'].map(name=>[name,{id:randomUUID(),auth:randomUUID(),membership:randomUUID()}]));
+  const client=()=>new PrismaClient({adapter:new PrismaPg({connectionString:url!}),log:[{emit:'event',level:'query'}]});
+  let db:ReturnType<typeof client>, learn:LearnService, count=0, selects=0;
+  let queryCounts: Record<string,number> = {};
+  const identity=(name:string)=>({authUserId:people[name]!.auth} as SupabaseIdentity);
+  const input={academyId,materialId,classId};
+  beforeAll(async()=>{
+    if(!['localhost','127.0.0.1'].includes(new URL(url!).hostname)) throw new Error('Disposable local PostgreSQL required');
+    db=client(); db.$on('query',event=>{count++;if(/^\s*(SELECT|WITH)\b/i.test(event.query)) selects++;});
+    const org=await db.organization.create({data:{name:'Material reliability',slug:`reliability-${academyId}`}});
+    await db.academy.create({data:{id:academyId,organizationId:org.id,name:'Material reliability',slug:`reliability-${academyId}`}});
+    await db.user.createMany({data:Object.entries(people).map(([name,p])=>({id:p.id,authUserId:p.auth,displayName:name,status:'ACTIVE' as const}))});
+    await db.academyMembership.createMany({data:Object.entries(people).map(([name,p])=>({id:p.membership,userId:p.id,academyId,status:'ACTIVE' as const,role:name==='student'?'STUDENT' as const:name==='manager'?'MANAGER' as const:name==='lead'?'TEAM_LEAD' as const:'TEACHER' as const}))});
+    await db.course.create({data:{id:courseId,academyId,createdByUserId:people.manager!.id,title:'PDF coding',isVisible:true,modules:{create:{externalKey:randomUUID(),title:'Module',position:1,isVisible:true,lectures:{create:{id:lectureId,externalKey:randomUUID(),title:'Lecture',position:1,isVisible:true}}}}}});
+    await db.material.createMany({data:[{id:materialId,lectureId,title:'Addition',type:'PROGRAMMING_EXERCISE',position:1,isVisible:true},{id:pdfId,lectureId,title:'Reference PDF — 한글 제목',type:'PDF_DOCUMENT',position:2,isVisible:true}]});
+    const asset=await db.pdfAsset.create({data:{objectKey:randomUUID(),originalFilename:'notes.pdf',byteSize:880,checksumSha256:'0'.repeat(64),pageCount:2,uploaderUserId:people.manager!.id,academyId,courseId,lectureId,state:'READY'}});
+    await db.pdfDocument.create({data:{materialId:pdfId,assetId:asset.id,placement:'BOTH'}});
+    await db.programmingExercise.create({data:{materialId,externalKey:randomUUID(),difficulty:'EASY',description:'Add numbers',starterCode:'# student draft',solutionCode:'PRIVATE SOLUTION',referencePdfMaterialId:pdfId,testCases:{createMany:{data:[{position:1,input:'2 3',expectedOutput:'5',visibility:'SAMPLE'},{position:2,input:'secret',expectedOutput:'PRIVATE EXPECTED',visibility:'HIDDEN'}]}}}});
+    await db.class.create({data:{id:classId,academyId,name:'Class',createdByUserId:people.manager!.id,teacherMembershipId:people.teacher!.membership,courseAssignments:{create:{courseId,assignedByUserId:people.manager!.id}},enrollments:{create:{membershipId:people.student!.membership,enrolledByUserId:people.manager!.id}}}});
+    const prisma=db as unknown as PrismaService, access=new AcademyAccessService(prisma,new SupportGrantResolver(prisma));
+    const classes=new LearningClassContextService(prisma), config=new ConfigService<ApiEnvironment,true>({SUBMISSION_RATE_LIMIT:10000});
+    const queue={consumeSubmissionToken:vi.fn().mockResolvedValue(true)} as never;
+    learn=new LearnService(prisma,{} as never,access,new CurriculumOutlineService(prisma),new SubmissionService(prisma,access,config,classes,queue),classes,new StaffPracticeService(prisma,access,new ConfigService({SUBMISSION_RATE_LIMIT:10000}),queue));
+  },30000);
+  afterAll(async()=>{if(process.env.COVE_MATERIAL_LOADING_COUNTS_PATH) await writeFile(process.env.COVE_MATERIAL_LOADING_COUNTS_PATH,JSON.stringify(queryCounts,null,2)+'\n');await db?.$disconnect();});
+  it.each(['student','teacher','lead','manager'])('returns a contract-valid PDF exercise for %s',async role=>{
+    const result=await learn.getExerciseBootstrap(identity(role),input);
+    expect(learnExerciseBootstrapSchema.safeParse(result).success).toBe(true);
+    expect(result.workspace.exercise.referencePdf).toEqual({title:'Reference PDF — 한글 제목',materialId:pdfId,pageCount:2,revision:1,originalFilename:'notes.pdf',byteSize:880});
+    const serialized=JSON.stringify(result);
+    expect(serialized).not.toContain('PRIVATE SOLUTION'); expect(serialized).not.toContain('PRIVATE EXPECTED');
+  });
+  it('keeps query counts fixed when the curriculum grows',async()=>{
+    count=selects=0; await readSubmissionAdmission(db,materialId,academyId,{workspace:true}); const admission=count;
+    const admissionSelects=selects;
+    count=selects=0; await learn.getExerciseBootstrap(identity('student'),input); const small=count, smallSelects=selects;
+    await db.material.createMany({data:Array.from({length:100},(_,i)=>({lectureId,title:`Extra ${i}`,position:i+3,type:'EXPLANATION' as const,isVisible:true}))});
+    count=selects=0; await learn.getExerciseBootstrap(identity('student'),input); const large=count,largeSelects=selects;
+    await db.programmingExercise.update({where:{materialId},data:{referencePdfMaterialId:null}});
+    count=selects=0; const plain=await learn.getExerciseBootstrap(identity('student'),input); const noReference=count,noReferenceSelects=selects;
+    expect(plain.workspace.exercise.referencePdf).toBeNull();
+    await db.programmingExercise.update({where:{materialId},data:{referencePdfMaterialId:pdfId}});
+    queryCounts={admission,admissionSelects,bootstrapSmall:small,smallSelects,bootstrapLarge:large,largeSelects,noReference,noReferenceSelects};
+    expect(admission).toBe(1); expect(large).toBe(small); expect(large).toBeLessThanOrEqual(20);
+    expect(noReference).toBe(large);
+  });
+  it('retains historical code, draft ownership and metadata for saved attempts',async()=>{
+    const saved=await db.submission.create({data:{userId:people.student!.id,materialId,sourceMaterialId:materialId,courseId,classId,gradingRevision:1,engineVersion:'pyodide-0.27.5',language:'PYTHON',timeLimitMs:2000,memoryLimitMb:128,code:'print("SAVED ATTEMPT")',status:'PASSED',totalCount:1,passedCount:1,score:100,problemTitle:'Addition',courseTitle:'PDF coding',moduleTitle:'Module',lectureTitle:'Lecture',modulePosition:1,lecturePosition:1,problemPosition:1}});
+    await db.exerciseDraft.create({data:{userId:people.student!.id,materialId,sourceMaterialId:materialId,courseId,code:'print("MY DRAFT")'}});
+    const result=await learn.getExerciseBootstrap(identity('student'),{...input,submissionId:saved.id});
+    expect(learnExerciseBootstrapSchema.safeParse(result).success).toBe(true);
+    expect(JSON.stringify(result.selectedSubmission)).toContain('SAVED ATTEMPT');
+    expect(JSON.stringify(result.workspace.draft)).toContain('MY DRAFT');
+    expect(result.workspace.exercise.referencePdf?.title).toBe('Reference PDF — 한글 제목');
+  });
+  it.each(['PRACTICE_ONLY','MANUAL_REVIEW','AUTOMATIC'] as const)('preserves reference metadata with %s admission',async submissionPolicy=>{
+    await db.programmingExercise.update({where:{materialId},data:{submissionPolicy}});
+    const result=await learn.getExerciseBootstrap(identity('student'),input);
+    expect(learnExerciseBootstrapSchema.safeParse(result).success).toBe(true);
+    expect(result.workspace.exercise.referencePdf?.materialId).toBe(pdfId);
+    const admission=await readSubmissionAdmission(db,materialId,academyId);
+    expect(admission?.programmingExercise?.testCases.length).toBe(submissionPolicy==='AUTOMATIC'?2:0);
+    await db.programmingExercise.update({where:{materialId},data:{submissionPolicy:'AUTOMATIC'}});
+  });
+  it('accepts another lecture in the same course but never a foreign course reference',async()=>{
+    const otherLecture=await db.lecture.create({data:{courseModuleId:(await db.lecture.findUniqueOrThrow({where:{id:lectureId},select:{courseModuleId:true}})).courseModuleId,title:'Notes',externalKey:randomUUID(),position:2,isVisible:true}});
+    await db.material.update({where:{id:pdfId},data:{lectureId:otherLecture.id}});
+    expect((await learn.getExerciseBootstrap(identity('student'),input)).workspace.exercise.referencePdf?.materialId).toBe(pdfId);
+    const foreignCourse=await db.course.create({data:{academyId,createdByUserId:people.manager!.id,title:'Another course',isVisible:true,modules:{create:{externalKey:randomUUID(),title:'Other',position:1,isVisible:true,lectures:{create:{externalKey:randomUUID(),title:'Other',position:1,isVisible:true}}}}},include:{modules:{include:{lectures:true}}}});
+    await db.material.update({where:{id:pdfId},data:{lectureId:foreignCourse.modules[0]!.lectures[0]!.id}});
+    expect((await learn.getExerciseBootstrap(identity('student'),input)).workspace.exercise.referencePdf).toBeNull();
+    await db.material.update({where:{id:pdfId},data:{lectureId}});
+  });
+  it('omits hidden, unready and main-only references without breaking the contract',async()=>{
+    await db.material.update({where:{id:pdfId},data:{isVisible:false}});
+    expect((await learn.getExerciseBootstrap(identity('student'),input)).workspace.exercise.referencePdf).toBeNull();
+    await db.material.update({where:{id:pdfId},data:{isVisible:true}});
+    await db.pdfDocument.update({where:{materialId:pdfId},data:{placement:'MAIN'}});
+    expect((await learn.getExerciseBootstrap(identity('student'),input)).workspace.exercise.referencePdf).toBeNull();
+    await db.pdfDocument.update({where:{materialId:pdfId},data:{placement:'BOTH',asset:{update:{state:'PENDING'}}}});
+    expect((await learn.getExerciseBootstrap(identity('student'),input)).workspace.exercise.referencePdf).toBeNull();
+  });
+  it('keeps hidden ancestors and cross-academy content inaccessible',async()=>{
+    await db.lecture.update({where:{id:lectureId},data:{isVisible:false}});
+    await expect(learn.getExerciseBootstrap(identity('student'),input)).rejects.toThrow();
+    await expect(readSubmissionAdmission(db,materialId,randomUUID(),{workspace:true})).resolves.toBeNull();
+    await db.lecture.update({where:{id:lectureId},data:{isVisible:true}});
+    const preview=await learn.getExerciseBootstrap(identity('manager'),{...input,preview:true});
+    expect(learnExerciseBootstrapSchema.safeParse(preview).success).toBe(true);
+  });
+});

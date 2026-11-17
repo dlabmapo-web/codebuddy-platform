@@ -1,4 +1,6 @@
-import { notFound } from "next/navigation";
+import { routes } from '@/lib/routes';
+import { MaterialReadFailure } from '@/components/workspace/material-read-failure';
+import { isMaterialUnavailable } from '@/lib/material-read';
 import { requireAcademyRoute } from "@/lib/academy-route";
 import { createServerORPCClient } from "@/lib/orpc-server";
 import { StudentWorkPage } from "@/components/student-history/student-work-page";
@@ -39,15 +41,16 @@ export default async function SavedStudentWorkPage({
       page: attemptPage,
     });
     if (query.attempt && !attempts.attempts.some((a) => a.id === query.attempt))
-      notFound();
+      return <MaterialReadFailure unavailable backHref={routes.academyTeachClasses(academySlug)} />;
     const summary = await api.studentWorkHistory.getStudentSummary({
       academyId,
       classId: target.classId,
       membershipId: target.membershipId,
     });
     name = summary.student.name;
-  } catch {
-    notFound();
+  } catch (error) {
+    if (isMaterialUnavailable(error)) return <MaterialReadFailure unavailable backHref={routes.academyTeachClasses(academySlug)} />;
+    throw error;
   }
   return (
     <StudentWorkPage

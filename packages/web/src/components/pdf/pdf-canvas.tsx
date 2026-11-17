@@ -1,4 +1,5 @@
 'use client';
+import { MaterialReadFailure } from '@/components/workspace/material-read-failure';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { surfaceProps, anchorProps } from '@/lib/monitoring/awareness/surfaces';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -141,22 +142,10 @@ export function PdfCanvas({
       setZoom(Math.min(300, Math.max(25, value)));
     }
   };
-  if (!data || query.isError)
-    return (
-      <div
-        role={error || query.isError ? 'alert' : 'status'}
-        className="p-6 text-sub"
-      >
-        {error || query.isError
-          ? t(`pdf.errors.${error}`, { defaultValue: t('pdf.unavailable') })
-          : t('pdf.loading')}
-        {query.isError ? (
-          <button onClick={() => void load()} className="ml-3 underline">
-            {t('pdf.retry')}
-          </button>
-        ) : null}
-      </div>
-    );
+  if (query.isError) return <MaterialReadFailure embedded error={query.error}
+    retry={() => void load()} retrying={query.isFetching} />;
+  if (!data) return <p role="status" className="p-6 text-sub">{t('pdf.loading')}</p>;
+
   return (
     <div
       ref={root}

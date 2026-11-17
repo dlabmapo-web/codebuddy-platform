@@ -1,3 +1,4 @@
+import { readMaterialResponse } from './material-read';
 import type { ExplanationRead, ExplanationReadResult, SaveExplanation } from '@cove/shared';
 import { shouldForwardViewRole } from './orpc-view-role';
 async function headers() {
@@ -22,6 +23,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { ...(await headers()), ...init?.headers },
     cache: 'no-store',
   });
+  if (!init?.method || init.method === 'GET') return readMaterialResponse<T>(response);
   const data = await response.json();
   if (!response.ok) throw new Error(data.code ?? 'CONTENT_VALIDATION_FAILED');
   return data as T;

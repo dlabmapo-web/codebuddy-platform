@@ -1,9 +1,11 @@
+import { MaterialReadFailure } from '@/components/workspace/material-read-failure';
+import { isMaterialUnavailable, settleMaterialRead } from '@/lib/material-read';
 import { StaffWorkspace } from "./_components/staff-workspace";
 import { ExerciseImageProvider } from '@/components/studio/lesson-image-providers';
 import { routes } from '@/lib/routes';
 import { requireAcademyRoute } from '@/lib/academy-route';
 import type { LearnExerciseBootstrap } from '@cove/shared';
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
@@ -35,14 +37,14 @@ export default async function ExerciseWorkspacePage({
   // independent, and waiting for one before asking for the other doubled the
   // time to first paint. A Turtle exercise still redirects below; its unused
   // bootstrap answer (a refusal) is simply discarded.
-  const bootstrapRequest = createServerORPCClient().learn.getExerciseBootstrap({
+  const bootstrapRequest = settleMaterialRead(createServerORPCClient().learn.getExerciseBootstrap({
     academyId,
     materialId,
     ...(single(search.preview) === "true" ? { preview: true } : {}),
     ...(single(search.mode) === "student" ? { mode: "student" as const } : {}),
     ...(isUuid(requestedClassId) ? { classId: requestedClassId } : {}),
     ...(isUuid(submissionId) ? { submissionId } : {}),
-  }).then((value): LearnExerciseBootstrap | null => value, () => null);
+  }));
   if (!submissionId) {
     let destination: string | undefined;
     try {
@@ -51,7 +53,10 @@ export default async function ExerciseWorkspacePage({
         ...(isUuid(requestedClassId) ? { classId: requestedClassId } : {}),
         ...(single(search.preview) === 'true' ? { preview: true } : {}),
       });
-    } catch { notFound(); }
+    } catch (error) {
+      if (isMaterialUnavailable(error)) return <MaterialReadFailure unavailable backHref={routes.academyLearnClasses(academySlug)} />;
+      throw error;
+    }
     if (destination) redirect(destination);
   }
   // Reduced to this academy's own records path before it reaches the client,
@@ -66,8 +71,12 @@ export default async function ExerciseWorkspacePage({
   // Unpublished, missing, and out-of-academy are all just "not here" to a
   // student, and telling them apart would leak the existence of content they
   // cannot see.
-  const bootstrap = await bootstrapRequest;
-  if (!bootstrap) notFound();
+  const result = await bootstrapRequest;
+  if (!result.ok) {
+    if (isMaterialUnavailable(result.error)) return <MaterialReadFailure unavailable backHref={routes.academyLearnClasses(academySlug)} />;
+    throw result.error;
+  }
+  const bootstrap: LearnExerciseBootstrap = result.data;
 
   const staffPractice = bootstrap.access?.mode === "staff-practice";
   if (!staffPractice && !bootstrap.classContext.classId) {

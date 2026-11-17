@@ -1,4 +1,5 @@
 'use client';
+import { MaterialReadFailure } from '@/components/workspace/material-read-failure';
 import { useReadingView } from '@/components/workspace/use-reading-view';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -38,7 +39,9 @@ export function ExplanationLesson({ academyId, materialId, classId, preview, can
     revealReading(); compact.addEventListener('change', revealReading);
     return () => compact.removeEventListener('change', revealReading);
   }, [close]);
-  if (!data) return <main className="grid min-h-dvh place-content-center gap-4 bg-canvas p-6 text-center text-ink"><BookOpen aria-hidden className="mx-auto size-9 text-brand" /><p role={query.isError ? 'alert' : 'status'}>{t(query.isError ? 'unavailable' : 'loading')}</p>{query.isError ? <button type="button" className={lessonAction} onClick={() => void query.refetch()}>{t('retry')}</button> : null}</main>;
+  if (!data) return query.isError
+    ? <MaterialReadFailure error={query.error} retry={() => void query.refetch()} retrying={query.isFetching} backHref={navigation.courseHref} />
+    : <main className="grid min-h-dvh place-content-center gap-4 bg-canvas p-6 text-center text-ink"><BookOpen aria-hidden className="mx-auto size-9 text-brand" /><p role="status">{t('loading')}</p></main>;
   return <main className="relative flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
     <LessonHeader courseTitle={data.course.title} lectureTitle={data.lecture.title} title={data.title} leaveHref={navigation.courseHref} badge={preview ? <span className="rounded-full bg-brand-soft px-2 py-1 text-xs font-semibold text-brand">{t('preview')}</span> : undefined}
       curriculum={<CurriculumTrigger compact ref={triggerRef} open={open} panelId={panelId} onToggle={toggle} path={navigation.context?.path ?? null} />}>

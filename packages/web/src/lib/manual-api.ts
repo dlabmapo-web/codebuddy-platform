@@ -1,3 +1,4 @@
+import { readMaterialResponse } from './material-read';
 import { shouldForwardViewRole } from "./orpc-view-role";
 import type {
   MultipleChoiceDefinition,
@@ -40,6 +41,7 @@ async function request<T>(
     body: data === undefined ? undefined : JSON.stringify(data),
     cache: "no-store",
   });
+  if (method === 'GET') return readMaterialResponse<T>(response);
   const body = await response.json();
   if (!response.ok)
     throw Object.assign(new Error(body.message ?? "Request failed"), {

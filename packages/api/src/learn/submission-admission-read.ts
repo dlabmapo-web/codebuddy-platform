@@ -1,4 +1,11 @@
 import type { Prisma } from '../generated/prisma/client.js';
+import type { referencePdfMetadata } from '../documents/pdf-reference.js';
+
+/** Nested JSON selected by the workspace query, including the mapper's title. */
+type ReferenceProjection = Record<string, unknown> & {
+  material: NonNullable<Parameters<typeof referencePdfMetadata>[0]>['material'];
+  asset: Record<string, unknown>;
+};
 
 type AdmissionMaterial = Prisma.MaterialGetPayload<{include: {
   programmingExercise: {include: {testCases: true}},
@@ -13,7 +20,7 @@ function columns<T>(value: Record<string, unknown>): T {
 /** Admission metadata and automatic-only cases in one statement, without a deep include. */
 export async function readSubmissionAdmission(db: Prisma.TransactionClient, materialId: string, academyId: string, options: {workspace?: boolean; preview?: boolean} = {}): Promise<AdmissionMaterial | null> {
   const [row] = await db.$queryRaw<Array<{ material: Record<string, unknown>; exercise: Record<string, unknown> | null;
-    tests: Record<string, unknown>[]; hints: Record<string, unknown>[]; reference: Record<string, unknown> | null; lecture: Record<string, unknown>; module: Record<string, unknown>; course: Record<string, unknown> }>>`
+    tests: Record<string, unknown>[]; hints: Record<string, unknown>[]; reference: ReferenceProjection | null; lecture: Record<string, unknown>; module: Record<string, unknown>; course: Record<string, unknown> }>>`
     SELECT to_jsonb(m) AS material, CASE WHEN pe.material_id IS NULL THEN NULL WHEN ${Boolean(options.workspace)}::boolean THEN to_jsonb(pe) - 'solution_code' ELSE jsonb_build_object(
         'materialId',pe.material_id,'quiz',pe.quiz,'language',pe.language,
         'gradingRevision',pe.grading_revision,'submissionPolicy',pe.submission_policy,
@@ -32,7 +39,7 @@ export async function readSubmissionAdmission(db: Prisma.TransactionClient, mate
       CASE WHEN ${Boolean(options.workspace)}::boolean THEN COALESCE((SELECT jsonb_agg(to_jsonb(h) ORDER BY h.position,h.id)
         FROM exercise_hints h WHERE h.exercise_material_id=m.id), '[]'::jsonb) ELSE '[]'::jsonb END AS hints,
       CASE WHEN ${Boolean(options.workspace)}::boolean THEN (SELECT to_jsonb(pd) || jsonb_build_object('asset',to_jsonb(pa),
-        'material',jsonb_build_object('id',pm.id,'isVisible',pm.is_visible,'lecture',jsonb_build_object('isVisible',pl.is_visible,
+        'material',jsonb_build_object('id',pm.id,'title',pm.title,'isVisible',pm.is_visible,'lecture',jsonb_build_object('isVisible',pl.is_visible,
           'courseModule',jsonb_build_object('isVisible',pcm.is_visible,'courseId',pcm.course_id))))
         FROM pdf_documents pd JOIN pdf_assets pa ON pa.id=pd.asset_id JOIN materials pm ON pm.id=pd.material_id
         JOIN lectures pl ON pl.id=pm.lecture_id JOIN course_modules pcm ON pcm.id=pl.course_module_id
@@ -50,7 +57,7 @@ export async function readSubmissionAdmission(db: Prisma.TransactionClient, mate
   return { ...columns<AdmissionMaterial>(row.material),
     programmingExercise: row.exercise ? { ...columns<NonNullable<AdmissionMaterial['programmingExercise']>>(row.exercise),
       ...(options.workspace ? {hints: row.hints.map(h => columns(h)), referencePdf: row.reference ? {
-        ...columns<Record<string,unknown>>(row.reference), asset: columns<Record<string,unknown>>(row.reference.asset as Record<string,unknown>), material: row.reference.material,
+        ...columns<Record<string,unknown>>(row.reference), asset: columns<Record<string,unknown>>(row.reference.asset), material: row.reference.material,
       } : null} : {}),
       testCases: row.tests.map(test => columns<NonNullable<AdmissionMaterial['programmingExercise']>['testCases'][number]>(test)) } : null,
     lecture: { ...columns<AdmissionMaterial['lecture']>(row.lecture), courseModule: {

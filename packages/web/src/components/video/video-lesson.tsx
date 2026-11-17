@@ -1,4 +1,5 @@
 "use client";
+import { MaterialReadFailure } from '@/components/workspace/material-read-failure';
 import { useClassroom } from '@/components/classroom/classroom-context';
 import type { VideoReadResult } from '@cove/shared';
 import { claimServerRead, SERVER_READ_FRESH_MS } from '@/lib/server-read';
@@ -93,22 +94,10 @@ export function VideoLesson({
     );
     return () => clearTimeout(timer);
   }, [countdown, next, path, router, classroom]);
-  if (!data)
-    return (
-      <main role={query.isError ? "alert" : "status"} className="p-6">
-        <p>{t(query.isError ? "unavailable" : "loading")}</p>
-        {query.isError ? (
-          <button
-            type="button"
-            className="mt-3 rounded border border-border px-4 py-2 text-brand"
-            disabled={query.isFetching}
-            onClick={() => void query.refetch()}
-          >
-            {t("retry")}
-          </button>
-        ) : null}
-      </main>
-    );
+  if (!data) return query.isError
+    ? <MaterialReadFailure error={query.error} retry={() => void query.refetch()} retrying={query.isFetching} backHref={navigation.courseHref} />
+    : <main role="status" className="p-6">{t("loading")}</main>;
+
   return (
     <main className="relative flex h-dvh flex-col overflow-hidden bg-canvas text-ink">
       <LessonHeader courseTitle={data.course.title} lectureTitle={data.lecture.title} title={data.title} leaveHref={navigation.courseHref}

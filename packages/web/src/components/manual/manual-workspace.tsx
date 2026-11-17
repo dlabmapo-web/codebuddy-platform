@@ -1,4 +1,5 @@
 'use client';
+import { MaterialReadFailure } from '@/components/workspace/material-read-failure';
 
 import { ClassroomWorkspaceActions, useClassroom, useClassroomNavigationGuard } from '@/components/classroom/classroom-context';
 import { TerminalLines } from './terminal-lines';
@@ -445,14 +446,9 @@ export function ManualWorkspace({
           ? mt("evaluating")
           : mt("awaiting_teacher_review");
   };
-  if (!data)
-    return (
-      <main className="p-6" role={query.isError ? "alert" : "status"}>
-        {query.isError
-          ? mt("material_is_not_available")
-          : mt("loading_activity")}
-      </main>
-    );
+  if (!data) return query.isError
+    ? <MaterialReadFailure error={query.error} retry={() => void query.refetch()} retrying={query.isFetching} backHref={navigation.courseHref} />
+    : <main className="p-6" role="status">{mt("loading_activity")}</main>;
   const attempts = data.practice ? data.attempts : data.attempts.filter((a) => a.classId === selectedClass);
   const attempt = attempts[0],
     review = attempt?.reviews[0];

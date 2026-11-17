@@ -1,3 +1,5 @@
+import { MaterialReadFailure } from '@/components/workspace/material-read-failure';
+import { isMaterialUnavailable } from '@/lib/material-read';
 import { readClassWorkspaceRoster } from '@/lib/class-workspace-server';
 import { StudentSwitcher } from '@/components/monitoring/student-switcher';
 import { routes } from '@/lib/routes';
@@ -49,6 +51,7 @@ export default async function LiveStudentPage({
         <StudentUnavailable academySlug={academySlug} academyId={academyId} classId={classId} membershipId={membershipId} />
       );
     }
+    if (!isMaterialUnavailable(error)) throw error;
     // Not assigned, not enrolled, and not there are one answer: a teacher must
     // not be able to probe another class's roster by URL. The reason is logged
     // where only the operator can see it, because "404" alone is impossible to
@@ -58,7 +61,7 @@ export default async function LiveStudentPage({
         `[live] ${academyId}/${classId}/${membershipId} refused: ${code ?? 'unknown'}`,
       );
     }
-    notFound();
+    return <MaterialReadFailure unavailable backHref={routes.academyTeachClasses(academySlug)} />;
   }
   if (!context) notFound();
 

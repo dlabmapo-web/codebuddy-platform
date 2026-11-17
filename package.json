@@ -27,6 +27,7 @@
     "e2e:dlab": "playwright test --config e2e/dlab.playwright.config.ts",
     "e2e:monitoring:materials": "bash packages/api/scripts/test-all-material-monitoring.sh",
     "test:dlab": "bash packages/api/scripts/test-dlab-isolated.sh",
+    "test:material-loading:local": "bash packages/api/scripts/test-material-loading.sh",
     "test:web-courses:local": "bash packages/api/scripts/test-web-courses.sh",
     "test:c-cpp:local": "bash packages/api/scripts/test-c-cpp-local.sh",
     "dev:c-cpp": "bash packages/api/scripts/test-c-cpp-local.sh --playground",

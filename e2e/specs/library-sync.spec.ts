@@ -12,6 +12,24 @@ test("publishes a correction, preserves academy text and solved progress, and re
   const f = JSON.parse(await readFile(resolve(dir, "browser.json"), "utf8"));
   await page.context().addCookies(f.auth.admin.cookies);
   await page.goto(routes.adminLibraryCourse(f.ids.master));
+  // A published library question remains editable. Saving options is a draft
+  // change; the Publish updates action below distributes the batch.
+  const quiz = page.getByRole('button', { name: 'Quiz options', exact: true });
+  if (!await quiz.isVisible()) await page.getByRole('button', { name: 'Expand all', exact: true }).click();
+  await quiz.click();
+  const editor = page.getByRole('dialog');
+  await expect(editor.getByRole('button', { name: 'Add option', exact: true })).toBeEnabled();
+  await expect(editor.getByText(/Published or submitted grading rules are locked/)).toHaveCount(0);
+  await editor.getByRole('button', { name: 'Add option', exact: true }).click();
+  await editor.getByRole('textbox', { name: 'Option 4', exact: true }).fill('32');
+  await editor.getByRole('radio', { name: 'Correct option 4', exact: true }).check();
+  await page.screenshot({ path: 'test-results/library-sync/06-library-quiz-added-option.png', fullPage: true });
+  await editor.getByRole('button', { name: 'Save activity', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await quiz.click();
+  await expect(page.getByRole('textbox', { name: 'Option 4', exact: true })).toHaveValue('32');
+  await expect(page.getByRole('radio', { name: 'Correct option 4', exact: true })).toBeChecked();
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click();
   await page
     .getByRole("button", { name: "Publish updates", exact: true })
     .click();

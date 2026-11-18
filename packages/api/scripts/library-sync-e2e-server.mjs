@@ -33,6 +33,7 @@ Object.assign(process.env, {
   DLAB_SSO_ENABLED: "false",
   GUI_ENABLED: "false",
   VIDEO_LESSONS_ENABLED: "false",
+  MULTIPLE_CHOICE_ENABLED: "true",
 });
 const provider = nextAuthFixture(studio);
 const server = createServer((req, res) => {
@@ -84,6 +85,7 @@ const ids = Object.fromEntries(
     "lecture",
     "explanation",
     "exercise",
+    "choice",
     "classId",
   ].map((k) => [k, randomUUID()]),
 );
@@ -240,6 +242,16 @@ NestFactory.create = async (...args) => {
           },
         },
       },
+    },
+  });
+  await db.material.create({
+    data: {
+      id: ids.choice, lectureId: ids.lecture, type: "MULTIPLE_CHOICE", title: "Quiz options", position: 3, isVisible: true,
+      manualMaterial: { create: { files: {}, multipleChoice: {
+        version: 1, question: "What is double 4?", selectionMode: "SINGLE", problemDescription: "",
+        options: [4, 8, 16].map((value, index) => ({ id: `${ids.choice.slice(0, -1)}${index}`, content: `<p>${value}</p>` })),
+        correctOptionIds: [`${ids.choice.slice(0, -1)}1`], shuffleOptions: false, explanationEnabled: false, explanation: "",
+      } } },
     },
   });
   await db.$transaction((tx) =>

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ConfigService } from "@nestjs/config";
+import { saveManualSchema } from "@cove/shared";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +11,9 @@ import { SupportGrantResolver } from "../authorization/support-grant.resolver.js
 import { AcademyLibraryService } from "../content/library/academy-library.service.js";
 import type { PrismaService } from "../database/prisma.service.js";
 import { PrismaClient } from "../generated/prisma/client.js";
+import { ManualService } from "../manual/manual.service.js";
+import { MultipleChoiceService } from "../manual/multiple-choice.service.js";
+import { ShortAnswerService } from "../manual/short-answer.service.js";
 import { lockCourseRow } from "./release.js";
 import { publishRelease } from "./release-access.js";
 import { AcademyLibrarySyncService } from "./academy-sync.service.js";
@@ -63,6 +67,7 @@ describe.skipIf(!databaseUrl)("library course sync (PostgreSQL)", () => {
     classId: randomUUID(),
   };
   const leadAuth = randomUUID();
+  const adminAuth = randomUUID();
   const identity = { authUserId: leadAuth } as SupabaseIdentity;
   let copyId = "";
   let jobs: LibrarySyncJobService;
@@ -110,7 +115,7 @@ describe.skipIf(!databaseUrl)("library course sync (PostgreSQL)", () => {
       data: [
         {
           id: ids.admin,
-          authUserId: randomUUID(),
+          authUserId: adminAuth,
           status: "ACTIVE",
           platformRole: "ADMIN",
         },
@@ -977,5 +982,63 @@ describe.skipIf(!databaseUrl)("library course sync (PostgreSQL)", () => {
         where: { copyCourseId: copyId, status: "OPEN" },
       }),
     ).toBe(0);
+  });
+
+  it("lets library authors edit live answer definitions, publishes them together, and keeps academy attempts frozen", async () => {
+    const access = new AcademyAccessService(db, new SupportGrantResolver(db));
+    const config = new ConfigService({ MULTIPLE_CHOICE_ENABLED: true, SHORT_ANSWER_ENABLED: true });
+    const manual = new ManualService(db, access, audit, {} as never, {} as never, {} as never,
+      new ShortAnswerService(db, config, {} as never), new MultipleChoiceService(config));
+    const admin = { authUserId: adminAuth } as SupabaseIdentity;
+    const copyChoice = await local(ids.choice);
+    const copyWritten = await local(ids.written);
+    await client.material.updateMany({ where: { id: { in: [ids.choice, ids.written, copyChoice, copyWritten] } }, data: { isVisible: true } });
+    const frozen = await client.multipleChoiceAssessment.findMany({ where: { submission: { materialId: copyChoice } } });
+    expect(frozen.length).toBeGreaterThan(0);
+    const beforeChoice = await client.manualMaterial.findUniqueOrThrow({ where: { materialId: copyChoice } });
+
+    statements = 0;
+    const choice = await manual.workspace(admin, { academyId: ids.library, materialId: ids.choice }, true);
+    // Existing full author workspace budget; library scope uses facts already
+    // read for authorization and adds no database round trip.
+    expect(statements).toBe(15);
+    expect(choice.definitionLocked).toBe(false);
+    const optionId = randomUUID();
+    const edit = saveManualSchema.parse({ ...choice.config, academyId: ids.library, courseId: ids.master,
+      lectureId: ids.lecture, materialId: ids.choice, title: choice.title, type: choice.type,
+      multipleChoice: { ...choice.config.multipleChoice, options: [...choice.config.multipleChoice!.options, { id: optionId, content: "<p>Another choice</p>" }], correctOptionIds: [optionId] } });
+    await manual.save(admin, edit);
+    await expect(manual.save(admin, edit)).rejects.toThrow("Content changed; reload before saving");
+
+    const written = await manual.workspace(admin, { academyId: ids.library, materialId: ids.written }, true);
+    expect(written.definitionLocked).toBe(false);
+    await manual.save(admin, saveManualSchema.parse({ ...written.config, academyId: ids.library, courseId: ids.master,
+      lectureId: ids.lecture, materialId: ids.written, title: written.title, type: written.type,
+      shortAnswer: { ...written.config.shortAnswer, expectedAnswer: "four hundred" } }));
+
+    // Saves remain drafts: existing copies change only when the batch is published.
+    expect((await client.manualMaterial.findUniqueOrThrow({ where: { materialId: copyChoice } })).multipleChoice).toEqual(beforeChoice.multipleChoice);
+    expect((await client.manualMaterial.findUniqueOrThrow({ where: { materialId: copyWritten } })).shortAnswer).toMatchObject({ expectedAnswer: "four" });
+    await publish("Quiz and short-answer corrections");
+    expect(await jobs.drain()).toBe(1);
+    const updated = await client.manualMaterial.findUniqueOrThrow({ where: { materialId: copyChoice } });
+    expect(updated.multipleChoice).toMatchObject({ options: expect.arrayContaining([expect.objectContaining({ content: "<p>Another choice</p>" })]) });
+    const mappedId = (updated.multipleChoice as { options: Array<{ id: string; content: string }> }).options.find(o => o.content === "<p>Another choice</p>")!.id;
+    expect(updated.multipleChoice).toMatchObject({ correctOptionIds: [mappedId] });
+    expect((await client.manualMaterial.findUniqueOrThrow({ where: { materialId: copyWritten } })).shortAnswer).toMatchObject({ expectedAnswer: "four hundred" });
+    expect(await client.multipleChoiceAssessment.findMany({ where: { submission: { materialId: copyChoice } } })).toEqual(frozen);
+
+    // Neither academy membership nor platform inspection inherits the library exception.
+    const academyChoice = await manual.workspace(identity, { academyId: ids.academy, materialId: copyChoice }, true);
+    expect(academyChoice.definitionLocked).toBe(true);
+    const localEdit = saveManualSchema.parse({ ...academyChoice.config, academyId: ids.academy, courseId: copyId,
+      lectureId: academyChoice.staff!.lectureId, materialId: copyChoice, title: academyChoice.title, type: academyChoice.type,
+      multipleChoice: { ...academyChoice.config.multipleChoice, correctOptionIds: [academyChoice.config.multipleChoice!.options[0]!.id] } });
+    await expect(manual.save(identity, localEdit)).rejects.toThrow("answer definitions are locked");
+    await expect(manual.save(admin, localEdit)).rejects.toThrow("answer definitions are locked");
+    const academyWritten = await manual.workspace(identity, { academyId: ids.academy, materialId: copyWritten }, true);
+    await expect(manual.save(identity, saveManualSchema.parse({ ...academyWritten.config, academyId: ids.academy, courseId: copyId,
+      lectureId: academyWritten.staff!.lectureId, materialId: copyWritten, title: academyWritten.title, type: academyWritten.type,
+      shortAnswer: { ...academyWritten.config.shortAnswer, expectedAnswer: "Different local key" } }))).rejects.toThrow("answer definitions are locked");
   });
 });

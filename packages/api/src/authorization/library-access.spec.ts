@@ -53,6 +53,7 @@ describe('AcademyAccessService, inside a library academy', () => {
 
     expect(access.via).toBe('platform');
     expect(access.role).toBe('TEAM_LEAD');
+    expect(access.library).toBe(true);
   });
 
   /**
@@ -119,6 +120,7 @@ describe('AcademyAccessService, inside a customer academy', () => {
     // library set, so the two paths are distinguishable by their answers.
     expect(access.via).toBe('platform');
     expect(access.role).toBe('MANAGER');
+    expect(access.library).toBeUndefined();
   });
 
   it('still lets that operator read', async () => {

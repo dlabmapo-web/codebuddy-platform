@@ -288,6 +288,8 @@ export class ManualService {
           current.manualMaterial.revision !== revision
         )
           throw new ConflictException("Content changed; reload before saving");
+        // Library authors edit the working draft; publishing syncs the batch.
+        // Academy editors still cannot rewrite a live/submitted answer key.
         if (input.multipleChoice) {
           const oldChoice = multipleChoiceSchema.parse(
             current.manualMaterial.multipleChoice,
@@ -300,6 +302,7 @@ export class ManualService {
               d.shuffleOptions,
             ]);
           if (
+            !actor.library &&
             structural(oldChoice) !==
               structural(multipleChoiceSchema.parse(input.multipleChoice)) &&
             (current.isVisible ||
@@ -325,6 +328,7 @@ export class ManualService {
           );
         const conversion = Boolean(before) !== Boolean(next);
         if (
+          !actor.library &&
           (changedRule || conversion) &&
           (current.isVisible ||
             (await tx.manualSubmission.count({ where: { materialId: id } })))
@@ -551,12 +555,13 @@ export class ManualService {
         classes: tutoringClasses.map(c => ({ classId: c.id, name: c.name })),
       } } : {}),
       definitionLocked: preview
-        ? row.isVisible ||
-          Boolean(
-            await this.db.manualSubmission.count({
-              where: { materialId: row.id },
-            }),
-          )
+        ? !actor.library &&
+          (row.isVisible ||
+            Boolean(
+              await this.db.manualSubmission.count({
+                where: { materialId: row.id },
+              }),
+            ))
         : undefined,
       submissionUnavailable: Boolean(
         (parsed.shortAnswer && !this.shortAnswers.enabled()) ||

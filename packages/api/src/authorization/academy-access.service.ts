@@ -48,6 +48,9 @@ export type AcademyAccess = {
    * accountability story for support access.
    */
   via: "membership" | "support" | "platform";
+  /** Library scope established by the permission reader, not by a client route.
+   * Ordinary academy inspection/support must not inherit library author rules. */
+  library?: true;
   /** Present only when `via === "support"`. */
   supportGrantId?: string;
 };
@@ -272,6 +275,7 @@ export class AcademyAccessService {
       role: "TEAM_LEAD",
       roles: ["TEAM_LEAD"],
       via: "platform",
+      library: true,
     };
   }
 

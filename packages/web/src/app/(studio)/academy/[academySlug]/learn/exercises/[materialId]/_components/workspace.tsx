@@ -20,6 +20,7 @@ import { BrowserBaselineNotice } from '@/components/workspace/browser-baseline-n
 import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-navigator';
 import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
 import { ProblemStatement } from '@/components/workspace/problem-statement';
+import { ExerciseImageProvider } from '@/components/studio/lesson-image-providers';
 import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import { useStudentFeedback } from '@/lib/monitoring/use-student-feedback';
 import { useStudentMonitoring } from '@/lib/monitoring/use-student-monitoring';
@@ -561,12 +562,16 @@ function ProgrammingWorkspace({
   }, [hintCount]);
 
   return (
+    // Student navigation swaps the workspace in memory. The server page's
+    // materialId stays at the entry problem, so resolve private images against
+    // the displayed exercise without remounting the editor or its runtime.
     // Exactly one viewport, and a clip for anything that escapes its own
     // scroller: a document even one pixel taller than `h-dvh` scrolls the whole
     // page, sliding the header off the top and leaving a band of background
     // under the workspace. `relative` is what lets `overflow-hidden` clip
     // absolutely positioned descendants that have no nearer positioned
     // ancestor. Remote pointers are `fixed` in a portal and are unaffected.
+    <ExerciseImageProvider academyId={academyId} materialId={exercise.materialId}>
     <div className="relative flex h-dvh flex-col overflow-hidden bg-canvas">
       <BrowserBaselineNotice />
 
@@ -787,5 +792,6 @@ function ProgrammingWorkspace({
         index={workspaceMaterialSequence(navigation.navigator).findIndex(item => item.materialId === exercise.materialId) + 1}
         total={workspaceMaterialSequence(navigation.navigator).length} disabled={busy} />
     </div>
+    </ExerciseImageProvider>
   );
 }

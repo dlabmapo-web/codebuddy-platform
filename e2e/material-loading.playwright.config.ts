@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 import base from './web-courses.playwright.config';
 export default defineConfig({
   ...base,
-  testMatch:'material-loading.spec.ts',
+  testMatch:/(?:material-loading|exercise-image-navigation)\.spec\.ts/,
   outputDir:'../test-results/material-loading',
   projects:[{name:'chromium',use:{...devices['Desktop Chrome']}},{name:'webkit',use:{...devices['Desktop Safari']}}],
   webServer:(Array.isArray(base.webServer)?base.webServer:[]).map((server,index)=>index===1 ? {

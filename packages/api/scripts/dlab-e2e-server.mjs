@@ -2,7 +2,7 @@
  * Explicit local isolated DB required; never import this from application code.
  */
 import { createServer } from 'node:http';
-import { randomUUID, createHmac, timingSafeEqual } from 'node:crypto';
+import { randomUUID, createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { Redis } from 'ioredis';
 import { ConfigService } from '@nestjs/config';
 const apiBuild = new URL(process.env.COVE_DLAB_API_BUILD_DIR ? process.env.COVE_DLAB_API_BUILD_DIR.replace(/\/$/, '') + '/' : '../dist/', import.meta.url);
@@ -190,6 +190,24 @@ const server = createServer(async (req, res) => {
         } });
         secondProgrammingMaterialId = other.id;
       }
+      const imageMaterialIds = [];
+      if (input.includeImageNavigation) {
+        const imageLecture = await db.lecture.create({ data: { courseModuleId: module.id, title: 'Image navigation', externalKey: randomUUID(), position: 3, isVisible: true } });
+        // Distinct private assets expose a stale material scope: the real API
+        // must refuse an image that does not belong to the requested problem.
+        const bytes = await readFile(join(process.env.COVE_OBSERVATION_MEDIA_DIR, 'poster.jpg'));
+        for (let position = 1; position <= 3; position++) {
+          const assetId = randomUUID(), objectKey = `${fixture.academy.id}/${assetId}`;
+          explanationAssets.set(`turtle-assets/${objectKey}`, { bytes, mime: 'image/jpeg' });
+          await db.manualAsset.create({ data: { id: assetId, academyId: fixture.academy.id, courseId: course.id, objectKey,
+            name: `problem-${position}.jpg`, byteSize: bytes.length, mimeType: 'image/jpeg', sha256: createHash('sha256').update(bytes).digest('hex') } });
+          const problem = await db.material.create({ data: { lectureId: imageLecture.id, title: `Image problem ${position}`, type: 'PROGRAMMING_EXERCISE', position, isVisible: true,
+            programmingExercise: { create: { externalKey: randomUUID(), difficulty: 'EASY',
+              description: `<p>Read this problem's picture.</p><img src="cove-asset:${assetId}" alt="Picture for problem ${position}">`,
+              starterCode: `# image problem ${position}\nprint(${position})`, solutionCode: `print(${position})` } } } });
+          imageMaterialIds.push(problem.id);
+        }
+      }
       const written = await db.material.create({ data: { lectureId: lecture.id, title: 'Explain your addition', type: 'WRITTEN_RESPONSE', position: 2, isVisible: true,
         manualMaterial: { create: { description: 'Explain how your program adds two numbers.', includeInScore: true } },
       } });
@@ -294,7 +312,7 @@ const server = createServer(async (req, res) => {
         await db.courseModule.update({ where: { id: module.id }, data: { title: 'HTML and CSS' } });
         await db.lecture.update({ where: { id: lecture.id }, data: { title: '1주차 · HTML basics' } });
       }
-      return json(res, { explanationMaterialId, secondProgrammingMaterialId, reviewStudentMembershipId, turtleMaterialId, pdfMaterialId, videoMaterialId, courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, shortMaterialId: short.id, quizMaterialId: quiz.id, studentMembershipId: student.id, classes });
+      return json(res, { imageMaterialIds, explanationMaterialId, secondProgrammingMaterialId, reviewStudentMembershipId, turtleMaterialId, pdfMaterialId, videoMaterialId, courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, shortMaterialId: short.id, quizMaterialId: quiz.id, studentMembershipId: student.id, classes });
     }
     if (path.startsWith('/fixtures/') && req.method === 'PUT') {
       const id = path.split('/')[2], fixture = fixtures.get(id), input = await body(req);

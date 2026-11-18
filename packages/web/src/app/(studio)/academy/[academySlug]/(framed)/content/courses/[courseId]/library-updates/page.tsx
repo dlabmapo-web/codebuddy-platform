@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
 import { BackLink } from '@/components/studio/back-link';
@@ -50,6 +50,11 @@ export default async function LibraryUpdatesPage({
     initial = null;
   }
 
+  const courseHref = routes.academyLearnCourse(academySlug, courseId);
+  if (initial && !initial.conflicts.some(item => !nodeKey || item.nodeKey === nodeKey) && !initial.sync?.unmatchedCount) {
+    redirect(courseHref);
+  }
+
   const locale = await getLocale();
   const { resources } = await initTranslations(locale, librarySyncNamespaces);
 
@@ -84,6 +89,7 @@ export default async function LibraryUpdatesPage({
             courseId={courseId}
             initial={initial}
             nodeKey={nodeKey}
+            courseHref={courseHref}
           />
         ) : (
           <p className="text-[14px] text-sub">{t('page.not_linked')}</p>

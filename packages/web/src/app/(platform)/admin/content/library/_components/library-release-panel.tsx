@@ -2,7 +2,6 @@
 
 import type {
   LibraryReleaseDraft,
-  LibrarySyncCopy,
 } from '@cove/shared';
 import * as React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -12,29 +11,18 @@ import { Button } from '@/components/studio/button';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
 
-/**
- * Publish update, and where each academy copy stands (library sync design §18.1).
- *
- * Head office keeps editing the master freely; nothing reaches an academy
- * until this button records a release. The copies list is counts and states
- * only — never an academy's content.
- */
+/** Publish saved library edits as one batch. Academy review stays with academy staff. */
 export function LibraryReleasePanel({
   courseId,
   initialDraft,
-  initialCopies,
 }: {
   courseId: string;
   initialDraft: LibraryReleaseDraft;
-  initialCopies: LibrarySyncCopy[];
 }) {
   const { t } = useTranslation('platform-library');
   const errorText = useErrorText();
   const [draft, setDraft] = React.useState<LibraryReleaseDraft | null>(
     initialDraft,
-  );
-  const [copies, setCopies] = React.useState<LibrarySyncCopy[] | null>(
-    initialCopies,
   );
   const queryClient = useQueryClient();
   const [busy, setBusy] = React.useState(false);
@@ -43,12 +31,7 @@ export function LibraryReleasePanel({
 
   const load = React.useCallback(async () => {
     try {
-      const [nextDraft, nextCopies] = await Promise.all([
-        orpc.platformLibrarySync.draft({ courseId }),
-        orpc.platformLibrarySync.copies({ courseId }),
-      ]);
-      setDraft(nextDraft);
-      setCopies(nextCopies.copies);
+      setDraft(await orpc.platformLibrarySync.draft({ courseId }));
     } catch (caught) {
       setError(caught);
     }
@@ -88,24 +71,6 @@ export function LibraryReleasePanel({
       await load();
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function act(
-    action: 'retry' | 'pause' | 'resume',
-    copyCourseId: string,
-  ) {
-    setError(null);
-    try {
-      const updated = await orpc.platformLibrarySync[action]({ copyCourseId });
-      setCopies(
-        (current) =>
-          current?.map((copy) =>
-            copy.courseId === copyCourseId ? updated : copy,
-          ) ?? null,
-      );
-    } catch (caught) {
-      setError(caught);
     }
   }
 
@@ -176,83 +141,6 @@ export function LibraryReleasePanel({
         </p>
       ) : null}
 
-      <details className="mt-4 border-t border-border pt-3">
-      <summary className="cursor-pointer text-[13px] font-semibold text-sub">
-        {t('sync.copies_heading')}
-      </summary>
-      {copies && copies.length === 0 ? (
-        <p className="mt-2 text-[13.5px] text-sub">{t('sync.copies_empty')}</p>
-      ) : (
-        <ul className="mt-2 divide-y divide-border">
-          {(copies ?? []).map((copy) => (
-            <li
-              className="flex flex-wrap items-center gap-3 py-2.5"
-              key={copy.courseId}
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[14px] font-bold text-ink">
-                  {copy.academyName}
-                </p>
-                <p className="truncate text-[13px] text-sub">
-                  {copy.courseTitle}
-                </p>
-                {copy.lastRunAt ? (
-                  <time
-                    className="text-[12px] text-sub"
-                    dateTime={copy.lastRunAt}
-                  >
-                    {t('sync.last_run', {
-                      date: copy.lastRunAt.slice(0, 16).replace('T', ' '),
-                    })}
-                  </time>
-                ) : null}
-              </div>
-              <span
-                className={`rounded-full px-2.5 py-1 text-[12.5px] font-bold ${
-                  copy.status === 'FAILED'
-                    ? 'bg-danger/10 text-danger'
-                    : copy.status === 'IDLE'
-                      ? 'bg-canvas text-sub'
-                      : 'bg-brand-soft text-brand'
-                }`}
-                title={
-                  copy.lastErrorCode
-                    ? t('sync.failed', { code: copy.lastErrorCode })
-                    : undefined
-                }
-              >
-                {t(`sync.status.${copy.status}`)}
-              </span>
-              {copy.openConflictCount > 0 ? (
-                <span className="rounded-full bg-draft-soft px-2.5 py-1 text-[12.5px] font-bold text-draft">
-                  {t('sync.conflicts', { count: copy.openConflictCount })}
-                </span>
-              ) : null}
-              {copy.status === 'FAILED' ? (
-                <Button
-                  onClick={() => void act('retry', copy.courseId)}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  {t('sync.retry')}
-                </Button>
-              ) : null}
-              <Button
-                onClick={() =>
-                  void act(copy.paused ? 'resume' : 'pause', copy.courseId)
-                }
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                {copy.paused ? t('sync.resume') : t('sync.pause')}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-      </details>
     </section>
   );
 }

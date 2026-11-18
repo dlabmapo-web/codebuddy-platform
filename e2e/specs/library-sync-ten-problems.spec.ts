@@ -606,9 +606,7 @@ test("10 library problems, 2 academy additions, conflicting and convergent edits
       await manager
         .getByRole("button", { name: "Keep academy version", exact: true })
         .click();
-      await expect(
-        manager.getByText("Nothing needs your decision.", { exact: true }),
-      ).toBeVisible();
+      await expect(manager).toHaveURL(routes.academyLearnCourse(f.slug, copyId));
       expect(
         (await exercise("manager", copyTarget(2))).material!
           .programmingExercise!.description,
@@ -702,9 +700,7 @@ test("10 library problems, 2 academy additions, conflicting and convergent edits
       await manager
         .getByRole("button", { name: "Use admin version", exact: true })
         .click();
-      await expect(
-        manager.getByText("Nothing needs your decision.", { exact: true }),
-      ).toBeVisible();
+      await expect(manager).toHaveURL(routes.academyLearnCourse(f.slug, copyId));
       expect(
         (await exercise("manager", copyTarget(4))).material!
           .programmingExercise!.description,
@@ -737,9 +733,7 @@ test("10 library problems, 2 academy additions, conflicting and convergent edits
       );
       const merged = '<p>Academy P09: explain with a classroom example.</p>';
       await manager.getByRole('button', { name: 'Keep academy version', exact: true }).click();
-      await expect(
-        manager.getByText("Nothing needs your decision.", { exact: true }),
-      ).toBeVisible();
+      await expect(manager).toHaveURL(routes.academyLearnCourse(f.slug, copyId));
       const final = await copyTree();
       expect(materials(final)).toHaveLength(13);
       expect(
@@ -756,9 +750,7 @@ test("10 library problems, 2 academy additions, conflicting and convergent edits
       ).toBe(sameP5);
       expect((await updates()).conflicts).toHaveLength(0);
       await manager.reload();
-      await expect(
-        manager.getByText("Nothing needs your decision.", { exact: true }),
-      ).toBeVisible();
+      await expect(manager).toHaveURL(routes.academyLearnCourse(f.slug, copyId));
       await screenshot(
         manager,
         "11-final-no-decisions.png",

@@ -1,8 +1,6 @@
-import { LegacyCopiesPanel } from '../_components/legacy-copies-panel';
 import { notFound } from 'next/navigation';
 import type {
   LibraryReleaseDraft,
-  LibrarySyncCopy,
 } from '@cove/shared';
 
 import { CourseBuilder } from '@/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/_components/course-builder';
@@ -51,26 +49,14 @@ export default async function LibraryCourseBuilderPage({
   let initialTree = null;
   let loadFailed = false;
   let releaseDraft: LibraryReleaseDraft | null = null;
-  let syncCopies: LibrarySyncCopy[] = [];
-  let legacyCopies: Awaited<
-    ReturnType<
-      ReturnType<
-        typeof createPlatformServerORPCClient
-      >['platformLibrarySync']['linkReport']
-    >
-  >['copies'] = [];
   try {
     const client = createPlatformServerORPCClient();
-    const [tree, legacy, draft, copies] = await Promise.all([
+    const [tree, draft] = await Promise.all([
       client.academyCourses.getOutline({ academyId, courseId }),
-      client.platformLibrarySync.linkReport({ courseId }),
       client.platformLibrarySync.draft({ courseId }),
-      client.platformLibrarySync.copies({ courseId }),
     ]);
     initialTree = tree;
-    legacyCopies = legacy.copies;
     releaseDraft = draft;
-    syncCopies = copies.copies;
   } catch (error) {
     loadFailed = !isAccessDeniedError(error);
   }
@@ -112,11 +98,7 @@ export default async function LibraryCourseBuilderPage({
         <LibraryReleasePanel
           courseId={courseId}
           initialDraft={releaseDraft}
-          initialCopies={syncCopies}
         />
-      ) : null}
-      {initialTree ? (
-        <LegacyCopiesPanel courseId={courseId} initial={legacyCopies} />
       ) : null}
       {initialTree ? (
         <CourseBuilder

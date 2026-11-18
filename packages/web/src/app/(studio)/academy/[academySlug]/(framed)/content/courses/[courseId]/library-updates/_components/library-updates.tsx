@@ -11,14 +11,15 @@ import { RichTextFrame } from '@/components/studio/rich-text-frame';
 import { reviewFieldKey } from '@/components/studio/library-review-label';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
+import { TestCaseComparison } from '@/components/studio/test-case-comparison';
 import { PrivateImageContext } from '@/components/editor/private-image-context';
 
 const GRADING_UNITS = /^exercise\.(testCase|limits|gradingProfile|submissionPolicy|manualAssessment|language|quiz)/;
 
 /** Review only the disputed parts. Internal release history is not an editing workflow. */
-export function LibraryUpdates({ academyId, courseId, canResolve, initial, nodeKey }: {
+export function LibraryUpdates({ academyId, courseId, canResolve, initial, nodeKey, courseHref }: {
   academyId: string; courseId: string; canResolve: boolean;
-  initial: AcademyLibrarySyncUpdates; nodeKey?: string;
+  initial: AcademyLibrarySyncUpdates; nodeKey?: string; courseHref: string;
 }) {
   const { t } = useTranslation('library-sync');
   const errorText = useErrorText();
@@ -51,20 +52,28 @@ export function LibraryUpdates({ academyId, courseId, canResolve, initial, nodeK
   async function resolve(action: LibrarySyncResolution) {
     if (!open) return;
     setBusy(true); setError(null);
+    let returningToCourse = false;
     try {
       await orpc.academyLibrarySync.resolve({ academyId, conflictId: open.id, action,
         expectedOursHash: open.expectedOursHash, expectedTheirsHash: open.expectedTheirsHash,
         requestKey: crypto.randomUUID() });
-      setSelectedId(null);
-      setNotice(t(action === 'ACCEPT_LIBRARY' ? 'actions.used_admin' : 'actions.kept_academy'));
-      setState(await orpc.academyLibrarySync.updates({ academyId, courseId, nodeKey }));
+      const updated = await orpc.academyLibrarySync.updates({ academyId, courseId, nodeKey });
       await Promise.all([
         client.invalidateQueries({ queryKey: ['academy', academyId, 'course', courseId] }),
         client.invalidateQueries({ queryKey: ['notifications', 'list'] }),
       ]);
+      if (!updated.conflicts.some(item => !nodeKey || item.nodeKey === nodeKey)) {
+        returningToCourse = true;
+        router.replace(courseHref);
+        router.refresh();
+        return;
+      }
+      setSelectedId(null);
+      setNotice(t(action === 'ACCEPT_LIBRARY' ? 'actions.used_admin' : 'actions.kept_academy'));
+      setState(updated);
       router.refresh();
     } catch (caught) { setError(caught); }
-    finally { setBusy(false); }
+    finally { if (!returningToCourse) setBusy(false); }
   }
 
   return <PrivateImageContext.Provider value={resolveImage}><div className="flex flex-col gap-5">
@@ -157,28 +166,7 @@ export function Version({
           title={`${label}: ${unitKey}`}
         />
       ) : unitKey.startsWith('exercise.testCase:') && object ? (
-        <table className="w-full text-left text-[12px]">
-          <thead>
-            <tr>
-              <th>{t('compare.field')}</th>
-              <th>{t('compare.value')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Object.entries(object).map(([key, item]) => (
-              <tr className="border-t border-border align-top" key={key}>
-                <th className="py-1 pr-2 font-semibold">
-                  {t(`compare.case.${key}`, { defaultValue: key })}
-                </th>
-                <td className="py-1">
-                  <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words">
-                    {typeof item === 'string' ? item : JSON.stringify(item)}
-                  </pre>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <TestCaseComparison value={object} previous={previous?.value} />
       ) : unitKey === 'mc.structure' &&
         object &&
         Array.isArray(object.options) ? (

@@ -77,3 +77,26 @@ Final validation details:
 - Disposable test databases and browser servers are cleaned up; Cove API port
   4000 is left free under AGENTS.md. The development migration and ignored local
   worker flag are recorded in the runbook; no production deployment.
+
+## Course-review UI follow-up
+
+- Return to the course detail page once the current material’s decisions are
+  complete (or all decisions on the course-wide review). Do not navigate away
+  while that material still has another pending part. An already-resolved
+  review URL redirects to the course during server rendering.
+- Use input and expected-output blocks for test cases. Render settings in a
+  stable order with readable defaults, expand them when changed, and preserve
+  literal whitespace in input/output.
+- Remove academy copy/review lists and their RPC reads from the admin course
+  authoring page. The course outline and publish summary are its only main reads.
+- No database migration is needed for these UI changes. Regression coverage
+  includes both review choices, pending parts, browser return navigation,
+  input/output comparisons and absence of admin copy tracking.
+
+Follow-up verification: 13 focused review/renderer tests, web and e2e typechecks,
+changed-file lint, and the isolated browser flow pass. The browser checks keeping
+an explanation, returning to the course with a remaining test-case review,
+readable input/output comparisons, accepting that test case, and returning to a
+clean course outline while preserving solved student progress. Admin copy and
+legacy-copy lists are absent. No backend query or migration was added; admin
+page data RPCs drop from four to two, and publish-panel refreshes from two to one.

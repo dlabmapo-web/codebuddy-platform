@@ -19,6 +19,8 @@ test("publishes a correction, preserves academy text and solved progress, and re
     page.getByRole("status").filter({ hasText: /published/i }),
   ).toBeVisible();
   await expect(page.getByText('Release history', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Academy copies', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Existing academy copies', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Release note, shown to academies')).toHaveCount(0);
   await page.screenshot({ path: 'test-results/library-sync/00-admin-publish-updates.png', fullPage: true });
   const context = await browser.newContext({
@@ -48,9 +50,19 @@ test("publishes a correction, preserves academy text and solved progress, and re
   await manager
     .getByRole("button", { name: "Keep academy version", exact: true })
     .click();
-  await expect(
-    manager.getByText("Nothing needs your decision.", { exact: true }),
-  ).toBeVisible();
+  await expect(manager).toHaveURL(routes.academyLearnCourse(f.slug, f.copyId));
+  await manager.screenshot({path:'test-results/library-sync/03-returned-to-course.png',fullPage:true});
+  const testCaseReview = manager.getByRole('link').filter({hasText:'Admin changes to review'}).filter({hasText:'Test case'});
+  await expect(testCaseReview).toBeVisible();
+  await testCaseReview.click();
+  const comparison = manager.locator('section[aria-label="Test case"]');
+  await expect(comparison.locator('pre[aria-label="Input"]:visible')).toHaveText(['4','6']);
+  await expect(comparison.locator('pre[aria-label="Expected output"]:visible')).toHaveText(['8','12']);
+  await expect(comparison.getByRole('table')).toHaveCount(0);
+  await manager.screenshot({path:'test-results/library-sync/04-test-case-input-output.png',fullPage:true});
+  await manager.getByRole('button',{name:'Use admin version',exact:true}).click();
+  await expect(manager).toHaveURL(routes.academyLearnCourse(f.slug, f.copyId));
+  await manager.screenshot({path:'test-results/library-sync/05-all-reviewed-course.png',fullPage:true});
   // A refreshed server render confirms the saved decision, not just client state.
   await manager.reload();
   await expect(

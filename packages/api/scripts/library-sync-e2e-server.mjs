@@ -266,6 +266,10 @@ NestFactory.create = async (...args) => {
   });
   explanationId = links.find((l) => l.nodeKey === ids.explanation).localId;
   exerciseId = links.find((l) => l.nodeKey === ids.exercise).localId;
+  await db.exerciseTestCase.updateMany({
+    where: { exerciseMaterialId: exerciseId },
+    data: { input: "4", expectedOutput: "8" },
+  });
   await db.explanationMaterial.update({
     where: { materialId: explanationId },
     data: { body: "<p>Academy custom text</p>", revision: { increment: 1 } },
@@ -315,7 +319,7 @@ NestFactory.create = async (...args) => {
   });
   await db.exerciseTestCase.updateMany({
     where: { exerciseMaterialId: ids.exercise },
-    data: { expectedOutput: "3" },
+    data: { input: "6", expectedOutput: "12" },
   });
   await db.course.update({
     where: { id: ids.master },

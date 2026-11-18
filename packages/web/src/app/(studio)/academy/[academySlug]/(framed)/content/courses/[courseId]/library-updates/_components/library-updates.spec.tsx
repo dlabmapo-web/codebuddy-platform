@@ -5,8 +5,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { LibraryUpdates, Version, changedLines } from './library-updates';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { LibrarySyncConflict, LibrarySyncConflictDetail } from '@cove/shared';
-const api = vi.hoisted(() => ({ updates: vi.fn(), conflict: vi.fn(), resolve: vi.fn(), refresh: vi.fn() }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: api.refresh }) }));
+const api = vi.hoisted(() => ({ updates: vi.fn(), conflict: vi.fn(), resolve: vi.fn(), refresh: vi.fn(), replace: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: api.refresh, replace: api.replace }) }));
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -23,17 +23,19 @@ const roots: ReturnType<typeof createRoot>[] = [];
 afterEach(async () => {
   for (const root of roots.splice(0)) await act(() => root.unmount());
   document.body.innerHTML = '';
+  vi.clearAllMocks();
 });
 async function show(
   unitKey: string,
   value: Parameters<typeof Version>[0]['value'],
+  previous?: Parameters<typeof Version>[0]['value'],
 ) {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
   roots.push(root);
   await act(() =>
-    root.render(<Version label="Academy" unitKey={unitKey} value={value} />),
+    root.render(<Version label="Academy" unitKey={unitKey} value={value} previous={previous} />),
   );
   return host;
 }
@@ -51,14 +53,12 @@ it('shows test-case input and output without hiding fields inside a serialized o
     kind: 'json',
     value: { input: '1', expectedOutput: '2', visibility: 'HIDDEN' },
   });
-  expect(
-    [...host.querySelectorAll('tbody th')].map((n) => n.textContent),
-  ).toEqual([
-    'compare.case.input',
-    'compare.case.expectedOutput',
-    'compare.case.visibility',
-  ]);
-  expect(host.textContent).toContain('HIDDEN');
+  expect(host.querySelector('table')).toBeNull();
+  expect([...host.querySelectorAll('pre')].map(node => node.getAttribute('aria-label'))).toEqual(['compare.case.input','compare.case.expectedOutput']);
+  expect([...host.querySelectorAll('pre')].map(node => node.textContent)).toEqual(['1','2']);
+  expect(host.textContent).toContain('compare.case.visibility_HIDDEN');
+  expect(host.textContent).not.toContain('null');
+  expect(host.querySelector('details')?.open).toBe(false);
 });
 it('shows structural sibling order as a numbered list', async () => {
   const host = await show('@order', {
@@ -69,6 +69,16 @@ it('shows structural sibling order as a numbered list', async () => {
     'Module › Lecture › A',
     'Module › Lecture › B',
   ]);
+});
+it('keeps test-case field order stable and opens settings when a grading setting changed', async () => {
+  const host = await show('exercise.testCase:key', {
+    kind:'json',value:{weight:2,expectedOutput:'8\n10',softPenalty:null,input:'4\n5',comparator:'STDOUT',visibility:'SAMPLE'},
+  }, {kind:'json',value:{input:'4\n5',expectedOutput:'8\n10',weight:1,visibility:'SAMPLE',comparator:'STDOUT'}});
+  expect([...host.querySelectorAll('pre')].map(node=>node.textContent)).toEqual(['4\n5','8\n10']);
+  expect(host.querySelector('details')?.open).toBe(true);
+  expect(host.textContent).toContain('compare.case.settings_changed');
+  expect(host.textContent).toContain('compare.case.comparator_STDOUT');
+  expect(host.textContent).not.toContain('null');
 });
 it('distinguishes a missing item from an unknown historical base', async () => {
   expect(
@@ -145,7 +155,7 @@ it('reviews one material with two explicit choices, without history or internal 
   const host=document.createElement('div');document.body.append(host);
   const root=createRoot(host);roots.push(root);
   await act(async()=>root.render(<QueryClientProvider client={new QueryClient()}><LibraryUpdates
-    academyId="academy" courseId="course" canResolve nodeKey="material-a"
+    academyId="academy" courseId="course" canResolve nodeKey="material-a" courseHref="/academy/test/learn/courses/course"
     initial={{sync:null,conflicts:[conflict,{...conflict,id:'b',groupId:'b',nodeKey:'material-b',path:['Other material']}],runs:[]}}
   /></QueryClientProvider>));
   // React Query batches observer notifications onto the next task.
@@ -158,6 +168,32 @@ it('reviews one material with two explicit choices, without history or internal 
   expect(buttons.some(button=>button.textContent==='actions.MANUAL')).toBe(false);
   await act(async()=>buttons.find(button=>button.textContent==='actions.KEEP_ACADEMY')!.click());
   expect(api.resolve).toHaveBeenCalledWith(expect.objectContaining({action:'KEEP_ACADEMY',expectedOursHash:'ours',expectedTheirsHash:'theirs'}));
-  expect(host.textContent).toContain('actions.kept_academy');
-  expect(host.textContent).toContain('empty.decisions');
+  expect(api.replace).toHaveBeenCalledWith('/academy/test/learn/courses/course');
+});
+
+it.each([true,false])('returns after a scoped review only when that material is finished (remaining here: %s)', async remainingHere => {
+  const change: LibrarySyncConflict = {
+    id:'one',groupId:'one',nodeKey:'material-a',unitKey:'exercise.description',kind:'CONCURRENT_EDIT',
+    path:['Module','Problem'],materialType:'PROGRAMMING_EXERCISE',releaseNumber:2,
+    message:null,reason:null,createdAt:'2026-11-18T00:00:00Z',actions:['ACCEPT_LIBRARY','KEEP_ACADEMY'],
+  };
+  const remaining = {...change,id:'two',groupId:'two',nodeKey:remainingHere?'material-a':'material-b',unitKey:'exercise.starterCode'};
+  const details = (item: LibrarySyncConflict): LibrarySyncConflictDetail => ({...item,
+    base:{kind:'text',value:'Original'},ours:{kind:'text',value:'Academy'},theirs:{kind:'text',value:'Admin'},
+    expectedOursHash:'ours',expectedTheirsHash:'theirs',members:[],dependents:[],
+  });
+  api.conflict.mockImplementation(async({conflictId}:{conflictId:string})=>details(conflictId==='one'?change:remaining));
+  api.resolve.mockResolvedValue({sync:null});
+  api.updates.mockResolvedValue({sync:null,conflicts:[remaining],runs:[]});
+  const host=document.createElement('div');document.body.append(host);
+  const root=createRoot(host);roots.push(root);
+  await act(async()=>root.render(<QueryClientProvider client={new QueryClient()}><LibraryUpdates
+    academyId="academy" courseId="course" canResolve nodeKey="material-a" courseHref="/academy/test/learn/courses/course"
+    initial={{sync:null,conflicts:[change,remaining],runs:[],detail:details(change)}}
+  /></QueryClientProvider>));
+  await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent==='actions.ACCEPT_LIBRARY')!.click());
+  if(remainingHere){
+    expect(api.replace).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('fields.starterCode');
+  } else expect(api.replace).toHaveBeenCalledWith('/academy/test/learn/courses/course');
 });

@@ -911,9 +911,10 @@ actions are labelled in the console's audit vocabulary and `platform-audit`
   together. Saves never sync or send notifications. Show a compact pending-change
   summary and validation blockers. No release notes, release history, or visible
   release numbers. Internal immutable releases and retention remain unchanged.
-- **Copies panel:** operational counts, failures/retry and pause/resume, collapsed
-  below the publish control. No visible release counters.
-- **Existing copies:** retain the conservative linking workflow.
+- **Academy copies:** no academy-by-academy sync, approval, pause or review
+  tracking in the authoring page. It reads only the course outline and pending
+  publish summary. Legacy linking and operational endpoints remain maintenance
+  tools, outside the normal library course editor.
 
 ### 18.2 Academy
 
@@ -932,6 +933,12 @@ actions are labelled in the console's audit vocabulary and `platform-audit`
   **Use admin version** / **Keep academy version**, applying only to the selected
   unit or explicitly grouped dependencies. Preserve backend manual resolution
   for compatibility, without adding a third default product action.
+- Finishing every pending decision for the material being reviewed returns to
+  the normal course detail page. Course-wide review returns when all decisions
+  are finished. Keeping a version completes a decision just like accepting one.
+- Test cases show labeled input and expected-output blocks in a stable order.
+  Scoring and limits are collapsible, expand if changed, and describe inherited
+  limits without exposing raw null values.
 - Render rich text with images, code differences, test-case fields, quiz answers,
   PDFs and videos appropriately. Preview assets only through an authorized
   conflict, with short-lived signed URLs. Preview failure must not block keeping

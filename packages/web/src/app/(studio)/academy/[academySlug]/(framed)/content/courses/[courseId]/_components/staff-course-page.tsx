@@ -79,6 +79,7 @@ export async function StaffCoursePage({
           canImport={canImport}
           courseId={courseId}
           initialTree={initialTree}
+          serverReadToken={crypto.randomUUID()}
         />
       ) : (
         <div className="rounded-card border border-danger/25 bg-danger/5 p-5">

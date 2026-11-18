@@ -48,6 +48,32 @@ it('uses the server outline without a duplicate mount read and refreshes through
   expect(getTree).not.toHaveBeenCalled();
 });
 
+it('applies a fresh server refresh to cached review rows without another read, and ignores replayed snapshots', async () => {
+  const before = { course: { id: 'course', title: 'Course', provenance: { linked: { openConflictCount: 0 } } }, modules: [] } as unknown as CourseOutline;
+  const pending = { ...before, course: { ...before.course, provenance: { linked: { openConflictCount: 1 } } } } as unknown as CourseOutline;
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  clients.push(client);
+  function Probe({ initialTree, token }: { initialTree: CourseOutline; token: string }) {
+    const state = useCourseBuilder({ target: { academyId: 'academy', courseId: 'course' }, initialTree, serverReadToken: token, canEditCurriculum: true, canEditExercises: true });
+    return <span>{state.tree.course.provenance?.linked?.openConflictCount}</span>;
+  }
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host); roots.push(root);
+  const firstToken = crypto.randomUUID(), refreshedToken = crypto.randomUUID();
+  const render = async (tree: CourseOutline, token: string) => {
+    await act(() => root.render(<QueryClientProvider client={client}><Probe initialTree={tree} token={token} /></QueryClientProvider>));
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+  };
+  await render(before, firstToken);
+  expect(host.textContent).toBe('0');
+  await render(pending, refreshedToken);
+  expect(host.textContent).toBe('1');
+  await render(before, firstToken);
+  expect(host.textContent).toBe('1');
+  expect(getOutline).not.toHaveBeenCalled();
+  expect(getTree).not.toHaveBeenCalled();
+});
+
 const movingMaterials = [
   ['Python', 'PROGRAMMING_EXERCISE', false], ['PDF', 'PDF_DOCUMENT', false],
   ['PDF + code', 'PROGRAMMING_EXERCISE', true], ['Turtle', 'TURTLE_EXERCISE', false],

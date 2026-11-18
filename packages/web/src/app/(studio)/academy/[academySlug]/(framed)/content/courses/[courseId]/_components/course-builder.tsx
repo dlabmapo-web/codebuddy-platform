@@ -25,6 +25,7 @@ export function CourseBuilder({
   canImport,
   courseId,
   initialTree,
+  serverReadToken,
   treeStaleTime = 30_000,
 }: {
   academyId: string;
@@ -33,6 +34,7 @@ export function CourseBuilder({
   canImport: boolean;
   courseId: string;
   initialTree: CourseTree;
+  serverReadToken?: string;
   treeStaleTime?: number;
 }) {
   const contentPaths = useContentBasePath();
@@ -44,6 +46,7 @@ export function CourseBuilder({
   const builder = useCourseBuilder({
     target: { academyId, courseId },
     initialTree,
+    serverReadToken,
     treeStaleTime,
     canEditCurriculum,
     canEditExercises,

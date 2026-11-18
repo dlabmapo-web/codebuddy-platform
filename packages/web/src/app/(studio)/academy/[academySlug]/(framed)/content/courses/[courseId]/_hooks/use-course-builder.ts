@@ -6,10 +6,11 @@ import { explanationApi } from '@/lib/explanation-api';
 import { pdfApi } from '@/lib/pdf-api';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { toApiError } from '@/lib/api-errors';
 import { orpc } from '@/lib/orpc';
+import { claimServerRead } from '@/lib/server-read';
 
 import {
   countLectures,
@@ -60,12 +61,14 @@ type BuilderTarget = {
 export function useCourseBuilder({
   target,
   initialTree,
+  serverReadToken,
   treeStaleTime = 30_000,
   canEditCurriculum,
   canEditExercises,
 }: {
   target: BuilderTarget;
   initialTree: CourseTree;
+  serverReadToken?: string;
   treeStaleTime?: number;
   canEditCurriculum: boolean;
   canEditExercises: boolean;
@@ -84,6 +87,14 @@ export function useCourseBuilder({
     staleTime: treeStaleTime,
     retry: false,
   });
+  // initialData only seeds an empty query. A same-course notification refresh
+  // supplies a new server snapshot to an already mounted/cached builder.
+  // Consume that snapshot once; back/forward must not replay an older tree.
+  useEffect(() => {
+    if (claimServerRead(serverReadToken)) {
+      queryClient.setQueryData(courseOutlineQueryKey(academyId, courseId), initialTree);
+    }
+  }, [academyId, courseId, initialTree, queryClient, serverReadToken]);
   const tree = treeQuery.data;
   const editable = canEditCurriculum;
   const exerciseEditable = canEditExercises;

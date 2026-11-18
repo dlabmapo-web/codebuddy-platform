@@ -68,8 +68,12 @@ test("10 library problems, 2 academy additions, conflicting and convergent edits
   const checks: Array<{ scenario: string; result: string }> = [];
   const observations: Record<string, unknown> = {};
   const consoleErrors: string[] = [];
-  for (const p of [admin, manager])
+  for (const p of [admin, manager]) {
     p.on("pageerror", (error) => consoleErrors.push(error.message));
+    p.on('console', message => {
+      if (/hydrated|hydration.mismatch|server rendered HTML/i.test(message.text())) consoleErrors.push(message.text());
+    });
+  }
   function token(actor: "admin" | "manager") {
     const cookie = f.auth[actor].cookies.find(
       (c: { name: string }) => c.name === "sb-127-auth-token",
@@ -123,6 +127,7 @@ test("10 library problems, 2 academy additions, conflicting and convergent edits
       await element.screenshot({
         path: resolve(artifacts, file),
         animations: "disabled",
+        caret: "initial",
       });
       if (viewport) await p.setViewportSize(viewport);
     } else
@@ -130,6 +135,7 @@ test("10 library problems, 2 academy additions, conflicting and convergent edits
         path: resolve(artifacts, file),
         fullPage: true,
         animations: "disabled",
+        caret: "initial",
       });
     screenshots.push({ file, caption });
     await info.attach(caption, {
@@ -720,18 +726,18 @@ test("10 library problems, 2 academy additions, conflicting and convergent edits
           "<p>Library P09: explicitly cover zero and negative inputs.</p>",
       });
       await publish(
-        "Release 6: P09 differing edits; academy manually combines both",
+        "Release 6: P09 differing edits; academy keeps its wording",
         6,
       );
       await settled(6);
       const panel = await compare(9);
       await screenshot(
         manager,
-        "10-manual-merge-before.png",
-        "Problem 09: third conflict, before manually combining both versions",
+        "10-keep-academy-before.png",
+        "Problem 09: third conflict, before keeping the academy version",
         panel,
       );
-      const merged = '<p>Academy P09: explain with a classroom example.</p>';
+      const kept = '<p>Academy P09: explain with a classroom example.</p>';
       await manager.getByRole('button', { name: 'Keep academy version', exact: true }).click();
       await expect(manager).toHaveURL(routes.academyLearnCourse(f.slug, copyId));
       const final = await copyTree();
@@ -739,7 +745,7 @@ test("10 library problems, 2 academy additions, conflicting and convergent edits
       expect(
         (await exercise("manager", copyTarget(9))).material!
           .programmingExercise!.description,
-      ).toBe(merged);
+      ).toBe(kept);
       expect(
         (await exercise("manager", copyTarget(2))).material!
           .programmingExercise!.description,
@@ -770,7 +776,7 @@ test("10 library problems, 2 academy additions, conflicting and convergent edits
       checks.push({
         scenario: "Final integrity",
         result:
-          "PASS — no open decisions; kept P02, converged P05, accepted P04, manually merged P09, retained P11/P12, retained archived P10, adopted P13.",
+          "PASS — no open decisions; kept P02, converged P05, accepted P04, kept P09, retained P11/P12, retained archived P10, adopted P13.",
       });
       expect(consoleErrors).toEqual([]);
     });

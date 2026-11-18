@@ -71,6 +71,20 @@ stop_learning_services() {
   fi
 }
 
+# A pre-sync Prisma client rejects the new enum value in a feature-list read.
+# The manifest key identifies releases that understand it, including those
+# with draining disabled. Clear only rollout gates before restoring an older
+# API; snapshots, jobs, baselines, decisions and academy content are retained.
+prepare_library_rollback() {
+  local target="$1"
+  if ! grep -q '^LIBRARY_SYNC_ENABLED=' "$deployment_env" ||
+     grep -q '^LIBRARY_SYNC_ENABLED=' "$target"; then
+    return 0
+  fi
+  compose --profile operations run --rm --entrypoint node migrate \
+    node_modules/tsx/dist/cli.mjs src/library-sync/prepare-production.ts --clear-academy-gates
+}
+
 fail() {
   printf 'ERROR: %s\n' "$*" >&2
   exit 1

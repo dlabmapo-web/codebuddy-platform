@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { afterAll, beforeAll, expect, it, describe } from 'vitest';
 import { PrismaClient } from '../generated/prisma/client.js';
-import { prepareLibrarySync } from './prepare.js';
+import { clearLibrarySyncGates, prepareLibrarySync } from './prepare.js';
 import { deleteSyncFixture } from './sync-fixture-cleanup.js';
 
 const url = process.env.COVE_INTEGRATION_DATABASE_URL;
@@ -47,5 +47,12 @@ describe.skipIf(!url)('library deployment preparation (disposable PostgreSQL)', 
     await expect(prepareLibrarySync(db, { enableAllAcademies: true })).rejects.toThrow('Cannot publish');
     expect(await db.libraryRelease.count({ where: { libraryCourseId: course.id } })).toBe(0);
     expect((await db.academyFeatureFlag.findUniqueOrThrow({ where: { academyId_feature: { academyId: ids.academy, feature: 'LIBRARY_COURSE_SYNC' } } })).isEnabled).toBe(false);
+  });
+
+  it('clears only enum-bearing rollout gates for an older API rollback', async () => {
+    expect(await clearLibrarySyncGates(db)).toEqual({ clearedAcademyGates: 1 });
+    expect(await db.academyFeatureFlag.count()).toBe(0);
+    expect(await db.libraryRelease.count({ where: { libraryCourseId: ids.master } })).toBe(1);
+    expect(await clearLibrarySyncGates(db)).toEqual({ clearedAcademyGates: 0 });
   });
 });

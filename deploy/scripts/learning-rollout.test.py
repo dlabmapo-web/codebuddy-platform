@@ -211,6 +211,48 @@ if os.environ.get('FAIL_APP') and args[-3:] == ['up', '-d', '--remove-orphans'] 
         self.assertEqual(len(app_starts), 1)
         self.assertFalse(app_starts[0]['candidate'])
 
+    def test_sync_gates_are_enabled_only_after_the_new_api_is_healthy(self):
+        self.prepare_deployment_fixture()
+        with self.candidate.open('a') as output:
+            output.write('LIBRARY_SYNC_ENABLED=true\n')
+        self.run_script('deploy.sh', str(self.candidate))
+        calls = self.deployment_calls()
+        api = next(i for i, call in enumerate(calls) if '--wait' in call['args'])
+        enable = next(i for i, call in enumerate(calls) if '--enable-all-academies' in call['args'])
+        app = next(i for i, call in enumerate(calls) if call['args'][-3:] == ['up', '-d', '--remove-orphans'])
+        self.assertLess(api, enable)
+        self.assertLess(enable, app)
+
+    def test_automatic_rollback_clears_new_enum_before_starting_an_old_api(self):
+        self.prepare_deployment_fixture()
+        with self.candidate.open('a') as output:
+            output.write('LIBRARY_SYNC_ENABLED=true\n')
+        self.env['FAIL_APP'] = '1'
+        self.assertEqual(self.run_script('deploy.sh', str(self.candidate), check=False).returncode, 43)
+        calls = self.deployment_calls()
+        clear = next(i for i, call in enumerate(calls) if '--clear-academy-gates' in call['args'])
+        restored = next(i for i, call in enumerate(calls) if call['args'][-3:] == ['up', '-d', '--remove-orphans'] and not call['candidate'])
+        self.assertLess(clear, restored)
+        self.assertTrue(calls[clear]['candidate'])
+
+    def test_manual_rollback_clears_gates_only_for_an_unaware_target(self):
+        self.prepare_deployment_fixture()
+        (self.root / 'state').mkdir()
+        previous = self.root / 'state/previous-deployment.env'
+        previous.write_text(self.previous_manifest)
+        self.manifest.write_text(self.candidate.read_text() + 'LIBRARY_SYNC_ENABLED=true\n')
+        self.run_script('rollback.sh')
+        calls = self.deployment_calls()
+        clear = next(i for i, call in enumerate(calls) if '--clear-academy-gates' in call['args'])
+        restored = next(i for i, call in enumerate(calls) if call['args'][-3:] == ['up', '-d', '--remove-orphans'])
+        self.assertLess(clear, restored)
+        # A newer target with draining off still understands the enum.
+        (self.root / 'calls.jsonl').unlink()
+        self.manifest.write_text(self.candidate.read_text() + 'LIBRARY_SYNC_ENABLED=true\n')
+        previous.write_text(self.previous_manifest + 'LIBRARY_SYNC_ENABLED=false\n')
+        self.run_script('rollback.sh')
+        self.assertFalse(any('--clear-academy-gates' in call['args'] for call in self.deployment_calls()))
+
     def test_automatic_rollback_stops_new_web_before_restoring_old_api(self):
         self.prepare_deployment_fixture()
         self.env['FAIL_APP'] = '1'

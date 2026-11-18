@@ -3,6 +3,12 @@ import { AuditService } from '../academies/audit.service.js';
 import { captureTree, lockCourseRow, releaseBlockers } from './release.js';
 import { latestOrInitialRelease, latestRelease } from './release-access.js';
 
+/** Older generated clients cannot deserialize this enum value, even when false. */
+export async function clearLibrarySyncGates(db: PrismaClient) {
+  const clearedAcademyGates = await db.$executeRaw`DELETE FROM academy_feature_flags WHERE feature::text='LIBRARY_COURSE_SYNC'`;
+  return { clearedAcademyGates };
+}
+
 /** One bounded, idempotent maintenance transaction per master, before API startup. */
 export async function prepareLibrarySync(db: PrismaClient, options: { checkOnly?: boolean; enableAllAcademies?: boolean } = {}) {
   const masters = await db.course.findMany({

@@ -70,21 +70,32 @@ expand deliberately after inspecting its history, conflicts and job failures.
 For the all-academy production rollout requested on 2026-11-18, the release
 workflow takes the `LIBRARY_SYNC_ENABLED` repository variable into the candidate
 deployment manifest. Compose passes that manifest value to the API; a rollback
-to an older manifest defaults it to false. Before API startup, deployment runs:
+to an older manifest defaults it to false. Before API startup, deployment runs
+preparation without options to create missing initial snapshots. Once the new
+API is healthy, all-academy enablement runs:
 
 ```sh
 node node_modules/tsx/dist/cli.mjs src/library-sync/prepare-production.ts --enable-all-academies
 ```
 
 The migration container supplies `DIRECT_URL` explicitly. Preparation captures
-initial releases for all visible, unretired library masters, then enables the
-academy gate for all active academies. It does not link existing copies, change
+initial releases for all visible, unretired library masters; the later enablement
+step enables the academy gate for all active academies. The old API must not see
+the new feature enum before it is replaced. Preparation does not link existing copies, change
 their content, or clear per-copy pauses. Repeating it reuses existing releases.
 Without global enablement, deployment still creates initial snapshots so academy
 library browsing remains available. `--check` validates missing snapshots without
 writing snapshots or feature flags. New academies added after the release need
 their `LIBRARY_COURSE_SYNC` row enabled during onboarding or the next all-academy
 preparation run.
+
+When restoring a release whose manifest predates `LIBRARY_SYNC_ENABLED`, both
+automatic and manual rollback run `--clear-academy-gates` using the current
+migration image before starting the older API. Older generated Prisma clients
+cannot deserialize the new enum value, including a disabled row. This removes
+only the rollout flags: releases, jobs, baselines, decisions, course content and
+grades are retained. A later all-academy preparation recreates the flags. A
+rollback between sync-aware releases keeps their academy gates.
 
 The authorized platform sync API provides `pause`, `resume`, and `retry`;
 these controls are not shown in the admin course page. Pause retains the newest

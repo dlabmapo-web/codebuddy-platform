@@ -14,6 +14,7 @@ install -m 600 "$deployment_env" "$current_copy"
 compose stop --timeout 30 studio
 "$script_dir/drain-turtle-browser.sh"
 stop_learning_services
+prepare_library_rollback "$previous"
 install -m 600 "$previous" "$deployment_env"
 
 compose pull home studio api judge-worker judge-sandbox mvp

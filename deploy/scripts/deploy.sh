@@ -18,6 +18,7 @@ candidate_copy="$state_dir/candidate-deployment.env"
 install -m 600 "$candidate" "$candidate_copy"
 
 had_previous=false
+library_gates_may_exist=false
 if [[ -f "$deployment_env" ]]; then
   install -m 600 "$deployment_env" "$state_dir/previous-deployment.env"
   had_previous=true
@@ -37,6 +38,9 @@ rollback_on_error() {
     # Fail closed: an unaware API must never see browser run IDs.
     "$script_dir/drain-turtle-browser.sh" || { printf 'Browser drain failed; rollback stopped before restoring the old API.\n' >&2; exit "$status"; }
     stop_learning_services
+    if [[ "$library_gates_may_exist" == true ]]; then
+      prepare_library_rollback "$state_dir/previous-deployment.env" || { printf 'Library gate cleanup failed; refusing to restore an incompatible API.\n' >&2; exit "$status"; }
+    fi
     install -m 600 "$state_dir/previous-deployment.env" "$deployment_env"
     if feature_enabled GUI_ENABLED; then
       "$script_dir/pin-gui-runtime.sh" || true
@@ -71,15 +75,18 @@ compose --profile operations run --rm --entrypoint node migrate \
 # Academy browsing reads immutable snapshots even when job draining is off.
 # Prepare existing published masters before replacing the API; fail closed if
 # one cannot be captured, rather than making the library disappear on rollout.
-library_sync_options=()
-if feature_enabled LIBRARY_SYNC_ENABLED; then
-  library_sync_options+=(--enable-all-academies)
-fi
 compose --profile operations run --rm --entrypoint node migrate \
-  node_modules/tsx/dist/cli.mjs src/library-sync/prepare-production.ts ${library_sync_options[@]+"${library_sync_options[@]}"}
+  node_modules/tsx/dist/cli.mjs src/library-sync/prepare-production.ts
 # Keep the existing web serving until the new API passes its health check.
 # getOutline is additive: the old web remains compatible during this stage.
 compose up -d --wait --wait-timeout "${HEALTH_TIMEOUT_SECONDS:-300}" api
+# Only the new API can deserialize the new internal feature enum. The old API
+# continues serving during snapshot capture and must not see these rows yet.
+if feature_enabled LIBRARY_SYNC_ENABLED; then
+  library_gates_may_exist=true
+  compose --profile operations run --rm --entrypoint node migrate \
+    node_modules/tsx/dist/cli.mjs src/library-sync/prepare-production.ts --enable-all-academies
+fi
 compose up -d --remove-orphans
 compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
 "$script_dir/wait-healthy.sh"

@@ -38,6 +38,7 @@ function createService(options: {
   exists?: number;
 } = {}) {
   const prisma = {
+    $queryRaw: vi.fn().mockResolvedValue([]).mockResolvedValueOnce(options.rows ?? [decision()]),
     user: {
       findUnique: vi.fn().mockResolvedValue({ id: userId, status: "ACTIVE" }),
     },
@@ -97,11 +98,10 @@ describe("NotificationsService.list", () => {
     const { prisma, service } = createService();
     await service.list(identity);
 
-    expect(prisma.academyJoinRequest.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { userId, status: { in: ["APPROVED", "REJECTED"] } },
-      }),
-    );
+    const sql = vi.mocked(prisma.$queryRaw).mock.calls[0];
+    expect(sql.slice(1)).toContain(userId);
+    expect(String(sql[0])).toContain('r.user_id=');
+
   });
 
   it("does not count an acknowledged decision as unread", async () => {

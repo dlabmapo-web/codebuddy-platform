@@ -1,0 +1,169 @@
+{
+  "banner": {
+    "linked": "라이브러리와 연결됨 · 릴리스 {{release}}",
+    "review_other": "관리자 변경 사항 {{count}}개를 검토해 주세요",
+    "open": "변경 사항 검토",
+    "preserved": "선택하기 전까지 학원의 콘텐츠가 유지됩니다. 아래 표시된 자료를 검토해 주세요.",
+    "review_one": "관리자 변경 사항 {{count}}개를 검토해 주세요"
+  },
+  "page": {
+    "title": "관리자 변경 사항 검토",
+    "description": "학원과 관리자가 수정한 부분을 비교하고 사용할 버전을 선택해 주세요.",
+    "back": "과정으로 돌아가기",
+    "not_linked": "이 과정은 콘텐츠 라이브러리와 연결되어 있지 않습니다.",
+    "parts": "검토할 부분",
+    "loading": "비교 내용을 불러오는 중…"
+  },
+  "status": {
+    "UP_TO_DATE": "최신",
+    "SYNCING": "업데이트 중",
+    "NEEDS_REVIEW": "관리자 변경 사항 검토",
+    "SYNC_FAILED": "동기화 실패 · 본사에 알렸습니다",
+    "SOURCE_RETIRED": "본사에서 지원 종료",
+    "release": "릴리스 {{applied}} / {{latest}}",
+    "customized_other": "학원 변경 {{count}}건 유지"
+  },
+  "tabs": {
+    "decisions": "결정 필요",
+    "history": "기록"
+  },
+  "empty": {
+    "decisions": "결정할 항목이 없습니다.",
+    "history": "아직 도착한 라이브러리 업데이트가 없습니다."
+  },
+  "kind": {
+    "CONCURRENT_EDIT": "학원과 본사가 모두 변경했습니다",
+    "UNKNOWN_BASE": "동기화 이전 사본입니다. 유지할 버전을 선택하세요",
+    "REMOVED_UPSTREAM_EDITED_LOCALLY": "본사가 삭제했지만 학원에서 변경한 항목입니다",
+    "EDITED_UPSTREAM_DELETED_LOCALLY": "본사가 변경했지만 학원에서 삭제한 항목입니다",
+    "REMOVED_UPSTREAM_HAS_LOCAL_CONTENT": "본사가 삭제했지만 학원 자체 콘텐츠가 들어 있습니다",
+    "PARENT_MISSING": "학원에서 삭제한 위치에 본사가 새 항목을 추가했습니다",
+    "PLACEMENT": "학원과 본사가 모두 순서를 바꿨습니다",
+    "INVALID_RESULT": "본사 변경을 학원 버전과 합칠 수 없습니다",
+    "AMBIGUOUS_LINK": "라이브러리 항목과 연결할 수 없습니다"
+  },
+  "compare": {
+    "base": "이전 공유 버전",
+    "ours": "현재 학원 버전",
+    "theirs": "관리자의 최신 버전",
+    "absent": "없음",
+    "unknown": "기록 없음",
+    "structural": "내용이 아니라 항목의 위치에 대한 결정입니다.",
+    "dependents": "다음 문제에서 이 PDF를 참조하고 있습니다. 삭제를 적용하기 전에 참조를 변경하세요.",
+    "group": "이 결정은 아래의 모든 항목에 적용됩니다. 전체 내용을 검토하세요.",
+    "field": "항목",
+    "value": "값",
+    "option": "선택지 {{number}}",
+    "correct": "정답",
+    "video": "동영상",
+    "diff": "이전 공유 버전과의 차이",
+    "diff_large": "변경 내용이 커서 인라인 차이 보기를 표시할 수 없습니다. 위의 전체 버전을 비교하세요.",
+    "shuffle": "선택지 순서 섞기",
+    "captions": "자막",
+    "formatting": "서식이 변경되었습니다. 위에 표시된 버전을 비교하세요.",
+    "case": {
+      "input": "입력",
+      "expectedOutput": "예상 출력",
+      "visibility": "공개 범위",
+      "comparator": "출력 비교 방식",
+      "weight": "배점 가중치",
+      "timeLimitMsOverride": "최대 시간 (ms)",
+      "softTimeLimitMs": "부분 점수 시간 (ms)",
+      "softPenalty": "부분 점수 감점",
+      "label": "레이블"
+    },
+    "show_base": "수정 전 공통 버전 보기",
+    "scope": "선택은 이 부분에만 적용됩니다. 다른 콘텐츠는 유지됩니다.",
+    "group_scope": "콘텐츠가 올바르게 작동하도록 관련 부분은 함께 적용됩니다. 다른 콘텐츠는 유지됩니다.",
+    "open_media": "새 탭에서 미리보기",
+    "preview_unavailable": "미리보기를 사용할 수 없습니다. 아래 파일 정보를 확인하거나 학원 버전을 유지할 수 있습니다."
+  },
+  "actions": {
+    "ACCEPT_LIBRARY": "관리자 버전 사용",
+    "KEEP_ACADEMY": "학원 버전 유지",
+    "MANUAL": "직접 병합",
+    "save_manual": "병합한 버전 저장",
+    "cancel": "취소",
+    "working": "저장 중…",
+    "decided": "결정을 저장했습니다.",
+    "used_admin": "검토한 부분에 관리자 버전을 적용했습니다.",
+    "kept_academy": "학원 버전을 유지했습니다. 이 관리자 업데이트의 검토를 완료했습니다."
+  },
+  "consequence": {
+    "grading": "이후 제출부터 이 기준으로 채점합니다. 기존 결과는 그대로 유지됩니다.",
+    "answer_key": "이후 응시부터 이 정답을 사용합니다. 기존 응시는 기존 정답을 유지합니다.",
+    "media": "교체된 영상은 시청 전 상태로 시작하며 이전 시청 기록은 보존됩니다."
+  },
+  "outcome": {
+    "APPLIED": "업데이트됨",
+    "KEPT": "학원 버전 유지",
+    "CONVERGED": "이미 일치",
+    "CONFLICT": "결정 필요",
+    "ADDED": "추가됨",
+    "REMOVED": "삭제됨",
+    "ARCHIVED": "본사에서 삭제 · 학생 기록을 위해 보관",
+    "MOVED": "이동됨",
+    "RESTORED": "복원됨",
+    "RESOLVED": "결정됨"
+  },
+  "history_release": "릴리스 {{number}}",
+  "archived": {
+    "badge": "본사에서 삭제됨 · 학생 기록 보존",
+    "tooltip": "본사가 삭제한 콘텐츠입니다. 학생들이 이미 한 학습 기록을 위해 숨긴 채로 남겨 둡니다. 열어 보고 수정할 수는 있지만 다시 공개하거나 옮길 수는 없으며, 이후 라이브러리 업데이트에서 다시 돌아올 수 있습니다."
+  },
+  "legacy": {
+    "title": "기존 자료 연결",
+    "description": "각 라이브러리 항목에 해당하는 기존 자료를 선택하세요. 제목과 순서만으로 연결하지 않습니다. 먼저 모듈과 강의를 연결하세요. 연결하지 않은 기존 자료는 아카데미 자료로 유지됩니다.",
+    "choose": "{{title}} 연결",
+    "select": "기존 항목 선택…",
+    "deleted": "이 라이브러리 항목을 강좌에 추가하지 않음",
+    "save": "연결 저장",
+    "add": "새 라이브러리 항목으로 추가"
+  },
+  "fields": {
+    "title": "제목",
+    "required": "필수 여부",
+    "description": "설명",
+    "input": "입력 형식",
+    "output": "출력 형식",
+    "constraints": "제약 조건",
+    "difficulty": "난이도",
+    "starterCode": "시작 코드",
+    "language": "프로그래밍 언어",
+    "limits": "실행 제한",
+    "grading": "채점 설정",
+    "submission": "제출 설정",
+    "feedback": "피드백 설정",
+    "answers": "정답 및 문항 설정",
+    "referencePdf": "참고 PDF",
+    "solution": "풀이",
+    "solutionOrder": "풀이 순서",
+    "testCase": "테스트 케이스",
+    "testOrder": "테스트 케이스 순서",
+    "hint": "힌트",
+    "hintOrder": "힌트 순서",
+    "body": "본문 설명",
+    "sideNotes": "보조 설명",
+    "pdf": "PDF 파일",
+    "video": "동영상 및 자막",
+    "instructions": "안내",
+    "modelAnswer": "모범 답안",
+    "starterFile": "시작 파일",
+    "entryPoint": "시작 지점",
+    "solutionFile": "풀이 파일",
+    "attachment": "첨부 파일",
+    "solutionAttachment": "풀이 첨부 파일",
+    "canvas": "캔버스 크기",
+    "execution": "실행 환경 설정",
+    "option": "선택지",
+    "answerExplanation": "정답 해설",
+    "answerRule": "정답 규칙",
+    "settings": "콘텐츠 설정",
+    "placement": "위치 및 순서",
+    "presence": "추가 또는 삭제된 콘텐츠",
+    "prompt": "질문"
+  },
+  "row": {
+    "review": "관리자 변경 사항 검토"
+  }
+}

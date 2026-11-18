@@ -47,7 +47,7 @@ function builderFor(lectureCount = 3): CourseBuilderState {
       { id: 'M2', title: 'Strings', position: 2, isVisible: true, lectures: lectures.slice(2) },
     ],
   } as unknown as CourseTree;
-  return { tree, move: vi.fn() } as unknown as CourseBuilderState;
+  return { tree, move: vi.fn(), isArchived: () => false } as unknown as CourseBuilderState;
 }
 
 const render = (builder = builderFor(), itemId = 'P3', kind: 'exercise' | 'lecture' = 'exercise') =>

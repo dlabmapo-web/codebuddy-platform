@@ -5,8 +5,10 @@ import { rolesHavePermission } from "@cove/shared";
 import { taughtMaterialWhere } from "../classes/assigned-course-access.js";
 import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
 import { privateSolutions, replaceExerciseSolutions, solutionOrder } from "./exercise-solutions.js";
+import { fingerprint, resolveItemKeys } from "./item-keys.js";
 import type { ExerciseSolutionEntry } from "@cove/shared";
 import { validatePdfReference, assertPublishedPdfReferences, detachSubtreePdfReferences } from "../documents/pdf-reference.js";
+import { archivedRows, assertNotArchived } from "./archived-content.js";
 import { assertLessonImages } from "./lesson-images.js";
 import { lockLibraryTitles, assertLibraryTitleAvailable } from "./library/library-title-lock.js";
 import {videoMetadata} from "../videos/video-metadata.js";
@@ -23,6 +25,8 @@ import {
   gradingProfileIssues,
   isCourseCustomized,
   librarySyncState,
+  linkedSyncChip,
+  type LibrarySyncRunStatus,
   semanticVersionForMode,
   stableKeyFromUuid,
   type CourseProvenance,
@@ -74,6 +78,17 @@ const sourceCourseInclude = {
   },
   sourceCourse: {
     select: { id: true, title: true, contentRevision: true, retiredAt: true },
+  },
+  // Library course sync: a linked copy's chip comes from its sync state, not
+  // from revision arithmetic that cannot see preserved customizations.
+  syncState: {
+    select: {
+      status: true,
+      appliedReleaseNumber: true,
+      targetReleaseNumber: true,
+      openConflictCount: true,
+      divergentUnitCount: true,
+    },
   },
 } as const;
 
@@ -133,11 +148,16 @@ const treeInclude = {
     },
   },
   ...sourceCourseInclude,
+  // The builder disables showing and moving archived rows (archived-content.ts).
+  syncLinks: { where: { state: "ARCHIVED", localId: { not: null } }, select: { localId: true } },
 } as const satisfies Prisma.CourseInclude;
 
 /** Explicit projection: do not fetch rich exercise/manual content for an outline. */
 const outlineInclude = {
   ...sourceCourseInclude,
+  syncState: { select: { ...sourceCourseInclude.syncState.select, reviewItems: true } },
+  // The builder disables showing and moving archived rows (archived-content.ts).
+  syncLinks: { where: { state: "ARCHIVED", localId: { not: null } }, select: { localId: true } },
   modules: {
     orderBy: [{ position: "asc" }, { id: "asc" }],
     select: {
@@ -213,7 +233,7 @@ type ExerciseWriteInput = {
   isVisible: boolean;
   testCases: ExerciseTestCaseDraft[];
   grading: ExerciseGradingProfile;
-  hints: Array<{ content: string; triggerExpression: string | null }>;
+  hints: Array<{ syncKey?: string; content: string; triggerExpression: string | null }>;
 };
 
 @Injectable()
@@ -428,16 +448,21 @@ export class CourseService {
     const course = await this.requireCourse(input.academyId, input.courseId);
     await this.prisma.$transaction(async (tx) => {
       await lockCourse(tx, input.courseId);
+      // Showing everything leaves library-archived rows, and what sits under
+      // them, hidden: they are kept for student work, not for teaching.
+      const archived = input.isVisible
+        ? await archivedRows(tx, course.id)
+        : { modules: [], lectures: [], materials: [] };
       const modules = await tx.courseModule.updateMany({
-        where: { courseId: course.id },
+        where: { courseId: course.id, ...(archived.modules.length ? { id: { notIn: archived.modules } } : {}) },
         data: { isVisible: input.isVisible },
       });
       const lectures = await tx.lecture.updateMany({
-        where: { courseModule: { courseId: course.id } },
+        where: { courseModule: { courseId: course.id }, ...(archived.lectures.length ? { id: { notIn: archived.lectures } } : {}) },
         data: { isVisible: input.isVisible },
       });
       const materials = await tx.material.updateMany({
-        where: { lecture: { courseModule: { courseId: course.id } } },
+        where: { lecture: { courseModule: { courseId: course.id } }, ...(archived.materials.length ? { id: { notIn: archived.materials } } : {}) },
         data: { isVisible: input.isVisible },
       });
       if (input.isVisible) await assertPublishedPdfReferences(tx, input.courseId);
@@ -571,6 +596,7 @@ export class CourseService {
     const current = await this.requireModule(input.courseId, input.moduleId);
     await this.prisma.$transaction(async (tx) => {
       await lockCourse(tx, input.courseId);
+      if (input.isVisible) await assertNotArchived(tx, input.courseId, { moduleIds: [current.id] });
       const updated = await tx.courseModule.update({
         where: { id: current.id },
         data: {
@@ -831,6 +857,7 @@ export class CourseService {
     const current = await this.requireLecture(input.courseId, input.lectureId);
     await this.prisma.$transaction(async (tx) => {
       await lockCourse(tx, input.courseId);
+      if (input.isVisible) await assertNotArchived(tx, input.courseId, { lectureIds: [current.id] });
       const updated = await tx.lecture.update({
         where: { id: current.id },
         data: {
@@ -1010,6 +1037,9 @@ export class CourseService {
         input.toIndex,
       );
       const reparenting = lecture.courseModuleId !== destination.id;
+      // Reordering in place is fine. Leaving an archived chapter would publish
+      // the lecture again, and entering one would trap it there.
+      if (reparenting) await assertNotArchived(tx, input.courseId, { lectureIds: [lecture.id], moduleIds: [destination.id] });
       const beforeIndex = reparenting
         ? await this.lectureIndex(tx, lecture.courseModuleId, lecture.id)
         : currentIds.indexOf(lecture.id);
@@ -1133,6 +1163,9 @@ export class CourseService {
         input.toIndex,
       );
       const reparenting = material.lectureId !== destination.id;
+      // Reordering in place is fine. Leaving an archived lecture would publish
+      // the material again, and entering one would trap it there.
+      if (reparenting) await assertNotArchived(tx, input.courseId, { materialIds: [material.id], lectureIds: [destination.id] });
       const beforeIndex = reparenting
         ? await this.materialIndex(tx, material.lectureId, material.id)
         : currentIds.indexOf(material.id);
@@ -1335,8 +1368,8 @@ export class CourseService {
                 input.grading.mode,
                 input.grading.inputPromptPolicy,
               ),
-              testCases: { create: testCaseCreates(input.testCases) },
-              hints: { create: hintCreates(input.hints) },
+              testCases: { create: testCaseCreates(input.testCases, testCaseKeys([], input.testCases)) },
+              hints: { create: hintCreates(input.hints, hintKeys([], input.hints)) },
             },
           },
         },
@@ -1402,6 +1435,7 @@ export class CourseService {
     const nextRevision = exercise.gradingRevision + (gradingChanged ? 1 : 0);
     const record = await this.prisma.$transaction(async (tx) => {
       await lockCourse(tx, input.courseId);
+      if (input.isVisible) await assertNotArchived(tx, input.courseId, { materialIds: [current.id] });
       const latest = await tx.programmingExercise.findUniqueOrThrow({ where: { materialId: current.id } });
       await validatePdfReference(tx, input, input.referencePdfMaterialId === undefined ? latest.referencePdfMaterialId : input.referencePdfMaterialId, input.isVisible);
       await assertLessonImages(tx, { academyId: input.academyId, courseId: input.courseId, html: input.description, previousHtml: latest.description });
@@ -1444,12 +1478,12 @@ export class CourseService {
         where: { id: current.id },
         data: { title: input.title.trim(), isVisible: input.isVisible },
       });
-      await replaceExerciseSolutions(tx, current.id, input.solutions);
+      await replaceExerciseSolutions(tx, current.id, input.solutions, exercise.solutions);
       await tx.exerciseTestCase.deleteMany({
         where: { exerciseMaterialId: current.id },
       });
       await tx.exerciseTestCase.createMany({
-        data: testCaseCreates(input.testCases).map((testCase) => ({
+        data: testCaseCreates(input.testCases, testCaseKeys(exercise.testCases, input.testCases)).map((testCase) => ({
           ...testCase,
           exerciseMaterialId: current.id,
         })),
@@ -1459,7 +1493,7 @@ export class CourseService {
       });
       if (input.hints.length > 0) {
         await tx.exerciseHint.createMany({
-          data: hintCreates(input.hints).map((hint) => ({
+          data: hintCreates(input.hints, hintKeys(exercise.hints, input.hints)).map((hint) => ({
             ...hint,
             exerciseMaterialId: current.id,
           })),
@@ -1525,6 +1559,7 @@ export class CourseService {
     const current = await this.requireExercise(input);
     await this.prisma.$transaction(async (tx) => {
       await lockCourse(tx, input.courseId);
+      if (input.isVisible) await assertNotArchived(tx, input.courseId, { materialIds: [current.id] });
       await tx.material.update({
         where: { id: current.id },
         data: { isVisible: input.isVisible },
@@ -1805,8 +1840,9 @@ function assertGradingSupported(
 }
 
 /** Every stored field of every case: grading reads all of them. */
-function testCaseCreates(testCases: ExerciseWriteInput["testCases"]) {
+function testCaseCreates(testCases: ExerciseWriteInput["testCases"], keys: string[]) {
   return testCases.map((testCase, index) => ({
+    syncKey: keys[index]!,
     position: index + 1,
     input: testCase.input,
     expectedOutput: testCase.expectedOutput,
@@ -1820,12 +1856,53 @@ function testCaseCreates(testCases: ExerciseWriteInput["testCases"]) {
   }));
 }
 
-function hintCreates(hints: ExerciseWriteInput["hints"]) {
+function hintCreates(hints: ExerciseWriteInput["hints"], keys: string[]) {
   return hints.map((hint, index) => ({
+    syncKey: keys[index]!,
     position: index + 1,
     content: hint.content.trim(),
     triggerExpression: emptyToNull(hint.triggerExpression),
   }));
+}
+
+const caseFingerprint = (testCase: {
+  input: string; expectedOutput: string; visibility: string; comparator: string; weight: number;
+  timeLimitMsOverride: number | null; softTimeLimitMs: number | null; softPenalty: number | null; label?: string | null;
+}) =>
+  fingerprint({
+    input: testCase.input,
+    expectedOutput: testCase.expectedOutput,
+    visibility: testCase.visibility,
+    comparator: testCase.comparator,
+    weight: testCase.weight,
+    timeLimitMsOverride: testCase.timeLimitMsOverride,
+    softTimeLimitMs: testCase.softTimeLimitMs,
+    softPenalty: testCase.softPenalty,
+    label: emptyToNull(testCase.label ?? null),
+  });
+
+/** Library-sync identity for a saved case list (item-keys.ts). */
+function testCaseKeys(
+  existing: ReadonlyArray<Parameters<typeof caseFingerprint>[0] & { syncKey: string }>,
+  incoming: ExerciseWriteInput["testCases"],
+) {
+  return resolveItemKeys(
+    existing.map((item) => ({ syncKey: item.syncKey, fingerprint: caseFingerprint(item) })),
+    incoming.map((item) => ({ syncKey: item.syncKey, fingerprint: caseFingerprint(item) })),
+  );
+}
+
+function hintKeys(
+  existing: ReadonlyArray<{ syncKey: string; content: string; triggerExpression: string | null }>,
+  incoming: ExerciseWriteInput["hints"],
+) {
+  return resolveItemKeys(
+    existing.map((item) => ({ syncKey: item.syncKey, fingerprint: fingerprint({ content: item.content, trigger: item.triggerExpression }) })),
+    incoming.map((item) => ({
+      syncKey: item.syncKey,
+      fingerprint: fingerprint({ content: item.content.trim(), trigger: emptyToNull(item.triggerExpression) }),
+    })),
+  );
 }
 
 function emptyToNull(value: string | null) {
@@ -1994,9 +2071,33 @@ function courseProvenance(course: {
     contentRevision: number;
     retiredAt: Date | null;
   } | null;
+  syncState?: {
+    status: LibrarySyncRunStatus;
+    appliedReleaseNumber: number;
+    targetReleaseNumber: number;
+    openConflictCount: number;
+    divergentUnitCount: number;
+    reviewItems?: Prisma.JsonValue;
+  } | null;
+  syncLinks?: Array<{ localId: string | null }>;
 }): CourseProvenance | null {
   const source = course.sourceCourse;
   if (!source) return null;
+  const linked = course.syncState;
+  if (linked)
+    return {
+      sourceCourseId: source.id,
+      sourceTitle: source.title,
+      syncState: linkedSyncChip({ ...linked, sourceRetiredAt: source.retiredAt }),
+      isCustomized: linked.divergentUnitCount > 0,
+      copiedAt: course.createdAt.toISOString(),
+      linked: {
+        releaseNumber: linked.appliedReleaseNumber,
+        openConflictCount: linked.openConflictCount,
+        ...(linked.reviewItems ? { reviewItems: linked.reviewItems as NonNullable<CourseProvenance["linked"]>["reviewItems"] } : {}),
+        ...(course.syncLinks ? { archivedIds: course.syncLinks.flatMap((link) => (link.localId ? [link.localId] : [])) } : {}),
+      },
+    };
   return {
     sourceCourseId: source.id,
     sourceTitle: source.title,
@@ -2188,6 +2289,7 @@ function serializeExercise(
     updatedAt: exercise.updatedAt.toISOString(),
     testCases: exercise.testCases.map((testCase) => ({
       id: testCase.id,
+      syncKey: testCase.syncKey,
       position: testCase.position,
       input: testCase.input,
       expectedOutput: testCase.expectedOutput,
@@ -2201,6 +2303,7 @@ function serializeExercise(
     })),
     hints: exercise.hints.map((hint) => ({
       id: hint.id,
+      syncKey: hint.syncKey,
       position: hint.position,
       content: hint.content,
       triggerExpression: hint.triggerExpression,

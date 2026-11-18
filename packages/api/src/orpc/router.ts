@@ -1,3 +1,4 @@
+import { LegacyLibraryLinkService } from "../library-sync/legacy-link.service.js";
 import { ClassroomService } from "../classes/classroom.service.js";
 import { ProgrammingReviewService } from "../learn/programming-review.service.js";
 import { StudentWorkHistoryService } from "../teach/student-work-history.service.js";
@@ -67,6 +68,9 @@ import { PlatformApplicationsService } from "../platform/platform-applications.s
 import { PlatformContentService } from "../platform/platform-content.service.js";
 import { PlatformLibraryService } from "../platform/platform-library.service.js";
 import { AcademyLibraryService } from "../content/library/academy-library.service.js";
+import { LibraryReleaseService } from "../library-sync/library-release.service.js";
+import { AcademyLibrarySyncService } from "../library-sync/academy-sync.service.js";
+import { createLibrarySyncRouters } from "../library-sync/library-sync.router.js";
 import { createPlatformApplicationsRouters } from "../platform/platform-applications.router.js";
 import { createPlatformContentRouters } from "../platform/platform-content.router.js";
 import { createPlatformOperationsRouters } from "../platform/platform-operations.router.js";
@@ -177,6 +181,9 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     }),
     platformLibraryService: app.get(PlatformLibraryService, { strict: false }),
     academyLibraryService: app.get(AcademyLibraryService, { strict: false }),
+    legacyLibraryLinkService: app.get(LegacyLibraryLinkService, { strict: false }),
+    libraryReleaseService: app.get(LibraryReleaseService, { strict: false }),
+    academyLibrarySyncService: app.get(AcademyLibrarySyncService, { strict: false }),
     platformContentService: app.get(PlatformContentService, {
       strict: false,
     }),
@@ -238,6 +245,7 @@ function createORPCRouter(deps: ORPCDeps) {
   const platformContentRouters = createPlatformContentRouters(os, deps);
   const platformLibraryRouters = createPlatformLibraryRouters(os, deps);
   const academyLibraryRouters = createAcademyLibraryRouters(os, deps);
+  const librarySyncRouters = createLibrarySyncRouters(os, deps);
   const platformInvitationsRouters = createPlatformInvitationsRouters(os, deps);
   const platformRankingRouters = createPlatformRankingRouters(os, deps);
   const platformSettingsRouters = createPlatformSettingsRouters(os, deps);
@@ -261,6 +269,7 @@ function createORPCRouter(deps: ORPCDeps) {
     ...platformContentRouters,
     ...platformLibraryRouters,
     ...academyLibraryRouters,
+    ...librarySyncRouters,
     ...platformInvitationsRouters,
     ...platformRankingRouters,
     ...platformSettingsRouters,

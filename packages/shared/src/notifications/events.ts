@@ -32,13 +32,15 @@ export const notificationRooms = {
 } as const;
 
 /**
- * One event, server to client. There are no client events: a socket on this
+ * Server-to-client events. Course changes invalidate the authorized list;
+ * they carry no course or content payload. There are no client events: a socket on this
  * namespace listens and sends nothing, which is what keeps it free of the rate
  * limiter, the invalid-payload budget and the revocation machinery that
  * `/monitoring` needs.
  */
 export const notificationServerEvents = {
   created: "notification.created",
+  changed: "notification.changed",
 } as const;
 
 /**

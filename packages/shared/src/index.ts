@@ -8,6 +8,7 @@ export * from "./memberships/index.js";
 export * from "./monitoring/index.js";
 export * from "./notifications/index.js";
 export * from "./platform/index.js";
+export * from "./library-sync/sync.js";
 export * from "./points/index.js";
 export * from "./profile/index.js";
 

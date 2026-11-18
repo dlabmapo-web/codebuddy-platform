@@ -129,5 +129,47 @@
         "description": "HTML, CSS, JavaScript. 학생은 자신의 편집기에서 코딩하므로 코딩 실습은 제공하지 않습니다."
       }
     }
+  },
+  "sync": {
+    "heading": "라이브러리 업데이트",
+    "latest": "릴리스 {{number}} · {{date}} 게시",
+    "none": "아직 릴리스 없음",
+    "changes": "수정 {{changed}}개 · 추가 {{added}}개 · 삭제 {{removed}}개 게시 준비 완료",
+    "no_changes": "저장된 변경 사항이 모두 게시되었습니다.",
+    "first": "게시하면 첫 릴리스가 만들어집니다",
+    "note": "릴리스 메모 (학원에 표시됨)",
+    "publish": "업데이트 게시",
+    "publishing": "게시 중…",
+    "published": "릴리스 {{number}} 게시됨",
+    "blockers": "게시 전에 수정하세요: {{list}}",
+    "copies_heading": "학원 사본",
+    "copies_empty": "아직 이 과정을 가져간 학원이 없습니다.",
+    "copy_release": "릴리스 {{applied}} / {{target}}",
+    "conflicts_other": "결정 대기 {{count}}건",
+    "retry": "다시 시도",
+    "pause": "일시 중지",
+    "resume": "재개",
+    "paused": "일시 중지됨",
+    "failed": "실패: {{code}}",
+    "status": {
+      "IDLE": "동기화됨",
+      "PENDING": "대기 중",
+      "RUNNING": "업데이트 중",
+      "FAILED": "실패",
+      "PAUSED": "일시 중지됨"
+    },
+    "history": "배포 이력",
+    "rollout": "{{synced}}개 동기화 · {{pending}}개 대기 · {{needsReview}}개 검토 필요 · {{failed}}개 실패",
+    "last_run": "최근 실행: {{date}} UTC",
+    "batch_help": "강좌의 변경 사항을 저장한 뒤 한 번에 게시하세요. 학원의 수정 내용에 검토가 필요한 경우에만 알림이 전송됩니다.",
+    "batch_published": "업데이트를 게시했습니다. 학원 사본이 자동으로 동기화됩니다."
+  },
+  "legacy": {
+    "title": "기존 아카데미 복사 강좌",
+    "description": "기존 강좌를 게시된 업데이트에 연결합니다. 자료 연결은 아카데미 편집자가 검토하며 기존 내용은 보존됩니다.",
+    "preview": "연결 검토",
+    "review": "라이브러리 항목 {{count}}개의 연결을 검토해야 합니다. 기존 내용은 덮어쓰지 않습니다.",
+    "link": "이 복사 강좌 연결",
+    "cancel": "취소"
   }
 }

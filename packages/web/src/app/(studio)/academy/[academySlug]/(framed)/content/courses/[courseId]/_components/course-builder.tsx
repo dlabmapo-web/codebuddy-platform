@@ -3,10 +3,12 @@
 import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 
 import type { CourseOutline as CourseTree } from '@cove/shared';
-import { Plus } from 'lucide-react';
+import { Plus, AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
+import { routes } from '@/lib/routes';
+import { useContentAcademySlug, useContentSurface } from '@/components/studio/content-base-path-provider';
 
 import { useTranslation } from 'react-i18next';
-import { useLayoutTranslation } from '@/i18n';
 import { useErrorText } from '@/i18n/client/use-error-text';
 
 import { useCourseBuilder } from '../_hooks/use-course-builder';
@@ -35,6 +37,9 @@ export function CourseBuilder({
 }) {
   const contentPaths = useContentBasePath();
   const { t } = useTranslation('content');
+  const { t: sync } = useTranslation('library-sync');
+  const academySlug = useContentAcademySlug();
+  const surface = useContentSurface();
   const errorText = useErrorText();
   const builder = useCourseBuilder({
     target: { academyId, courseId },
@@ -54,6 +59,16 @@ export function CourseBuilder({
         courseId={courseId}
       />
 
+      {surface === 'academy' && builder.editable && (builder.tree.course.provenance?.linked?.openConflictCount ?? 0) > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-draft/25 bg-draft-soft px-4 py-3" role="status">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle aria-hidden className="mt-0.5 size-4 shrink-0 text-draft" />
+            <div><p className="text-[13.5px] font-bold text-ink">{sync('banner.review', { count: builder.tree.course.provenance!.linked!.openConflictCount })}</p>
+            <p className="mt-0.5 text-[13px] text-sub">{sync('banner.preserved')}</p></div>
+          </div>
+          <Link className="rounded text-[13px] font-bold text-draft underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-brand" href={routes.academyCourseLibraryUpdates(academySlug, courseId)}>{sync('banner.open')}</Link>
+        </div>
+      ) : null}
       <ContentReadinessNotice builder={builder} />
 
       <div>

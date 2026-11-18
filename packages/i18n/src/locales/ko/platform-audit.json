@@ -169,6 +169,17 @@
         "deleted": "설명 자료 삭제",
         "moved": "설명 자료 이동",
         "visibility": "설명 자료 공개 설정 변경"
+      },
+      "library_release": {
+        "published": "라이브러리 업데이트 게시"
+      },
+      "library_sync": {
+        "applied": "사본에 라이브러리 업데이트 적용",
+        "conflict_resolved": "라이브러리 업데이트 결정",
+        "paused": "라이브러리 동기화 일시 중지",
+        "resumed": "라이브러리 동기화 재개",
+        "legacy_linked": "기존 강좌를 라이브러리 업데이트에 연결",
+        "link_resolved": "라이브러리 자료 연결 검토"
       }
     },
     "platform": {

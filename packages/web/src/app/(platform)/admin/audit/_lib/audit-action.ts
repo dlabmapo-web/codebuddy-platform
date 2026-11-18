@@ -199,6 +199,13 @@ export const auditActionLabels: Record<
   'class.updated': 'action.class.updated',
   'content.course.adopted_from_library':
     'action.content.course.adopted_from_library',
+  'content.library_release.published': 'action.content.library_release.published',
+  'content.library_sync.legacy_linked': 'action.content.library_sync.legacy_linked',
+  'content.library_sync.link_resolved': 'action.content.library_sync.link_resolved',
+  'content.library_sync.applied': 'action.content.library_sync.applied',
+  'content.library_sync.conflict_resolved': 'action.content.library_sync.conflict_resolved',
+  'content.library_sync.paused': 'action.content.library_sync.paused',
+  'content.library_sync.resumed': 'action.content.library_sync.resumed',
   'content.course.content_visibility_changed':
     'action.content.course.content_visibility_changed',
   'content.course.created': 'action.content.course.created',

@@ -1,6 +1,8 @@
-import { copyCourseTree, courseCopyInclude } from "./course-tree-copy.js";
-import { videoMetadata } from "../../videos/video-metadata.js";
-import { pdfMetadata } from "../../documents/pdf-metadata.js";
+import { releasedLibrary, availableRelease, previewRelease } from "../../library-sync/release-preview.js";
+import { latestOrInitialRelease, releaseCourseDescription } from "../../library-sync/release-access.js";
+import { lockCourseRow } from "../../library-sync/release.js";
+import { runCopySync } from "../../library-sync/sync-run.js";
+import { SyncWriteError } from "../../library-sync/writer.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import type { AvailableLibraryCourse } from "@cove/shared";
@@ -16,16 +18,9 @@ import { toCourseSummary } from "../course.service.js";
 /**
  * The content library, as an academy uses it.
  *
- * An academy adopts a master course by taking a **complete copy** of its tree.
- * Nothing is shared afterwards: from the moment the transaction commits, the
- * copy is an ordinary course of that academy and every existing endpoint
- * treats it as one. Head office's later edits never reach it, which is the
- * point — a live shared course would rewrite what a branch is teaching that
- * afternoon, and `Class → ClassCourse → Course → academyId` would stop naming
- * one academy.
- *
- * What the branch gets instead is a *status*, computed from revisions that
- * already exist, telling them whether head office has moved on.
+ * Adoption materializes an immutable release into an academy-owned tree.
+ * Published updates are merged into linked copies; academy edits are preserved
+ * and overlapping edits become review decisions.
  *
  * Which library an academy sees is never a parameter. It follows from the
  * academy's own `organizationId`, so a customer outside the franchise sees an
@@ -52,67 +47,8 @@ export class AcademyLibraryService {
     const library = await this.libraryFor(input.academyId);
     if (!library) return { courses: [] };
 
-    const records = await this.prisma.course.findMany({
-      where: {
-        academyId: library,
-        // Published and not withdrawn. A draft is head office's unfinished
-        // work and must not be adoptable while it is being written.
-        isVisible: true,
-        retiredAt: null,
-      },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        language: true,
-        contentRevision: true,
-        updatedAt: true,
-        _count: { select: { modules: true } },
-        modules: {
-          select: {
-            _count: { select: { lectures: true } },
-            lectures: { select: { _count: { select: { materials: {where:{type:"PROGRAMMING_EXERCISE"}} } } } },
-          },
-        },
-        // What this academy has already taken from this master. One query for
-        // every row, filtered to the caller's academy, so a branch sees its
-        // own adoptions and never another's.
-        copies: {
-          where: { academyId: input.academyId },
-          select: { id: true, title: true },
-        },
-      },
-      orderBy: [{ title: "asc" }, { id: "asc" }],
-    });
-
-    return {
-      courses: records.map((record) => ({
-        id: record.id,
-        title: record.title,
-        description: record.description,
-        language: record.language,
-        contentRevision: record.contentRevision,
-        moduleCount: record._count.modules,
-        lectureCount: record.modules.reduce(
-          (sum, module) => sum + module._count.lectures,
-          0,
-        ),
-        exerciseCount: record.modules.reduce(
-          (sum, module) =>
-            sum +
-            module.lectures.reduce(
-              (inner, lecture) => inner + lecture._count.materials,
-              0,
-            ),
-          0,
-        ),
-        existingCopies: record.copies.map((copy) => ({
-          courseId: copy.id,
-          title: copy.title,
-        })),
-        updatedAt: record.updatedAt.toISOString(),
-      })),
-    };
+    const rows = await releasedLibrary(this.prisma, library, input.academyId);
+    return { courses: rows.map(availableRelease) };
   }
 
   /**
@@ -138,45 +74,10 @@ export class AcademyLibraryService {
       input.libraryCourseId,
     );
 
-    const tree = await this.prisma.course.findUniqueOrThrow({
-      where: { id: course.id },
-      include: previewInclude,
-    });
-
-    return {
-      course: toCourseSummary(tree),
-      modules: tree.modules.map((courseModule) => ({
-        id: courseModule.id,
-        title: courseModule.title,
-        description: courseModule.description,
-        position: courseModule.position,
-        isVisible: courseModule.isVisible,
-        lectures: courseModule.lectures.map((lecture) => ({
-          id: lecture.id,
-          title: lecture.title,
-          description: lecture.description,
-          position: lecture.position,
-          isVisible: lecture.isVisible,
-          materials: lecture.materials.map((material) => ({
-            id: material.id,
-            type: material.type,
-            title: material.title,
-            position: material.position,
-            isRequired: material.isRequired,
-            isVisible: material.isVisible,
-            // Null throughout: a preview says what is in the course, never
-            // what the answers are. The branch owns a full copy the moment it
-            // adopts, and not one moment sooner.
-            videoLesson:material.videoLesson?videoMetadata(material.videoLesson):null,
-          pdfDocument: material.pdfDocument
-              ? pdfMetadata(material.pdfDocument)
-              : null,
-            manualMaterial:material.manualMaterial?{revision:material.manualMaterial.revision,submitEnabled:material.manualMaterial.submitEnabled,includeInScore:material.manualMaterial.includeInScore,maximumHundredths:material.manualMaterial.maximumHundredths}:null,
-            programmingExercise: null,
-          })),
-        })),
-      })),
-    };
+    const library = await this.libraryFor(input.academyId);
+    const [row] = library ? await releasedLibrary(this.prisma, library, input.academyId, course.id) : [];
+    if (!row) throw new AppException("LIBRARY_COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
+    return previewRelease(row);
   }
 
   /**
@@ -214,36 +115,59 @@ export class AcademyLibraryService {
       throw new AppException("LIBRARY_ADOPTION_CONFLICT", HttpStatus.CONFLICT);
     }
 
-    const source = await this.prisma.course.findUniqueOrThrow({
-      where: { id: master.id },
-      include: courseCopyInclude,
-    });
-
     const courseId = randomUUID();
-    // Prisma's default 5 s is too short for a large course's bulk inserts over
-    // the database link; the same budget the platform library import gives it.
+    // Adoption copies the latest *published release*, never the working tree
+    // (library sync design D4, §6.3): head office's unfinished edits do not
+    // reach a new copy. The master's row lock is the publish lock, held until
+    // the copy's link and sync state exist, so a concurrent publish either
+    // fans out to this copy or completes before it picks its release.
     const created = await this.prisma.$transaction(async (tx) => {
+      await lockCourseRow(tx, master.id);
+      const release = await latestOrInitialRelease(tx, master.id, this.audit);
+      const description = await releaseCourseDescription(tx, release.id, master.id);
+
       const course = await tx.course.create({
         data: {
           id: courseId,
           academyId: input.academyId,
           title,
-          description: source.description,
-          // The copy is written in the master's language, and so are its
-          // exercises (each keeps its own, copied by `copyCourseTree`).
-          language: source.language,
+          description,
+          // The copy is written in the release's language, and so are its
+          // exercises (each keeps its own).
+          language: release.language,
           // Visible on arrival, with its whole tree: students see it once it is
           // assigned to their class. Hiding it stays one switch away.
           isVisible: true,
           contentRevision: 1,
           baselineRevision: 1,
-          sourceCourseId: source.id,
-          sourceContentRevision: source.contentRevision,
+          sourceCourseId: master.id,
+          sourceContentRevision: release.libraryContentRevision,
           createdByUserId: actor.userId,
         },
       });
+      await tx.courseSyncState.create({
+        data: {
+          courseId,
+          libraryCourseId: master.id,
+          linkMethod: "ADOPTED",
+          baseReleaseId: release.id,
+          appliedReleaseNumber: release.number,
+          targetReleaseId: release.id,
+          targetReleaseNumber: release.number,
+          status: "IDLE",
+        },
+      });
 
-      await copyCourseTree(tx, source, courseId, "ACADEMY_ADOPTION");
+      // The same writer a sync uses, from an empty copy, with base = the
+      // release: every node arrives linked and the academy's chosen title is
+      // its own customization from the start.
+      try {
+        await runCopySync(tx, this.audit, { copyCourseId: courseId, fence: null, adoption: true });
+      } catch (error) {
+        // An asset the release names is no longer ready: nothing is copied.
+        if (error instanceof SyncWriteError) throw new AppException("LIBRARY_IMPORT_CONTENT_INVALID", HttpStatus.CONFLICT, error.code);
+        throw error;
+      }
 
       await this.audit.write(tx, {
         actorUserId: actor.userId,
@@ -252,14 +176,15 @@ export class AcademyLibraryService {
         targetType: "Course",
         targetId: course.id,
         after: {
-          sourceCourseId: source.id,
-          sourceContentRevision: source.contentRevision,
+          sourceCourseId: master.id,
+          sourceContentRevision: release.libraryContentRevision,
+          releaseNumber: release.number,
           title,
         },
       });
 
       return course;
-    }, { maxWait: 5_000, timeout: 30_000 });
+    }, { maxWait: 5_000, timeout: 60_000 });
 
     const summary = await this.prisma.course.findUniqueOrThrow({
       where: { id: created.id },
@@ -336,26 +261,3 @@ const summaryInclude = {
     select: { id: true, title: true, contentRevision: true, retiredAt: true },
   },
 } as const satisfies Prisma.CourseInclude;
-
-/** The outline only — no exercise bodies, no test cases. */
-const previewInclude = {
-  modules: {
-    orderBy: [{ position: "asc" }, { id: "asc" }],
-    include: {
-      lectures: {
-        orderBy: [{ position: "asc" }, { id: "asc" }],
-        include: {
-          materials: {
-            orderBy: [{ position: "asc" }, { id: "asc" }],
-            include: { videoLesson:{include:{asset:true}},manualMaterial:true,pdfDocument: { include: { asset: true } } },
-          },
-        },
-      },
-    },
-  },
-  sourceCourse: {
-    select: { id: true, title: true, contentRevision: true, retiredAt: true },
-  },
-} as const satisfies Prisma.CourseInclude;
-
-/** Everything the copy has to carry across. */

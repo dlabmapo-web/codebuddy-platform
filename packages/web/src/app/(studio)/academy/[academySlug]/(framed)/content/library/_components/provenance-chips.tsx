@@ -1,7 +1,7 @@
 'use client';
 
 import type { CourseProvenance } from '@cove/shared';
-import { Archive, ArrowUpCircle, CheckCircle2, PencilLine } from 'lucide-react';
+import { AlertTriangle, Archive, ArrowUpCircle, CheckCircle2, GitMerge, Loader2, PencilLine } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -22,6 +22,26 @@ const sync = {
     tone: 'bg-retired-soft text-retired',
     label: 'sync_source_retired',
     hint: 'retired_hint',
+  },
+  // A copy linked by library course sync: updates arrive on their own, so the
+  // chip says where that stands rather than inviting a fresh copy.
+  SYNCING: {
+    icon: Loader2,
+    tone: 'bg-canvas text-sub',
+    label: 'sync_syncing',
+    hint: 'syncing_hint',
+  },
+  NEEDS_REVIEW: {
+    icon: GitMerge,
+    tone: 'bg-brand-soft text-brand',
+    label: 'sync_needs_review',
+    hint: 'needs_review_hint',
+  },
+  SYNC_FAILED: {
+    icon: AlertTriangle,
+    tone: 'bg-danger/10 text-danger',
+    label: 'sync_failed',
+    hint: 'failed_hint',
   },
 } as const satisfies Record<
   CourseProvenance['syncState'],
@@ -47,6 +67,7 @@ export function ProvenanceChips({
   provenance: CourseProvenance;
 }) {
   const { t } = useTranslation('academy-library');
+  if (provenance.linked && provenance.syncState === 'UP_TO_DATE') return null;
   const state = sync[provenance.syncState];
   const Icon = state.icon;
   const hint = 'hint' in state ? t(state.hint) : undefined;
@@ -60,7 +81,7 @@ export function ProvenanceChips({
         <Icon className="size-3.5" strokeWidth={2.5} />
         {t(state.label)}
       </span>
-      {provenance.isCustomized ? (
+      {provenance.isCustomized && !provenance.linked ? (
         <span
           className="inline-flex items-center gap-1.5 rounded-full bg-course-b-soft px-2.5 py-1 text-[12.5px] font-bold text-course-b"
           title={t('customized_hint')}

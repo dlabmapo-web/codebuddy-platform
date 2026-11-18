@@ -9,7 +9,7 @@ import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-
 
 import type { CourseBuilderState } from '../_hooks/use-course-builder';
 import type { CourseModule } from '../_lib/course-tree';
-import { RowVisibility } from './builder-controls';
+import { ArchivedBadge, RowVisibility } from './builder-controls';
 import { DragHandle, DropIndicator, useOutlineRowDnd } from './builder-dnd';
 import { DeleteModal } from './delete-modal';
 import { MoveModal } from './move-modal';
@@ -52,6 +52,8 @@ export function ModuleCard({
   );
 
   const open = !builder.isCollapsed(courseModule.id);
+  // Removed by head office and kept for student work: shown, never published again.
+  const archived = builder.isArchived(courseModule.id);
   // A chapter header takes a dragged chapter beside it and a dragged lecture
   // into its list, which is how a lecture reaches a collapsed or empty chapter.
   const { dropEdge, handle, isDragging, setNodeRef } = useOutlineRowDnd({
@@ -60,7 +62,7 @@ export function ModuleCard({
     item: { kind: 'module', id: courseModule.id, title: courseModule.title },
     target: {
       row: { kind: 'module', id: courseModule.id },
-      container: { accepts: 'lecture', parentId: courseModule.id },
+      container: archived ? undefined : { accepts: 'lecture', parentId: courseModule.id },
     },
   });
 
@@ -106,6 +108,7 @@ export function ModuleCard({
             <p className="truncate text-[16.5px] font-bold tracking-[-0.01em]">
               {courseModule.title}
             </p>
+            {builder.isArchivedRoot(courseModule.id) ? <ArchivedBadge /> : null}
           </div>
           <p className="text-[13px] text-sub">
             {t('module.lecture_count', {
@@ -123,7 +126,7 @@ export function ModuleCard({
         {visibilityIsReal ? (
           <RowVisibility
             busy={builder.visibilityPending(courseModule.id)}
-            editable={builder.editable}
+            editable={builder.editable && !archived}
             effectivelyVisible={effectivelyVisible}
             isVisible={courseModule.isVisible}
             onChange={(next) => {
@@ -163,7 +166,7 @@ export function ModuleCard({
         ))}
       </ul>
 
-      {builder.editable ? (
+      {builder.editable && !archived ? (
         addingLecture ? (
           <form
             className="flex flex-wrap gap-2 border-t border-border bg-canvas p-3"

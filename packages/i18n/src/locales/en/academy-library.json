@@ -22,5 +22,11 @@
   "update_hint": "Head office has changed this course since you copied it. Take a fresh copy to compare.",
   "retired_hint": "Head office has withdrawn this course. Your copy keeps working.",
   "unavailable_heading": "The library could not be read",
-  "unavailable_body": "Reload the page. If it keeps failing, ask your manager whether curriculum editing is available to you."
+  "unavailable_body": "Reload the page. If it keeps failing, ask your manager whether curriculum editing is available to you.",
+  "sync_syncing": "Updating",
+  "sync_needs_review": "Admin changes to review",
+  "sync_failed": "Sync failed",
+  "syncing_hint": "A library update is being applied.",
+  "needs_review_hint": "Head office and this academy changed the same content. Open Library updates to decide.",
+  "failed_hint": "The last library update could not be applied. Head office has been told."
 }

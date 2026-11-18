@@ -169,6 +169,17 @@
         "deleted": "Explanation deleted",
         "moved": "Explanation moved",
         "visibility": "Explanation shown or hidden"
+      },
+      "library_release": {
+        "published": "Library update published"
+      },
+      "library_sync": {
+        "applied": "Library update applied to a copy",
+        "conflict_resolved": "Library update decision made",
+        "paused": "Library sync paused",
+        "resumed": "Library sync resumed",
+        "legacy_linked": "Existing course linked to library updates",
+        "link_resolved": "Library material identity reviewed"
       }
     },
     "platform": {

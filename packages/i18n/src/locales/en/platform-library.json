@@ -134,5 +134,48 @@
         "description": "HTML, CSS and JavaScript. Students code in their own editor, so coding practice is not offered."
       }
     }
+  },
+  "sync": {
+    "heading": "Library updates",
+    "latest": "Release {{number}} · published {{date}}",
+    "none": "Not released yet",
+    "changes": "{{changed}} changed · {{added}} added · {{removed}} removed, ready to publish",
+    "no_changes": "All saved changes have been published.",
+    "first": "Publishing creates the first release",
+    "note": "Release note, shown to academies",
+    "publish": "Publish updates",
+    "publishing": "Publishing…",
+    "published": "Release {{number}} published",
+    "blockers": "Fix before publishing: {{list}}",
+    "copies_heading": "Academy copies",
+    "copies_empty": "No academy has adopted this course yet.",
+    "copy_release": "Release {{applied}} / {{target}}",
+    "conflicts_one": "{{count}} decision waiting",
+    "conflicts_other": "{{count}} decisions waiting",
+    "retry": "Retry",
+    "pause": "Pause",
+    "resume": "Resume",
+    "paused": "Paused",
+    "failed": "Failed: {{code}}",
+    "status": {
+      "IDLE": "Synced",
+      "PENDING": "Waiting",
+      "RUNNING": "Updating",
+      "FAILED": "Failed",
+      "PAUSED": "Paused"
+    },
+    "history": "Release history",
+    "rollout": "{{synced}} synced · {{pending}} waiting · {{needsReview}} need review · {{failed}} failed",
+    "last_run": "Last run: {{date}} UTC",
+    "batch_help": "Save your changes across the course, then publish them together. Academies are notified only when their own edits need review.",
+    "batch_published": "Updates published. Academy copies will sync automatically."
+  },
+  "legacy": {
+    "title": "Existing academy copies",
+    "description": "Link old copies to published updates. Uncertain material identities are reviewed by academy editors; their content is preserved.",
+    "preview": "Review linking",
+    "review": "{{count}} library nodes will require identity review. Linking will not replace academy content.",
+    "link": "Link this copy",
+    "cancel": "Cancel"
   }
 }

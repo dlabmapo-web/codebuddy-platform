@@ -293,6 +293,22 @@ export function useCourseBuilder({
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  // Library sync archived these: hidden, kept for student work. They and
+  // everything under them are never shown again or moved by hand (the API
+  // refuses too), and nothing new is put inside them.
+  const archivedIds = new Set(tree.course.provenance?.linked?.archivedIds ?? []);
+  const archivedRows = new Set<string>();
+  for (const courseModule of tree.modules) {
+    const moduleArchived = archivedIds.has(courseModule.id);
+    if (moduleArchived) archivedRows.add(courseModule.id);
+    for (const lecture of courseModule.lectures) {
+      const lectureArchived = moduleArchived || archivedIds.has(lecture.id);
+      if (lectureArchived) archivedRows.add(lecture.id);
+      for (const material of lecture.materials)
+        if (lectureArchived || archivedIds.has(material.id)) archivedRows.add(material.id);
+    }
+  }
+
   const outlineIds = tree.modules.flatMap((courseModule) => [
     courseModule.id,
     ...courseModule.lectures.map((lecture) => lecture.id),
@@ -382,6 +398,10 @@ export function useCourseBuilder({
   return {
     tree,
     target,
+    /** Archived by library sync, or inside something that is: read-only placement and visibility. */
+    isArchived: (id: string) => archivedRows.has(id),
+    /** Archived by library sync itself, where the row says so. */
+    isArchivedRoot: (id: string) => archivedIds.has(id),
     refresh: () => treeQuery.refetch(),
     editable,
     exerciseEditable,

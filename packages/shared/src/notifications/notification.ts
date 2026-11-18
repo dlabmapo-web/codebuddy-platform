@@ -2,32 +2,17 @@ import { z } from "zod";
 
 import { academyRoleSchema } from "../auth/roles.js";
 
-/**
- * What the bell can carry.
- *
- * A discriminated union from the first release, holding two members, because
- * the second source of notifications is already known — a manager being told
- * that applicants are waiting — and a shape that has to grow a discriminant
- * later is a shape every consumer has to be revisited for.
- *
- * The items are the applicant's own application row, projected. Nothing is
- * written beside the review that decided it, so the bell cannot disagree with
- * the membership that review created, a retried review cannot produce two of
- * it, and an application that already existed already has a correct one. When
- * a notification arrives that is *not* a fact already on a row — the manager's
- * one is academy-scoped and addressed to many people — that is the change that
- * earns a table, and this contract is what lets it arrive without the client
- * being rewritten.
- */
+/** One bell for application decisions and academy-scoped course reviews. */
 export const notificationKinds = [
   "APPLICATION_APPROVED",
   "APPLICATION_REJECTED",
+  "COURSE_CONTENT_REVIEW",
 ] as const;
 export const notificationKindSchema = z.enum(notificationKinds);
 export type NotificationKind = z.infer<typeof notificationKindSchema>;
 
-export const notificationItemSchema = z.object({
-  /** The application this decision belongs to. */
+const notificationBaseSchema = z.object({
+  /** Application id, or the academy copy id for a grouped course review. */
   id: z.uuid(),
   kind: notificationKindSchema,
   academy: z.object({
@@ -42,6 +27,13 @@ export const notificationItemSchema = z.object({
   createdAt: z.iso.datetime(),
   acknowledgedAt: z.iso.datetime().nullable(),
 });
+export const notificationItemSchema = z.discriminatedUnion("kind", [
+  notificationBaseSchema.extend({ kind: z.enum(["APPLICATION_APPROVED", "APPLICATION_REJECTED"]) }),
+  notificationBaseSchema.extend({
+    kind: z.literal("COURSE_CONTENT_REVIEW"),
+    course: z.object({ id: z.uuid(), title: z.string(), reviewVersion: z.number().int().positive(), pendingCount: z.number().int().positive() }),
+  }),
+]);
 export type NotificationItem = z.infer<typeof notificationItemSchema>;
 
 export const notificationListSchema = z.object({
@@ -50,4 +42,4 @@ export const notificationListSchema = z.object({
 });
 export type NotificationList = z.infer<typeof notificationListSchema>;
 
-export const acknowledgeNotificationSchema = z.object({ id: z.uuid() });
+export const acknowledgeNotificationSchema = z.object({ id: z.uuid(), reviewVersion: z.number().int().positive().optional() });

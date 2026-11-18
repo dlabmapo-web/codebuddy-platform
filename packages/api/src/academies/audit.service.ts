@@ -46,4 +46,31 @@ export class AuditService {
       },
     });
   }
+
+  /**
+   * An act performed by a background job, not a person.
+   *
+   * No actor, and deliberately no support grant: a job runs outside any
+   * request, and attributing it to whoever triggered the work (an admin who
+   * published, an operator under a grant) would claim they made edits they
+   * never made. Library sync is the first writer of this kind.
+   */
+  async writeSystem(
+    transaction: Prisma.TransactionClient,
+    input: Omit<AuditInput, "actorUserId" | "supportGrantId" | "requestId">,
+  ) {
+    return transaction.auditLog.create({
+      data: {
+        actorUserId: null,
+        academyId: input.academyId,
+        action: input.action,
+        targetType: input.targetType,
+        targetId: input.targetId,
+        before: input.before,
+        after: input.after,
+        reason: input.reason,
+        supportGrantId: null,
+      },
+    });
+  }
 }

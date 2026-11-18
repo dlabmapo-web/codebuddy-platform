@@ -16,7 +16,7 @@ vi.mock('@/components/manual/manual-author-dialog', () => ({ ManualAuthorDialog:
 vi.mock('@/components/video/video-author-dialog', () => ({ VideoAuthorDialog: () => null }));
 vi.mock('@/components/pdf/pdf-author-dialog', () => ({ PdfAuthorDialog: ({ initialPreview, editable, onClose }: { initialPreview: boolean; editable: boolean; onClose: () => void }) => <section data-pdf-mode={initialPreview ? 'preview' : 'edit'} data-editable={String(editable)}><button onClick={onClose}>{'close PDF'}</button></section> }));
 vi.mock('./builder-dnd', () => ({ DragHandle: () => null, DropIndicator: () => null, useOutlineRowDnd: (config: unknown) => { dragConfigs(config); return { setNodeRef: () => undefined, handle: {}, isDragging: false }; } }));
-vi.mock('./builder-controls', () => ({ RowVisibility: () => null }));
+vi.mock('./builder-controls', () => ({ RowVisibility: ({ editable }: { editable: boolean }) => <span data-visibility-editable={String(editable)} />, ArchivedBadge: () => <span data-archived-badge /> }));
 vi.mock('./row-menu', () => ({ RowMenu: ({ label, renameLabel, onRename, onMove }: { label: string; renameLabel?: string; onRename: () => void; onMove?: () => void }) => <><button onClick={onRename}>{renameLabel ?? 'rename'}</button>{onMove ? <button data-move-for={label} onClick={onMove}>{'move '}{label}</button> : null}</> }));
 vi.mock('./delete-modal', () => ({ DeleteModal: () => null }));
 vi.mock('./new-material-dialog', () => ({ NewMaterialDialog: () => null }));
@@ -25,7 +25,7 @@ vi.mock('./move-anywhere-modal', () => ({ MoveAnywhereModal: (props: unknown) =>
 vi.mock('./rename-modal', () => ({ RenameModal: () => null }));
 const roots: Array<ReturnType<typeof createRoot>> = [];
 afterEach(async () => { for (const root of roots.splice(0)) await act(() => root.unmount()); document.body.innerHTML = ''; vi.clearAllMocks(); });
-async function render(editable: boolean, coding = false, visible = true, type?: string, linked = false) {
+async function render(editable: boolean, coding = false, visible = true, type?: string, linked = false, archived: readonly string[] = []) {
   const lecture = { id: 'lecture', title: 'Lesson', position: 1, isVisible: true, materials: [{ id: 'pdf', title: 'Reference document', type: 'PDF_DOCUMENT', position: 1, isVisible: true, programmingExercise: null, pdfDocument: { placement: 'BOTH', originalFilename: 'lesson.pdf', byteSize: 880 } }] } as unknown as CourseLecture;
   if (coding) lecture.materials = [{ id: 'problem', title: 'Coding exercise', type: 'PROGRAMMING_EXERCISE', position: 1, isVisible: visible, programmingExercise: { difficulty: 'EASY' } }] as unknown as CourseLecture['materials'];
   if (type) lecture.materials = [{ id: 'material', title: 'Material fixture', type, position: 1, isVisible: true,
@@ -33,7 +33,7 @@ async function render(editable: boolean, coding = false, visible = true, type?: 
     programmingExercise: type === 'PROGRAMMING_EXERCISE' ? { difficulty: 'EASY', referencePdfMaterialId: linked ? 'pdf' : null } : null,
   }] as unknown as CourseLecture['materials'];
   const destination = { id: 'destination', title: 'Destination', materials: [] };
-  const builder = { editable, exerciseEditable: editable, isCollapsed: () => false, visibilityPending: () => false, tree: { course: { language: 'PYTHON' }, modules: [{ id: 'module', lectures: [lecture, destination] }] }, clearReveal: vi.fn(), target: { academyId: 'academy', courseId: 'course' }, refresh: vi.fn(), movePending: false } as unknown as CourseBuilderState;
+  const builder = { editable, exerciseEditable: editable, isCollapsed: () => false, visibilityPending: () => false, tree: { course: { language: 'PYTHON' }, modules: [{ id: 'module', lectures: [lecture, destination] }] }, clearReveal: vi.fn(), target: { academyId: 'academy', courseId: 'course' }, refresh: vi.fn(), movePending: false, isArchived: (id: string) => archived.includes(id) || archived.includes('lecture'), isArchivedRoot: (id: string) => archived.includes(id) } as unknown as CourseBuilderState;
   const host = document.createElement('div'); document.body.append(host);
   const root = createRoot(host); roots.push(root);
   await act(() => root.render(<ul><LectureRow builder={builder} exercisePath={() => '/exercise'} lecture={lecture} moduleId="module" moduleNumber={1} parentEffectivelyVisible /></ul>));
@@ -81,4 +81,15 @@ it.each([
   expect(action).not.toBeNull();
   await act(() => action!.click());
   expect(moveDialogs).toHaveBeenCalledWith(expect.objectContaining({ kind: 'exercise', itemId: 'material' }));
+});
+
+it('keeps an archived lecture and its contents in place and out of reach of students', async () => {
+  const host = await render(true, false, true, 'EXPLANATION', false, ['lecture']);
+  // The archived lecture says so; its contents are read-only, not badged again.
+  expect(host.querySelectorAll('[data-archived-badge]')).toHaveLength(1);
+  expect([...host.querySelectorAll('[data-visibility-editable]')].map(node => node.getAttribute('data-visibility-editable'))).toEqual(['false', 'false']);
+  expect(host.querySelector('button[data-move-for]')).toBeNull();
+  expect(dragConfigs.mock.calls.some(([config]) => config.canDrag)).toBe(false);
+  // Nothing can be dropped into it either.
+  expect(dragConfigs.mock.calls.find(([config]) => config.item.kind === 'lecture')?.[0].target.container).toBeUndefined();
 });

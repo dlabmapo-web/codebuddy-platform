@@ -182,6 +182,8 @@ export type CourseSummary = z.infer<typeof courseSummarySchema>;
 
 export const exerciseTestCaseSchema = z.object({
   id: z.uuid(),
+  /** Identity across saves, for library sync; the editor round-trips it. */
+  syncKey: z.uuid(),
   position: positionSchema,
   input: z.string(),
   expectedOutput: z.string(),
@@ -200,6 +202,8 @@ export const exerciseTestCaseSchema = z.object({
 
 export const exerciseHintSchema = z.object({
   id: z.uuid(),
+  /** Identity across saves, for library sync; the editor round-trips it. */
+  syncKey: z.uuid(),
   position: positionSchema,
   content: z.string().trim().min(1).max(10_000),
   triggerExpression: z.string().trim().max(2_000).nullable(),
@@ -509,6 +513,8 @@ export const legacyCaseGrading = {
 
 export const exerciseTestCaseDraftSchema = z
   .object({
+    /** The item this draft edits; absent for a new case. */
+    syncKey: z.uuid().optional(),
     input: z
       .string()
       .max(
@@ -570,6 +576,8 @@ export const exerciseTestCaseDraftSchema = z
   );
 
 export const exerciseHintDraftSchema = z.object({
+  /** The item this draft edits; absent for a new hint. */
+  syncKey: z.uuid().optional(),
   content: z.string().trim().min(1).max(10_000),
   triggerExpression: z.string().trim().max(2_000).nullable(),
 });

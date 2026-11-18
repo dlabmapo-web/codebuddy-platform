@@ -28,6 +28,18 @@ export class NotificationBroadcaster {
     this.server = server;
   }
 
+  /** Invalidate after commit; carry no content that a revoked member could read. */
+  async courseReviewChanged(courseId: string): Promise<void> {
+    if (!this.server) return;
+    try {
+      const recipients = await this.notifications.reviewRecipients(courseId);
+      if (recipients.length) this.server.to(recipients.map(notificationRooms.user))
+        .emit(notificationServerEvents.changed, {});
+    } catch (error) {
+      this.logger.warn(`Course review notification broadcast failed: ${String(error)}`);
+    }
+  }
+
   /**
    * `userId` is the applicant, resolved by the caller from the row it just
    * wrote — never from anything a client sent.

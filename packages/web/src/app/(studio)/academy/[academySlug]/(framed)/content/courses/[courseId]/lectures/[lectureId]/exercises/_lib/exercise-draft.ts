@@ -28,6 +28,11 @@ import {
  */
 export type TestCaseDraft = {
   key: string;
+  /**
+   * The stored item this draft edits, round-tripped so library sync can tell
+   * an edited case from a removed one. Absent for a case added here.
+   */
+  syncKey?: string;
   input: string;
   expectedOutput: string;
   visibility: TestCaseVisibility;
@@ -56,6 +61,8 @@ export function newTestCaseDraft(
 
 export type HintDraft = {
   key: string;
+  /** The stored hint this draft edits; absent for a new one. */
+  syncKey?: string;
   content: string;
   triggerExpression: string;
 };
@@ -136,6 +143,7 @@ export function contextToDraft(
     isVisible: context.material!.isVisible,
     testCases: exercise.testCases.map((testCase) => ({
       key: testCase.id,
+      syncKey: testCase.syncKey,
       input: testCase.input,
       expectedOutput: testCase.expectedOutput,
       visibility: testCase.visibility,
@@ -156,6 +164,7 @@ export function contextToDraft(
     },
     hints: exercise.hints.map((hint) => ({
       key: hint.id,
+      syncKey: hint.syncKey,
       content: hint.content,
       triggerExpression: hint.triggerExpression ?? '',
     })),
@@ -211,6 +220,7 @@ export function draftToPayload(draft: ExerciseDraft) {
         ? !(testCase.key === 'new-sample' && !testCase.expectedOutput && !testCase.input && !testCase.label)
         : testCase.expectedOutput.trim().length > 0))
       .map((testCase) => ({
+        ...(testCase.syncKey ? { syncKey: testCase.syncKey } : {}),
         input: testCase.input,
         expectedOutput: testCase.expectedOutput,
         visibility: testCase.visibility,
@@ -225,6 +235,7 @@ export function draftToPayload(draft: ExerciseDraft) {
     hints: draft.hints
       .filter((hint) => hint.content.trim().length > 0)
       .map((hint) => ({
+        ...(hint.syncKey ? { syncKey: hint.syncKey } : {}),
         content: hint.content.trim(),
         triggerExpression: hint.triggerExpression.trim() || null,
       })),

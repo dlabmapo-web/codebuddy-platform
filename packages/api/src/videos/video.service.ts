@@ -1,3 +1,5 @@
+import { assertNotArchived } from "../content/archived-content.js";
+import { isAssetRetained } from "../library-sync/asset-retention.js";
 import {
   BadRequestException,
   ConflictException,
@@ -255,7 +257,8 @@ export class VideoService {
       await tx.$queryRaw`SELECT id FROM video_assets WHERE id=${a.id}::uuid FOR UPDATE`;
       if (
         (await tx.videoLesson.count({ where: { assetId: a.id } })) ||
-        a.consumedAt
+        a.consumedAt ||
+        (await isAssetRetained(tx, "VIDEO", a.id))
       )
         throw new ConflictException(
           "Published or saved assets cannot be discarded",
@@ -537,6 +540,7 @@ export class VideoService {
       if (!row?.videoLesson) throw new NotFoundException();
       if (visible === true && row.videoLesson.asset.state !== "READY")
         throw new ConflictException("Video is not ready");
+      if (visible === true) await assertNotArchived(tx, input.courseId, { materialIds: [row.id] });
       if (visible === undefined) {
         await tx.material.delete({ where: { id: row.id } });
         await compactMaterialPositions(tx, input.lectureId);

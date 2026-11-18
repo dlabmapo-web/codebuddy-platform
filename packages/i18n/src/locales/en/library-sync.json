@@ -1,0 +1,170 @@
+{
+  "banner": {
+    "linked": "Linked to the library · release {{release}}",
+    "review_one": "{{count}} admin change needs review",
+    "review_other": "{{count}} admin changes need review",
+    "open": "Review changes",
+    "preserved": "Your academy’s content is preserved until you choose. Review the marked materials below."
+  },
+  "page": {
+    "title": "Review admin changes",
+    "description": "Compare the parts your academy and the admin changed. Choose which version to use for each part.",
+    "back": "Back to course",
+    "not_linked": "This course is not linked to the content library.",
+    "parts": "Parts to review",
+    "loading": "Loading comparison…"
+  },
+  "status": {
+    "UP_TO_DATE": "Up to date",
+    "SYNCING": "Updating",
+    "NEEDS_REVIEW": "Admin changes to review",
+    "SYNC_FAILED": "Sync failed · head office has been told",
+    "SOURCE_RETIRED": "Retired by head office",
+    "release": "Release {{applied}} of {{latest}}",
+    "customized_one": "{{count}} of your changes kept",
+    "customized_other": "{{count}} of your changes kept"
+  },
+  "tabs": {
+    "decisions": "Needs decision",
+    "history": "History"
+  },
+  "empty": {
+    "decisions": "Nothing needs your decision.",
+    "history": "No library updates have arrived yet."
+  },
+  "kind": {
+    "CONCURRENT_EDIT": "You and head office both changed this",
+    "UNKNOWN_BASE": "This copy predates sync; choose which version to keep",
+    "REMOVED_UPSTREAM_EDITED_LOCALLY": "Head office removed this; you had changed it",
+    "EDITED_UPSTREAM_DELETED_LOCALLY": "Head office changed this; you had deleted it",
+    "REMOVED_UPSTREAM_HAS_LOCAL_CONTENT": "Head office removed this; it holds your own content",
+    "PARENT_MISSING": "Head office added this inside something you deleted",
+    "PLACEMENT": "You and head office both reordered this",
+    "INVALID_RESULT": "Head office's change could not be combined with your version",
+    "AMBIGUOUS_LINK": "This could not be matched to the library"
+  },
+  "compare": {
+    "base": "Previous shared version",
+    "ours": "Your academy’s current version",
+    "theirs": "Admin’s latest version",
+    "absent": "Not present",
+    "unknown": "Not recorded",
+    "structural": "This decision is about where the item is, not its content.",
+    "dependents": "These exercises still use this PDF. Change their references before accepting its removal.",
+    "group": "This decision applies to every item shown below. Review the complete definition.",
+    "field": "Field",
+    "value": "Value",
+    "option": "Option {{number}}",
+    "correct": "Correct answer",
+    "video": "Video",
+    "diff": "Changes from the previous shared version",
+    "diff_large": "This change is too large for the inline difference view. Compare the complete versions above.",
+    "shuffle": "Shuffle options",
+    "captions": "Captions",
+    "formatting": "Formatting changed; compare the rendered versions above.",
+    "case": {
+      "input": "Input",
+      "expectedOutput": "Expected output",
+      "visibility": "Visibility",
+      "comparator": "Output matching",
+      "weight": "Weight",
+      "timeLimitMsOverride": "Hard limit (ms)",
+      "softTimeLimitMs": "Soft limit (ms)",
+      "softPenalty": "Soft-limit penalty",
+      "label": "Label"
+    },
+    "show_base": "Show the version before these edits",
+    "scope": "Your choice applies only to this part. Other course content is preserved.",
+    "group_scope": "These related parts are applied together to keep the content valid. Other course content is preserved.",
+    "open_media": "Open preview in a new tab",
+    "preview_unavailable": "Preview unavailable. File details are shown below; you can still keep your academy’s version."
+  },
+  "actions": {
+    "ACCEPT_LIBRARY": "Use admin version",
+    "KEEP_ACADEMY": "Keep academy version",
+    "MANUAL": "Merge manually",
+    "save_manual": "Save merged version",
+    "cancel": "Cancel",
+    "working": "Saving…",
+    "decided": "Decision saved.",
+    "used_admin": "Admin version applied to the reviewed part.",
+    "kept_academy": "Academy version kept. This admin update has been acknowledged."
+  },
+  "consequence": {
+    "grading": "Future submissions grade against this. Past results stay as they are.",
+    "answer_key": "Future attempts use this answer key. Past attempts keep theirs.",
+    "media": "A replaced video starts unwatched; earlier viewing history is kept."
+  },
+  "outcome": {
+    "APPLIED": "Updated",
+    "KEPT": "Kept yours",
+    "CONVERGED": "Already matched",
+    "CONFLICT": "Needs decision",
+    "ADDED": "Added",
+    "REMOVED": "Removed",
+    "ARCHIVED": "Removed by head office · kept for student work",
+    "MOVED": "Moved",
+    "RESTORED": "Restored",
+    "RESOLVED": "Decided"
+  },
+  "history_release": "Release {{number}}",
+  "archived": {
+    "badge": "Removed by head office · kept for student work",
+    "tooltip": "Head office removed this. It stays here, hidden, for the work students already did on it. You can open and edit it, but not show or move it; a later library release can bring it back."
+  },
+  "legacy": {
+    "title": "Match existing materials",
+    "description": "Choose the existing academy item for each library item. Titles and positions are not proof. Unmatched academy items remain your own content. Resolve modules and lectures before their materials.",
+    "choose": "Match {{title}}",
+    "select": "Choose an existing item…",
+    "deleted": "Keep this library item out of this course",
+    "save": "Save identity",
+    "add": "Add this as a new library item"
+  },
+  "fields": {
+    "title": "Title",
+    "required": "Required status",
+    "description": "Description",
+    "input": "Input format",
+    "output": "Output format",
+    "constraints": "Constraints",
+    "difficulty": "Difficulty",
+    "starterCode": "Starter code",
+    "language": "Programming language",
+    "limits": "Execution limits",
+    "grading": "Grading settings",
+    "submission": "Submission settings",
+    "feedback": "Feedback settings",
+    "answers": "Answers and question settings",
+    "referencePdf": "Reference PDF",
+    "solution": "Solution",
+    "solutionOrder": "Solution order",
+    "testCase": "Test case",
+    "testOrder": "Test case order",
+    "hint": "Hint",
+    "hintOrder": "Hint order",
+    "body": "Main explanation",
+    "sideNotes": "Side notes",
+    "pdf": "PDF file",
+    "video": "Video and captions",
+    "instructions": "Instructions",
+    "modelAnswer": "Model answer",
+    "starterFile": "Starter file",
+    "entryPoint": "Entry point",
+    "solutionFile": "Solution file",
+    "attachment": "Attachment",
+    "solutionAttachment": "Solution attachment",
+    "canvas": "Canvas size",
+    "execution": "Runtime settings",
+    "option": "Answer option",
+    "answerExplanation": "Answer explanation",
+    "answerRule": "Answer rule",
+    "settings": "Content settings",
+    "placement": "Location and order",
+    "presence": "Added or removed content",
+    "prompt": "Question"
+  },
+  "row": {
+    "review": "Admin changes to review"
+  }
+}

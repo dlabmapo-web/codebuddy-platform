@@ -18,6 +18,14 @@ export function AcademyRouteProvider({
   );
 }
 
+/**
+ * The academy slug, or null on a surface that has no academy — the content
+ * library's editors are mounted under the console with none.
+ */
+export function useOptionalAcademySlug(): string | null {
+  return useContext(AcademySlugContext);
+}
+
 export function useAcademySlug(): string {
   const academySlug = useContext(AcademySlugContext);
   if (!academySlug) {

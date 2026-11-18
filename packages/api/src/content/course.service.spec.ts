@@ -54,7 +54,7 @@ function courseRecord() {
 function createService(options?: { duplicate?: boolean }) {
   const created = courseRecord();
   const transaction = {
-    $queryRaw: vi.fn(),
+    $queryRaw: vi.fn().mockResolvedValue([]),
     programmingExercise: { findMany: vi.fn().mockResolvedValue([]) },
     course: {
       create: vi.fn().mockResolvedValue(created),
@@ -219,7 +219,7 @@ function createHierarchyService() {
     isVisible: false,
   };
   const transaction = {
-    $queryRaw: vi.fn(),
+    $queryRaw: vi.fn().mockResolvedValue([]),
     programmingExercise: { findMany: vi.fn().mockResolvedValue([]) },
     courseModule: { update: vi.fn().mockResolvedValue(module) },
     lecture: { update: vi.fn().mockResolvedValue(lecture) },
@@ -440,7 +440,7 @@ function createExerciseService() {
   const current = exerciseRecord();
   const updated = exerciseRecord();
   const transaction = {
-    $queryRaw: vi.fn(),
+    $queryRaw: vi.fn().mockResolvedValue([]),
 
     programmingExerciseSolution: { deleteMany: vi.fn(), createMany: vi.fn() },
     programmingExercise: {
@@ -643,7 +643,8 @@ describe("CourseService direct problem editing", () => {
       solutions: [{ title: null, code: "print(sum(map(int, input().split())))\n" }],
     });
 
-    expect(transaction.programmingExerciseSolution.createMany).toHaveBeenCalledWith({data: [{ materialId, position: 0, title: null, code: "print(sum(map(int, input().split())))\n" }]});
+    // A new solution gets a fresh library-sync identity (item-keys.ts).
+    expect(transaction.programmingExerciseSolution.createMany).toHaveBeenCalledWith({data: [{ materialId, position: 0, title: null, code: "print(sum(map(int, input().split())))\n", syncKey: expect.any(String) }]});
     expect(transaction.programmingExercise.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.not.objectContaining({ gradingRevision: 2 }),
@@ -805,7 +806,7 @@ function createBulkVisibilityService() {
   const revocation = { revokeClass: vi.fn().mockResolvedValue(undefined) };
   const audit = { write: vi.fn().mockResolvedValue({ id: "audit-id" }) };
   const transaction = {
-    $queryRaw: vi.fn(),
+    $queryRaw: vi.fn().mockResolvedValue([]),
     programmingExercise: { findMany: vi.fn().mockResolvedValue([]) },
     courseModule: { updateMany: vi.fn().mockResolvedValue({ count: 3 }) },
     lecture: { updateMany: vi.fn().mockResolvedValue({ count: 11 }) },

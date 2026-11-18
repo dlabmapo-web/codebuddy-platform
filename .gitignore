@@ -93,3 +93,7 @@ packages/web/.next-turtle-browser/
 
 # Disposable API builds used by isolated history browser tests.
 packages/api/.history-e2e-*/
+
+# Isolated library synchronization browser acceptance
+packages/web/.next-library-sync/
+packages/api/.library-sync-e2e-*/

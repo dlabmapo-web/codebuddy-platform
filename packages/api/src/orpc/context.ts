@@ -1,3 +1,4 @@
+import type { LegacyLibraryLinkService } from "../library-sync/legacy-link.service.js";
 import type { ClassroomService } from "../classes/classroom.service.js";
 import type { ProgrammingReviewService } from "../learn/programming-review.service.js";
 import type { StudentWorkHistoryService } from "../teach/student-work-history.service.js";
@@ -52,6 +53,8 @@ import type { PlatformApplicationsService } from "../platform/platform-applicati
 import type { PlatformContentService } from "../platform/platform-content.service.js";
 import type { PlatformLibraryService } from "../platform/platform-library.service.js";
 import type { AcademyLibraryService } from "../content/library/academy-library.service.js";
+import type { LibraryReleaseService } from "../library-sync/library-release.service.js";
+import type { AcademyLibrarySyncService } from "../library-sync/academy-sync.service.js";
 import type { PlatformInvitationsService } from "../platform/platform-invitations.service.js";
 import type { PlatformRankingService } from "../platform/platform-ranking.service.js";
 import type { PlatformSettingsService } from "../platform/platform-settings.service.js";
@@ -130,6 +133,9 @@ export type ORPCDeps = {
   platformContentService: PlatformContentService;
   platformLibraryService: PlatformLibraryService;
   academyLibraryService: AcademyLibraryService;
+  legacyLibraryLinkService: LegacyLibraryLinkService;
+  libraryReleaseService: LibraryReleaseService;
+  academyLibrarySyncService: AcademyLibrarySyncService;
   platformInvitationsService: PlatformInvitationsService;
   platformRankingService: PlatformRankingService;
   platformSettingsService: PlatformSettingsService;

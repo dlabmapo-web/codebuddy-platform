@@ -1,3 +1,4 @@
+import { reviewFieldKey } from '@/components/studio/library-review-label';
 import {VideoAuthorDialog} from "@/components/video/video-author-dialog";
 import { publicConfig } from '@/lib/config';
 import { ManualAuthorDialog } from '@/components/manual/manual-author-dialog';
@@ -15,7 +16,7 @@ import { VisibilityConfirmModal } from '../../../_components/visibility-confirm-
 
 import type { CourseBuilderState } from '../_hooks/use-course-builder';
 import type { CourseLecture } from '../_lib/course-tree';
-import { RowVisibility } from './builder-controls';
+import { ArchivedBadge, RowVisibility } from './builder-controls';
 import { DragHandle, DropIndicator, useOutlineRowDnd } from './builder-dnd';
 import { DeleteModal } from './delete-modal';
 import { MoveAnywhereModal } from './move-anywhere-modal';
@@ -123,6 +124,8 @@ function ExerciseRow({
   siblings: readonly CourseMaterial[];
 }) {
   const { t } = useTranslation(['content', 'courses', 'pdf-practice', 'material-picker']);
+  const { t: sync } = useTranslation('library-sync');
+  const pending = builder.tree.course.provenance?.linked?.reviewItems?.filter(item => item.localId === material.id) ?? [];
   // See `ModuleCard`: the flag is inert in a library academy.
   const surface = useContentSurface();
   const academySlug = useContentAcademySlug();
@@ -138,6 +141,9 @@ function ExerciseRow({
     material.type !== 'PROGRAMMING_EXERCISE'
       ? builder.editable
       : builder.exerciseEditable;
+  // Removed by head office (or inside something that was), kept for student
+  // work: it can still be opened and edited, never shown or moved again here.
+  const archived = builder.isArchived(material.id);
   const [moving, setMoving] = useState(false);
   // Resolve shared references across the course only while a PDF action is
   // open, so idle outline rows do not repeatedly scan the entire curriculum.
@@ -147,7 +153,7 @@ function ExerciseRow({
     : [];
   const rowRef = useRevealAfterMove<HTMLLIElement>(builder, material.id);
   const { dropEdge, handle, isDragging, setNodeRef } = useOutlineRowDnd({
-    canDrag: rowEditable && !builder.movePending,
+    canDrag: rowEditable && !archived && !builder.movePending,
     item: { kind: 'exercise', id: material.id, title: material.title },
     target: { row: { kind: 'exercise', id: material.id } },
   });
@@ -226,13 +232,20 @@ function ExerciseRow({
             {formatMaterialSize(material.pdfDocument.byteSize)}
           </span>
         ) : <span className="mt-0.5 block text-xs text-sub">{t(`material-picker:types.${materialKind}.title`)}</span>}
+        {surface === 'academy' && builder.editable && pending.length > 0 ? (
+          <Link href={routes.academyCourseLibraryReview(academySlug, builder.target.courseId, pending[0].nodeKey)}
+            className="mt-1.5 inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-draft/20 bg-draft-soft px-2 py-1 text-[12px] font-semibold text-draft hover:underline focus-visible:ring-2 focus-visible:ring-brand">
+            <span>{sync('row.review')}</span><span className="font-normal">{[...new Set(pending.map(item => sync(`fields.${reviewFieldKey(item.unitKey)}`)))].join(' · ')}</span>
+          </Link>
+        ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-1">
+        {builder.isArchivedRoot(material.id) ? <ArchivedBadge /> : null}
         {material.type === 'PDF_DOCUMENT' ? <button type="button" aria-label={`${t('pdf.open')}: ${material.title}`} title={t('pdf.open')} onClick={() => setPdfMode('preview')} className="grid size-7 place-items-center rounded-md text-brand transition-colors hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand"><BookOpen aria-hidden className="size-4" /></button> : null}
         {visibilityIsReal ? (
           <RowVisibility
             busy={builder.visibilityPending(material.id)}
-            editable={rowEditable}
+            editable={rowEditable && !archived}
             effectivelyVisible={effectivelyVisible}
             isVisible={material.isVisible}
             onChange={(next) =>
@@ -283,7 +296,7 @@ function ExerciseRow({
           }
           label={material.title}
           onDelete={() => setDeleting(true)}
-          onMove={canMove ? () => setMoving(true) : undefined}
+          onMove={canMove && !archived ? () => setMoving(true) : undefined}
           // A problem's title lives with the rest of its content, so renaming
           // opens the problem instead of editing the row in place.
           onRename={() =>
@@ -348,6 +361,8 @@ export function LectureRow({
   parentEffectivelyVisible: boolean;
 }) {
   const { t } = useTranslation(['content', 'courses', 'pdf-practice', 'material-picker']);
+
+
   const visibilityIsReal = useContentSurface() !== 'library';
   const contentPaths = useContentBasePath();
   const [pdfAdding, setPdfAdding] = useState(false);
@@ -379,15 +394,17 @@ export function LectureRow({
   // The header is the lecture's handle and target. It takes a dragged lecture
   // beside it, and a dragged problem into its list — the only way to reach a
   // lecture that is collapsed or has no problems yet.
+  // See the material row: read-only placement and visibility, nothing new inside.
+  const archived = builder.isArchived(lecture.id);
   const { dropEdge, handle, isDragging, setNodeRef } = useOutlineRowDnd({
-    canDrag: builder.editable && !builder.movePending,
+    canDrag: builder.editable && !archived && !builder.movePending,
     canDrop:
       (builder.editable || builder.exerciseEditable) && !builder.movePending,
     item: { kind: 'lecture', id: lecture.id, title: lecture.title },
     target: {
       row: builder.editable ? { kind: 'lecture', id: lecture.id } : undefined,
       container:
-        builder.exerciseEditable || builder.editable
+        (builder.exerciseEditable || builder.editable) && !archived
           ? { accepts: 'exercise', parentId: lecture.id }
           : undefined,
     },
@@ -446,6 +463,7 @@ export function LectureRow({
             <p className="truncate text-[15.5px] font-semibold">
               {lecture.title}
             </p>
+            {builder.isArchivedRoot(lecture.id) ? <ArchivedBadge /> : null}
             {/* The count sits with the title it describes, not off at the edge. */}
             <span className="shrink-0 text-[13px] text-sub">
               {hasExercises
@@ -461,11 +479,11 @@ export function LectureRow({
                 : ''}
             </span>
           </div>
-          <NewMaterialDialog kinds={materialKinds} lectureTitle={lecture.title} onChoose={chooseMaterial} unavailable={unavailableMaterialKinds(builder.tree.course.language)} unavailableReason={t('material-picker:unavailable_web')} />
+          {archived ? null : <NewMaterialDialog kinds={materialKinds} lectureTitle={lecture.title} onChoose={chooseMaterial} unavailable={unavailableMaterialKinds(builder.tree.course.language)} unavailableReason={t('material-picker:unavailable_web')} />}
           {visibilityIsReal ? (
             <RowVisibility
               busy={builder.visibilityPending(lecture.id)}
-              editable={builder.editable}
+              editable={builder.editable && !archived}
               effectivelyVisible={effectivelyVisible}
               isVisible={lecture.isVisible}
               onChange={(next) => {
@@ -483,7 +501,7 @@ export function LectureRow({
               kindLabel={t('row.kind_lecture')}
               label={lecture.title}
               onDelete={() => setDeleting(true)}
-              onMove={canMove ? () => setMoving(true) : undefined}
+              onMove={canMove && !archived ? () => setMoving(true) : undefined}
               onRename={() => setRenaming(true)}
             />
           ) : null}

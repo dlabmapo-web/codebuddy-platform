@@ -49,6 +49,13 @@ export const apiEnvironmentSchema = z.object({
   VIDEO_COURSE_QUOTA_BYTES:z.coerce.number().int().min(1).max(Number.MAX_SAFE_INTEGER).default(100000000000),
   MULTIPLE_CHOICE_ENABLED: z.preprocess(v => v === "true" || v === true, z.boolean()).default(false),
   SHORT_ANSWER_ENABLED:z.preprocess(v=>v === "true" || v === true,z.boolean()).default(false),
+  /**
+   * Library course sync's drain (design §14). Off: releases still record and
+   * queue their targets, nothing is applied. Each academy also needs its
+   * `LIBRARY_COURSE_SYNC` feature, checked again when a job runs.
+   */
+  LIBRARY_SYNC_ENABLED: z.preprocess(v => v === "true" || v === true, z.boolean()).default(false),
+  LIBRARY_SYNC_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(1),
   GUI_ENABLED:z.preprocess(v=>v === "true" || v === true,z.boolean()).default(false),
   GUI_SERVICE_URL:httpUrlSchema.optional(),
   GUI_SERVICE_SECRET:z.string().min(32).optional(),

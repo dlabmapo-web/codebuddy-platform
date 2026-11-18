@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 export const exerciseSolutionEntrySchema = z.object({
+  /** The item this entry edits; absent for a new solution. */
+  syncKey: z.uuid().optional(),
   title: z.string().trim().max(80).nullable().transform(value => value || null),
   code: z.string().max(100_000).refine(value => value.trim().length > 0, "A correct answer is required."),
 }).strict();

@@ -17,6 +17,7 @@ import { academyClassesContract } from "./orpc/classes.contract.js";
 import { academyContentImportsContract } from "./orpc/content-imports.contract.js";
 import { academyCoursesContract } from "./orpc/courses.contract.js";
 import { academyLibraryContract } from "./orpc/library.contract.js";
+import { academyLibrarySyncContract, platformLibrarySyncContract } from "./orpc/library-sync.contract.js";
 import { learnContract } from "./orpc/learn.contract.js";
 import { lobbyContract } from "./orpc/lobby.contract.js";
 import {
@@ -68,6 +69,7 @@ export const appContract = {
   academyCourses: academyCoursesContract,
   academyContentImports: academyContentImportsContract,
   academyLibrary: academyLibraryContract,
+  academyLibrarySync: academyLibrarySyncContract,
   academyClasses: academyClassesContract,
   learn: learnContract,
   lobby: lobbyContract,
@@ -80,6 +82,7 @@ export const appContract = {
   platformAudit: platformAuditContract,
   platformContent: platformContentContract,
   platformLibrary: platformLibraryContract,
+  platformLibrarySync: platformLibrarySyncContract,
   platformInvitations: platformInvitationsContract,
   platformRanking: platformRankingContract,
   platformUsers: platformUsersContract,

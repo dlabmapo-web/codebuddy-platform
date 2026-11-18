@@ -201,6 +201,7 @@ describe('exercise draft helpers', () => {
           updatedAt: '2026-09-10T00:00:00.000Z',
           testCases: [30, 30, 40].map((weight, index) => ({
             id: `50000000-0000-4000-8000-00000000000${index + 1}`,
+            syncKey: `60000000-0000-4000-8000-00000000000${index + 1}`,
             position: index + 1,
             input: `${index}`,
             expectedOutput: `${index}`,

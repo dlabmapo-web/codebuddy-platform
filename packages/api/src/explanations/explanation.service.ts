@@ -6,6 +6,7 @@ import { AcademyAccessService } from "../authorization/academy-access.service.js
 import { AuditService } from "../academies/audit.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AppException } from "../common/app-exception.js";
+import { assertNotArchived } from "../content/archived-content.js";
 import { ManualAssetsService } from "../manual/manual-assets.service.js";
 import { learningScopeFor, enrolledClassWhere, taughtClassWhere } from "../classes/assigned-course-access.js";
 import { effectivelyVisibleActivityWhere } from "../learn/curriculum-visibility.js";
@@ -103,9 +104,10 @@ export class ExplanationService {
       await tx.$queryRaw`SELECT id FROM courses WHERE id = ${input.courseId}::uuid FOR UPDATE`;
       const lecture = await tx.lecture.findFirst({ where: { id: input.lectureId, courseModule: { courseId: input.courseId, course: { academyId: input.academyId } } }, select: { id: true } });
       if (!lecture) throw new AppException("CONTENT_PARENT_MISMATCH", 404);
-      const previous = input.materialId ? await tx.explanationMaterial.findFirst({ where: { materialId: input.materialId, material: { lectureId: input.lectureId, type: "EXPLANATION" } }, select: { materialId: true, body: true, sideBody: true, revision: true } }) : null;
+      const previous = input.materialId ? await tx.explanationMaterial.findFirst({ where: { materialId: input.materialId, material: { lectureId: input.lectureId, type: "EXPLANATION" } }, select: { materialId: true, body: true, sideBody: true, revision: true, material: { select: { isVisible: true } } } }) : null;
       if (input.materialId && !previous) throw new AppException("EXERCISE_NOT_AVAILABLE", 404);
       if (previous && previous.revision !== input.expectedRevision) throw new AppException("CONTENT_EDIT_CONFLICT", 409);
+      if (previous && input.isVisible) await assertNotArchived(tx, input.courseId, { materialIds: [previous.materialId] });
       await assertLessonImages(tx, { ...input, html: body + (sideBody ?? ""), previousHtml: (previous?.body ?? "") + (previous?.sideBody ?? "") });
       const material = previous ? await tx.material.update({ where: { id: previous.materialId }, data: {
         title: input.title, isVisible: input.isVisible, explanationMaterial: { update: { body, sideBody, revision: { increment: 1 } } },
@@ -129,8 +131,9 @@ export class ExplanationService {
     await this.db.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM courses WHERE id = ${input.courseId}::uuid FOR UPDATE`;
       const row = await tx.material.findFirst({ where: { id: input.materialId, type: "EXPLANATION", lectureId: input.lectureId,
-        lecture: { courseModule: { courseId: input.courseId, course: { academyId: input.academyId } } } }, select: { id: true } });
+        lecture: { courseModule: { courseId: input.courseId, course: { academyId: input.academyId } } } }, select: { id: true, isVisible: true } });
       if (!row) throw new AppException("EXERCISE_NOT_AVAILABLE", 404);
+      if (input.isVisible) await assertNotArchived(tx, input.courseId, { materialIds: [row.id] });
       if (input.isVisible === undefined) {
         await tx.material.delete({ where: { id: row.id } });
         await compactMaterialPositions(tx, input.lectureId);

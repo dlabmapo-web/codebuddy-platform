@@ -16,6 +16,7 @@ import { validateEnvironment } from "./config/env.schema.js";
 import { DatabaseModule } from "./database/database.module.js";
 import { DraftsModule } from "./drafts/drafts.module.js";
 import { ContentModule } from "./content/content.module.js";
+import { LibrarySyncModule } from "./library-sync/library-sync.module.js";
 import { LeadModule } from "./lead/lead.module.js";
 import { LearnModule } from "./learn/learn.module.js";
 import { LobbyModule } from "./lobby/lobby.module.js";
@@ -48,6 +49,7 @@ import { TeachModule } from "./teach/teach.module.js";
     AuthorizationModule,
     ClassesModule,
     ContentModule,
+    LibrarySyncModule,
     LeadModule,
     LearnModule,
     LobbyModule,

@@ -9,6 +9,7 @@ import type video from "@cove/i18n/locales/en/video.json";
 import type manual from '@cove/i18n/locales/en/manual.json';
 import type grading from "@cove/i18n/locales/en/grading.json";
 import type sampleCheck from "@cove/i18n/locales/en/sample-check.json";
+import type librarySync from '@cove/i18n/locales/en/library-sync.json';
 /**
  * Makes `t()` key-checked. English is the source of truth for the key shape,
  * so `t('nav.link.membrs')` fails `pnpm typecheck` instead of rendering the
@@ -112,6 +113,7 @@ declare module 'i18next' {
       'platform-content': typeof platformContent;
       'platform-library': typeof platformLibrary;
       'academy-library': typeof academyLibrary;
+      'library-sync': typeof librarySync;
       'platform-invitations': typeof platformInvitations;
       'platform-ranking': typeof platformRanking;
       'platform-users': typeof platformUsers;

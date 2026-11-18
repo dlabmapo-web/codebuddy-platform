@@ -122,7 +122,11 @@ function toMaterial(row: MaterialJson): Material {
   };
 }
 
-/** Metadata for the mixed student-history table, scoped to one authorized class. */
+/**
+ * Metadata for the mixed student-history table, scoped to one authorized
+ * class: the taught curriculum, and library-archived content students already
+ * worked on, so staff keep reading that history (sync design §10).
+ */
 export function readClassHistoryMaterials(db: Pick<PrismaService, "$queryRaw">, academyId: string, classId: string) {
   type Row = {id: string; title: string; type: import('../generated/prisma/client.js').MaterialType; position: number; isRequired: boolean;
     programmingExercise: {gradingRevision: number; submissionPolicy: import('../generated/prisma/client.js').SubmissionPolicy; manualMaximumHundredths: number; manualIncludeInScore: boolean} | null;
@@ -140,7 +144,12 @@ export function readClassHistoryMaterials(db: Pick<PrismaService, "$queryRaw">, 
     FROM materials m JOIN lectures l ON l.id=m.lecture_id JOIN course_modules cm ON cm.id=l.course_module_id
     JOIN courses c ON c.id=cm.course_id JOIN class_courses cc ON cc.course_id=c.id AND cc.class_id=${classId}::uuid
     LEFT JOIN programming_exercises pe ON pe.material_id=m.id LEFT JOIN manual_materials mm ON mm.material_id=m.id
-    WHERE c.academy_id=${academyId}::uuid AND c.is_visible AND cm.is_visible AND l.is_visible AND m.is_visible
+    WHERE c.academy_id=${academyId}::uuid AND c.is_visible
+      -- Taught content, plus what library sync archived: head office removed
+      -- it and it stays hidden from students, but their work on it stays here.
+      AND ((cm.is_visible AND l.is_visible AND m.is_visible)
+        OR EXISTS (SELECT 1 FROM library_sync_links k WHERE k.copy_course_id=c.id AND k.state='ARCHIVED'
+          AND k.local_id IN (m.id, l.id, cm.id)))
       AND (pe.material_id IS NOT NULL OR mm.material_id IS NOT NULL
         OR EXISTS (SELECT 1 FROM explanation_materials e WHERE e.material_id=m.id)
         OR EXISTS (SELECT 1 FROM pdf_documents p WHERE p.material_id=m.id)

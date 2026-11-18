@@ -16,7 +16,7 @@ export function createNotificationsRouter(
     acknowledge: os.notifications.acknowledge
       .use(access.authenticated)
       .handler(({ context, input }) =>
-        deps.notificationsService.acknowledge(context.identity, input.id)
+        deps.notificationsService.acknowledge(context.identity, input.id, input.reviewVersion)
       ),
   };
 }

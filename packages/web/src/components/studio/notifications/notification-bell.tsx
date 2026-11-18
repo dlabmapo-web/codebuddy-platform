@@ -2,7 +2,7 @@
 
 import type { AcademyRole, NotificationItem } from '@cove/shared';
 import { formatShortDateTime } from '@cove/i18n/format';
-import { Bell, BellOff, CheckCircle2, XCircle } from 'lucide-react';
+import { Bell, BellOff, CheckCircle2, FilePenLine, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -58,25 +58,16 @@ export function NotificationBell({ className }: { className?: string }) {
   );
 
   function act(item: NotificationItem) {
-    /*
-     * Close before doing anything else, and run the rest in a transition —
-     * the same shape, for the same reason, as `ProfileControl`'s role switch.
-     *
-     * While this panel is open Radix marks the content behind it
-     * `aria-hidden="true"` / `data-aria-hidden="true"`. Those attributes are
-     * set imperatively on nodes React does not own, so refreshing or
-     * navigating from underneath an open panel reconciles a fresh server tree
-     * into markup that still carries them, and React reports a hydration
-     * mismatch naming the page's own container.
-     *
-     * It showed up here rather than on a plain navigation because entering the
-     * academy from the lobby is a `push` to the URL already on screen — so the
-     * work is all done by `refresh`, against DOM the closing menu had not
-     * finished releasing. The transition lets the close commit first.
-     */
+    // Read only the version the person clicked, then navigate after closing.
+    // The course itself still holds any unresolved academy decisions.
     setOpen(false);
     startTransition(async () => {
-      await notifications.acknowledge(item.id);
+      await notifications.acknowledge(item);
+      if (item.kind === 'COURSE_CONTENT_REVIEW') {
+        router.push(routes.academyLearnCourse(item.academy.slug, item.course.id));
+        router.refresh();
+        return;
+      }
       if (item.kind === 'APPLICATION_APPROVED') {
         router.push(routes.academy(item.academy.slug));
         /*
@@ -96,7 +87,10 @@ export function NotificationBell({ className }: { className?: string }) {
       <span aria-live="polite" className="sr-only">
         {arrived ? <ItemSentence item={arrived} /> : ''}
       </span>
-      <DropdownMenu onOpenChange={setOpen} open={open}>
+      {/* A notification popover does not hide the page behind it. In particular,
+          same-course navigation must not hydrate a refreshed tree under Radix's
+          temporary aria-hidden attributes while the menu finishes closing. */}
+      <DropdownMenu modal={false} onOpenChange={setOpen} open={open}>
         <DropdownMenuTrigger
           aria-label={t('label')}
           className={cn(
@@ -199,14 +193,15 @@ function NotificationRow({
   const { t } = useTranslation('notifications');
   const locale = useLocale();
   const approved = item.kind === 'APPLICATION_APPROVED';
+  const review = item.kind === 'COURSE_CONTENT_REVIEW';
   const unread = item.acknowledgedAt === null;
-  const Icon = approved ? CheckCircle2 : XCircle;
+  const Icon = review ? FilePenLine : approved ? CheckCircle2 : XCircle;
 
   return (
     <div
       className={cn(
         'px-3.5 py-3.5 transition-colors',
-        unread && (approved ? 'bg-success/[0.05]' : 'bg-danger/[0.04]'),
+        unread && (review ? 'bg-draft/5' : approved ? 'bg-success/[0.05]' : 'bg-danger/[0.04]'),
       )}
     >
       <div className="flex items-start gap-2.5">
@@ -215,10 +210,10 @@ function NotificationRow({
           className={cn(
             'mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl',
             unread
-              ? approved
+              ? review ? 'bg-draft text-on-draft' : approved
                 ? 'bg-success text-on-success'
                 : 'bg-danger text-on-danger'
-              : approved
+              : review ? 'bg-draft/10 text-draft' : approved
                 ? 'bg-success/12 text-success'
                 : 'bg-danger/12 text-danger',
           )}
@@ -233,7 +228,7 @@ function NotificationRow({
               unread ? 'text-ink' : 'text-sub',
             )}
           >
-              {t(approved ? 'approved.title' : 'rejected.title')}
+              {t(review ? 'course_review.title' : approved ? 'approved.title' : 'rejected.title')}
             </h3>
             {unread ? (
               <span
@@ -266,7 +261,7 @@ function NotificationRow({
             unread
               ? cn(
                   'inline-flex h-8 items-center rounded-lg px-3 text-[12.5px] font-bold',
-                  approved
+                  approved || review
                     ? 'bg-brand text-on-brand hover:bg-brand-deep'
                     : 'border border-border text-ink hover:bg-accent',
                 )
@@ -276,7 +271,7 @@ function NotificationRow({
           onClick={() => onAct(item)}
           type="button"
         >
-          {t(approved ? 'approved.action' : 'rejected.action')}
+          {t(review ? 'course_review.action' : approved ? 'approved.action' : 'rejected.action')}
         </button>
       </div>
     </div>
@@ -298,6 +293,8 @@ function NotificationRow({
 function ItemSentence({ item }: { item: NotificationItem }) {
   const { t } = useTranslation('notifications');
   const { t: layout } = useLayoutTranslation('common');
+
+  if (item.kind === 'COURSE_CONTENT_REVIEW') return <>{t('course_review.body', { course: item.course.title, count: item.course.pendingCount })}</>;
 
   if (item.kind === 'APPLICATION_APPROVED') {
     return (

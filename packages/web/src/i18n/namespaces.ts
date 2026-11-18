@@ -306,6 +306,13 @@ export const pointsNamespaces = ["points", "errors"] as const;
 export const academyLibraryNamespaces = ["academy-library", "errors"] as const;
 
 /**
+ * Library course sync: an academy's Library updates page and the builder's
+ * banner. Read by curriculum staff on two routes, so page-scoped like
+ * `academy-library` rather than in the layout payload.
+ */
+export const librarySyncNamespaces = ["library-sync", "academy-library", "errors"] as const;
+
+/**
  * The operator's maintenance page.
  *
  * Its own list rather than a member of `platformNamespaces`, which every
@@ -317,6 +324,7 @@ export const academyLibraryNamespaces = ["academy-library", "errors"] as const;
 export const operationsNamespaces = ["platform-operations", "errors"] as const;
 
 export type PageNamespace =
+  | (typeof librarySyncNamespaces)[number]
   | (typeof authNamespaces)[number]
   | (typeof monitoringNamespaces)[number]
   | (typeof exerciseNamespaces)[number]

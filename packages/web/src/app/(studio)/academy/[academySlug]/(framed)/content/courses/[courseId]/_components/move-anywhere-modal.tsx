@@ -65,7 +65,12 @@ export function MoveAnywhereModal({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
-  const groups = moveDestinations(tree, kind, itemId);
+  // Nothing moves into content library sync archived: it would be hidden
+  // there and could not be moved back out (the API refuses both ways).
+  const groups = moveDestinations(tree, kind, itemId).map((group) => ({
+    ...group,
+    parents: group.parents.filter((parent) => !builder.isArchived(parent.id)),
+  }));
   const searchable = destinationCount(groups) > MOVE_SEARCH_THRESHOLD;
   const shown = filterDestinations(groups, query);
   const { options } = positionOptions(tree, kind, itemId, parentId);

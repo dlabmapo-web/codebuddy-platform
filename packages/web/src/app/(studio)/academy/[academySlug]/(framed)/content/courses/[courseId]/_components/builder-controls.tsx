@@ -5,6 +5,23 @@ import { useLayoutTranslation } from '@/i18n';
 
 import { VisibilityToggle } from '../../../_components/visibility-toggle';
 
+/**
+ * Library sync archived this row: head office removed it, and it stays here,
+ * hidden, for the work students already did on it. Rendered only on a linked
+ * copy, the one page that loads the `library-sync` namespace.
+ */
+export function ArchivedBadge() {
+  const { t } = useTranslation('library-sync');
+  return (
+    <span
+      className="shrink-0 rounded-full border border-border bg-canvas px-2 py-0.5 text-[12px] font-semibold text-sub"
+      title={t('archived.tooltip')}
+    >
+      {t('archived.badge')}
+    </span>
+  );
+}
+
 /** Shows an item's own flag while the tooltip explains inherited visibility. */
 export function VisibilityIndicator({
   isVisible,

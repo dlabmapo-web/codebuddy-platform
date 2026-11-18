@@ -134,6 +134,12 @@ export const librarySyncStates = [
   "UP_TO_DATE",
   "UPDATE_AVAILABLE",
   "SOURCE_RETIRED",
+  /** Linked copies (library course sync): a release is on its way in. */
+  "SYNCING",
+  /** Linked copies: library updates wait on an academy decision. */
+  "NEEDS_REVIEW",
+  /** Linked copies: the last sync failed; head office has been told. */
+  "SYNC_FAILED",
 ] as const;
 export const librarySyncStateSchema = z.enum(librarySyncStates);
 export type LibrarySyncState = z.infer<typeof librarySyncStateSchema>;
@@ -188,6 +194,22 @@ export const courseProvenanceSchema = z.object({
   syncState: librarySyncStateSchema,
   isCustomized: z.boolean(),
   copiedAt: z.iso.datetime(),
+  /** Present for a copy linked by library course sync. */
+  linked: z
+    .object({
+      releaseNumber: z.number().int().nonnegative(),
+      openConflictCount: z.number().int().nonnegative(),
+      /**
+       * Modules, lectures and materials head office removed and sync archived:
+       * hidden, kept for student work, never shown again or moved by hand.
+       * Present on the course builder's reads only.
+       */
+      archivedIds: z.array(z.uuid()).optional(),
+      reviewItems: z.array(z.object({
+        id: z.uuid(), nodeKey: z.string(), localId: z.uuid().nullable(), unitKey: z.string(),
+      })).optional(),
+    })
+    .optional(),
 });
 export type CourseProvenance = z.infer<typeof courseProvenanceSchema>;
 

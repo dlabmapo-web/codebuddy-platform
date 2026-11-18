@@ -58,10 +58,14 @@ export async function StaffCoursePage({
   }
 
   const locale = await getLocale();
-  const { resources } = await initTranslations(locale, contentNamespaces);
+  // A linked copy's rows can carry the archived badge, worded in `library-sync`.
+  const namespaces = initialTree?.course.provenance?.linked
+    ? [...contentNamespaces, 'library-sync' as const]
+    : [...contentNamespaces];
+  const { resources } = await initTranslations(locale, namespaces);
 
   return (
-    <PageTranslationsProvider locale={locale} namespaces={contentNamespaces} resources={resources}>
+    <PageTranslationsProvider locale={locale} namespaces={namespaces} resources={resources}>
     <StudioPage
       bleed
       description={initialTree ? t('builder.description') : undefined}

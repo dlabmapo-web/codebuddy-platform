@@ -1,4 +1,6 @@
+import { assertNotArchived } from "../content/archived-content.js";
 import { pdfMetadata } from "./pdf-metadata.js";
+import { isAssetRetained } from "../library-sync/asset-retention.js";
 import { randomUUID } from "node:crypto";
 import {
   Injectable,
@@ -256,6 +258,7 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
           },
         });
         if (!material) throw new AppException("PDF_NOT_AVAILABLE", 404);
+        if (visible === true) await assertNotArchived(tx, target.courseId, { materialIds: [material.id] });
         if (visible === undefined) {
           if (await tx.programmingExercise.count({ where: { referencePdfMaterialId: material.id } })) throw new AppException("PDF_REFERENCE_IN_USE", 409);
           await tx.material.delete({ where: { id: material.id } });
@@ -422,6 +425,13 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
           });
           if (!row || row._count.documents > 0 || row.state === "DELETED")
             return false;
+          // A library release (or a sync base/conflict) may be the only thing
+          // still referring to it. Keep it readable rather than half-deleted.
+          if (await isAssetRetained(tx, "PDF", row.id)) {
+            if (row.state === "DELETING")
+              await tx.pdfAsset.update({ where: { id: row.id }, data: { state: "READY" } });
+            return false;
+          }
           await tx.pdfAsset.update({
             where: { id: row.id },
             data: { state: "DELETING" },

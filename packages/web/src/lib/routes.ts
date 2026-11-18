@@ -156,6 +156,12 @@ export const routes = {
     `${academyRoot(academySlug)}/content/library`,
   academyCourseImport: (academySlug: string, courseId: string) =>
     `${academyRoot(academySlug)}/content/courses/${segment(courseId)}/imports/new`,
+  /** Library course sync: decisions and history for one linked copy. */
+  academyCourseLibraryMatches: (academySlug: string, courseId: string) => `${academyRoot(academySlug)}/content/courses/${segment(courseId)}/library-updates/unmatched`,
+  academyCourseLibraryUpdates: (academySlug: string, courseId: string) =>
+    `${academyRoot(academySlug)}/content/courses/${segment(courseId)}/library-updates`,
+  academyCourseLibraryReview: (academySlug: string, courseId: string, nodeKey: string) =>
+    withQuery(`${academyRoot(academySlug)}/content/courses/${segment(courseId)}/library-updates`, { nodeKey }),
   academyLearnCourses: (academySlug: string) =>
     `${academyRoot(academySlug)}/learn/courses`,
   academyLearnCourse: (

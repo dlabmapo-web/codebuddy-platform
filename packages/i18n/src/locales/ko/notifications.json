@@ -19,5 +19,11 @@
   },
   "unread_badge": "새 알림 {{count}}",
   "just_now": "방금",
-  "action_hint": "입장하면 페이지가 바로 채워집니다."
+  "action_hint": "입장하면 페이지가 바로 채워집니다.",
+  "course_review": {
+    "title": "관리자 변경 사항을 검토해 주세요",
+    "body_one": "{{course}}에서 학원이 수정한 부분에 업데이트가 있습니다. 학원의 콘텐츠는 유지됩니다.",
+    "body_other": "{{course}}에서 학원이 수정한 부분에 업데이트 {{count}}개가 있습니다. 학원의 콘텐츠는 유지됩니다.",
+    "action": "강좌 보기"
+  }
 }

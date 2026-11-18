@@ -1,3 +1,4 @@
+import { assertNotArchived } from "../content/archived-content.js";
 import { AppException } from "../common/app-exception.js";
 import { ManualPracticeService } from "./manual-practice.service.js";
 import type { AcademyAccess } from "../authorization/academy-access.service.js";
@@ -377,6 +378,7 @@ export class ManualService {
     return this.db.$transaction(async (tx) => {
       const courseId = row.lecture.courseModule.course.id;
       await tx.$queryRaw`SELECT id FROM courses WHERE id = ${courseId}::uuid FOR UPDATE`;
+      if (visible === true) await assertNotArchived(tx, courseId, { materialIds: [row.id] });
       if (visible === undefined) {
         if (await tx.manualSubmission.count({ where: { materialId: row.id } }))
           throw new ConflictException(

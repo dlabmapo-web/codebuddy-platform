@@ -34,3 +34,23 @@ string fragments.
 The readable, organization-scoped academy identifier used in Cove Studio
 addresses, for example `/academy/dlab-gangnam/courses`. Database IDs remain internal
 identifiers and are not the canonical academy URL interface.
+
+## Library Course Sync
+
+A library master has an editable working tree and internal immutable snapshots.
+Admin saves collect a batch; **Publish updates** shares the saved batch at once.
+Release notes, release counters and history are not part of the editing UI.
+Academy browsing and adoption use the latest release. A linked academy copy
+retains its own rows, student history and local edits. Sync merges independent
+units automatically; overlapping edits keep the academy value and require an
+academy decision. Only new overlapping disagreements notify active Managers and
+Team Leads, grouped per academy course. Notifications lead to the course’s marked
+rows and scoped comparisons; reading does not accept a change. A retained base
+records what the two sides last shared.
+
+Legacy identity matching establishes which old academy row corresponds to a
+library node. It does not prove historical content. Uncertain nodes are
+quarantined until academy review; differing values with no historical base
+remain explicit decisions. Library removals archive content and retain history.
+Grading corrections affect future attempts without resetting solved progress.
+See [the operator runbook](docs/operations/library-sync.md) for flags and rollout.

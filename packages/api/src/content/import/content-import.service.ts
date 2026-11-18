@@ -1,4 +1,5 @@
 import { privateSolutions, replaceExerciseSolutions, solutionOrder } from "../exercise-solutions.js";
+import { fingerprint, resolveItemKeys } from "../item-keys.js";
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -1040,7 +1041,7 @@ export class ContentImportService {
     if (planned.gradingChanged && !planned.changedFields.includes("test_cases")) {
       await tx.studentExerciseProgress.updateMany({ where: { materialId: existing.id, gradingRevision: currentExercise!.gradingRevision }, data: { gradingRevision: currentExercise!.gradingRevision + 1 } });
     }
-    await replaceExerciseSolutions(tx, existing.id, planned.solutions);
+    await replaceExerciseSolutions(tx, existing.id, planned.solutions, currentExercise?.solutions ?? []);
 
     // A weighted problem's cases carry comparators, weights and limits the
     // workbook has no columns for. The planner refuses a workbook that changes
@@ -1057,10 +1058,22 @@ export class ContentImportService {
       await tx.exerciseTestCase.deleteMany({
         where: { exerciseMaterialId: existing.id },
       });
+      // A workbook has no key column: an item keeps its library-sync identity
+      // only on an exact, unique content match, never by row (item-keys.ts).
+      const caseKeys = resolveItemKeys(
+        (currentExercise?.testCases ?? []).map((row) => ({
+          syncKey: row.syncKey,
+          fingerprint: fingerprint({ input: row.input, expectedOutput: row.expectedOutput, visibility: row.visibility }),
+        })),
+        planned.testCases.map((row) => ({
+          fingerprint: fingerprint({ input: row.input, expectedOutput: row.expectedOutput, visibility: row.visibility }),
+        })),
+      );
       await tx.exerciseTestCase.createMany({
-        data: planned.testCases.map((testCase) => ({
+        data: planned.testCases.map((testCase, index) => ({
           exerciseMaterialId: existing.id,
           ...testCase,
+          syncKey: caseKeys[index]!,
         })),
       });
     }
@@ -1069,10 +1082,20 @@ export class ContentImportService {
       where: { exerciseMaterialId: existing.id },
     });
     if (planned.hints.length > 0) {
+      const hintKeys = resolveItemKeys(
+        (currentExercise?.hints ?? []).map((row) => ({
+          syncKey: row.syncKey,
+          fingerprint: fingerprint({ content: row.content, trigger: row.triggerExpression }),
+        })),
+        planned.hints.map((row) => ({
+          fingerprint: fingerprint({ content: row.content, trigger: row.triggerExpression ?? null }),
+        })),
+      );
       await tx.exerciseHint.createMany({
-        data: planned.hints.map((hint) => ({
+        data: planned.hints.map((hint, index) => ({
           exerciseMaterialId: existing.id,
           ...hint,
+          syncKey: hintKeys[index]!,
         })),
       });
     }

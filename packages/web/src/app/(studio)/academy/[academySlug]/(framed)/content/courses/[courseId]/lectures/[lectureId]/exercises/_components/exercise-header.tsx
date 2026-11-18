@@ -1,6 +1,6 @@
 import { useSearchParams } from 'next/navigation';
 import { routes } from '@/lib/routes';
-import { useAcademySlug } from '@/components/studio/academy-route-provider';
+import { useOptionalAcademySlug } from '@/components/studio/academy-route-provider';
 import { usePracticeTranslation } from '@/components/workspace/use-practice-translation';
 import type { ExerciseAuthoringContext } from '@cove/shared';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
@@ -19,7 +19,9 @@ export function ExerciseHeader({
 }) {
   const { t } = useTranslation('content');
   const { t: tp } = usePracticeTranslation();
-  const slug = useAcademySlug();
+  // Null in the content library's console editor, which has no academy and
+  // so no learner route to preview in.
+  const slug = useOptionalAcademySlug();
   const search = useSearchParams();
   const fromPractice = search.get("practice") === "true";
   const preview = search.get("practicePreview") === "true" || !fromPractice;
@@ -38,7 +40,7 @@ export function ExerciseHeader({
         {t('exercise.back')}
       </button>
 
-      {context.material ? <button type="button" className="float-right rounded-lg border border-brand/25 bg-brand-soft px-3 py-2 text-sm font-semibold text-brand" onClick={() => leave(routes.academyLearnExercise(slug, context.material!.id, preview ? { preview: true } : undefined))}>{tp(fromPractice ? 'return_problem' : 'preview_problem')}</button> : null}
+      {context.material && slug ? <button type="button" className="float-right rounded-lg border border-brand/25 bg-brand-soft px-3 py-2 text-sm font-semibold text-brand" onClick={() => leave(routes.academyLearnExercise(slug, context.material!.id, preview ? { preview: true } : undefined))}>{tp(fromPractice ? 'return_problem' : 'preview_problem')}</button> : null}
 
       {/* Where this problem lives: course → module → lecture → problem. */}
       <nav

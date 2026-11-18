@@ -19,5 +19,11 @@
   },
   "unread_badge": "{{count}} new",
   "just_now": "Just now",
-  "action_hint": "Your pages fill in as soon as you enter."
+  "action_hint": "Your pages fill in as soon as you enter.",
+  "course_review": {
+    "title": "Admin changes need your review",
+    "body_one": "{{course}} has an update to a part your academy customized. Your content has been preserved.",
+    "body_other": "{{course}} has {{count}} updates to parts your academy customized. Your content has been preserved.",
+    "action": "View course"
+  }
 }

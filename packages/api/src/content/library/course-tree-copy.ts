@@ -250,6 +250,8 @@ export async function copyCourseTree(
         for (const testCase of exercise.testCases) {
           testCases.push({
             exerciseMaterialId: materialId,
+            // Carried verbatim: a copy's items are its source's items.
+            syncKey: testCase.syncKey,
             position: testCase.position,
             input: testCase.input,
             expectedOutput: testCase.expectedOutput,
@@ -265,6 +267,7 @@ export async function copyCourseTree(
         for (const hint of exercise.hints) {
           hints.push({
             exerciseMaterialId: materialId,
+            syncKey: hint.syncKey,
             position: hint.position,
             content: hint.content,
             triggerExpression: hint.triggerExpression,

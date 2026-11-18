@@ -67,6 +67,10 @@ const syncStates: Record<LibrarySyncState, { icon: LucideIcon; tone: string }> =
     UP_TO_DATE: { icon: CheckCircle2, tone: 'bg-canvas text-sub' },
     UPDATE_AVAILABLE: { icon: ArrowUpCircle, tone: 'bg-brand-soft text-brand' },
     SOURCE_RETIRED: { icon: Archive, tone: 'bg-retired-soft text-retired' },
+    // Linked copies (library course sync).
+    SYNCING: { icon: ArrowUpCircle, tone: 'bg-canvas text-sub' },
+    NEEDS_REVIEW: { icon: ArrowUpCircle, tone: 'bg-brand-soft text-brand' },
+    SYNC_FAILED: { icon: Archive, tone: 'bg-danger/10 text-danger' },
   };
 
 export function LibrarySyncChip({

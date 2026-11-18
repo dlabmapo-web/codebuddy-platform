@@ -126,6 +126,9 @@ enum AcademyFeature {
   /// languages; running them depends on the native node's eligibility, and
   /// existing C/C++ exercises keep working if this is turned off.
   C_CPP_EXERCISES
+  /// Library course sync: published library releases are merged into this
+  /// academy's linked copies. A rollout gate, checked again when a job runs.
+  LIBRARY_COURSE_SYNC
 }
 
 /// Why one student earned points.
@@ -392,6 +395,10 @@ enum ExerciseProgressStatus {
 }
 
 model User {
+  syncNotificationReads LibrarySyncNotificationRead[]
+  libraryReleases        LibraryRelease[]
+  resolvedSyncConflicts  LibrarySyncConflict[]
+  syncResolutionReceipts LibrarySyncResolutionReceipt[]
   materialViews StudentMaterialView[]
   staffPracticeDrafts StaffPracticeDraft[]
   staffPracticeAttempts StaffPracticeAttempt[]
@@ -1350,6 +1357,18 @@ model PlatformOperationRun {
 
 model Course {
   libraryImport LibraryCourseImport?
+  /// Library-course sync. `releases` and `syncCopies` exist only on a library
+  /// master; `syncState`, links, bases, jobs and conflicts only on an academy
+  /// copy. See docs/superpowers/specs/2026-11-18-library-course-sync-design.md.
+  releases      LibraryRelease[]               @relation("LibraryReleaseCourse")
+  syncCopies    CourseSyncState[]              @relation("CourseSyncStateLibrary")
+  syncState     CourseSyncState?               @relation("CourseSyncStateCopy")
+  syncLinks     LibrarySyncLink[]
+  syncBases     LibrarySyncBase[]
+  syncJobs      LibrarySyncJob[]
+  syncConflicts LibrarySyncConflict[]
+  syncChanges   LibrarySyncChange[]
+  syncReceipts  LibrarySyncResolutionReceipt[]
   id              String  @id @default(uuid()) @db.Uuid
   academyId       String  @map("academy_id") @db.Uuid
   title           String
@@ -1730,12 +1749,16 @@ model ExerciseTestCase {
   softTimeLimitMs     Int?               @map("soft_time_limit_ms")
   softPenalty         Int?               @map("soft_penalty")
   label               String?
+  /// Item identity across replace-all saves, for library sync. A copy carries
+  /// its master's key verbatim; a key never moves between exercises.
+  syncKey             String             @default(dbgenerated("gen_random_uuid()")) @map("sync_key") @db.Uuid
   createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   exercise ProgrammingExercise @relation(fields: [exerciseMaterialId], references: [materialId], onDelete: Cascade)
 
   @@unique([exerciseMaterialId, position])
+  @@unique([exerciseMaterialId, syncKey])
   @@map("exercise_test_cases")
 }
 
@@ -2145,12 +2168,15 @@ model ExerciseHint {
   position           Int
   content            String
   triggerExpression  String?  @map("trigger_expression")
+  /// Item identity across replace-all saves, for library sync.
+  syncKey            String   @default(dbgenerated("gen_random_uuid()")) @map("sync_key") @db.Uuid
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   exercise ProgrammingExercise @relation(fields: [exerciseMaterialId], references: [materialId], onDelete: Cascade)
 
   @@unique([exerciseMaterialId, position])
+  @@unique([exerciseMaterialId, syncKey])
   @@map("exercise_hints")
 }
 
@@ -2725,7 +2751,10 @@ model ProgrammingExerciseSolution {
   position Int
   title String? @db.VarChar(80)
   code String @db.Text
+  /// Item identity across replace-all saves, for library sync.
+  syncKey String @default(dbgenerated("gen_random_uuid()")) @map("sync_key") @db.Uuid
   @@unique([materialId, position])
+  @@unique([materialId, syncKey])
   @@map("programming_exercise_solutions")
 }
 
@@ -2905,4 +2934,397 @@ model ProgrammingSubmissionReview {
   @@unique([submissionId, version])
   @@unique([reviewerId, requestId])
   @@map("programming_submission_reviews")
+}
+// ---------------------------------------------------------------------------
+// Library course sync.
+// docs/superpowers/specs/2026-11-18-library-course-sync-design.md §5.
+// Every table here is service-only: snapshot values contain answer keys,
+// solutions and hidden tests. The migration enables RLS and revokes anon and
+// authenticated access.
+// ---------------------------------------------------------------------------
+
+enum LibrarySyncNodeKind {
+  COURSE
+  MODULE
+  LECTURE
+  MATERIAL
+}
+
+enum LibrarySyncLinkMethod {
+  /// Linked by adoption from a release, with exact provenance.
+  ADOPTED
+  /// Linked after the fact from evidence (design §15).
+  LEGACY_LINKED
+}
+
+enum LibrarySyncStatus {
+  IDLE
+  PENDING
+  RUNNING
+  FAILED
+  PAUSED
+}
+
+enum LibrarySyncLinkState {
+  LINKED
+  /// The academy deleted its row; the tombstone stops a later release from
+  /// reading the absence as a fresh library addition.
+  LOCAL_DELETED
+  /// Removed upstream and kept for student work, hidden (design §10).
+  ARCHIVED
+  /// Explicitly made academy-owned; later releases leave it alone.
+  DETACHED
+  /// Removed on both sides.
+  CLOSED
+}
+
+enum LibrarySyncLinkEvidence {
+  ADOPTED
+  EXTERNAL_KEY
+  ASSET_IDENTITY
+  FINGERPRINT
+  PROVENANCE_UNIQUE
+  MANUAL
+}
+
+enum LibrarySyncBaseState {
+  VALUE
+  /// The node or item was known not to exist in base.
+  ABSENT
+  /// Base could not be established (legacy copies, design §15.3 B4).
+  UNKNOWN
+}
+
+enum LibrarySyncJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum LibrarySyncConflictKind {
+  CONCURRENT_EDIT
+  UNKNOWN_BASE
+  REMOVED_UPSTREAM_EDITED_LOCALLY
+  EDITED_UPSTREAM_DELETED_LOCALLY
+  REMOVED_UPSTREAM_HAS_LOCAL_CONTENT
+  PARENT_MISSING
+  PLACEMENT
+  INVALID_RESULT
+  AMBIGUOUS_LINK
+}
+
+enum LibrarySyncConflictStatus {
+  OPEN
+  RESOLVED
+  OBSOLETE
+}
+
+enum LibrarySyncResolution {
+  ACCEPT_LIBRARY
+  KEEP_ACADEMY
+  MANUAL
+  CONVERGED
+}
+
+enum LibrarySyncOutcome {
+  APPLIED
+  KEPT
+  CONVERGED
+  CONFLICT
+  ADDED
+  REMOVED
+  ARCHIVED
+  MOVED
+  RESTORED
+  RESOLVED
+}
+
+enum LibrarySyncAssetKind {
+  PDF
+  VIDEO
+  CAPTION
+  MANUAL
+  LESSON_IMAGE
+}
+
+enum LibrarySyncAssetOwner {
+  RELEASE
+  BASE
+  CONFLICT
+  RESOLUTION
+}
+
+/// An immutable published version of a library master (design §6).
+model LibraryRelease {
+  id                     String         @id @default(uuid()) @db.Uuid
+  libraryCourseId        String         @map("library_course_id") @db.Uuid
+  /// 1, 2, 3 … per master. Release numbers only ever advance.
+  number                 Int
+  /// The master's `contentRevision` when captured. "Unpublished changes" is
+  /// `master.contentRevision > latest release.libraryContentRevision`.
+  libraryContentRevision Int            @map("library_content_revision")
+  /// Creation-time input for adoption; never reinterprets an existing copy.
+  language               CourseLanguage
+  /// Shown to academies in their sync history. At most 500 characters.
+  note                   String         @default("")
+  publishedByUserId      String         @map("published_by_user_id") @db.Uuid
+  publishedAt            DateTime       @default(now()) @map("published_at") @db.Timestamptz(6)
+  nodeCount              Int            @map("node_count")
+  /// Change counts against the previous release, for the console summary.
+  summary                Json           @default("{}")
+
+  libraryCourse Course                @relation("LibraryReleaseCourse", fields: [libraryCourseId], references: [id], onDelete: Cascade)
+  publishedBy   User                  @relation(fields: [publishedByUserId], references: [id], onDelete: Restrict)
+  nodes         LibraryReleaseNode[]
+  baseOf        CourseSyncState[]     @relation("CourseSyncBaseRelease")
+  targetOf      CourseSyncState[]     @relation("CourseSyncTargetRelease")
+  jobs          LibrarySyncJob[]
+  conflicts     LibrarySyncConflict[]
+
+  @@unique([libraryCourseId, number])
+  @@map("library_releases")
+}
+
+/// One node of one release: where it sits and the hash of every unit.
+///
+/// `nodeKey` is the master row id and deliberately has no foreign key: a
+/// release outlives the working-tree rows it was taken from.
+model LibraryReleaseNode {
+  releaseId    String              @map("release_id") @db.Uuid
+  nodeKey      String              @map("node_key") @db.Uuid
+  kind         LibrarySyncNodeKind
+  materialType MaterialType?       @map("material_type")
+  parentKey    String?             @map("parent_key") @db.Uuid
+  /// 0-based among siblings.
+  ordinal      Int
+  /// `{ "<unitKey>": "<hash>" }`, including keyed-list items, list orders and
+  /// the reserved structural units.
+  unitHashes   Json                @map("unit_hashes")
+
+  release LibraryRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  @@id([releaseId, nodeKey])
+  @@map("library_release_nodes")
+}
+
+/// Content-addressed canonical unit values. Append-only. Read only through an
+/// authorized release, copy or conflict, never by bare hash.
+model LibrarySyncValue {
+  hash      String   @id
+  value     Json
+  byteSize  Int      @map("byte_size")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("library_sync_values")
+}
+
+/// One copy's link to its master, and where its sync stands.
+model CourseSyncState {
+  /// Advances only when a newly published admin change needs a fresh decision.
+  reviewVersion             Int                   @default(0) @map("review_version")
+  reviewUpdatedAt           DateTime?             @map("review_updated_at") @db.Timestamptz(6)
+  /// Outline-only projection of unresolved rows; never contains authoring values.
+  reviewItems               Json                  @default("[]") @map("review_items")
+  notificationReads         LibrarySyncNotificationRead[]
+  /// The academy copy.
+  courseId                  String                @id @map("course_id") @db.Uuid
+  libraryCourseId           String                @map("library_course_id") @db.Uuid
+  linkMethod                LibrarySyncLinkMethod @map("link_method")
+  /// Last release fully processed. Null only between legacy linking and the
+  /// first sync.
+  baseReleaseId             String?               @map("base_release_id") @db.Uuid
+  /// Mirrors the base release's number, so advancement can be checked as
+  /// `applied < target` without a join and never moves backwards.
+  appliedReleaseNumber      Int                   @default(0) @map("applied_release_number")
+  /// Newest release this copy should reach.
+  targetReleaseId           String?               @map("target_release_id") @db.Uuid
+  targetReleaseNumber       Int                   @default(0) @map("target_release_number")
+  status                    LibrarySyncStatus     @default(IDLE)
+  pausedAt                  DateTime?             @map("paused_at") @db.Timestamptz(6)
+  openConflictCount         Int                   @default(0) @map("open_conflict_count")
+  /// Units where the copy differs from base after the last run.
+  divergentUnitCount        Int                   @default(0) @map("divergent_unit_count")
+  lastSyncedContentRevision Int?                  @map("last_synced_content_revision")
+  lastRunAt                 DateTime?             @map("last_run_at") @db.Timestamptz(6)
+  lastErrorCode             String?               @map("last_error_code")
+  createdAt                 DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  course        Course          @relation("CourseSyncStateCopy", fields: [courseId], references: [id], onDelete: Cascade)
+  /// Cascade is safe: `Course.sourceCourseId` is Restrict, so a master cannot
+  /// be deleted while any copy still names it. This only runs when both go.
+  libraryCourse Course          @relation("CourseSyncStateLibrary", fields: [libraryCourseId], references: [id], onDelete: Cascade)
+  baseRelease   LibraryRelease? @relation("CourseSyncBaseRelease", fields: [baseReleaseId], references: [id], onDelete: SetNull)
+  targetRelease LibraryRelease? @relation("CourseSyncTargetRelease", fields: [targetReleaseId], references: [id], onDelete: SetNull)
+
+  @@index([libraryCourseId])
+  @@map("course_sync_states")
+}
+
+/// Reading a notification does not resolve the academy's content decision.
+model LibrarySyncNotificationRead {
+  courseId       String   @map("course_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  reviewVersion  Int      @map("review_version")
+  acknowledgedAt DateTime @default(now()) @map("acknowledged_at") @db.Timestamptz(6)
+
+  state CourseSyncState @relation(fields: [courseId], references: [courseId], onDelete: Cascade)
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, userId])
+  @@index([userId])
+  @@map("library_sync_notification_reads")
+}
+
+/// Master node → copy row. Course-scoped, so moves inside the copy keep it.
+model LibrarySyncLink {
+  copyCourseId       String                  @map("copy_course_id") @db.Uuid
+  nodeKey            String                  @map("node_key") @db.Uuid
+  kind               LibrarySyncNodeKind
+  /// Null once the local row is gone (tombstone states).
+  localId            String?                 @map("local_id") @db.Uuid
+  state              LibrarySyncLinkState
+  evidence           LibrarySyncLinkEvidence
+  /// `{ optionMap: { libraryOptionId: localOptionId } }` for multiple choice.
+  meta               Json                    @default("{}")
+  /// Local visibility immediately before archival, restored on reintroduction.
+  archivedVisibility Boolean?                @map("archived_visibility")
+  archivedAt         DateTime?               @map("archived_at") @db.Timestamptz(6)
+  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  copyCourse Course @relation(fields: [copyCourseId], references: [id], onDelete: Cascade)
+
+  // Partial unique in SQL: one link per local row of a kind.
+  @@id([copyCourseId, nodeKey])
+  @@index([copyCourseId, localId])
+  @@map("library_sync_links")
+}
+
+/// Exceptions to "base = baseRelease": units in an open conflict, and every
+/// linked unit of a legacy copy until its first sync completes.
+model LibrarySyncBase {
+  copyCourseId String               @map("copy_course_id") @db.Uuid
+  nodeKey      String               @map("node_key") @db.Uuid
+  unitKey      String               @map("unit_key")
+  /// CHECK in SQL: a hash exactly when the state is VALUE.
+  baseState    LibrarySyncBaseState @map("base_state")
+  baseHash     String?              @map("base_hash")
+
+  copyCourse Course @relation(fields: [copyCourseId], references: [id], onDelete: Cascade)
+
+  @@id([copyCourseId, nodeKey, unitKey])
+  @@map("library_sync_bases")
+}
+
+model LibrarySyncJob {
+  id                  String               @id @default(uuid()) @db.Uuid
+  copyCourseId        String               @map("copy_course_id") @db.Uuid
+  targetReleaseId     String               @map("target_release_id") @db.Uuid
+  targetReleaseNumber Int                  @map("target_release_number")
+  status              LibrarySyncJobStatus @default(PENDING)
+  attempts            Int                  @default(0)
+  nextAttemptAt       DateTime             @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  /// Fencing token: a worker commits only while its lease id is current.
+  leaseId             String?              @map("lease_id") @db.Uuid
+  leaseUntil          DateTime?            @map("lease_until") @db.Timestamptz(6)
+  lastErrorCode       String?              @map("last_error_code")
+  summary             Json?
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt           DateTime?            @map("started_at") @db.Timestamptz(6)
+  finishedAt          DateTime?            @map("finished_at") @db.Timestamptz(6)
+
+  copyCourse    Course              @relation(fields: [copyCourseId], references: [id], onDelete: Cascade)
+  targetRelease LibraryRelease      @relation(fields: [targetReleaseId], references: [id], onDelete: Cascade)
+  changes       LibrarySyncChange[]
+
+  // Partial uniques in SQL: one PENDING and one RUNNING job per copy.
+  @@index([status, nextAttemptAt])
+  @@index([copyCourseId, createdAt(sort: Desc)])
+  @@map("library_sync_jobs")
+}
+
+model LibrarySyncConflict {
+  id               String                    @id @default(uuid()) @db.Uuid
+  copyCourseId     String                    @map("copy_course_id") @db.Uuid
+  /// Members of one grouped decision share it; a lone conflict uses its own id.
+  groupId          String                    @map("group_id") @db.Uuid
+  nodeKey          String                    @map("node_key") @db.Uuid
+  unitKey          String                    @map("unit_key")
+  kind             LibrarySyncConflictKind
+  baseState        LibrarySyncBaseState      @map("base_state")
+  baseHash         String?                   @map("base_hash")
+  oursHash         String?                   @map("ours_hash")
+  theirsHash       String?                   @map("theirs_hash")
+  theirsReleaseId  String                    @map("theirs_release_id") @db.Uuid
+  /// Validator message, coupled units, human-readable path.
+  detail           Json                      @default("{}")
+  status           LibrarySyncConflictStatus @default(OPEN)
+  resolution       LibrarySyncResolution?
+  resolvedHash     String?                   @map("resolved_hash")
+  resolvedByUserId String?                   @map("resolved_by_user_id") @db.Uuid
+  resolvedAt       DateTime?                 @map("resolved_at") @db.Timestamptz(6)
+  createdAt        DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  copyCourse    Course         @relation(fields: [copyCourseId], references: [id], onDelete: Cascade)
+  theirsRelease LibraryRelease @relation(fields: [theirsReleaseId], references: [id], onDelete: Cascade)
+  resolvedBy    User?          @relation(fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  // Partial unique in SQL: one OPEN conflict per (copy, node, unit).
+  @@index([copyCourseId, status])
+  @@index([groupId])
+  @@map("library_sync_conflicts")
+}
+
+/// What one sync run did, per unit: the academy's History tab.
+model LibrarySyncChange {
+  id           String             @id @default(uuid()) @db.Uuid
+  jobId        String?            @map("job_id") @db.Uuid
+  copyCourseId String             @map("copy_course_id") @db.Uuid
+  releaseId    String             @map("release_id") @db.Uuid
+  nodeKey      String             @map("node_key") @db.Uuid
+  unitKey      String             @map("unit_key")
+  outcome      LibrarySyncOutcome
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  job        LibrarySyncJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  copyCourse Course          @relation(fields: [copyCourseId], references: [id], onDelete: Cascade)
+
+  @@index([copyCourseId, createdAt(sort: Desc)])
+  @@map("library_sync_changes")
+}
+
+/// Assets pinned by retained snapshot values, so cleanup cannot remove an
+/// asset a release, base, conflict or resolution still refers to (design §12).
+model LibrarySyncAssetReference {
+  id        String                @id @default(uuid()) @db.Uuid
+  ownerKind LibrarySyncAssetOwner @map("owner_kind")
+  ownerId   String                @map("owner_id") @db.Uuid
+  assetKind LibrarySyncAssetKind  @map("asset_kind")
+  assetId   String                @map("asset_id") @db.Uuid
+  createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([ownerKind, ownerId, assetKind, assetId])
+  @@index([assetKind, assetId])
+  @@map("library_sync_asset_references")
+}
+
+/// Durable idempotency for conflict resolution (design §13.2).
+model LibrarySyncResolutionReceipt {
+  copyCourseId String   @map("copy_course_id") @db.Uuid
+  requestKey   String   @map("request_key") @db.Uuid
+  actorUserId  String   @map("actor_user_id") @db.Uuid
+  /// Canonical hash of the request; the same key with a different request is refused.
+  requestHash  String   @map("request_hash")
+  groupId      String   @map("group_id") @db.Uuid
+  result       Json
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  copyCourse Course @relation(fields: [copyCourseId], references: [id], onDelete: Cascade)
+  actor      User   @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@id([copyCourseId, requestKey])
+  @@map("library_sync_resolution_receipts")
 }

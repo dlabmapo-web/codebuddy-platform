@@ -1,4 +1,9 @@
+import { LegacyCopiesPanel } from '../_components/legacy-copies-panel';
 import { notFound } from 'next/navigation';
+import type {
+  LibraryReleaseDraft,
+  LibrarySyncCopy,
+} from '@cove/shared';
 
 import { CourseBuilder } from '@/app/(studio)/academy/[academySlug]/(framed)/content/courses/[courseId]/_components/course-builder';
 import { BackLink } from '@/components/studio/back-link';
@@ -9,6 +14,7 @@ import { createPlatformServerORPCClient } from '@/lib/orpc-server';
 import { routes } from '@/lib/routes';
 
 import { PlatformShell } from '../../../_components/platform-shell';
+import { LibraryReleasePanel } from '../_components/library-release-panel';
 import { requireLibraryAcademyId } from '../_lib/require-library';
 
 /**
@@ -44,11 +50,27 @@ export default async function LibraryCourseBuilderPage({
 
   let initialTree = null;
   let loadFailed = false;
+  let releaseDraft: LibraryReleaseDraft | null = null;
+  let syncCopies: LibrarySyncCopy[] = [];
+  let legacyCopies: Awaited<
+    ReturnType<
+      ReturnType<
+        typeof createPlatformServerORPCClient
+      >['platformLibrarySync']['linkReport']
+    >
+  >['copies'] = [];
   try {
-    initialTree = await createPlatformServerORPCClient().academyCourses.getOutline({
-      academyId,
-      courseId,
-    });
+    const client = createPlatformServerORPCClient();
+    const [tree, legacy, draft, copies] = await Promise.all([
+      client.academyCourses.getOutline({ academyId, courseId }),
+      client.platformLibrarySync.linkReport({ courseId }),
+      client.platformLibrarySync.draft({ courseId }),
+      client.platformLibrarySync.copies({ courseId }),
+    ]);
+    initialTree = tree;
+    legacyCopies = legacy.copies;
+    releaseDraft = draft;
+    syncCopies = copies.copies;
   } catch (error) {
     loadFailed = !isAccessDeniedError(error);
   }
@@ -63,16 +85,39 @@ export default async function LibraryCourseBuilderPage({
         />
       }
       bleed
-      namespaces={[...contentNamespaces, 'content-import']}
+      namespaces={[...contentNamespaces, 'content-import', 'platform-library']}
       title={initialTree?.course.title ?? t('platform-library:title')}
     >
-      {copied === '1' && initialTree ? <p role="status" className="mb-4 rounded-lg border border-brand/20 bg-brand-soft px-4 py-3 text-sm text-ink">{t('platform-library:import.success')}</p> : null}
-      {initialTree?.course.libraryImportOrigin ? <p className="mb-4 text-sm text-sub">{t('platform-library:import.origin', {
-        academy: initialTree.course.libraryImportOrigin.sourceAcademyName,
-        course: initialTree.course.libraryImportOrigin.sourceCourseTitle,
-        revision: initialTree.course.libraryImportOrigin.sourceContentRevision,
-        date: initialTree.course.libraryImportOrigin.copiedAt.slice(0, 10),
-      })}</p> : null}
+      {copied === '1' && initialTree ? (
+        <p
+          role="status"
+          className="mb-4 rounded-lg border border-brand/20 bg-brand-soft px-4 py-3 text-sm text-ink"
+        >
+          {t('platform-library:import.success')}
+        </p>
+      ) : null}
+      {initialTree?.course.libraryImportOrigin ? (
+        <p className="mb-4 text-sm text-sub">
+          {t('platform-library:import.origin', {
+            academy: initialTree.course.libraryImportOrigin.sourceAcademyName,
+            course: initialTree.course.libraryImportOrigin.sourceCourseTitle,
+            revision:
+              initialTree.course.libraryImportOrigin.sourceContentRevision,
+            date: initialTree.course.libraryImportOrigin.copiedAt.slice(0, 10),
+          })}
+        </p>
+      ) : null}
+      {/* Releases and copies: head office's editing stays private until published. */}
+      {releaseDraft ? (
+        <LibraryReleasePanel
+          courseId={courseId}
+          initialDraft={releaseDraft}
+          initialCopies={syncCopies}
+        />
+      ) : null}
+      {initialTree ? (
+        <LegacyCopiesPanel courseId={courseId} initial={legacyCopies} />
+      ) : null}
       {initialTree ? (
         <CourseBuilder
           academyId={academyId}

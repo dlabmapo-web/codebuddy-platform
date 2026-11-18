@@ -26,6 +26,7 @@
     "db:seed:sandbox": "tsx prisma/seed/manual-sandbox.ts",
     "db:seed:ranking": "tsx prisma/seed/console-ranking-fixture.ts",
     "db:seed:library": "tsx prisma/seed/library-fixture.ts",
+    "db:seed:library-sync": "tsx prisma/seed/library-sync-demo.ts",
     "db:demo": "tsx prisma/seed/demo/demo.ts",
     "db:demo:reset": "tsx prisma/seed/demo/reset.ts",
     "platform:bootstrap-admin": "tsx src/platform/bootstrap-admin.ts",
@@ -43,7 +44,8 @@
     "dlab:invalidate-sessions": "tsx src/integrations/dlab/scripts/operator.ts invalidate",
     "benchmark:native-classroom": "node --max-old-space-size=512 scripts/benchmark-native-classroom.mjs",
     "test:native-harness": "node --test scripts/benchmark-native-classroom.test.mjs ../../deploy/native/deployment-contract.test.mjs",
-    "dlab:sync-directory": "tsx src/integrations/dlab/scripts/sync-directory.ts"
+    "dlab:sync-directory": "tsx src/integrations/dlab/scripts/sync-directory.ts",
+    "library:initial-release": "tsx src/library-sync/initial-release.ts"
   },
   "dependencies": {
     "@cove/shared": "workspace:*",

@@ -67,6 +67,8 @@ export function useNotifications() {
     }
 
     socket.on(notificationServerEvents.created, onCreated);
+    const onChanged = () => void client.invalidateQueries({ queryKey });
+    socket.on(notificationServerEvents.changed, onChanged);
     // A reconnect may have missed a packet. Refetching closes that gap in the
     // seconds it takes, which is why nothing here needs delivery guarantees.
     socket.on('connect', () => {
@@ -75,12 +77,16 @@ export function useNotifications() {
 
     return () => {
       socket.off(notificationServerEvents.created, onCreated);
+      socket.off(notificationServerEvents.changed, onChanged);
       socket.close();
     };
   }, [client]);
 
   const acknowledge = useMutation({
-    mutationFn: (id: string) => orpc.notifications.acknowledge({ id }),
+    mutationFn: (item: NotificationItem) => orpc.notifications.acknowledge({
+      id: item.id,
+      ...(item.kind === 'COURSE_CONTENT_REVIEW' ? { reviewVersion: item.course.reviewVersion } : {}),
+    }),
     onSuccess: () => client.invalidateQueries({ queryKey }),
   });
 
@@ -91,6 +97,6 @@ export function useNotifications() {
     failed: list.isError,
     /** The id of the item that most recently arrived over the socket. */
     announcement,
-    acknowledge: (id: string) => acknowledge.mutateAsync(id),
+    acknowledge: (item: NotificationItem) => acknowledge.mutateAsync(item),
   };
 }

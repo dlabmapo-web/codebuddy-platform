@@ -4,6 +4,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, Prisma } from "../generated/prisma/client.js";
 import { VideoStorage } from "./video-storage.js";
 import { encodeVideo, InvalidVideo } from "./video-encoder.js";
+import { isAssetRetained } from "../library-sync/asset-retention.js";
 import { mkdtemp, rm, statfs, readdir, stat } from "node:fs/promises";
 import { createWriteStream, createReadStream } from "node:fs";
 import { tmpdir } from "node:os";
@@ -234,7 +235,9 @@ async function cleanup() {
       await tx.$queryRaw`SELECT id FROM video_assets WHERE id=${a.id}::uuid FOR UPDATE`;
       if (
         (await tx.videoLesson.count({ where: { assetId: a.id } })) ||
-        (await tx.videoWatchProgress.count({ where: { assetId: a.id } }))
+        (await tx.videoWatchProgress.count({ where: { assetId: a.id } })) ||
+        // A library release, sync base or conflict may still refer to it.
+        (await isAssetRetained(tx, "VIDEO", a.id))
       )
         return false;
       await tx.videoAsset.update({

@@ -104,6 +104,23 @@ class LearningRolloutTests(unittest.TestCase):
         self.assertIn("GUI_ENABLED must be true or false", result.stderr)
         self.assertEqual(self.manifest.read_text(), previous)
 
+    def test_library_sync_selection_is_explicit_and_preserves_active_manifest(self):
+        deploy = self.root / 'scripts' / 'deploy.sh'
+        deploy.write_text('#!/usr/bin/env bash\ncp "$1" "$COVE_DEPLOY_ROOT/candidate.env"\n')
+        deploy.chmod(0o700)
+        previous = self.manifest.read_text()
+        self.run_script('set-v2-release.sh', 'ghcr.io/acme', 'sha-' + SHA, 'true', 'true', 'true', 'true', 'true', '', 'true')
+        self.assertIn('LIBRARY_SYNC_ENABLED=true', (self.root / 'candidate.env').read_text())
+        self.assertEqual(self.manifest.read_text(), previous)
+
+    def test_library_snapshots_are_prepared_before_api_start(self):
+        script = (SCRIPTS / 'deploy.sh').read_text()
+        self.assertLess(script.index('run --rm migrate'), script.index('prepare-production.ts'))
+        self.assertLess(script.index('prepare-production.ts'), script.index('compose up -d --wait'))
+        self.assertIn('feature_enabled LIBRARY_SYNC_ENABLED', script)
+        dockerfile = (SCRIPTS.parent / 'docker/api.Dockerfile').read_text().split('FROM dependencies AS migration', 1)[1]
+        self.assertIn('pnpm --filter @cove/shared build', dockerfile)
+
     def test_reviewed_browser_pilot_is_applied_only_to_the_release_candidate(self):
         deploy = self.root / 'scripts/deploy.sh'
         deploy.write_text('#!/bin/sh\ncp "$1" "$COVE_DEPLOY_ROOT/candidate.env"\n')

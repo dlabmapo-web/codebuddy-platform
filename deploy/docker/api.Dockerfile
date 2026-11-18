@@ -69,7 +69,8 @@ ARG DIRECT_URL=postgresql://build:build@localhost:5432/build
 ARG DATABASE_URL=postgresql://build:build@localhost:5432/build
 ENV DIRECT_URL=$DIRECT_URL
 ENV DATABASE_URL=$DATABASE_URL
-RUN pnpm --filter @cove/api db:generate \
+RUN pnpm --filter @cove/shared build \
+ && pnpm --filter @cove/api db:generate \
  && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
     /opt/corepack /pnpm \
  && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \

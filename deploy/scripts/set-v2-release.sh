@@ -10,6 +10,7 @@ choice="${5:-}"
 video="${6:-}"
 trial="${7:-false}"
 browser_config="${8:-}"
+library_sync="${9:-false}"
 [[ "$namespace" =~ ^ghcr\.io/[a-z0-9_.-]+$ ]] || fail "invalid GHCR namespace"
 assert_safe_tag "$tag"
 require_file "$deployment_env"
@@ -20,7 +21,7 @@ candidate="$(mktemp "$deploy_root/state/v2-release.XXXXXX")"
 cp "$deployment_env" "$candidate"
 chmod 600 "$candidate"
 
-python3 - "$candidate" "$namespace" "$tag" "$gui" "$short_answer" "$choice" "$video" "$trial" "$browser_config" "$script_dir" <<'PY'
+python3 - "$candidate" "$namespace" "$tag" "$gui" "$short_answer" "$choice" "$video" "$trial" "$browser_config" "$script_dir" "$library_sync" <<'PY'
 import pathlib
 import sys
 
@@ -39,6 +40,9 @@ updates = {
     "GUI_RUNTIME_IMAGE": f"{namespace}/cove-gui-runtime:{tag}",
     "DLAB_OS_BASE_URL": "https://os.dlabcampus.com/v1",
 }
+if sys.argv[11] not in ("true", "false"):
+    raise SystemExit("LIBRARY_SYNC_ENABLED must be true or false")
+updates["LIBRARY_SYNC_ENABLED"] = sys.argv[11]
 for key, value in zip(
     ("GUI_ENABLED", "SHORT_ANSWER_ENABLED", "MULTIPLE_CHOICE_ENABLED", "VIDEO_LESSONS_ENABLED", "TURTLE_TRIAL_ENABLED"),
     sys.argv[4:9],

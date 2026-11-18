@@ -5,6 +5,7 @@ x-learning-flags: &learning-flags
   SHORT_ANSWER_ENABLED: ${SHORT_ANSWER_ENABLED:-false}
   MULTIPLE_CHOICE_ENABLED: ${MULTIPLE_CHOICE_ENABLED:-false}
   VIDEO_LESSONS_ENABLED: ${VIDEO_LESSONS_ENABLED:-false}
+  LIBRARY_SYNC_ENABLED: ${LIBRARY_SYNC_ENABLED:-false}
 
 # Old manifests need the old origin when rolling back to its pinned API image.
 # Release selection advances this non-secret value alongside the image SHAs.

@@ -67,9 +67,29 @@ intended to drain jobs. Each copy's academy must also have an enabled
 draining or the academy feature is off. Enable one pilot academy first, then
 expand deliberately after inspecting its history, conflicts and job failures.
 
-In the admin release panel, **Pause** retains the newest target and queued
-work; **Resume** reconciles the target with the newest release. A pause takes
-effect at the next transaction boundary. **Retry** queues a fresh attempt.
+For the all-academy production rollout requested on 2026-11-18, the release
+workflow takes the `LIBRARY_SYNC_ENABLED` repository variable into the candidate
+deployment manifest. Compose passes that manifest value to the API; a rollback
+to an older manifest defaults it to false. Before API startup, deployment runs:
+
+```sh
+node node_modules/tsx/dist/cli.mjs src/library-sync/prepare-production.ts --enable-all-academies
+```
+
+The migration container supplies `DIRECT_URL` explicitly. Preparation captures
+initial releases for all visible, unretired library masters, then enables the
+academy gate for all active academies. It does not link existing copies, change
+their content, or clear per-copy pauses. Repeating it reuses existing releases.
+Without global enablement, deployment still creates initial snapshots so academy
+library browsing remains available. `--check` validates missing snapshots without
+writing snapshots or feature flags. New academies added after the release need
+their `LIBRARY_COURSE_SYNC` row enabled during onboarding or the next all-academy
+preparation run.
+
+The authorized platform sync API provides `pause`, `resume`, and `retry`;
+these controls are not shown in the admin course page. Pause retains the newest
+target and queued work; resume reconciles it with the newest release. A pause
+takes effect at the next transaction boundary. Retry queues a fresh attempt.
 Jobs use a two-minute lease, bounded transactions and exponential backoff;
 eight ordinary failures require an operator retry. Review `last_error_code`
 and the actual failing asset/definition before retrying repeatedly.
@@ -82,10 +102,11 @@ those records retain historical comparisons and their assets.
 ## Existing academy copies
 
 1. Publish an initial release of the library master if it has none.
-2. In the admin master page, **Existing academy copies → Review linking**
-   produces an opaque evidence fingerprint and counts. **Link this copy**
-   establishes its course-level sync state. No uncertain node is copied or
-   overwritten as a result of linking.
+2. An authorized operator uses the platform sync `linkReport`, `linkPreview`,
+   and `linkCopy` APIs. Preview produces an opaque evidence fingerprint and
+   counts; linkCopy requires that fingerprint to establish course-level sync
+   state. These operations are not exposed in the simplified admin course
+   page. No uncertain node is copied or overwritten as a result of linking.
 3. An academy editor opens **Library updates → Match existing materials**.
    Match modules, then lectures, then materials to existing academy rows.
    Select **Add this as a new library item** only after verifying there is no
@@ -185,12 +206,13 @@ was performed during this continuation. Temporary services are stopped after
 verification; the API port 4000 is left free.
 
 
-The final comparison pass also renders all test-case fields in a table, keyed MC
+The final comparison pass renders test-case input/output blocks and metadata, keyed MC
 options with answer markers and current wording, PDF/video asset metadata cards,
 video caption definitions, named structural order, and bounded text/code change
 regions. Large bodies retain complete side-by-side versions without running an
-unbounded diff algorithm. The console includes release notes/authors/change counts,
-rollout counts and copy last-run times. Main admin data is server-rendered; refresh
+unbounded diff algorithm. The admin page shows saved change counts and one Publish
+updates action; release notes/history and per-academy review tracking are omitted.
+Main admin data is server-rendered; refresh
 uses focus/events rather than polling. These additions preserve the four-statement
 academy updates read.
 

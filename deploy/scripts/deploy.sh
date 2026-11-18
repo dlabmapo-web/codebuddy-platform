@@ -68,6 +68,15 @@ fi
 compose --profile operations run --rm migrate
 compose --profile operations run --rm --entrypoint node migrate \
   node_modules/tsx/dist/cli.mjs scripts/setup-learning-storage.mts --production
+# Academy browsing reads immutable snapshots even when job draining is off.
+# Prepare existing published masters before replacing the API; fail closed if
+# one cannot be captured, rather than making the library disappear on rollout.
+library_sync_options=()
+if feature_enabled LIBRARY_SYNC_ENABLED; then
+  library_sync_options+=(--enable-all-academies)
+fi
+compose --profile operations run --rm --entrypoint node migrate \
+  node_modules/tsx/dist/cli.mjs src/library-sync/prepare-production.ts ${library_sync_options[@]+"${library_sync_options[@]}"}
 # Keep the existing web serving until the new API passes its health check.
 # getOutline is additive: the old web remains compatible during this stage.
 compose up -d --wait --wait-timeout "${HEALTH_TIMEOUT_SECONDS:-300}" api

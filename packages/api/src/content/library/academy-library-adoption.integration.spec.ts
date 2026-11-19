@@ -10,6 +10,9 @@ import type { PrismaService } from "../../database/prisma.service.js";
 import { PrismaClient } from "../../generated/prisma/client.js";
 import { deleteSyncFixture } from "../../library-sync/sync-fixture-cleanup.js";
 import { AcademyLibraryService } from "./academy-library.service.js";
+import { CourseService } from "../course.service.js";
+import type { MonitoringRevocationService } from "../../monitoring/monitoring-revocation.service.js";
+import { createProgrammingExerciseSchema, defaultEliceGradingProfile, starterBundleFor } from "@cove/shared";
 
 /**
  * Adoption materializes the latest library release through the sync writer
@@ -29,6 +32,7 @@ describe.skipIf(!databaseUrl)("adopting a library course (PostgreSQL)", () => {
   const library = randomUUID();
   const academy = randomUUID();
   const admin = randomUUID();
+  const adminAuth = randomUUID();
   const leadAuth = randomUUID();
   const lead = randomUUID();
   const identity = { authUserId: leadAuth } as SupabaseIdentity;
@@ -103,7 +107,7 @@ describe.skipIf(!databaseUrl)("adopting a library course (PostgreSQL)", () => {
     const db = client as unknown as PrismaService;
     service = new AcademyLibraryService(db, new AcademyAccessService(db, new SupportGrantResolver(db)), new AuditService());
     await client.organization.create({ data: { id: org, name: "Adoption", slug: `adopt-${org}` } });
-    await client.user.createMany({ data: [{ id: admin, authUserId: randomUUID(), status: "ACTIVE", platformRole: "ADMIN" }, { id: lead, authUserId: leadAuth, status: "ACTIVE", platformRole: "USER" }] });
+    await client.user.createMany({ data: [{ id: admin, authUserId: adminAuth, status: "ACTIVE", platformRole: "ADMIN" }, { id: lead, authUserId: leadAuth, status: "ACTIVE", platformRole: "USER" }] });
     await client.academy.create({ data: { id: library, organizationId: org, name: "Library", slug: `lib-${library}`, kind: "LIBRARY" } });
     await client.academy.create({ data: { id: academy, organizationId: org, name: "Branch", slug: `branch-${academy}` } });
     await client.academyMembership.create({ data: { academyId: academy, userId: lead, role: "TEAM_LEAD", status: "ACTIVE" } });
@@ -167,6 +171,55 @@ describe.skipIf(!databaseUrl)("adopting a library course (PostgreSQL)", () => {
     const copy = await tree(summary.id);
     expect(copy.language).toBe("C_CPP");
     expect(copy.modules[0]!.lectures[0]!.materials[0]!.programmingExercise).toMatchObject({ language: "CPP", gradingSemanticVersion: "elice-v1" });
+  });
+
+  it("lets a platform admin author a multi-file C/C++ library problem, and adoption keeps its files", async () => {
+    const db = client as unknown as PrismaService;
+    const access = new AcademyAccessService(db, new SupportGrantResolver(db));
+    const courses = new CourseService(db, access, new AuditService(), { revokeClass: async () => undefined } as unknown as MonitoringRevocationService);
+    const platformAdmin = { authUserId: adminAuth, email: "admin@library.test" } as SupabaseIdentity;
+    const project = {
+      version: 1 as const,
+      files: [
+        { path: "main.cpp", content: '#include <cstdio>\n#include "sum.h"\nint main() { int a, b; scanf("%d %d", &a, &b); printf("%d\\n", sum(a, b)); }\n', readOnly: false, hidden: false, openByDefault: true },
+        { path: "sum.c", content: "int sum(int a, int b) { return 0; }\n", readOnly: false, hidden: false, openByDefault: true },
+        { path: "sum.h", content: "int sum(int a, int b);\n", readOnly: true, hidden: false, openByDefault: true },
+        { path: "checks.c", content: "int library_secret(void) { return 1; }\n", readOnly: false, hidden: true, openByDefault: false },
+      ],
+      sources: ["main.cpp", "sum.c", "checks.c"],
+      includeLearnerSources: false,
+      fileTree: "OPEN" as const,
+    };
+
+    // The library is authored with the same services a Team Lead's academy uses.
+    const course = await courses.create(platformAdmin, { academyId: library, title: `Library C++ ${randomUUID().slice(0, 8)}`, description: "", language: "C_CPP" });
+    await courses.createModule(platformAdmin, { academyId: library, courseId: course.id, title: "Headers", description: "" });
+    const moduleId = (await client.courseModule.findFirstOrThrow({ where: { courseId: course.id } })).id;
+    await courses.createLecture(platformAdmin, { academyId: library, courseId: course.id, moduleId, title: "Three files", description: "" });
+    const lectureId = (await client.lecture.findFirstOrThrow({ where: { courseModuleId: moduleId } })).id;
+    const created = await courses.createExercise(platformAdmin, createProgrammingExerciseSchema.parse({
+      academyId: library, courseId: course.id, lectureId, title: "Sum in three files", difficulty: "EASY",
+      description: "<p>Write sum.</p>", inputFormat: "", outputFormat: "", constraints: "", starterCode: "",
+      language: "CPP", sourceProject: project,
+      solutions: [{ title: null, code: "//@cove-file sum.c\nint sum(int a, int b) { return a + b; }\n" }],
+      aiFeedbackEnabled: false, isVisible: true, grading: defaultEliceGradingProfile, hints: [],
+      testCases: [{ input: "4 6\n", expectedOutput: "10", weight: 100, visibility: "SAMPLE", comparator: "STDOUT", timeLimitMsOverride: null, softTimeLimitMs: null, softPenalty: null, label: null }],
+    }));
+    expect(created.material!.programmingExercise!.sourceProject).toEqual(project);
+    await client.courseModule.updateMany({ where: { courseId: course.id }, data: { isVisible: true } });
+    await client.lecture.updateMany({ where: { id: lectureId }, data: { isVisible: true } });
+    await client.course.update({ where: { id: course.id }, data: { isVisible: true } });
+
+    // A Team Lead adopts it: the copy keeps every file, flag and compile rule.
+    const summary = await service.adopt(identity, { academyId: academy, libraryCourseId: course.id, title: "Branch C++ files" });
+    const copy = await tree(summary.id);
+    expect(copy.language).toBe("C_CPP");
+    const exercise = copy.modules[0]!.lectures[0]!.materials[0]!.programmingExercise!;
+    expect(exercise.language).toBe("CPP");
+    expect(exercise.sourceProject).toEqual(project);
+    expect(exercise.starterCode).toBe(starterBundleFor(project));
+    expect(exercise.starterCode).not.toContain("library_secret");
+    expect(exercise.solutions[0]!.code).toBe("//@cove-file sum.c\nint sum(int a, int b) { return a + b; }\n");
   });
 
   it("costs the same number of statements for a small and a large course", async () => {

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { starterBundleFor } from "@cove/shared";
 import { ConfigService } from "@nestjs/config";
 import { saveManualSchema } from "@cove/shared";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -1040,5 +1041,63 @@ describe.skipIf(!databaseUrl)("library course sync (PostgreSQL)", () => {
     await expect(manual.save(identity, saveManualSchema.parse({ ...academyWritten.config, academyId: ids.academy, courseId: copyId,
       lectureId: academyWritten.staff!.lectureId, materialId: copyWritten, title: academyWritten.title, type: academyWritten.type,
       shortAnswer: { ...academyWritten.config.shortAnswer, expectedAnswer: "Different local key" } }))).rejects.toThrow("answer definitions are locked");
+  });
+
+  it("adopts and updates a multi-file C/C++ library problem, files and flags included", async () => {
+    const master = randomUUID(), moduleId = randomUUID(), lectureId = randomUUID(), added = randomUUID();
+    const project = (secret: string) => ({
+      version: 1 as const,
+      files: [
+        { path: "main.cpp", content: '#include "sum.h"\nint main() { return sum(1, 2) == 3 ? 0 : 1; }\n', readOnly: false, hidden: false, openByDefault: true },
+        { path: "sum.c", content: "int sum(int a, int b) { return 0; }\n", readOnly: false, hidden: false, openByDefault: true },
+        { path: "sum.h", content: "int sum(int a, int b);\n", readOnly: true, hidden: false, openByDefault: true },
+        { path: "checks.c", content: `int library_secret(void) { return ${secret}; }\n`, readOnly: false, hidden: true, openByDefault: false },
+      ],
+      sources: ["main.cpp", "sum.c", "checks.c"],
+      includeLearnerSources: false,
+      fileTree: "OPEN" as const,
+    });
+    const first = project("1");
+    // A C/C++ library course of its own: a C++ problem belongs only in one.
+    await client.course.create({ data: { id: master, academyId: ids.library, title: `C++ files ${master.slice(0, 8)}`, description: "", isVisible: true, language: "C_CPP", createdByUserId: ids.admin } });
+    await client.courseModule.create({ data: { id: moduleId, courseId: master, externalKey: "m1", title: "Headers", position: 1, isVisible: true } });
+    await client.lecture.create({ data: { id: lectureId, courseModuleId: moduleId, externalKey: "l1", title: "Three files", position: 1, isVisible: true } });
+    await client.material.create({
+      data: {
+        id: added, lectureId, type: "PROGRAMMING_EXERCISE", title: "Sum in three files", position: 1, isVisible: true,
+        programmingExercise: {
+          create: {
+            externalKey: `files-${added}`, difficulty: "EASY", language: "CPP", gradingRevision: 1,
+            gradingMode: "ELICE_STDIO", inputPromptPolicy: "INCLUDE", gradingSemanticVersion: "elice-v1",
+            totalTimeLimitMs: 10000, comparatorTimeLimitMs: 1000, materialMaximumHundredths: 10000, materialScorePolicy: "PROPORTIONAL",
+            starterCode: starterBundleFor(first), sourceProject: first,
+            solutions: { create: [{ position: 0, code: "//@cove-file sum.c\nint sum(int a, int b) { return a + b; }\n" }] },
+            testCases: { create: [{ position: 1, input: "4 6\n", expectedOutput: "10", visibility: "SAMPLE" }] },
+          },
+        },
+      },
+    });
+    const release = (note: string, requireChanges = true) => client.$transaction(async (tx) => {
+      await lockCourseRow(tx, master);
+      return publishRelease(tx, audit, { libraryCourseId: master, note, actorUserId: ids.admin, requireChanges });
+    }, { timeout: 60_000 });
+    await release("First", false);
+    const library = new AcademyLibraryService(db, new AcademyAccessService(db, new SupportGrantResolver(db)), audit);
+    const copy = (await library.adopt(identity, { academyId: ids.academy, libraryCourseId: master, title: "C++ files copy" })).id;
+    const localId = (await client.librarySyncLink.findFirstOrThrow({ where: { copyCourseId: copy, nodeKey: added } })).localId!;
+    const copied = await client.programmingExercise.findUniqueOrThrow({ where: { materialId: localId } });
+    expect(copied.sourceProject).toEqual(first);
+    expect(copied.starterCode).toBe(starterBundleFor(first));
+    expect(copied.starterCode).not.toContain("library_secret");
+
+    // The library changes a hidden file: the copy follows on the next release.
+    const second = project("2");
+    await client.programmingExercise.update({ where: { materialId: added }, data: { sourceProject: second, starterCode: starterBundleFor(second) } });
+    await client.course.update({ where: { id: master }, data: { contentRevision: { increment: 1 } } });
+    await release("Hidden check");
+    expect(await jobs.drain()).toBeGreaterThanOrEqual(1);
+    const updated = await client.programmingExercise.findUniqueOrThrow({ where: { materialId: localId } });
+    expect(updated.sourceProject).toEqual(second);
+    expect(updated.starterCode).not.toContain("library_secret");
   });
 });

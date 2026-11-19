@@ -30,7 +30,8 @@ export async function readSubmissionAdmission(db: Prisma.TransactionClient, mate
         'comparatorTimeLimitMs',pe.comparator_time_limit_ms,'continuationPolicy',pe.continuation_policy,
         'exitStatusPolicy',pe.exit_status_policy,'materialMaximumHundredths',pe.material_maximum_hundredths,
         'materialScorePolicy',pe.material_score_policy,'feedbackPolicy',pe.feedback_policy,
-        'manualMaximumHundredths',pe.manual_maximum_hundredths,'manualIncludeInScore',pe.manual_include_in_score
+        'manualMaximumHundredths',pe.manual_maximum_hundredths,'manualIncludeInScore',pe.manual_include_in_score,
+        'sourceProject',pe.source_project
       ) END AS exercise,
       CASE WHEN pe.submission_policy = 'AUTOMATIC' THEN COALESCE((
         SELECT jsonb_agg(to_jsonb(tc) ORDER BY tc.position, tc.id)

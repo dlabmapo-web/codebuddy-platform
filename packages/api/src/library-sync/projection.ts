@@ -69,6 +69,7 @@ export type ProjectedExercise = {
   manualMaximumHundredths: number;
   manualIncludeInScore: boolean;
   feedbackPolicy: unknown;
+  sourceProject: unknown;
   aiFeedbackEnabled: boolean;
   quiz: unknown;
   referencePdfMaterialId: string | null;
@@ -262,6 +263,7 @@ export async function readCourseProjection(
                 'manualMaximumHundredths', pe.manual_maximum_hundredths,
                 'manualIncludeInScore', pe.manual_include_in_score,
                 'feedbackPolicy', pe.feedback_policy, 'aiFeedbackEnabled', pe.ai_feedback_enabled,
+                'sourceProject', pe.source_project,
                 'quiz', pe.quiz, 'referencePdfMaterialId', pe.reference_pdf_material_id,
                 'gradingRevision', pe.grading_revision,
                 'testCases', coalesce((SELECT json_agg(json_build_object(

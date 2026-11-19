@@ -944,7 +944,9 @@ export class ContentImportService {
       inputFormat: planned.inputFormat,
       outputFormat: planned.outputFormat,
       constraints: planned.constraints,
-      starterCode: planned.starterCode,
+      // A multi-file problem's starting code is derived from its project,
+      // which a workbook does not carry: the project, not the sheet, decides.
+      ...(existing?.programmingExercise?.sourceProject == null ? { starterCode: planned.starterCode } : {}),
       aiFeedbackEnabled: planned.aiFeedbackEnabled,
       manualMaximumHundredths: planned.manualAssessment?.maximumHundredths ?? existing?.programmingExercise?.manualMaximumHundredths ?? 10000,
       manualIncludeInScore: planned.manualAssessment?.includeInScore ?? existing?.programmingExercise?.manualIncludeInScore ?? false,

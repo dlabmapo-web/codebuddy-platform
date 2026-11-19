@@ -129,6 +129,7 @@ export const MODEL_COVERAGE: Record<string, Record<string, Claim>> = {
     manualIncludeInScore: unit("exercise.manualAssessment"),
     submissionPolicy: unit("exercise.submissionPolicy"),
     feedbackPolicy: unit("exercise.feedbackPolicy"),
+    sourceProject: unit("exercise.sourceProject"),
     quiz: unit("exercise.quiz"),
     referencePdfMaterialId: unit("exercise.referencePdf"),
     createdAt: STAMP,

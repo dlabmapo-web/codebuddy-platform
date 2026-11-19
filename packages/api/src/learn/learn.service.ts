@@ -1,4 +1,5 @@
 import { readSubmissionAdmission } from "./submission-admission-read.js";
+import { learnerProjectView } from "../content/exercise-project.js";
 import { manualProgrammingResult } from "./programming-assessment.js";
 import { resolveGradingProfile } from "../judge/grading-profile.js";
 import { isCompiledLanguage, rolesHavePermission, roleCanMonitor } from "@cove/shared";
@@ -457,6 +458,8 @@ export class LearnService {
         outputFormat: exercise.outputFormat,
         constraints: exercise.constraints,
         starterCode: exercise.starterCode,
+        // Flags of the visible files only: a hidden file's path never leaves.
+        project: learnerProjectView(exercise.sourceProject),
         timeLimitMs: exercise.timeLimitMs,
         memoryLimitMb: exercise.memoryLimitMb,
         gradingMode: exercise.gradingMode,

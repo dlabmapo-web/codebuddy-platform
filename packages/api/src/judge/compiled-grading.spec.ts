@@ -1,5 +1,5 @@
 import { nativeRuntimeVersion } from "@cove/grading-runtime";
-import type { NativeGccDescriptor } from "@cove/shared";
+import { encodeFileBundle, type NativeGccDescriptor } from "@cove/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import type { PrismaService } from "../database/prisma.service.js";
@@ -193,5 +193,66 @@ describe("GradingService with a compiled language", () => {
     await python.service.grade(submissionId, async () => undefined);
     expect(python.compile).not.toHaveBeenCalled();
     expect(python.run).not.toHaveBeenCalled();
+  });
+
+  describe("a multi-file project (policy version 6)", () => {
+    const project = {
+      version: 1,
+      files: [
+        { path: "main.c", content: '#include "sum.h"\nint main(void){return 0;}\n', readOnly: false, hidden: false, openByDefault: true },
+        { path: "sum.c", content: "int sum(int a,int b){return 0;}\n", readOnly: false, hidden: false, openByDefault: true },
+        { path: "sum.h", content: "int sum(int a,int b);\n", readOnly: true, hidden: false, openByDefault: true },
+        { path: "secret.c", content: "int secret(void){return 7;}\n", readOnly: false, hidden: true, openByDefault: false },
+      ],
+      sources: ["main.c", "sum.c", "secret.c"],
+      includeLearnerSources: false,
+      fileTree: "CLOSED",
+    };
+    const v6 = { gradingPolicySnapshot: { ...profile.gradingPolicySnapshot, version: 6, project } };
+    const bundle = encodeFileBundle([
+      { path: "main.c", content: "MAIN" },
+      { path: "sum.c", content: "int sum(int a,int b){return a+b;}" },
+      { path: "sum.h", content: "tampered" },
+      { path: "extra.c", content: "int extra;" },
+    ]);
+
+    it("compiles the composed files: the learner's editable text, the author's fixed and hidden files", async () => {
+      const { service, compile, tx } = createService({ profile: { ...v6, code: bundle } });
+      await service.grade(submissionId, async () => undefined);
+      const request = compile.mock.calls[0]![0];
+      expect(request.code).toBeUndefined();
+      expect(request.sources).toEqual(["main.c", "sum.c", "secret.c"]);
+      expect(Object.fromEntries(request.files!.map((file) => [file.path, file.content]))).toEqual({
+        "main.c": "MAIN",
+        "sum.c": "int sum(int a,int b){return a+b;}",
+        "sum.h": "int sum(int a,int b);\n",
+        "secret.c": "int secret(void){return 7;}\n",
+        "extra.c": "int extra;",
+      });
+      expect(tx.submission.updateMany.mock.calls[0]![0].data).toMatchObject({ status: "PASSED" });
+    });
+
+    it("removes a hidden file's quoted source from the diagnostics a learner sees", async () => {
+      const diagnostics = "secret.c:1:5: error: conflicting types for 'secret'\n    1 | int secret(void){return 7;}\n      |     ^~~~~~\n";
+      const { service, tx } = createService({
+        profile: { ...v6, code: bundle },
+        compile: async () => ({ status: "COMPILE_ERROR", reason: "ERRORS", diagnostics, compileMs: 30, cached: false }),
+      });
+      await service.grade(submissionId, async () => undefined);
+      const stored = tx.submission.updateMany.mock.calls[0]![0].data.compileDiagnostics as string;
+      expect(stored).toContain("secret.c:1:5: error: conflicting types");
+      expect(stored).not.toContain("return 7");
+    });
+
+    it("explains a bundle that cannot be composed as the learner's compile error, compiling nothing", async () => {
+      const { service, compile, tx } = createService({
+        profile: { ...v6, code: encodeFileBundle([{ path: "-o.c", content: "" }]) },
+      });
+      await service.grade(submissionId, async () => undefined);
+      expect(compile).not.toHaveBeenCalled();
+      expect(tx.submission.updateMany.mock.calls[0]![0].data).toMatchObject({
+        status: "FAILED", compileFailed: true, compileDiagnostics: expect.stringContaining("'-o.c' is not a valid file name"),
+      });
+    });
   });
 });

@@ -21,12 +21,14 @@ import {
   type GradeSummary,
 } from "./grading.js";
 import {
+  isGccPolicy,
   resolveGradingProfile,
   runtimeMismatch,
   type ResolvedGradingProfile,
 } from "./grading-profile.js";
 import type { GradingProgress } from "./judge.queue.js";
 import { timeScaleOf } from "./time-scaled-engine.js";
+import { compileInputFor, redactCompileResult } from "./compile-input.js";
 
 const gradingInclude = {
   gradingCases: { orderBy: { position: "asc" } },
@@ -246,13 +248,13 @@ export class GradingService {
     try { descriptor = frozenNativeDescriptor(submission.executionRuntimeSnapshot); }
     catch { await fail("RUNTIME_VERSION_MISMATCH"); return; }
     const compiled = isCompiled(submission.language);
-    const nativePolicy = profile.kind === "elice" && (profile.policy?.version === 4 || profile.policy?.version === 5)
+    const nativePolicy = profile.kind === "elice" && (profile.policy?.version === 4 || isGccPolicy(profile.policy))
       ? profile.policy : undefined;
     if ((descriptor && nativeRuntimeVersion(descriptor) !== this.engine.version) ||
         (!descriptor && this.engine.version.startsWith("native-")) ||
         (nativePolicy && (!descriptor || !sameNativeRuntime(descriptor, nativePolicy.runtime))) ||
         (descriptor && profile.kind === "elice" &&
-          profile.policy?.version !== (descriptor.engine === "native-gcc" ? 5 : 4)) ||
+          (descriptor.engine === "native-gcc" ? !isGccPolicy(profile.policy) : profile.policy?.version !== 4)) ||
         // C and C++ only ever run compiled, on the GCC runtime they were admitted to.
         compiled !== (descriptor?.engine === "native-gcc") ||
         (compiled && (profile.kind !== "elice" || !this.engine.compile))) {
@@ -378,7 +380,7 @@ export class GradingService {
     try {
       if (isCompiled(submission.language)) {
         // Once per attempt, within the job's deadline and never a case's limit.
-        const compiled = await this.compileFor(submission, deadline);
+        const compiled = await this.compileFor(submission, profile, deadline);
         assertWithin(deadline);
         if (compiled.status === "COMPILE_ERROR") {
           await this.finalizeCompileError(submission, profile, compiled.diagnostics, sink);
@@ -512,13 +514,17 @@ export class GradingService {
   }
 
   /** Compiles a C/C++ attempt, leased until the job's deadline and its cleanup. */
-  private compileFor(submission: GradingWork, deadline: number): Promise<CompileResult> {
+  private async compileFor(submission: GradingWork, profile: EliceProfile, deadline: number): Promise<CompileResult> {
     const language = submission.language as "C" | "CPP";
-    return this.engine.compile!({
-      language,
-      code: submission.code,
+    // A multi-file attempt composes its project; one that cannot is the
+    // learner's compile error, said plainly, and nothing is compiled.
+    const input = compileInputFor(language, submission.code, profile.policy);
+    if (!input.ok) return { status: "COMPILE_ERROR", reason: "ERRORS", diagnostics: input.diagnostics, compileMs: 0, cached: false };
+    const result = await this.engine.compile!({
+      ...input.request,
       leaseMs: Math.min(30 * 60_000, Math.max(1000, deadline - Date.now() + GRADING_OVERHEAD_MS)),
     });
+    return redactCompileResult(result, input.hiddenPaths);
   }
 
   /**

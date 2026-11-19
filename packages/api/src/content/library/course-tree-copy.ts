@@ -223,6 +223,7 @@ export async function copyCourseTree(
           constraints: exercise.constraints,
           ...(exercise.quiz ? { quiz: exercise.quiz } : {}),
           starterCode: exercise.starterCode,
+          sourceProject: exercise.sourceProject == null ? Prisma.DbNull : exercise.sourceProject,
           solutionCode: preparedSolutions.solutionCode,
           language: exercise.language,
           timeLimitMs: exercise.timeLimitMs,

@@ -169,6 +169,7 @@ export function composeExercise(
     manualMaximumHundredths: manual.manualMaximumHundredths,
     manualIncludeInScore: manual.manualIncludeInScore,
     feedbackPolicy: (merged["exercise.feedbackPolicy"] ?? null) as unknown,
+    sourceProject: (merged["exercise.sourceProject"] ?? null) as unknown,
     aiFeedbackEnabled: merged["exercise.aiFeedback"] as boolean,
     quiz: (merged["exercise.quiz"] ?? null) as unknown,
     referencePdfMaterialId: referenceLocal(

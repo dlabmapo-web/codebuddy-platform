@@ -5,6 +5,7 @@ import {videoMetadataSchema} from "./video.js";
 import { publicQuizSchema } from "./quiz.js";
 import { z } from "zod";
 import { pdfMetadataSchema } from "./pdf.js";
+import { learnerProjectSchema } from "./source-files.js";
 
 import { memberAvatarUrlsShape } from "../profile/avatar.js";
 import {
@@ -264,7 +265,13 @@ export const learnExerciseSchema = z.object({
   inputFormat: z.string(),
   outputFormat: z.string(),
   constraints: z.string(),
+  /** One file's text, or for a multi-file exercise the visible files' bundle. */
   starterCode: z.string(),
+  /**
+   * A multi-file C/C++ exercise: its visible files' flags and the rules for the
+   * learner's own files. Absent or null for a single file.
+   */
+  project: learnerProjectSchema.nullable().optional(),
   timeLimitMs: z.number().int().positive(),
   memoryLimitMb: z.number().int().positive(),
   /**

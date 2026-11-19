@@ -711,6 +711,7 @@ export class RegradeService {
               description: true,
               gradingRevision: true,
               language: true,
+              sourceProject: true,
               timeLimitMs: true,
               memoryLimitMb: true,
               // The profile, whole: a repair is graded by the rules the

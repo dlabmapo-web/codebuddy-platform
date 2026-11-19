@@ -1,4 +1,5 @@
 import { exerciseSolutionsSchema } from "./solutions.js";
+import { exerciseProjectIssues, exerciseProjectSchema } from "./source-files.js";
 import {videoMetadataSchema} from "./video.js";
 import { quizDefinitionSchema } from "./quiz.js";
 import { z } from "zod";
@@ -229,6 +230,8 @@ export const programmingExerciseSchema = z.object({
   outputFormat: z.string().max(10_000),
   constraints: z.string().max(10_000),
   starterCode: z.string().max(100_000),
+  /** A multi-file C/C++ exercise, hidden files included: authoring only. */
+  sourceProject: exerciseProjectSchema.nullable().optional(),
   language: exerciseLanguageSchema,
   timeLimitMs: z.number().int().min(100).max(60_000),
   memoryLimitMb: z.number().int().min(16).max(4_096),
@@ -734,6 +737,12 @@ export const exerciseDraftFieldsSchema = z.object({
   constraints: z.string().max(10_000),
   starterCode: z.string().max(100_000),
   /**
+   * A multi-file C/C++ exercise: every file, its flags and what is compiled.
+   * Null makes it a single-file exercise; absent keeps what is stored. The
+   * server derives `starterCode` (the visible files' bundle) from it.
+   */
+  sourceProject: exerciseProjectSchema.nullable().optional(),
+  /**
    * C or C++, in a C/C++ course; absent keeps the stored one, and a new
    * problem starts in the course's default. A Python course's problems are
    * Python. The server checks it against the course.
@@ -804,6 +813,13 @@ function refineGrading(value: ExerciseDraftFields, context: z.RefinementCtx) {
       });
     }
     return;
+  }
+  if (value.sourceProject) {
+    if (value.quiz || value.language === "PYTHON")
+      context.addIssue({ code: "custom", path: ["sourceProject"], message: "Only C and C++ problems can have several files." });
+    else if (value.language)
+      for (const message of exerciseProjectIssues(value.sourceProject, value.language))
+        context.addIssue({ code: "custom", path: ["sourceProject"], message });
   }
   if (value.submissionPolicy === "MANUAL_REVIEW") return;
   if (!value.solutions.length && !value.referencePdfMaterialId)

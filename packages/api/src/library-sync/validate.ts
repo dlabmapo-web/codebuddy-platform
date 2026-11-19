@@ -258,6 +258,7 @@ function schemaIssues(type: string, merged: Merged): Issue[] {
       outputFormat: row.outputFormat,
       constraints: row.constraints,
       starterCode: row.starterCode,
+      sourceProject: (row.sourceProject ?? null) as never,
       language: row.language,
       solutions: row.solutions.map((solution) => ({
         title: solution.title,

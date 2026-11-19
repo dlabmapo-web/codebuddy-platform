@@ -1680,6 +1680,11 @@ model ProgrammingExercise {
   outputFormat      String             @default("") @map("output_format")
   constraints       String             @default("")
   starterCode       String             @default("") @map("starter_code")
+  /// A multi-file C/C++ exercise: every file with its flags, and which are
+  /// compiled (`exerciseProjectSchema`). Null for a single-file exercise.
+  /// `starterCode` then holds the learner's starting file bundle, the visible
+  /// files only; hidden files never leave this column.
+  sourceProject     Json?              @map("source_project")
   solutions         ProgrammingExerciseSolution[]
   solutionCode      String?            @map("solution_code") @db.Text
   language          ExerciseLanguage   @default(PYTHON)

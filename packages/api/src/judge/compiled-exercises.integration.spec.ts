@@ -8,6 +8,9 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { nativeRuntimeVersion } from "@cove/grading-runtime";
 import {
   createProgrammingExerciseSchema,
+  encodeFileBundle,
+  starterBundleFor,
+  updateProgrammingExerciseSchema,
   defaultEliceGradingProfile,
   legacyGradingProfile,
   type NativeGccDescriptor,
@@ -29,8 +32,9 @@ import type { MonitoringRevocationService } from "../monitoring/monitoring-revoc
 import type { PointAwardService } from "../points/point-award.service.js";
 import type { OutputComparator } from "./comparator-pool.js";
 import { ExecutionCapacity } from "./execution-capacity.js";
-import type { CompileResult, ExecutionEngine, ExecutionResult } from "./execution-engine.js";
+import type { CompileRequest, CompileResult, ExecutionEngine, ExecutionResult } from "./execution-engine.js";
 import { GradingService } from "./grading.service.js";
+import { learnerProjectView } from "../content/exercise-project.js";
 import { JudgeQueue } from "./judge.queue.js";
 import { NATIVE_READINESS_HEARTBEAT, nativeReadinessKey } from "./native-admission.js";
 import { SampleCheckRunner, terminalStreams } from "./sample-check.runner.js";
@@ -122,16 +126,18 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
   const gccEngine = (script: {
     compile?: CompileResult;
     run?: (stdin: string) => ExecutionResult;
-  }): ExecutionEngine & { compiled: number; sources: string[]; released: string[]; held: boolean[] } => {
+  }): ExecutionEngine & { compiled: number; sources: string[]; requests: CompileRequest[]; released: string[]; held: boolean[] } => {
     const engine = {
       version: nativeRuntimeVersion(gcc),
       compiled: 0,
       sources: [] as string[],
+      requests: [] as CompileRequest[],
       released: [] as string[],
       held: [] as boolean[],
-      compile: async (request: { code: string }) => {
+      compile: async (request: CompileRequest) => {
         engine.compiled += 1;
-        engine.sources.push(request.code);
+        engine.requests.push(request);
+        engine.sources.push(request.code ?? (request.files ?? []).map((file) => `${file.path}:${file.content}`).join("\n"));
         return script.compile ?? { status: "COMPILED" as const, artifact, lease: randomUUID(), diagnostics: "", compileMs: 30, cached: false };
       },
       release: async (lease: string) => { engine.released.push(lease); },
@@ -505,5 +511,137 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
       comparator, new ExecutionCapacity(2)).run(accepted.checkId);
     const view = await checks.get(student, { academyId: ids.academy, checkId: accepted.checkId });
     expect(view.result).toMatchObject({ outcome: "COMPILE_ERROR", compileDiagnostics: diagnostics, stdout: "" });
+  });
+
+  describe("a multi-file C project", () => {
+    const project = {
+      version: 1 as const,
+      files: [
+        { path: "main.c", content: '#include <stdio.h>\n#include "sum.h"\nint main(void) { int a, b; scanf("%d %d", &a, &b); printf("%d\\n", sum(a, b)); return 0; }\n', readOnly: false, hidden: false, openByDefault: true },
+        { path: "sum.c", content: '#include "sum.h"\nint sum(int a, int b) { return 0; }\n', readOnly: false, hidden: false, openByDefault: true },
+        { path: "sum.h", content: "int sum(int a, int b);\n", readOnly: true, hidden: false, openByDefault: true },
+        { path: "probe.c", content: "int author_probe(void) { return 42; }\n", readOnly: false, hidden: true, openByDefault: false },
+      ],
+      sources: ["main.c", "sum.c", "probe.c"],
+      includeLearnerSources: false,
+      fileTree: "CLOSED" as const,
+    };
+    let projectMaterial = "";
+    let projectRevision = 1;
+    // Its own state: an earlier Run left outstanding would hold this student busy.
+    beforeAll(async () => {
+      await (await queue.redis()).flushdb();
+      await heartbeat();
+    });
+    const learnerFiles = (sum: string, header = "int sum(int a, int b);\n") => encodeFileBundle([
+      { path: "main.c", content: project.files[0]!.content },
+      { path: "sum.c", content: sum },
+      { path: "sum.h", content: header },
+      { path: "extra.c", content: "this is not C" },
+    ]);
+
+    it("stores the project and gives learners only its visible files", async () => {
+      const created = await courses.createExercise(manager, createProgrammingExerciseSchema.parse({
+        ...exerciseInput(), title: "Sum in three files", sourceProject: project,
+        testCases: [answer("4 6\n", "10", 50, "SAMPLE"), answer("3 5\n", "8", 50, "HIDDEN")],
+      }));
+      projectMaterial = created.material!.id;
+      projectRevision = created.material!.programmingExercise!.gradingRevision;
+      expect(created.material!.programmingExercise!.sourceProject).toEqual(project);
+      const stored = await prisma.programmingExercise.findUniqueOrThrow({ where: { materialId: projectMaterial } });
+      expect(stored.starterCode).toBe(starterBundleFor(project));
+      expect(stored.starterCode).not.toContain("author_probe");
+      expect(learnerProjectView(stored.sourceProject)!.files.map((file) => file.path)).toEqual(["main.c", "sum.c", "sum.h"]);
+
+      // A project belongs to C and C++ only, and must be valid for its language.
+      expect(createProgrammingExerciseSchema.safeParse({
+        ...exerciseInput(), language: "C", sourceProject: { ...project, sources: ["sum.h"] },
+      }).success).toBe(false);
+      await expect(courses.createExercise(manager, {
+        ...exerciseInput(), language: "C", sourceProject: { ...project, sources: ["sum.h"] },
+      })).rejects.toMatchObject({ code: "EXERCISE_VALIDATION_FAILED" });
+    });
+
+    it("freezes the project in a version 6 policy and compiles the composed files", async () => {
+      await heartbeat();
+      const { submissionId } = await submissions.submit(student, {
+        academyId: ids.academy, materialId: projectMaterial, classId: ids.klass,
+        code: learnerFiles('#include "sum.h"\nint sum(int a, int b) { return a + b; }\n', "tampered"),
+      });
+      const row = await prisma.submission.findUniqueOrThrow({ where: { id: submissionId } });
+      expect(row.gradingPolicySnapshot).toMatchObject({ version: 6, language: "C", project });
+
+      const engine = gccEngine({ run: (stdin) => {
+        const [a, b] = stdin.trim().split(" ").map(Number);
+        return { stdout: `${a! + b!}\n`, stderr: "", outcome: "PASSED", runtimeMs: 1 };
+      } });
+      await grade(submissionId, engine);
+      expect(engine.compiled).toBe(1);
+      const request = engine.requests[0]!;
+      expect(request.code).toBeUndefined();
+      expect(request.sources).toEqual(["main.c", "sum.c", "probe.c"]);
+      const files = Object.fromEntries(request.files!.map((file) => [file.path, file.content]));
+      // The read-only header is the author's, whatever the learner sent; the
+      // hidden file is present; the learner's own file travels but is not compiled.
+      expect(files["sum.h"]).toBe("int sum(int a, int b);\n");
+      expect(files["probe.c"]).toBe("int author_probe(void) { return 42; }\n");
+      expect(files["extra.c"]).toBe("this is not C");
+      const result = await submissions.get(student, { academyId: ids.academy, submissionId });
+      expect(result).toMatchObject({ status: "PASSED", score: 100 });
+    });
+
+    it("runs on typed input with the terminal prelude after every compiled source, in the same statements", async () => {
+      // A Run of one file's text against the same problem, admitted and finished first.
+      statements = 0;
+      const single = await countedChecks.startRun(student, {
+        academyId: ids.academy, classId: ids.klass, materialId: projectMaterial, code: "int main(void) { return 0; }\n",
+        stdin: "", workspaceRevision: projectRevision, clientRequestId: randomUUID(),
+      });
+      const singleStatements = statements;
+      await new SampleCheckRunner(new SampleCheckStore(() => queue.redis()), gccEngine({}), comparator, new ExecutionCapacity(2)).run(single.checkId);
+      statements = 0;
+      const accepted = await countedChecks.startRun(student, {
+        academyId: ids.academy, classId: ids.klass, materialId: projectMaterial, code: learnerFiles("int sum(int a, int b) { return a + b; }\n"),
+        stdin: "40 2\n", workspaceRevision: projectRevision, clientRequestId: randomUUID(),
+      });
+      // Files add no statement: the project is a column of the row already read.
+      expect(statements).toBe(singleStatements);
+      const engine = gccEngine({ run: () => ({ stdout: "42\n", stderr: "", outcome: "PASSED", runtimeMs: 1 }) });
+      await new SampleCheckRunner(new SampleCheckStore(() => queue.redis()), engine, comparator, new ExecutionCapacity(2)).run(accepted.checkId);
+      const files = Object.fromEntries(engine.requests[0]!.files!.map((file) => [file.path, file.content]));
+      for (const source of ["main.c", "sum.c", "probe.c"]) expect(files[source]!.endsWith(terminalStreams)).toBe(true);
+      expect(files["sum.h"]).toBe("int sum(int a, int b);\n");
+      expect(files["extra.c"]).toBe("this is not C");
+    });
+
+    it("explains a file set that cannot be composed as a compile error", async () => {
+      const accepted = await checks.startRun(student, {
+        academyId: ids.academy, classId: ids.klass, materialId: projectMaterial,
+        code: encodeFileBundle([{ path: "probe.c", content: "int x;" }]),
+        stdin: "", workspaceRevision: projectRevision, clientRequestId: randomUUID(),
+      });
+      const engine = gccEngine({});
+      await new SampleCheckRunner(new SampleCheckStore(() => queue.redis()), engine, comparator, new ExecutionCapacity(2)).run(accepted.checkId);
+      expect(engine.compiled).toBe(0);
+      const view = await checks.get(student, { academyId: ids.academy, checkId: accepted.checkId });
+      expect(view.result).toMatchObject({ outcome: "COMPILE_ERROR", compileDiagnostics: expect.stringContaining("'probe.c' uses a name this problem reserves") });
+    });
+
+    it("starts a new grading revision only when what is compiled changes", async () => {
+      const current = await prisma.programmingExercise.findUniqueOrThrow({ where: { materialId: projectMaterial } });
+      const update = (sourceProject: typeof project, expectedUpdatedAt: string) => courses.updateExercise(manager, updateProgrammingExerciseSchema.parse({
+        ...exerciseInput(), title: "Sum in three files", materialId: projectMaterial, expectedUpdatedAt, sourceProject,
+        testCases: [answer("4 6\n", "10", 50, "SAMPLE"), answer("3 5\n", "8", 50, "HIDDEN")],
+      }));
+      const editable = { ...project, files: project.files.map((file) => file.path === "sum.c" ? { ...file, content: "/* start here */\n" } : file) };
+      const first = await update(editable, current.updatedAt.toISOString());
+      expect(first.material!.programmingExercise!.gradingRevision).toBe(projectRevision);
+      const hidden = { ...editable, files: editable.files.map((file) => file.path === "probe.c" ? { ...file, content: "int author_probe(void) { return 7; }\n" } : file) };
+      const second = await update(hidden, first.material!.programmingExercise!.updatedAt);
+      expect(second.material!.programmingExercise!.gradingRevision).toBe(projectRevision + 1);
+      const single = await update(null as never, second.material!.programmingExercise!.updatedAt);
+      expect(single.material!.programmingExercise!.sourceProject).toBeNull();
+      expect(single.material!.programmingExercise!.gradingRevision).toBe(projectRevision + 2);
+    });
   });
 });

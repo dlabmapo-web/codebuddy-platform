@@ -6,7 +6,9 @@ import { taughtMaterialWhere } from "../classes/assigned-course-access.js";
 import { effectivelyVisibleMaterialWhere } from "../learn/curriculum-visibility.js";
 import { privateSolutions, replaceExerciseSolutions, solutionOrder } from "./exercise-solutions.js";
 import { fingerprint, resolveItemKeys } from "./item-keys.js";
-import type { ExerciseSolutionEntry } from "@cove/shared";
+import type { ExerciseProject, ExerciseSolutionEntry } from "@cove/shared";
+import { exerciseProjectIssues, starterBundleFor } from "@cove/shared";
+import { storedExerciseProject } from "./exercise-project.js";
 import { validatePdfReference, assertPublishedPdfReferences, detachSubtreePdfReferences } from "../documents/pdf-reference.js";
 import { archivedRows, assertNotArchived } from "./archived-content.js";
 import { assertLessonImages } from "./lesson-images.js";
@@ -228,6 +230,8 @@ type ExerciseWriteInput = {
   outputFormat: string;
   constraints: string;
   starterCode: string;
+  /** Multi-file C/C++; null = single file; absent keeps the stored project. */
+  sourceProject?: ExerciseProject | null;
   solutions: ExerciseSolutionEntry[];
   aiFeedbackEnabled: boolean;
   isVisible: boolean;
@@ -1356,8 +1360,7 @@ export class CourseService {
               inputFormat: input.inputFormat,
               outputFormat: input.outputFormat,
               constraints: input.constraints,
-              starterCode: input.starterCode,
-
+              ...projectColumns(input.sourceProject, input.starterCode, language),
               language,
               timeLimitMs: CREATED_EXERCISE_TIME_LIMIT_MS,
               memoryLimitMb: 256,
@@ -1424,13 +1427,18 @@ export class CourseService {
       ? exercise.language
       : exerciseLanguageIn(current.lecture.courseModule.course.language, input.language);
     assertLanguageGrading({...input, submissionPolicy}, language);
+    const storedProject = storedExerciseProject(exercise.sourceProject);
+    const nextProject = input.sourceProject === undefined ? storedProject : input.sourceProject;
     const profileColumns = exerciseProfileColumns(input.grading);
     const definitionChanged =
       !sameQuizGrading(exercise.quiz, input.quiz) ||
       !sameGradingDefinition(exercise.testCases, input.testCases) ||
       !sameGradingProfile(exercise, profileColumns);
     const manualChanged = Boolean(input.manualAssessment && (input.manualAssessment.maximumHundredths !== exercise.manualMaximumHundredths || input.manualAssessment.includeInScore !== exercise.manualIncludeInScore));
+    // What a project compiles, and every file a learner cannot change, is
+    // part of every case's program; an editable file's starting text is not.
     const gradingChanged = manualChanged || definitionChanged || language !== exercise.language ||
+      projectGradingKey(storedProject) !== projectGradingKey(nextProject) ||
       submissionPolicy !== (exercise.submissionPolicy ?? "AUTOMATIC");
     const nextRevision = exercise.gradingRevision + (gradingChanged ? 1 : 0);
     const record = await this.prisma.$transaction(async (tx) => {
@@ -1454,7 +1462,7 @@ export class CourseService {
           inputFormat: input.inputFormat,
           outputFormat: input.outputFormat,
           constraints: input.constraints,
-          starterCode: input.starterCode,
+          ...projectColumns(nextProject, input.starterCode, language),
           language,
           aiFeedbackEnabled: input.aiFeedbackEnabled,
           ...(gradingChanged
@@ -2272,6 +2280,7 @@ function serializeExercise(
     outputFormat: exercise.outputFormat,
     constraints: exercise.constraints,
     starterCode: exercise.starterCode,
+    sourceProject: storedExerciseProject(exercise.sourceProject),
     language: exercise.language,
     timeLimitMs: exercise.timeLimitMs,
     memoryLimitMb: exercise.memoryLimitMb,
@@ -2362,6 +2371,33 @@ function exerciseLanguageIn(course: CourseLanguage, requested: ExerciseLanguage 
  * C and C++ grade with weighted rules and keep every byte a program prints:
  * the input-prompt setting only has a meaning for Python's `input()`.
  */
+/**
+ * The stored columns of an exercise's files. A project is checked against the
+ * exercise's language and stored whole; the learner's starting code is then
+ * always the bundle of its visible files, never a client's copy, so a hidden
+ * file cannot reach a learner through `starterCode`.
+ */
+function projectColumns(project: ExerciseProject | null | undefined, starterCode: string, language: ExerciseLanguage) {
+  if (!project) return { sourceProject: PrismaValues.DbNull, starterCode };
+  if (!isCompiledLanguage(language))
+    throw new AppException("EXERCISE_VALIDATION_FAILED", HttpStatus.BAD_REQUEST, "sourceProject: Only C and C++ problems can have several files.");
+  const issues = exerciseProjectIssues(project, language);
+  if (issues.length)
+    throw new AppException("EXERCISE_VALIDATION_FAILED", HttpStatus.BAD_REQUEST, `sourceProject: ${issues.join("; ")}`);
+  return { sourceProject: project as unknown as Prisma.InputJsonValue, starterCode: starterBundleFor(project) };
+}
+
+/** What of a project changes every case's program: compile list and fixed files. */
+function projectGradingKey(project: ExerciseProject | null): string {
+  if (!project) return "";
+  return JSON.stringify({
+    sources: project.sources,
+    includeLearnerSources: project.includeLearnerSources,
+    files: project.files.map((file) => [file.path, file.readOnly, file.hidden,
+      file.readOnly || file.hidden ? file.content : null]),
+  });
+}
+
 function assertLanguageGrading(input: ExerciseWriteInput, language: ExerciseLanguage) {
   if (input.quiz || input.submissionPolicy === "MANUAL_REVIEW" || !isCompiledLanguage(language)) return;
   if (input.grading.mode !== "ELICE_STDIO" || input.grading.inputPromptPolicy !== "INCLUDE")

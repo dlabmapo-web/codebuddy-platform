@@ -14,7 +14,7 @@ class LanguageFloor(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); self.root = pathlib.Path(self.tmp.name)
         scripts = self.root / 'scripts'; scripts.mkdir(); (self.root / 'bin').mkdir(); (self.root / 'state').mkdir()
-        for name in ('common.sh', 'rollback.sh', 'check-language-floor.sh'):
+        for name in ('common.sh', 'rollback.sh', 'check-language-floor.sh', 'check-project-floor.sh'):
             shutil.copy(SCRIPTS / name, scripts / name)
         self.current = 'API_IMAGE=ghcr.io/test/api:sha-' + 'b' * 40 + '\n'
         (self.root / 'deployment.env').write_text(self.current)

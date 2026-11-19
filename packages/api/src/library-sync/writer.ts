@@ -450,6 +450,7 @@ export async function applyPlan(
         manual_maximum_hundredths: row.manualMaximumHundredths,
         manual_include_in_score: row.manualIncludeInScore,
         feedback_policy: row.feedbackPolicy,
+        source_project: row.sourceProject,
         ai_feedback_enabled: row.aiFeedbackEnabled,
         quiz: row.quiz,
         reference_pdf_material_id: row.referencePdfMaterialId,
@@ -487,6 +488,10 @@ export async function applyPlan(
             row.feedbackPolicy === null
               ? Prisma.DbNull
               : (row.feedbackPolicy as Prisma.InputJsonValue),
+          sourceProject:
+            row.sourceProject === null
+              ? Prisma.DbNull
+              : (row.sourceProject as Prisma.InputJsonValue),
           aiFeedbackEnabled: row.aiFeedbackEnabled,
           quiz:
             row.quiz === null
@@ -823,6 +828,7 @@ export async function applyPlan(
         ["manual_maximum_hundredths", "int"],
         ["manual_include_in_score", "boolean"],
         ["feedback_policy", "jsonb"],
+        ["source_project", "jsonb"],
         ["ai_feedback_enabled", "boolean"],
         ["quiz", "jsonb"],
         ["reference_pdf_material_id", "uuid"],

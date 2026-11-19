@@ -289,6 +289,8 @@ function exerciseUnits(
     },
     "exercise.feedbackPolicy": (exercise.feedbackPolicy ??
       null) as CanonicalValue,
+    "exercise.sourceProject": (exercise.sourceProject ??
+      null) as CanonicalValue,
     "exercise.aiFeedback": exercise.aiFeedbackEnabled,
     "exercise.quiz": (exercise.quiz ?? null) as CanonicalValue,
     "exercise.referencePdf": context.referenceKey(

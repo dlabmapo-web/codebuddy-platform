@@ -1,4 +1,5 @@
 import { frozenNativeDescriptor } from "./native-admission.js";
+import { compileInputFor, redactCompileResult } from "./compile-input.js";
 import { nativeRuntimeVersion } from "@cove/grading-runtime";
 import { Logger } from "@nestjs/common";
 import { sampleCheckDisplayLimit, type SampleCheckStatus } from "@cove/shared";
@@ -139,12 +140,17 @@ export class SampleCheckRunner {
     let warnings: string | null = null;
     if (compiled) {
       let built;
+      // A multi-file check composes its project from the frozen policy; a
+      // bundle that cannot be composed is reported like any compile error.
+      const input = compileInputFor(snapshot.language!, snapshot.code, legacy ? null : snapshot.policy,
+        snapshot.run ? terminalStreams : undefined);
       try {
-        built = await this.engine.compile!({
-          language: snapshot.language!,
-          code: snapshot.run ? `${snapshot.code}${terminalStreams}` : snapshot.code,
-          leaseMs: Math.min(30 * 60_000, Math.max(1000, deadlineAt - Date.now() + GRADING_OVERHEAD_MS)),
-        });
+        built = input.ok
+          ? redactCompileResult(await this.engine.compile!({
+            ...input.request,
+            leaseMs: Math.min(30 * 60_000, Math.max(1000, deadlineAt - Date.now() + GRADING_OVERHEAD_MS)),
+          }), input.hiddenPaths)
+          : { status: "COMPILE_ERROR" as const, reason: "ERRORS" as const, diagnostics: input.diagnostics, compileMs: 0, cached: false };
       } catch (error) {
         this.logger.error(`sample check ${record.checkId} compile failure: ${String(error)}`);
         await this.end(record, ["RUNNING"], "UNAVAILABLE", { failure: "ENGINE_FAILURE" });

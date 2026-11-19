@@ -40,7 +40,12 @@ export type ExecutionResult = {
 
 export type CompileRequest = {
   language: "C" | "CPP";
-  code: string;
+  /** A single-file program. Exactly one of `code` and `files`. */
+  code?: string;
+  /** A multi-file project, composed by `compileInputFor`. */
+  files?: { path: string; content: string }[];
+  /** The `files` compiled, in order. */
+  sources?: string[];
   /** How long the attempt holds its program: at most its whole job budget. */
   leaseMs: number;
   signal?: AbortSignal;

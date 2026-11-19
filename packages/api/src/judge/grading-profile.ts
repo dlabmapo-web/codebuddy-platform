@@ -2,6 +2,8 @@ import {
   nativeAnyRuntimeDescriptorSchema,
   nativeGccDescriptorSchema,
   nativeRuntimeDescriptorSchema,
+  exerciseProjectIssues,
+  exerciseProjectSchema,
   type ExerciseLanguage,
   type NativeAnyRuntimeDescriptor,
 } from "@cove/shared";
@@ -59,6 +61,8 @@ export type ExerciseGradingSource = ProfileColumns & {
   submissionPolicy?: "AUTOMATIC" | "PRACTICE_ONLY" | "MANUAL_REVIEW";
   /** Absent means Python, as every exercise was before C and C++. */
   language?: ExerciseLanguage;
+  /** A multi-file C/C++ exercise's project (`exerciseProjectSchema`); null or absent for one file. */
+  sourceProject?: unknown;
   timeLimitMs: number;
   memoryLimitMb: number;
   testCases: ReadonlyArray<
@@ -120,18 +124,39 @@ const nativePolicySchema = z.object({
  * that predates compiled languages refuses it rather than running it as
  * Python. Prompts are always included: there is no `input()` to strip.
  */
-const gccPolicySchema = z.object({
+const gccPolicyShape = z.object({
   version: z.literal(5), language: z.enum(["C", "CPP"]), inputPromptPolicy: z.literal("INCLUDE"),
   semanticVersion: z.literal("elice-v1"),
   runtime: nativeGccDescriptorSchema,
   comparator: z.object({ runtime: z.literal("pyodide-cpython"), engineVersion: z.string(), budgetMs: z.number().int().positive() }),
   ceilings: z.object({ totalTimeLimitMs: z.number().int().positive(), caseTimeLimitMs: z.number().int().positive(),
     memoryLimitMb: z.number().int().min(16).max(512), outputBytes: z.number().int().positive().max(MAX_OUTPUT_BYTES) }),
-}).superRefine((policy, ctx) => {
+});
+const consistentGcc = (policy: z.infer<typeof gccPolicyShape> | { comparator: { engineVersion: string }; runtime: { comparator: { version: string } } }, ctx: z.RefinementCtx) => {
   if (policy.comparator.engineVersion !== policy.runtime.comparator.version)
     ctx.addIssue({ code: "custom", message: "Inconsistent GCC policy" });
-});
-export const gradingPolicySnapshotSchema = z.union([historicalPolicySchema, nativePolicySchema, gccPolicySchema]);
+};
+const gccPolicySchema = gccPolicyShape.superRefine(consistentGcc);
+/**
+ * A multi-file C/C++ submission: version 5 plus the author's project, frozen
+ * at admission. The project carries the read-only and hidden files the
+ * learner never sends and the compile list, so a regrade builds exactly what
+ * was graded. Its own version, so a judge that predates projects refuses it
+ * rather than compiling the bundle as one `main.c`.
+ */
+const gccProjectPolicySchema = gccPolicyShape
+  .extend({ version: z.literal(6), project: exerciseProjectSchema })
+  .superRefine((policy, ctx) => {
+    consistentGcc(policy, ctx);
+    if (exerciseProjectIssues(policy.project, policy.language).length > 0)
+      ctx.addIssue({ code: "custom", message: "Project not valid for its language" });
+  });
+export const gradingPolicySnapshotSchema = z.union([historicalPolicySchema, nativePolicySchema, gccPolicySchema, gccProjectPolicySchema]);
+
+/** The GCC policies: single-file (5) and multi-file (6). */
+export function isGccPolicy(policy: GradingPolicySnapshot | null | undefined): policy is Extract<GradingPolicySnapshot, { version: 5 | 6 }> {
+  return policy?.version === 5 || policy?.version === 6;
+}
 export type GradingPolicySnapshot = z.infer<typeof gradingPolicySnapshotSchema>;
 
 /**
@@ -176,15 +201,18 @@ export function gradingSnapshotFor(
   const language = exercise.language ?? "PYTHON";
   if (policy && runtime.descriptor?.engine === "native-gcc") {
     if (language === "PYTHON") throw new Error("A Python exercise cannot be snapshotted for GCC");
-    policy = gccPolicySchema.parse({ ...policy, version: 5, language,
-      inputPromptPolicy: "INCLUDE", runtime: runtime.descriptor,
+    const gcc = { ...policy, language,
+      inputPromptPolicy: "INCLUDE" as const, runtime: runtime.descriptor,
       comparator: { ...policy.comparator, engineVersion: runtime.descriptor.comparator.version },
-    });
+    };
+    policy = exercise.sourceProject == null
+      ? gccPolicySchema.parse({ ...gcc, version: 5 })
+      : gccProjectPolicySchema.parse({ ...gcc, version: 6, project: exercise.sourceProject });
   } else if (policy && runtime.descriptor) policy = nativePolicySchema.parse({ ...policy, version: 4,
     inputPromptPolicy: exercise.inputPromptPolicy ?? "INCLUDE", runtime: runtime.descriptor,
     comparator: { ...policy.comparator, engineVersion: runtime.descriptor.comparator.version },
   });
-  if (language !== "PYTHON" && (!policy || policy.version !== 5))
+  if (language !== "PYTHON" && !isGccPolicy(policy))
     throw new Error("C and C++ submissions need weighted grading on the GCC runtime");
   return {
     submission: {
@@ -341,7 +369,7 @@ export function runtimeMismatch(
   policy: GradingPolicySnapshot,
   running: { engine: string | null; comparator: string | null },
 ): string | null {
-  const recordedEngine = policy.version === 4 || policy.version === 5
+  const recordedEngine = policy.version === 4 || isGccPolicy(policy)
     ? nativeRuntimeVersion(policy.runtime)
     : `pyodide-${policy.runtime.engineVersion}`;
   const recordedComparator = `pyodide-${policy.comparator.engineVersion}`;

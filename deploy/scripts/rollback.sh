@@ -7,6 +7,8 @@ require_file "$previous"
 
 # Before anything stops: a target that cannot read C/C++ rows is refused.
 "$script_dir/check-language-floor.sh" "$previous"
+# Nor one that would compile a multi-file C/C++ program as a single main.c.
+"$script_dir/check-project-floor.sh" "$previous"
 
 current_copy="$deploy_root/state/failed-deployment.env"
 install -m 600 "$deployment_env" "$current_copy"

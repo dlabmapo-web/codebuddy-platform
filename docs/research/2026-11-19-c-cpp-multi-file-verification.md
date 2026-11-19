@@ -35,6 +35,50 @@ The new database integration tests prove:
 - **Grading revision:** editing an editable file's start keeps the revision;
   changing a hidden file bumps it; turning the project off clears it.
 
+## Live pointers on multi-file problems
+
+The code pointer (teacher ↔ student, anchored to a position in the shared
+document) now works across files. A pointer's anchor is the file's start in
+the bundle plus its offset in the file. It is drawn when the viewer shows
+that file; otherwise the viewer's tab for that file shows a "live pointer is
+in this file" marker.
+
+- `code-pointer.spec.ts` (5/5): every file's range, empty and last files
+  included. A pointer in `sum.c` stays anchored while `main.c` is edited, is
+  drawn only over `sum.c`, and names `sum.c` while the viewer shows another
+  file.
+- Browser test (real stack): the teacher points at `scanf` in `main.cpp` on
+  a larger screen and the student's arrow lands on their own `scanf`. The
+  teacher moves into `sum.c` and the student, still on `main.cpp`, sees the
+  marker on the `sum.c` tab. The full C/C++ browser suite passes 11/11.
+
+## Platform admins and the content library
+
+Platform admins author library courses through the console's library editor.
+The console's academy editor is the same `ExerciseWorkspace`, loading
+`contentNamespaces` and with it `exercise-files`, over the same
+`CourseService`. Two database tests follow a multi-file problem through the
+library:
+
+- `academy-library-adoption.integration.spec.ts`:
+  - a platform admin creates a C/C++ library course and a multi-file C++
+    problem through `CourseService` (as a Team Lead would);
+  - a Team Lead adopts it;
+  - the copy has the same project, the visible files' starting bundle (the
+    hidden file absent) and the multi-file solution. 5/5.
+- `library-sync.integration.spec.ts`:
+  - a multi-file problem in a C/C++ library course is published and adopted
+    with its project;
+  - after the library changes a hidden file, the next release's sync job
+    updates the academy copy's project, still without the hidden file in its
+    starting code;
+  - a C++ problem inside a Python library course is refused by release
+    validation. 9/9.
+- The platform console's web tests: 119/119.
+
+The console's editor was not exercised in a browser; it is the component the
+academy browser test covers.
+
 ## Earlier statement-count failures, fixed
 
 Five tests in `compiled-exercises.integration.spec.ts` failed on `main`

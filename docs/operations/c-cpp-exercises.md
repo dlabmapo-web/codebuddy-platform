@@ -312,8 +312,9 @@ editor read-only. Design:
 - **Students** may add, rename, delete and upload their own files. Reset (the
   arrow beside the tabs) restores the current file only, and the workspace's
   Reset restores all of them. History, the teacher's review, tutoring and
-  the live view show every file as a tab. A teacher's live pointer is not
-  drawn on multi-file problems yet.
+  the live view show every file as a tab. Live pointers land on the same
+  code when both people show the same file; when the other person points
+  into another file, that file's tab shows a pulsing marker.
 - **Not yet:** data files such as `input.txt` in the program's working
   directory, and importing Elice exercise zips.
 

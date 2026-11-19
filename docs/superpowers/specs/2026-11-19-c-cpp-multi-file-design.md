@@ -434,10 +434,13 @@ paths shown in a flat list, and data files wait for phase B.
   There is no separate admission check.
 - **A Run appends the terminal prelude to every compiled source**, after its
   last line. Each copy is `static` and does the same thing.
-- **A teacher's live pointer is not drawn on multi-file problems.** Editing,
-  live collaboration and the teacher's live view all work through
-  `bindYTextToBundle` (`packages/web/src/lib/monitoring/yjs-bundle.ts`), but
-  pointer awareness still maps offsets of a single model.
+- **Live code pointers work across files.** Editing, live collaboration
+  and the teacher's live view go through `bindYTextToBundle`
+  (`packages/web/src/lib/monitoring/yjs-bundle.ts`), which also registers the
+  code pointer. A pointer is anchored in the bundle: the file's start plus
+  the offset inside it. It is drawn only when the viewer shows the same file;
+  otherwise the viewer's tab for that file shows a "live pointer is here"
+  marker (`awareness/code-pointer.ts`). This works in both directions.
 - **New strings** are in `common.source_files` (the editor, used everywhere) and
   in a new authoring-only namespace, `exercise-files`, because `content` is at
   its 15 KB cap.

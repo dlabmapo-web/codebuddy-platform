@@ -118,7 +118,7 @@ export function RosterTable({
           }
           return (
             <div className="flex min-w-0 max-w-[16rem] items-center gap-2">
-              <MaterialIdentity compact number={exercise.number} title={exercise.title} type={exercise.type ?? 'PROGRAMMING_EXERCISE'} />
+              <MaterialIdentity compact number={exercise.outlineNumber ?? undefined} title={exercise.title} type={exercise.type ?? 'PROGRAMMING_EXERCISE'} />
             </div>
           );
         },

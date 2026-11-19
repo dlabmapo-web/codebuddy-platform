@@ -693,8 +693,13 @@ export type MonitoringRosterStudent = z.infer<
 export const monitoringRosterExerciseSchema = z.object({
   materialId: z.uuid(),
   type: materialTypeSchema.optional(),
-  /** Course-relative and 1-based, matching the student's navigator. */
+  /** Course-relative and 1-based walk order; the roster sorts by it. */
   number: z.number().int().positive(),
+  /**
+   * `module-lecture-material`, the number every screen prints for this
+   * exercise (QA-03). Null only when a stored position is missing.
+   */
+  outlineNumber: z.string().nullable(),
   title: z.string().min(1),
 });
 export type MonitoringRosterExercise = z.infer<

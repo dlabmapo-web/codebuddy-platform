@@ -32,7 +32,7 @@ export function MaterialIdentity({ title, type, hasReferencePdf, number, compact
   const { t } = useLayoutTranslation('learn');
   const { Icon, label, tone } = materialAppearance(type, hasReferencePdf);
   return <span className="flex min-w-0 flex-1 items-center gap-3">
-    {number !== undefined ? <span className="w-5 shrink-0 text-center font-mono text-xs font-semibold tabular-nums text-sub">{number}</span> : null}
+    {number !== undefined ? <span className="min-w-10 shrink-0 whitespace-nowrap text-center font-mono text-xs font-semibold tabular-nums text-sub">{number}</span> : null}
     <span className={`grid shrink-0 place-items-center rounded-lg ${compact ? 'size-8' : 'size-10'} ${tone}`}><Icon aria-hidden className={compact ? 'size-4' : 'size-5'} /></span>
     <span className="min-w-0 flex-1">
       <span className={`text-ink ${compact ? 'line-clamp-2 text-[13px] font-semibold leading-5' : 'block text-sm font-semibold leading-5'}`} title={title}>{title}</span>

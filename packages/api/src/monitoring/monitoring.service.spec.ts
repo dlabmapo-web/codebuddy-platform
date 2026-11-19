@@ -204,7 +204,9 @@ function createService(options?: {
   rosterExercises?: {
     id: string;
     title: string;
-    lecture: { courseModule: { courseId: string } };
+    type?: string;
+    position?: number;
+    lecture: { position?: number; courseModule: { courseId: string; position?: number } };
   }[];
   visit?: { id: string; material: { programmingExercise: { solutions: { title: string | null; code: string }[] } | null } | null } | null;
   latestSubmission?: { id: string; status: string; code?: string } | null;
@@ -457,6 +459,20 @@ describe("getClassRoster", () => {
     const { service } = createService({ featureEnabled: false });
     await expect(service.getClassRoster(identity, { academyId, classId })).rejects
       .toMatchObject({ code: "MONITORING_DISABLED" });
+  });
+
+  it("names each exercise by the outline number every screen prints (QA-03)", async () => {
+    const { service } = createService({
+      rosterExercises: [
+        { id: "a0000000-0000-4000-8000-000000000001", title: "First", type: "PROGRAMMING_EXERCISE", position: 1, lecture: { position: 1, courseModule: { courseId, position: 1 } } },
+        { id: "a0000000-0000-4000-8000-000000000002", title: "Later", type: "PROGRAMMING_EXERCISE", position: 6, lecture: { position: 10, courseModule: { courseId, position: 2 } } },
+      ],
+    });
+    const roster = await service.getClassRoster(identity, { academyId, classId });
+    expect(roster.exercises.map(({ number, outlineNumber }) => ({ number, outlineNumber }))).toEqual([
+      { number: 1, outlineNumber: "1-1-1" },
+      { number: 2, outlineNumber: "2-10-6" },
+    ]);
   });
 
   it("bounds the roster and says so rather than trimming silently", async () => {

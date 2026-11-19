@@ -32,7 +32,6 @@ import {
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -49,7 +48,6 @@ import { NavCountBadge, NavCountDot } from './nav-count-badge';
 import { usePendingApplicationsCount } from '../_hooks/use-pending-applications';
 import { activeNavHref } from '@/lib/nav-active';
 import { academyEntryPath } from '@/lib/academy-entry';
-import { MyPageRow, type MyPageViewer } from '@/components/studio/nav/my-page-row';
 import { RoleBadge } from '@/components/studio/role-badge';
 import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
@@ -91,7 +89,6 @@ type NavGroup = {
 export function StudioSidebar({
   academies,
   academyId,
-  viewer,
   canLearn,
   canManageAcademy,
   canManageClasses,
@@ -106,15 +103,6 @@ export function StudioSidebar({
 }: {
   academies: StudioAcademy[];
   academyId: string;
-  /**
-   * The reader's own photographs and name, for the My Page row.
-   *
-   * That row wears a face where every other row wears a glyph, because it is
-   * the only one that leads somewhere about the reader rather than about the
-   * academy — and a face is the one icon nobody has to be taught. Null when the
-   * account lookup failed; `ProfileAvatar` draws initials, then a stand-in.
-   */
-  viewer: MyPageViewer | null;
   /**
    * The role this reader is working as, which is what the chip under the
    * academy name shows.
@@ -151,17 +139,18 @@ export function StudioSidebar({
     hasPoints,
     isStudent,
   });
-  const myPageHref = routes.academyMe(academySlug);
   // Match shared detail pages against the most specific navigation owner.
-  const activeHref = activeNavHref(pathname, [
-    ...groups.flatMap((group) =>
+  // My Page is reached from the header's avatar menu only (QA-04), so no rail
+  // row is current there.
+  const activeHref = activeNavHref(
+    pathname,
+    groups.flatMap((group) =>
       group.items.map((item) => ({
         href: item.href,
         paths: item.alsoCurrentOn,
       })),
     ),
-    myPageHref,
-  ]);
+  );
   // Asked once for the whole sidebar rather than by the badge itself: the
   // collapsed rail puts the same number in a tooltip the button owns, and two
   // components reading it separately is how a dot and its tooltip end up
@@ -192,13 +181,6 @@ export function StudioSidebar({
           />
         ))}
       </SidebarContent>
-      <SidebarFooter className="shrink-0 gap-0 border-t border-border bg-sidebar p-0 pb-[env(safe-area-inset-bottom)]">
-        <MyPageRow
-          href={myPageHref}
-          isActive={activeHref === myPageHref}
-          viewer={viewer}
-        />
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

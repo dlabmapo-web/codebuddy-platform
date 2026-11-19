@@ -56,10 +56,14 @@ test('the console offers a way back to the operator’s own account', async ({
   await signInAsOperator(page);
   await page.goto(routes.admin);
 
-  // An operator with no academy has no sidebar and no academy switcher. Without
-  // this link the console is somewhere they can reach and never leave.
-  await page.getByRole('link', { name: /my page|마이 페이지/i }).click();
-  await expect(page).toHaveURL(/\/account/);
+  // An operator with no academy has no academy switcher. Without this menu
+  // item the console is somewhere they can reach and never leave.
+  await expect(
+    page.locator('[data-slot="sidebar"]').first().getByRole('link', { name: /my page|마이 페이지/i }),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: /my page|마이 페이지/i }).click();
+  await page.getByRole('menuitem', { name: /my page|마이 페이지/i }).click();
+  await expect(page).toHaveURL(/\/account\?from=admin/);
   await page.getByRole('link', { name: /back|스튜디오/i }).first().click();
   await expect(page).toHaveURL(/\/admin$/);
 

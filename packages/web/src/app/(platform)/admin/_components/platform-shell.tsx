@@ -11,6 +11,7 @@ import { initTranslations } from '@/i18n/init-translations';
 import { platformNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { getAccount } from '@/lib/orpc-server';
+import { routes } from '@/lib/routes';
 
 import { PlatformSidebar } from './platform-sidebar';
 
@@ -91,14 +92,17 @@ export async function PlatformShell({
       resources={resources}
     >
       <SidebarProvider defaultOpen={sidebarState !== 'false'}>
-        <PlatformSidebar viewer={viewer} />
+        <PlatformSidebar />
         <SidebarInset>
           <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-canvas/85 px-4 backdrop-blur-sm">
             <SidebarTrigger className="-ml-1" />
             <span className="truncate text-[14px] font-semibold text-sub">
               {title}
             </span>
-            <HeaderControls account={viewer} className="ml-auto" />
+            <HeaderControls
+              account={{ ...viewer, accountHref: routes.accountFrom('admin') }}
+              className="ml-auto"
+            />
           </header>
 
           <div className={`mx-auto w-full flex-1 ${wide ? 'px-0 py-0' : 'max-w-6xl px-5 py-7'}`}>
@@ -134,8 +138,7 @@ export async function PlatformShell({
 }
 
 /**
- * The operator's own photo, for the header's My Page control and the rail's
- * own row.
+ * The operator's own photo, for the header's My Page control.
  *
  * Always returns an account, even when the lookup fails. `HeaderControls` drops
  * the profile link entirely when handed nothing — so returning null on failure

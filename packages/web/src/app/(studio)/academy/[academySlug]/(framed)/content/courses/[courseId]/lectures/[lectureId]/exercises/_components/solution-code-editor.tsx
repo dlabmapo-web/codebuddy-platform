@@ -58,7 +58,7 @@ export function SolutionCodeEditor({ value, onChange, error, language = 'PYTHON'
     commit(entries, reorderedKeys);
   }
   const button = 'rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-40';
-  return <SectionCard title={t('title')} description={t('help')} icon={BadgeCheck}>
+  return <SectionCard title={t('title')} description={starterBundle ? t('help_files') : language === 'PYTHON' ? t('help') : t('help_compiled', { language: language === 'C' ? 'C' : 'C++' })} icon={BadgeCheck}>
     <div className="space-y-5" data-testid="solution-editors">
       {value.map((entry, index) => <section key={keys[index]} className="space-y-3 rounded-xl border border-border p-3" aria-label={t('answer', { number: index + 1 })}>
         <div className="flex flex-wrap items-center gap-2">

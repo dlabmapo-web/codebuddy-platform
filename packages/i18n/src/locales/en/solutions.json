@@ -11,5 +11,7 @@
   "invalid": "Enter nonblank code (up to 100,000 characters) and an optional name of up to 80 characters.",
   "total": "Use 1–10 solutions with at most 500,000 code characters in total.",
   "copy": "Copy answer {{number}}",
-  "retry": "Retry"
+  "retry": "Retry",
+  "help_compiled": "Add complete {{language}} programs for teachers to compare. Each solution is copied separately.",
+  "help_files": "Add complete answers for teachers to compare. Each answer has all of the problem’s files; Copy copies the file on screen."
 }

@@ -19,10 +19,13 @@ import { useAuthSubmission } from '../../_lib/use-auth-submission';
 const initialState: AuthFormState = {};
 
 export function LoginForm({
+  dlabEnabled = false,
   initialError,
   passwordReset = false,
   signupComplete = false,
 }: {
+  /** DLAB sign-in sits beside Google below the divider (QA-01). */
+  dlabEnabled?: boolean;
   initialError?: string;
   signupComplete?: boolean;
   /** Arrived here from a completed password reset, which requires a fresh sign-in. */
@@ -143,7 +146,7 @@ export function LoginForm({
       </form>
 
       <AuthDivider label={t('divider.or')} />
-      <SocialLoginButtons iconOnly />
+      <SocialLoginButtons dlab={dlabEnabled} />
 
       <p className="mt-7 text-center text-[15px] text-sub">
         {t('login.no_account')}{' '}

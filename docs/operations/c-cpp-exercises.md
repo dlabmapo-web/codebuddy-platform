@@ -181,8 +181,10 @@ environment requires a reviewer (`jurabek10`). Qualify in that window:
 
    It must print `"gate":"standby-behaviour","status":"PASS"`,
    `"gate":"cold-start","status":"PASS"`,
-   `"gate":"actual-linux-gcc","status":"PASS","passed":53,...` (53 on amd64:
-   one check runs only there) and `"gate":"actual-linux-containment","status":"PASS"`.
+   `"gate":"actual-linux-gcc","status":"PASS","passed":57,...` (57 on amd64,
+   56 on arm64: one check runs only on amd64; four of them are the
+   multi-file checks added with that release) and
+   `"gate":"actual-linux-containment","status":"PASS"`.
 3. All PASS: approve the deployment. Anything else: reject it, and do not
    deploy a release that admits C/C++; remove `C` and `CPP` from the
    eligibility first (Rollback).
@@ -272,6 +274,49 @@ separate execution host, never higher limits.
 - Programs may write and read files in their working directory; author-supplied
   input files are not supported yet.
 
+### Several files in one problem
+
+Only a **Team Lead** or **Manager** authors problems; a Teacher sees the
+editor read-only. Design:
+[multi-file exercises](../superpowers/specs/2026-11-19-c-cpp-multi-file-design.md).
+
+- **Turning it on:** in a C or C++ problem, choose **Several files** above
+  the starting code. An untouched problem starts from Elice's example:
+  - C: `main.c`, `sum.c`, `sum.h`;
+  - C++: `main.cpp`, `rectangle.cpp`, `rectangle.h`.
+
+  Code already written becomes `main.c` (or `main.cpp`). **One file** keeps
+  the first compiled file and removes the rest, after a confirmation.
+- **Per file:**
+  - **Read-only:** students see it but cannot change it; the server always
+    compiles the author's text.
+  - **Hidden:** compiled, never shown or sent to students. Compiler messages
+    keep the location but drop its source line.
+  - **Open at start:** opened as a tab when a student arrives.
+  - **Compiled:** passed to the compiler, in list order. Headers are only
+    included.
+- **Also compile files students add:** off by default. With it off, as on
+  Elice when the script names its files, a student's own `extra.c` is
+  marked "Not compiled".
+- **Student file list:** closed at start, open at start, or not available.
+  Without it, students cannot add files.
+- **Compilers:** the same as for one file. In a C++ problem a `.c` file is
+  compiled as C++, which is how Elice's `main.cpp` + `sum.c` links.
+- **Limits:** together the files share the single-file limit of 100,000
+  characters and at most 32 files. Names use letters, digits, `_`, `-` and
+  `.`; may not start with `-` or `.`; and go at most four folders deep. A line
+  starting with `//@cove-file` is reserved.
+- **What changes the grading revision:** changing which files are compiled,
+  the learner-files setting, or a read-only or hidden file. Editing a
+  student-editable file's starting text does not.
+- **Students** may add, rename, delete and upload their own files. Reset (the
+  arrow beside the tabs) restores the current file only, and the workspace's
+  Reset restores all of them. History, the teacher's review, tutoring and
+  the live view show every file as a tab. A teacher's live pointer is not
+  drawn on multi-file problems yet.
+- **Not yet:** data files such as `input.txt` in the program's working
+  directory, and importing Elice exercise zips.
+
 ## Rollback
 
 - Switching C/C++ off: remove `C` and `CPP` from the eligibility entry and
@@ -284,6 +329,13 @@ separate execution host, never higher limits.
   into a C/C++ course. The check (`deploy/scripts/check-language-floor.sh`)
   looks for `C_CPP` in the target API image's Prisma client. Roll forward
   instead.
+- **Below the multi-file release** a rollback is refused once any problem has
+  several files or any submission carries a version 6 policy. An older API
+  would compile a student's whole file bundle as one `main.c`. The check
+  (`deploy/scripts/check-project-floor.sh`, override
+  `COVE_ROLLBACK_PAST_SOURCE_PROJECTS=yes-I-checked`) looks for
+  `source_project` in the target API image's Prisma client. Make those
+  problems single-file, or roll forward.
 - **The grader image** is replaced like any release: on stop the node
   withdraws readiness and finishes queued native work for up to five minutes,
   and the API admits native work only while a node reports ready, so queued

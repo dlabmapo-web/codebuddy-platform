@@ -73,6 +73,8 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
     axis: 'horizontal', initial: classroom ? STATEMENT_PANE.initialPercent : exercise.hasReferencePdf ? 45 : 40,
     min: classroom ? STATEMENT_PANE.minPercent : 25, max: classroom ? STATEMENT_PANE.maxPercent : 65,
   });
+  /** GCC's messages from the latest C/C++ Run or Test, for a multi-file editor's marks. */
+  const [compileDiagnostics, setCompileDiagnostics] = React.useState<string | null>(null);
   const draft = useDraftAutosave({
     academyId, materialId: exercise.materialId, classId: 'staff-practice',
     // Separate IndexedDB identity from the same person's student buffer.
@@ -122,11 +124,13 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
     if (!sample) return;
     setTab('terminal'); setSample(index);
     try {
-      return await sampleRunner.runSample(draft.code, sample, index, {
+      const result = await sampleRunner.runSample(draft.code, sample, index, {
         sampleCount: exercise.sampleTestCases.length,
         gradingMode: exercise.gradingMode, inputPromptPolicy: exercise.inputPromptPolicy,
         server: serverTarget,
       });
+      if (exercise.project) setCompileDiagnostics(result?.compileDiagnostics ?? null);
+      return result;
     } finally { setSample(null); }
   }
   async function runAll() {
@@ -141,7 +145,11 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
   }
   /** C/C++ Run on the server, as Python's behaves: input is typed when the program waits. */
   async function runCompiled(target: NonNullable<typeof serverTarget>) {
-    await sampleRunner.runInteractive(draft.code, runCommandFor(exercise.language), target);
+    setCompileDiagnostics(null);
+    const result = await sampleRunner.runInteractive(draft.code,
+      runCommandFor(exercise.language, exercise.project ? { project: exercise.project, code: draft.code } : null), target);
+    // A multi-file editor marks GCC's messages in the files they name.
+    if (exercise.project) setCompileDiagnostics(result?.compileDiagnostics ?? null);
   }
   function submit() { draft.flushNow(); setTab('result'); void submission.submit(draft.code); }
   React.useEffect(() => () => { runningBatch.current = false; }, []);
@@ -200,6 +208,7 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
         <div aria-hidden className="hidden w-1 shrink-0 cursor-col-resize bg-border hover:bg-brand/40 md:block" {...dividerProps} />
         <section className={`min-w-0 flex-1 flex-col ${mobile === 'code' ? 'flex' : 'hidden'} md:flex`}>
           <div className={selectedStudent ? "hidden" : "flex min-h-0 flex-1 flex-col"}><EditorPane code={draft.code} onCodeChange={draft.setCode} runner={runner} submission={submission} language={exercise.language}
+            project={exercise.project ?? null} starterCode={exercise.starterCode} compileDiagnostics={compileDiagnostics}
             sampleTestCases={exercise.sampleTestCases} activeSample={activeSample} testingSamples={testing} sampleResults={samples} sampleRunFailed={false}
             onReset={() => {
               // Confirmed in the editor pane's dialog. The output always clears;

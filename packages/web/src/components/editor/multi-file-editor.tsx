@@ -103,6 +103,7 @@ export function MultiFileEditor({
   const models = React.useRef(new Map<string, TextModel>());
   const viewStates = React.useRef(new Map<string, unknown>());
   const pathsRef = React.useRef(paths);
+  const activeRef = React.useRef(active);
   const applying = React.useRef(false);
   const listeners = React.useRef(new Set<() => void>());
   const lastEmitted = React.useRef(code);
@@ -111,6 +112,7 @@ export function MultiFileEditor({
   const onChangeRef = React.useRef(onChange);
   // Read by Monaco's callbacks, which outlive any one render.
   React.useLayoutEffect(() => {
+    activeRef.current = active;
     pathsRef.current = paths;
     latestCode.current = code;
     onChangeRef.current = onChange;
@@ -176,6 +178,8 @@ export function MultiFileEditor({
     setActive((current) => (order.includes(current) ? current : (order[0] ?? '')));
   }, [createModel]);
 
+  /** The file a peer's live pointer is in, when it is not the one on screen. */
+  const [peerFile, setPeerFile] = React.useState<string | null>(null);
   const host = React.useMemo<BundleHost>(() => ({
     read,
     apply,
@@ -183,6 +187,12 @@ export function MultiFileEditor({
       listeners.current.add(listener);
       return { dispose: () => listeners.current.delete(listener) };
     },
+    pointer: () => editorRef.current ? {
+      editor: editorRef.current,
+      activePath: () => activeRef.current || null,
+      // Projection runs on every frame the pointer moves: set only on change.
+      showPeerFile: (path) => setPeerFile((current) => (current === path ? current : path)),
+    } : null,
   }), [apply, read]);
 
   const handleMount: OnMount = (editor, monaco) => {
@@ -378,6 +388,7 @@ export function MultiFileEditor({
                 <FileIcon path={path} />
                 <span>{path}</span>
                 {filesWithErrors.has(path) ? <span aria-label={t('source_files.has_errors')} className="size-1.5 rounded-full bg-red-400" /> : null}
+                {peerFile === path && path !== active ? <span aria-label={t('source_files.peer_here')} title={t('source_files.peer_here')} className="size-2 animate-pulse rounded-full bg-brand" /> : null}
                 {authorFiles.get(path)?.readOnly ? <Lock aria-label={t('source_files.read_only')} className="size-3 opacity-60" /> : null}
               </button>
               <button type="button" aria-label={t('source_files.close_tab', { path })} onClick={() => closeTab(path)} className="rounded p-0.5 opacity-50 hover:bg-white/10 hover:opacity-100">

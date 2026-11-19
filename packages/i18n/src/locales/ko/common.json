@@ -140,6 +140,7 @@
     "error_duplicate": "같은 이름의 파일이 있습니다.",
     "has_errors": "오류 있음",
     "upload": "파일 올리기",
-    "upload_skipped": "추가하지 못함: {{names}}"
+    "upload_skipped": "추가하지 못함: {{names}}",
+    "peer_here": "실시간 포인터가 이 파일에 있습니다"
   }
 }

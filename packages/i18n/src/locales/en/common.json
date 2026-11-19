@@ -140,6 +140,7 @@
     "error_duplicate": "That name is taken.",
     "has_errors": "Has errors",
     "upload": "Upload files",
-    "upload_skipped": "Not added: {{names}}"
+    "upload_skipped": "Not added: {{names}}",
+    "peer_here": "A live pointer is in this file"
   }
 }

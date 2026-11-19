@@ -3,7 +3,8 @@
 import { toSharedDocumentText } from '@cove/shared';
 import type * as Y from 'yjs';
 
-import type { YjsMonacoBinding } from './yjs-monaco';
+import { registerCodePointer } from './awareness/code-pointer';
+import type { MonacoCodeEditor, YjsMonacoBinding } from './yjs-monaco';
 
 /**
  * The bridge between one Yjs text and a multi-file editor.
@@ -29,6 +30,15 @@ export type BundleHost = {
   apply: (bundle: string) => void;
   /** Called after every local edit, structural ones (new file, rename) included. */
   onLocalChange: (listener: () => void) => { dispose: () => void };
+  /**
+   * The editor showing the active file, for code pointers: a peer's pointer is
+   * anchored in the bundle and drawn over the file it is in.
+   */
+  pointer?: () => {
+    editor: MonacoCodeEditor;
+    activePath: () => string | null;
+    showPeerFile: (path: string | null) => void;
+  } | null;
 };
 
 /** The single replace that turns `from` into `to`: common prefix and suffix kept. */
@@ -48,7 +58,11 @@ export function minimalEdit(from: string, to: string): { at: number; remove: num
 export function bindYTextToBundle(
   ytext: Y.Text,
   host: BundleHost,
-  options: { seed?: 'text' | 'model'; onLocalChange?: () => void } = {},
+  options: {
+    seed?: 'text' | 'model';
+    onLocalChange?: () => void;
+    pointerIdentity?: { draftId: string; material: string };
+  } = {},
 ): YjsMonacoBinding {
   const localOrigin = Symbol('cove-local-bundle-edit');
 
@@ -77,8 +91,16 @@ export function bindYTextToBundle(
     options.onLocalChange?.();
   });
 
+  const pointer = options.pointerIdentity ? host.pointer?.() : null;
+  const stopPointer = pointer && options.pointerIdentity
+    ? registerCodePointer({ editor: pointer.editor, text: ytext, ...options.pointerIdentity,
+      bundle: { activePath: pointer.activePath, showPeerFile: pointer.showPeerFile } })
+    : () => undefined;
+
   return {
     destroy: () => {
+      stopPointer();
+      pointer?.showPeerFile(null);
       subscription.dispose();
       ytext.unobserve(observer);
     },

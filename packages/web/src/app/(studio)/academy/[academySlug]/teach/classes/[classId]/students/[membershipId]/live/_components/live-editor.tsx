@@ -62,9 +62,12 @@ export function LiveEditor({
   const [host, setHost] = React.useState<BundleHost | null>(null);
   React.useEffect(() => {
     if (!multiFile || !host) return;
-    const binding = bindYTextToBundle(text, host, { seed: 'text' });
+    const binding = bindYTextToBundle(text, host, {
+      seed: 'text',
+      pointerIdentity: pointerDraftId && pointerMaterial ? { draftId: pointerDraftId, material: pointerMaterial } : undefined,
+    });
     return () => binding.destroy();
-  }, [host, multiFile, text]);
+  }, [host, multiFile, text, pointerDraftId, pointerMaterial]);
   React.useEffect(() => {
     if (!editor || multiFile) return;
     const binding = bindYTextToMonaco(text, editor, {

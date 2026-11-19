@@ -446,3 +446,52 @@ test('a multi-file C++ problem: tabs, a read-only header, Run, Test, Submit and 
   await teacherContext.close();
   await context.close();
 });
+
+test('a live code pointer lands on the same code in a multi-file problem, and names the file when it is elsewhere', async ({ browser }) => {
+  test.setTimeout(120_000);
+  const f = fixture();
+  const studentContext = await browser.newContext({ storageState: f.auth.student, viewport: { width: 1280, height: 720 } });
+  const teacherContext = await browser.newContext({ storageState: f.auth.teacher, viewport: { width: 1600, height: 900 } });
+  const student = await studentContext.newPage();
+  const teacher = await teacherContext.newPage();
+  await student.goto(routes.academyLearnExercise(f.slug, f.ids.MULTI, { classId: f.ids.class }));
+  await expect(student.getByRole('tab', { name: 'main.cpp' })).toBeVisible();
+  await student.getByRole('tab', { name: 'main.cpp' }).click();
+  await teacher.goto(routes.academyTeachStudentLive(f.slug, f.ids.class, f.ids.studentMembership));
+  await expect(teacher.getByRole('tab', { name: 'main.cpp' })).toBeVisible({ timeout: 30_000 });
+  await teacher.getByRole('tab', { name: 'main.cpp' }).click();
+
+  // A token both editors show, in the same file: the arrow lands on it.
+  // Measured inside each attempt: Monaco re-renders its lines as the shared
+  // document settles, so a box taken once can belong to a detached node.
+  const token = (page: Page) => page.locator('[data-collab-surface="editor"] .view-lines span').filter({ hasText: /^scanf$/ }).first();
+  const hover = async (target: ReturnType<typeof token>) => {
+    const box = await target.boundingBox().catch(() => null);
+    if (box) await teacher.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  };
+  await expect(token(teacher)).toBeVisible({ timeout: 30_000 });
+  const peer = student.getByTestId('peer-pointer');
+  await expect.poll(async () => {
+    await hover(token(teacher));
+    return peer.count();
+  }, { timeout: 30_000, intervals: [250] }).toBeGreaterThan(0);
+  const arrow = (await peer.boundingBox())!;
+  const there = (await token(student).boundingBox())!;
+  expect(arrow.x).toBeGreaterThanOrEqual(there.x - 6);
+  expect(arrow.x).toBeLessThanOrEqual(there.x + there.width + 6);
+  expect(arrow.y).toBeGreaterThanOrEqual(there.y - 6);
+  expect(arrow.y).toBeLessThanOrEqual(there.y + there.height + 6);
+
+  // The teacher moves to sum.c: the student, still on main.cpp, is told which file.
+  await teacher.getByRole('tab', { name: 'sum.c' }).click();
+  const sumToken = teacher.locator('[data-collab-surface="editor"] .view-lines span').filter({ hasText: /^sum$/ }).first();
+  await expect(sumToken).toBeVisible();
+  const marker = student.getByRole('tab', { name: /sum\.c/ }).getByLabel('A live pointer is in this file');
+  await expect.poll(async () => {
+    await hover(sumToken);
+    return marker.count();
+  }, { timeout: 30_000, intervals: [250] }).toBeGreaterThan(0);
+  await student.screenshot({ path: test.info().outputPath('multi-file-pointer-elsewhere.png') });
+  await teacherContext.close();
+  await studentContext.close();
+});

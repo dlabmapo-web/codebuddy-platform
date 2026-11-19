@@ -290,7 +290,10 @@ export function useStudentMonitoring({
     handedOffRef.current.add(current.draftId);
     const seed = firstHandoff && seedFromModelRef.current ? 'model' : 'text';
     bindingRef.current = bundleHostRef.current
-      ? bindYTextToBundle(docRef.current.getText('code'), bundleHostRef.current, { seed })
+      ? bindYTextToBundle(docRef.current.getText('code'), bundleHostRef.current, {
+        seed,
+        pointerIdentity: { draftId: current.draftId, material: current.materialId },
+      })
       : bindYTextToMonaco(docRef.current.getText('code'), editor, {
         seed,
         pointerIdentity: { draftId: current.draftId, material: current.materialId },

@@ -4,6 +4,9 @@ import {
   nativeAnyRuntimeDescriptorSchema,
   nativeDigestSchema,
   nativeRuntimeIdentity,
+  isCompiledSource,
+  sourceFileLimits,
+  sourcePathError,
   type NativeAnyRuntimeDescriptor,
   type NativeGccDescriptor,
   type NativeRuntimeDescriptor,
@@ -58,13 +61,52 @@ export const binaryRequestSchema = z
 export type NativeBinaryRequest = z.infer<typeof binaryRequestSchema> & {
   signal?: AbortSignal;
 };
+/**
+ * One compile: a single-file program as `code`, or a multi-file project as
+ * `files` and the `sources` among them that are compiled, in order.
+ *
+ * Paths are checked here again rather than trusted from the API: every path
+ * becomes a compiler argument and a file under `/src`, so none may start with
+ * `-`, climb out with `..`, or name anything but a C/C++ source or header of
+ * the language.
+ */
 export const compileRequestSchema = z
   .object({
     language: z.enum(["C", "CPP"]),
-    code: z.string().min(1).max(gradingDataLimits.codeChars),
+    code: z.string().min(1).max(gradingDataLimits.codeChars).optional(),
+    files: z
+      .array(z.object({ path: z.string().min(1).max(256), content: z.string() }).strict())
+      .min(1)
+      .max(sourceFileLimits.files)
+      .optional(),
+    sources: z.array(z.string()).min(1).max(sourceFileLimits.files).optional(),
     leaseMs: z.number().int().min(1000).max(MAX_LEASE_MS),
   })
-  .strict();
+  .strict()
+  .superRefine((request, ctx) => {
+    const issue = (message: string) => ctx.addIssue({ code: "custom", message });
+    if ((request.code === undefined) === (request.files === undefined))
+      return issue("Exactly one of code and files");
+    if ((request.files === undefined) !== (request.sources === undefined))
+      return issue("Files and sources go together");
+    if (!request.files || !request.sources) return;
+    const paths = new Set<string>();
+    const keys = new Set<string>();
+    let total = 0;
+    for (const file of request.files) {
+      if (sourcePathError(file.path, request.language)) return issue(`Invalid path ${file.path}`);
+      if (keys.has(file.path.toLowerCase())) return issue(`Duplicate path ${file.path}`);
+      paths.add(file.path);
+      keys.add(file.path.toLowerCase());
+      total += file.content.length;
+    }
+    // A Run appends a few lines to each source; the cap leaves room for them.
+    if (total > sourceFileLimits.chars + 4096) issue("Files too large");
+    if (new Set(request.sources).size !== request.sources.length) issue("Duplicate source");
+    for (const source of request.sources)
+      if (!paths.has(source) || !isCompiledSource(source, request.language))
+        issue(`Invalid source ${source}`);
+  });
 export type NativeCompileRequest = z.infer<typeof compileRequestSchema> & {
   signal?: AbortSignal;
 };

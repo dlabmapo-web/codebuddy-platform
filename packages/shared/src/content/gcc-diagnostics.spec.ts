@@ -14,10 +14,24 @@ describe("parseGccDiagnostics", () => {
       "main.c:1:10: fatal error: missing.h: No such file or directory",
     ].join("\n");
     expect(parseGccDiagnostics(text)).toEqual([
-      { line: 3, column: 12, severity: "error", message: "‘x’ undeclared (first use in this function)" },
-      { line: 3, column: 12, severity: "note", message: "each undeclared identifier is reported only once" },
-      { line: 7, column: 5, severity: "warning", message: "unused variable ‘y’ [-Wunused-variable]" },
-      { line: 1, column: 10, severity: "error", message: "missing.h: No such file or directory" },
+      { file: "main.c", line: 3, column: 12, severity: "error", message: "‘x’ undeclared (first use in this function)" },
+      { file: "main.c", line: 3, column: 12, severity: "note", message: "each undeclared identifier is reported only once" },
+      { file: "main.cpp", line: 7, column: 5, severity: "warning", message: "unused variable ‘y’ [-Wunused-variable]" },
+      { file: "main.c", line: 1, column: 10, severity: "error", message: "missing.h: No such file or directory" },
+    ]);
+  });
+
+  it("names the project file each message is about", () => {
+    const text = [
+      "In file included from main.cpp:2:",
+      "lib/sum.h:4:1: error: expected ‘;’ before ‘}’ token",
+      "sum.c:6:1: error: expected ‘;’ before ‘}’ token",
+      "./util.cc:2:3: warning: unused",
+    ].join("\n");
+    expect(parseGccDiagnostics(text).map(({ file, line }) => `${file}:${line}`)).toEqual([
+      "lib/sum.h:4",
+      "sum.c:6",
+      "util.cc:2",
     ]);
   });
 

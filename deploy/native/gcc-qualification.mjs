@@ -222,6 +222,53 @@ export async function qualifyGcc({ runtime, config }) {
         const ownPipe = await program('C', C('int p[2]; if (pipe(p)) return 5; char c; if (read(p[0], &c, 1) < 0) return 6; return 0;'), '', { holdStdin: true, timeLimitMs: 400 });
         assert.deepEqual([ownPipe.outcome, ownPipe.awaitingInput], ['TIME_LIMIT', undefined], 'own pipe: ' + JSON.stringify(ownPipe));
         passed++;
+        // Multi-file projects (docs/superpowers/specs/2026-11-19-c-cpp-multi-file-design.md):
+        // every file under /src, the listed sources compiled together, headers
+        // only included, a folder resolved beside its includer.
+        const project = (language, files, sources) => client.compile({ language, files, sources, leaseMs: 120_000 });
+        const sumFiles = [
+            { path: 'main.c', content: '#include <stdio.h>\n#include "sum.h"\n#include "lib/twice.h"\nint main(void) { int a, b; if (scanf("%d %d", &a, &b) != 2) return 3; printf("%d %d\\n", sum(a, b), twice(a)); return 0; }\n' },
+            { path: 'sum.c', content: '#include "sum.h"\nint sum(int a, int b) { return a + b; }\n' },
+            { path: 'sum.h', content: '#ifndef SUM_H\n#define SUM_H\nint sum(int a, int b);\n#endif\n' },
+            { path: 'lib/twice.h', content: 'int twice(int x);\n' },
+            { path: 'lib/twice.c', content: '#include "twice.h"\nint twice(int x) { return 2 * x; }\n' },
+        ];
+        started = performance.now();
+        const linked = await project('C', sumFiles, ['main.c', 'sum.c', 'lib/twice.c']);
+        timings.cProjectMs = performance.now() - started;
+        assert.deepEqual([linked.status, linked.diagnostics], ['COMPILED', ''], 'multi-file C: ' + linked.diagnostics);
+        assert.equal((await run(linked, '4 6\n')).stdout, '10 8\n');
+        await client.release(linked.lease);
+        // The same project again is the cached build; reordering the files is not a new program.
+        const cachedProject = await project('C', [...sumFiles].reverse(), ['main.c', 'sum.c', 'lib/twice.c']);
+        assert.deepEqual([cachedProject.status, cachedProject.cached], ['COMPILED', true]);
+        await client.release(cachedProject.lease);
+        passed++;
+        // Elice's DC-C-1 Week 9 layout: main.cpp with sum.c, which g++ compiles as C++.
+        started = performance.now();
+        const mixed = await project('CPP', [
+            { path: 'main.cpp', content: '#include <bits/stdc++.h>\n#include "sum.h"\nint main() { int a, b; std::cin >> a >> b; std::cout << sum(a, b) << "\\n"; }\n' },
+            { path: 'sum.c', content: '#include <bits/stdc++.h>\nint sum(int n1, int n2) { return n1 + n2; }\n' },
+            { path: 'sum.h', content: 'int sum(int n1, int n2);\n' },
+        ], ['main.cpp', 'sum.c']);
+        timings.cppProjectMs = performance.now() - started;
+        assert.deepEqual([mixed.status, mixed.diagnostics], ['COMPILED', ''], 'main.cpp + sum.c: ' + mixed.diagnostics);
+        assert.equal((await run(mixed, '3 5\n')).stdout, '8\n');
+        await client.release(mixed.lease);
+        passed++;
+        // A source left out of the build is the linker's error; a mistake names its own file.
+        const unlinked = await project('C', sumFiles, ['main.c', 'lib/twice.c']);
+        assert.equal(unlinked.status, 'COMPILE_ERROR');
+        assert.match(unlinked.diagnostics, /undefined reference to .sum./);
+        const broken = await project('C', sumFiles.map((file) => file.path === 'sum.c' ? { ...file, content: '#include "sum.h"\nint sum(int a, int b) {\n  return a + b\n}\n' } : file), ['main.c', 'sum.c', 'lib/twice.c']);
+        assert.equal(broken.status, 'COMPILE_ERROR');
+        assert.match(broken.diagnostics, /^sum\.c:3:\d+: error: expected .;./m);
+        passed++;
+        // Paths that would be compiler options or leave /src never reach the jail.
+        for (const path of ['-wrapper,/bin/sh.c', '../escape.c', '/etc/x.c', '.hidden.c'])
+            await assert.rejects(project('C', [...sumFiles, { path, content: '' }], ['main.c', 'sum.c', 'lib/twice.c']), undefined, path);
+        await assert.rejects(project('C', sumFiles, ['main.c', 'sum.h']), undefined, 'a header is never a source');
+        passed++;
         // A lapsed or unknown lease is refused without running anything.
         await assert.rejects(client.run({ code: '', artifact: 'sha256:' + '0'.repeat(64), lease: crypto.randomUUID(), stdin: '', memoryLimitMb: 64, timeLimitMs: 100 }), /INVALID_REQUEST/);
         passed++;

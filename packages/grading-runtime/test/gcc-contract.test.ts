@@ -6,9 +6,9 @@ import {
   sameNativeRuntime,
   type NativeGccDescriptor,
 } from "@cove/shared";
-import { nativeRuntimeVersion, resultSchema, terminationSchema, wireRequestSchema } from "../src/contract.js";
+import { compileRequestSchema, nativeRuntimeVersion, resultSchema, terminationSchema, wireRequestSchema } from "../src/contract.js";
 import { blockedReadFd, gateRequest } from "../src/launcher.js";
-import { binaryJailConfig, compileJailConfig, GCC_COMPILE_ARGV, NSJAIL_REVISION } from "../src/policy.js";
+import { binaryJailConfig, compileJailConfig, GCC_COMPILE_ARGV, gccCompileArgvFor, NSJAIL_REVISION } from "../src/policy.js";
 import { manifest, request } from "./fixtures.js";
 
 const digest = `sha256:${"1".repeat(64)}`;
@@ -126,4 +126,39 @@ test("a program's ending is an exit code or a named signal, nothing else", () =>
   assert.equal(terminationSchema.safeParse({ signal: "SIGWINCH" }).success, false);
   assert.equal(terminationSchema.safeParse({ exit: 256 }).success, false);
   assert.equal(terminationSchema.safeParse({ exit: 1, signal: "SIGSEGV" }).success, false);
+});
+
+test("a multi-file compile names safe paths, and its sources replace main.c in the descriptor's argv", () => {
+  const files = [
+    { path: "main.cpp", content: '#include "sum.h"\nint main(){return sum(1,2);}' },
+    { path: "sum.c", content: "int sum(int a,int b){return a+b;}" },
+    { path: "sum.h", content: "int sum(int,int);" },
+    { path: "lib/util.cc", content: "" },
+  ];
+  const project = { language: "CPP", files, sources: ["main.cpp", "sum.c"], leaseMs: 60_000 };
+  assert.equal(compileRequestSchema.safeParse(project).success, true);
+  assert.equal(wire({ descriptor: gcc, operation: "compile", compile: project }), true);
+  const refused = [
+    { ...project, code: "int main(){}" },
+    { ...project, sources: undefined },
+    { ...project, sources: ["sum.h"] },
+    { ...project, sources: ["missing.cpp"] },
+    { ...project, sources: ["main.cpp", "main.cpp"] },
+    { ...project, files: [...files, { path: "-wrapper,/bin/sh.c", content: "" }] },
+    { ...project, files: [...files, { path: "../escape.c", content: "" }] },
+    { ...project, files: [...files, { path: "/etc/x.c", content: "" }] },
+    { ...project, files: [...files, { path: "SUM.c", content: "" }] },
+    { ...project, language: "C" },
+    { language: "C", leaseMs: 60_000 },
+  ];
+  for (const body of refused) assert.equal(compileRequestSchema.safeParse(body).success, false, JSON.stringify(body).slice(0, 80));
+
+  assert.deepEqual(gccCompileArgvFor("C"), GCC_COMPILE_ARGV.C);
+  const argv = gccCompileArgvFor("CPP", ["main.cpp", "sum.c"]);
+  assert.deepEqual(argv, [GCC_COMPILE_ARGV.CPP[0], "main.cpp", "sum.c", ...GCC_COMPILE_ARGV.CPP.slice(2)]);
+  const config = compileJailConfig(
+    { root: "/r", policy: "/p", cgroup: "/c", log: "/l", source: "/s", output: "/o" },
+    manifest.resources, "CPP", 10_000, 5_000, ["main.cpp", "sum.c"],
+  );
+  assert.match(config, /arg: "main.cpp" arg: "sum.c" arg: "-o"/);
 });

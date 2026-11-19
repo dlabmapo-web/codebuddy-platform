@@ -101,6 +101,20 @@ export const GCC_COMPILE_ARGV = Object.freeze({
   ]),
 });
 export const GCC_SOURCE_NAME = Object.freeze({ C: "main.c", CPP: "main.cpp" });
+/**
+ * The compiler argv for a compile: the descriptor's own argv for a single
+ * file, or the same argv with `main.c` / `main.cpp` replaced by a project's
+ * sources, in order. Everything else — compiler, standard, flags, output — is
+ * the descriptor's, so a multi-file program is built exactly as a single file
+ * is and the runtime identity does not change. Every source path has passed
+ * `compileRequestSchema`, so none can be read as an option.
+ */
+export function gccCompileArgvFor(language: "C" | "CPP", sources?: readonly string[]): readonly string[] {
+  const argv = GCC_COMPILE_ARGV[language];
+  if (!sources) return argv;
+  const at = argv.indexOf(GCC_SOURCE_NAME[language]);
+  return [...argv.slice(0, at), ...sources, ...argv.slice(at + 1)];
+}
 /** One compile: 10 s of CPU, a 20 s wall backstop, 64 MiB of scratch and binary. */
 export const GCC_COMPILE_LIMITS = Object.freeze({
   cpuMs: 10_000,
@@ -159,6 +173,7 @@ export function compileJailConfig(
   language: "C" | "CPP",
   startupTimeoutMs = 10000,
   cleanupTimeoutMs = 5000,
+  sources?: readonly string[],
 ): string {
   const q = JSON.stringify;
   const l = GCC_COMPILE_LIMITS;
@@ -175,7 +190,7 @@ rlimit_nofile: ${l.nofile}
 rlimit_stack: 8
 rlimit_stack_type: VALUE
 time_limit: ${Math.ceil((startupTimeoutMs + l.wallMs + cleanupTimeoutMs) / 1000)}
-exec_bin { path: "/opt/cove/exec-gate" arg: "exec" ${GCC_COMPILE_ARGV[language].map((arg) => `arg: ${q(arg)}`).join(" ")} }
+exec_bin { path: "/opt/cove/exec-gate" arg: "exec" ${gccCompileArgvFor(language, sources).map((arg) => `arg: ${q(arg)}`).join(" ")} }
 `;
 }
 /**

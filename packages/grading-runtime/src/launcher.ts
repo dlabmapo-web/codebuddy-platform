@@ -16,7 +16,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { readFile, mkdir, readlink, lstat, statfs } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { arch, availableParallelism, constants as osConstants, totalmem } from "node:os";
 import type { Duplex } from "node:stream";
@@ -1043,13 +1043,25 @@ export class NsJailBackend implements NativeBackend {
       deliver,
     );
   }
-  private compileKey(language: "C" | "CPP", code: string) {
-    return createHash("sha256")
+  /**
+   * The cache key of a compile. A single file keeps the key it always had; a
+   * project hashes every path with its content's digest, in path order, and
+   * the compiled sources in compile order, under its own tag so the two kinds
+   * can never collide.
+   */
+  private compileKey(request: { language: "C" | "CPP"; code?: string; files?: { path: string; content: string }[]; sources?: string[] }) {
+    const hash = createHash("sha256")
       .update(nativeRuntimeIdentity(this.manifest.gcc!))
       .update("\0")
-      .update(language)
-      .update("\0")
-      .update(code, "utf8")
+      .update(request.language)
+      .update("\0");
+    if (request.code !== undefined) return hash.update(request.code, "utf8").digest("hex");
+    const files = [...request.files!]
+      .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+      .map((file) => [file.path, createHash("sha256").update(file.content, "utf8").digest("hex")]);
+    return hash
+      .update("files-v1\0")
+      .update(JSON.stringify({ files, sources: request.sources }), "utf8")
       .digest("hex");
   }
   /**
@@ -1060,7 +1072,7 @@ export class NsJailBackend implements NativeBackend {
     if (!this.gccReady || !this.store) return undefined;
     const { signal: ignored, ...data } = raw;
     const request = compileRequestSchema.parse(data);
-    const key = this.compileKey(request.language, request.code);
+    const key = this.compileKey(request);
     const cached = this.store.lookup(key);
     if (!cached) return undefined;
     return cached.artifact
@@ -1095,7 +1107,7 @@ export class NsJailBackend implements NativeBackend {
       r = this.manifest.resources,
       g = this.options.gcc!,
       store = this.store!;
-    const key = this.compileKey(request.language, request.code);
+    const key = this.compileKey(request);
     // Room for this compile's binary is promised before the compiler runs.
     const reservation = store.reserve();
     const staging = mkdtempSync(join(g.stagingPath, "compile-"));
@@ -1106,7 +1118,14 @@ export class NsJailBackend implements NativeBackend {
       // Traverse-only, for NsJail's bind-mount lookup (see prepareGcc).
       chmodSync(staging, 0o711);
       mkdirSync(source, { mode: 0o755 });
-      writeFileSync(join(source, GCC_SOURCE_NAME[request.language]), request.code, { mode: 0o444 });
+      if (request.files) {
+        for (const file of request.files) {
+          const target = join(source, file.path);
+          // Paths passed `compileRequestSchema`: no `..`, no absolute paths.
+          mkdirSync(dirname(target), { recursive: true, mode: 0o755 });
+          writeFileSync(target, file.content, { mode: 0o444 });
+        }
+      } else writeFileSync(join(source, GCC_SOURCE_NAME[request.language]), request.code!, { mode: 0o444 });
       mkdirSync(output, { mode: 0o700 });
       chownSync(output, 65534, 65534);
       const o = this.options,
@@ -1126,6 +1145,7 @@ export class NsJailBackend implements NativeBackend {
             request.language,
             o.startupTimeoutMs ?? 10000,
             o.cleanupTimeoutMs ?? 5000,
+            request.sources,
           ),
       };
       await this.runCase(

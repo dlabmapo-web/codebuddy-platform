@@ -370,3 +370,79 @@ test('Submit timings: cold compile and cached resubmission, apart from page load
   mkdirSync(resolve('test-results/c-cpp-browser'), { recursive: true });
   writeFileSync(resolve('test-results/c-cpp-browser/timings.json'), JSON.stringify(report, null, 2));
 });
+
+/** One file of a multi-file editor, by its project path. */
+async function setFile(page: Page, path: string, content: string) {
+  await expect.poll(() => page.evaluate(([name, next]) => {
+    const model = (window as any).monaco?.editor.getModels().find((item: any) => item.uri.path.endsWith('/' + name));
+    if (!model) return false;
+    model.setValue(next);
+    return true;
+  }, [path, content] as const)).toBe(true);
+}
+
+test('a multi-file C++ problem: tabs, a read-only header, Run, Test, Submit and per-file errors', async ({ browser }) => {
+  test.setTimeout(240_000);
+  const f = fixture(), materialId = f.ids.MULTI;
+  const context = await browser.newContext({ storageState: f.auth.student });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto(routes.academyLearnExercise(f.slug, materialId, { classId: f.ids.class }));
+
+  // Elice's Week 9 layout: three tabs, the file list open, the hidden file nowhere.
+  for (const path of ['main.cpp', 'sum.c', 'sum.h']) await expect(page.getByRole('tab', { name: path })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Files' })).toBeVisible();
+  await expect(page.locator('body')).not.toContainText('checks.c');
+  expect(await page.content()).not.toContain('cove_hidden_marker');
+  await page.getByRole('tab', { name: 'sum.h' }).click();
+  await expect(page.getByRole('note').filter({ hasText: 'This file is read-only.' })).toBeVisible();
+
+  // Run compiles the three files on the real grader and takes typed input.
+  await setFile(page, 'sum.c', '#include "sum.h"\n\nint sum(int a, int b) {\n    return a + b;\n}\n');
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  const input = page.getByRole('textbox', { name: 'Program input', exact: true });
+  await input.fill('3 5');
+  await input.press('Enter');
+  await expect(page.locator('#workspace-terminal-panel')).toContainText('The program finished.', { timeout: 45_000 });
+  await expect(page.locator('#workspace-terminal-panel')).toContainText('8');
+  // The banner names the compiled files a student may know of: never the hidden one.
+  await expect(page.locator('#workspace-terminal-panel')).toContainText('g++ main.cpp sum.c -o main');
+  await page.getByRole('button', { name: 'Test run', exact: true }).click();
+  await expect(page.locator('#workspace-terminal-panel')).toContainText('Sample 1 passed.');
+
+  // Submit: the learner's files, never the hidden one, frozen with a version 6 policy.
+  const before = (await latest(materialId))?.id;
+  await page.getByRole('button', { name: 'Submit', exact: true }).click();
+  await expect.poll(async () => { const row = await latest(materialId); return Boolean(row && row.id !== before && row.graded_at); }, { timeout: 45_000 }).toBe(true);
+  const correct = await latest(materialId);
+  expect(correct.score).toBe(100);
+  const stored = (await db.query('SELECT code, grading_policy_snapshot FROM submissions WHERE id=$1', [correct.id])).rows[0];
+  expect(stored.code.startsWith('//@cove-file main.cpp\n')).toBe(true);
+  expect(stored.code).not.toContain('cove_hidden_marker');
+  expect(stored.grading_policy_snapshot.version).toBe(6);
+
+  // A mistake in sum.c is reported against sum.c.
+  await setFile(page, 'sum.c', '#include "sum.h"\n\nint sum(int a, int b) {\n    return a + b\n}\n');
+  await page.getByRole('button', { name: 'Test run', exact: true }).click();
+  await expect(page.locator('#workspace-terminal-panel')).toContainText('sum.c:4', { timeout: 45_000 });
+  await expect(page.getByRole('tab', { name: /sum\.c/ }).getByLabel('Has errors')).toBeVisible();
+
+  // A file the student adds is theirs to keep, and marked as not compiled.
+  await page.getByRole('button', { name: 'New file', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Files' }).getByRole('textbox').fill('extra.c');
+  await page.getByRole('navigation', { name: 'Files' }).getByRole('textbox').press('Enter');
+  await expect(page.getByRole('navigation', { name: 'Files' })).toContainText('Not compiled');
+  await page.screenshot({ path: test.info().outputPath('multi-file-workspace.png'), fullPage: true });
+
+  // The teacher reads the attempt as files.
+  const teacherContext = await browser.newContext({ storageState: f.auth.teacher });
+  const teacher = await teacherContext.newPage();
+  await teacher.goto(routes.academyTeachSubmission(f.slug, f.ids.class, f.ids.studentMembership, correct.id));
+  for (const path of ['main.cpp', 'sum.c', 'sum.h']) await expect(teacher.getByRole('tab', { name: path })).toBeVisible();
+  await expect(teacher.locator('body')).not.toContainText('checks.c');
+  await teacher.screenshot({ path: test.info().outputPath('multi-file-teacher-review.png'), fullPage: true });
+  expect(errors).toEqual([]);
+  await teacherContext.close();
+  await context.close();
+});

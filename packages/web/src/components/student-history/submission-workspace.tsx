@@ -30,6 +30,7 @@ import type {
   MonitoringExercisePreview,
   ObservedMaterial,
 } from "@cove/shared";
+import { decodeFileBundle, isFileBundle } from "@cove/shared";
 import { orpc } from "@/lib/orpc";
 import { manualApi } from "@/lib/manual-api";
 import { usePythonRunner } from "@/lib/workspace/use-python-runner";
@@ -229,13 +230,16 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
   const original = React.useMemo(
     () =>
       data.kind === "programming"
-        ? { "main.py": data.review.code }
+        // A multi-file C/C++ attempt shows each of its files as a tab.
+        ? (isFileBundle(data.review.code)
+          ? Object.fromEntries((decodeFileBundle(data.review.code) ?? []).map((item) => [item.path, item.content]))
+          : { "main.py": data.review.code })
         : data.files,
     [data],
   );
   const [files, setFiles] = React.useState(original),
     [file, setFile] = React.useState(
-      data.kind === "programming" ? "main.py" : data.entryPoint,
+      data.kind === "programming" ? Object.keys(original)[0] ?? "main.py" : data.entryPoint,
     );
   const runner = usePythonRunner();
   const rt = useReviewTranslation();
@@ -843,7 +847,7 @@ function ReviewCopyBody({ data, ...props }: PrivateProps & { data: ReviewData })
                     />
                   </span>
                 ) : null}
-                {!coding &&
+                {(!coding || Object.keys(files).length > 1) &&
                   Object.keys(files).map((name) => (
                     <button
                       key={name}

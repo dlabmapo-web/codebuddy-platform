@@ -12,6 +12,8 @@ import {
   bindYTextToMonaco,
   type MonacoCodeEditor,
 } from '@/lib/monitoring/yjs-monaco';
+import { bindYTextToBundle, type BundleHost } from '@/lib/monitoring/yjs-bundle';
+import { MultiFileEditor } from '@/components/editor/multi-file-editor';
 
 const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), {
   ssr: false,
@@ -41,12 +43,15 @@ export function LiveEditor({
   language,
   readOnly,
   text,
+  multiFile = false,
 }: {
   pointerIdentity?: { draftId: string; material: string };
   fontSize: number;
   language?: ExerciseLanguage;
   readOnly: boolean;
   text: Y.Text;
+  /** A multi-file C/C++ exercise: the document is its file bundle. */
+  multiFile?: boolean;
 }) {
   const pointerDraftId = pointerIdentity?.draftId;
   const pointerMaterial = pointerIdentity?.material;
@@ -54,13 +59,34 @@ export function LiveEditor({
   // `onMount` cannot clean up after itself — it is a notification, not an
   // effect — so it does nothing but hand the editor over, and everything with
   // a lifetime is built and torn down below.
+  const [host, setHost] = React.useState<BundleHost | null>(null);
   React.useEffect(() => {
-    if (!editor) return;
+    if (!multiFile || !host) return;
+    const binding = bindYTextToBundle(text, host, { seed: 'text' });
+    return () => binding.destroy();
+  }, [host, multiFile, text]);
+  React.useEffect(() => {
+    if (!editor || multiFile) return;
     const binding = bindYTextToMonaco(text, editor, {
       pointerIdentity: pointerDraftId && pointerMaterial ? { draftId: pointerDraftId, material: pointerMaterial } : undefined,
     });
     return () => binding.destroy();
-  }, [editor, text, pointerDraftId, pointerMaterial]);
+  }, [editor, multiFile, text, pointerDraftId, pointerMaterial]);
+
+  if (multiFile && (language === 'C' || language === 'CPP')) {
+    return (
+      <MultiFileEditor
+        key={text.doc?.guid}
+        code={text.toString()}
+        documentManaged
+        fontSize={fontSize}
+        language={language}
+        onChange={() => undefined}
+        onMount={(_editor, bundleHost) => setHost(bundleHost)}
+        readOnly={readOnly}
+      />
+    );
+  }
 
   return (
     <div className="min-h-0 flex-1 bg-editor-bg">

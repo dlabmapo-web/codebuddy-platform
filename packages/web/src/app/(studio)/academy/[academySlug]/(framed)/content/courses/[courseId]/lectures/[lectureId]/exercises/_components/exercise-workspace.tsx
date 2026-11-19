@@ -23,6 +23,10 @@ import { ExerciseHeader } from './exercise-header';
 import { HintsEditor } from './hints-editor';
 import { PreviewModal } from './preview-modal';
 import { StarterCodeEditor } from './starter-code-editor';
+import { ProjectEditor } from './project-editor';
+import { isCompiledLanguage, starterBundleFor, type CompiledLanguage, type ExerciseProject } from '@cove/shared';
+import { projectTemplate } from '@/lib/workspace/file-bundle';
+import { compiledStarterTemplates } from '@/lib/workspace/exercise-language';
 import { SolutionCodeEditor } from './solution-code-editor';
 
 export function ExerciseWorkspace({
@@ -41,6 +45,7 @@ export function ExerciseWorkspace({
   initialSolutions: ExerciseSolutionEntry[];
 }) {
   const { t: tq } = useTranslation('quiz');
+  const { t: tf } = useTranslation('exercise-files');
   const { t } = useTranslation(['content', 'pdf-practice']);
   const requireReferencePdf = useSearchParams().get('referencePdf') === 'required' && !initialContext.material;
   const authoring = useExerciseAuthoring({
@@ -65,6 +70,7 @@ export function ExerciseWorkspace({
         {editable ? (
           <SolutionCodeEditor
             error={authoring.errorFor('solution')}
+            starterBundle={draft.sourceProject ? draft.starterCode : null}
             language={draft.language}
             onChange={(solutions) => update('solutions', solutions)}
             value={draft.solutions}
@@ -113,12 +119,43 @@ export function ExerciseWorkspace({
           }}
         />
         {draft.quiz ? <QuizEditor value={draft.quiz} disabled={!editable} onChange={(quiz) => update('quiz', quiz)} /> : <>
-        <StarterCodeEditor
-          editable={editable}
-          language={draft.language}
-          onChange={(starterCode) => update('starterCode', starterCode)}
-          value={draft.starterCode}
-        />
+        {isCompiledLanguage(draft.language) ? (
+          <FileModeSwitch
+            editable={editable}
+            multiple={Boolean(draft.sourceProject)}
+            onChange={(multiple) => {
+              if (multiple) {
+                const project = projectFromStarter(draft.starterCode, draft.language as 'C' | 'CPP');
+                update('sourceProject', project);
+                update('starterCode', starterBundleFor(project));
+              } else {
+                if (!window.confirm(tf('to_single_confirm'))) return;
+                const project = draft.sourceProject!;
+                const main = project.files.find((file) => file.path === project.sources[0]) ?? project.files[0];
+                update('sourceProject', null);
+                update('starterCode', main?.content ?? '');
+              }
+            }}
+          />
+        ) : null}
+        {draft.sourceProject && isCompiledLanguage(draft.language) ? (
+          <ProjectEditor
+            editable={editable}
+            language={draft.language as 'C' | 'CPP'}
+            project={draft.sourceProject}
+            onChange={(project) => {
+              update('sourceProject', project);
+              update('starterCode', starterBundleFor(project));
+            }}
+          />
+        ) : (
+          <StarterCodeEditor
+            editable={editable}
+            language={draft.language}
+            onChange={(starterCode) => update('starterCode', starterCode)}
+            value={draft.starterCode}
+          />
+        )}
         <SubmissionPolicyEditor draft={draft} editable={editable} onChange={policy => update('submissionPolicy', policy)} onAssessmentChange={value => update('manualAssessment', value)} />
         {(draft.submissionPolicy ?? 'AUTOMATIC') === 'AUTOMATIC' ? <div data-testid="grading-cases">        <AnswersEditor
           editable={editable}
@@ -146,5 +183,43 @@ export function ExerciseWorkspace({
       ) : null}
     </div>
     </ExerciseImageProvider>
+  );
+}
+
+/**
+ * A problem's own code as a project's start: an untouched template becomes
+ * Elice's three-file example, anything an author wrote becomes `main.c` (or
+ * `main.cpp`), compiled and open.
+ */
+function projectFromStarter(starterCode: string, language: CompiledLanguage): ExerciseProject {
+  if (!starterCode.trim() || starterCode === compiledStarterTemplates[language]) return projectTemplate(language);
+  const path = language === 'C' ? 'main.c' : 'main.cpp';
+  return {
+    version: 1,
+    files: [{ path, content: starterCode, readOnly: false, hidden: false, openByDefault: true }],
+    sources: [path],
+    includeLearnerSources: false,
+    fileTree: 'CLOSED',
+  };
+}
+
+function FileModeSwitch({ multiple, editable, onChange }: { multiple: boolean; editable: boolean; onChange: (multiple: boolean) => void }) {
+  const { t } = useTranslation('exercise-files');
+  return (
+    <div role="radiogroup" aria-label={t('title')} className="inline-flex rounded-lg border border-border bg-card p-1 text-sm">
+      {[false, true].map((value) => (
+        <button
+          key={String(value)}
+          type="button"
+          role="radio"
+          aria-checked={multiple === value}
+          disabled={!editable}
+          onClick={() => multiple !== value && onChange(value)}
+          className={`rounded-md px-3 py-1.5 font-semibold ${multiple === value ? 'bg-brand text-on-brand' : 'text-sub hover:text-text'}`}
+        >
+          {t(value ? 'multiple' : 'single')}
+        </button>
+      ))}
+    </div>
   );
 }

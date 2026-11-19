@@ -1,4 +1,4 @@
-import { compiledStarterTemplates, isCompiledLanguage, parseGccDiagnostics, type ExerciseLanguage } from '@cove/shared';
+import { compiledStarterTemplates, decodeFileBundle, isCompiledLanguage, isCompiledSource, parseGccDiagnostics, type ExerciseLanguage, type LearnerProject } from '@cove/shared';
 
 import type { MonacoCodeEditor } from '@/lib/monitoring/yjs-monaco';
 
@@ -18,8 +18,27 @@ export function sourceFileName(language: ExerciseLanguage | undefined): string {
   return language === 'C' ? 'main.c' : language === 'CPP' ? 'main.cpp' : 'main.py';
 }
 
-/** The command a Run banner shows, as Elice's runner script reads. */
-export function runCommandFor(language: ExerciseLanguage | undefined): string {
+/**
+ * The command a Run banner shows, as Elice's runner script reads. A
+ * multi-file exercise names the files it compiles: the author's compiled
+ * files, then the learner's own when the problem compiles them.
+ */
+export function runCommandFor(
+  language: ExerciseLanguage | undefined,
+  project?: { project: LearnerProject; code: string } | null,
+): string {
+  if (project && (language === 'C' || language === 'CPP')) {
+    const authored = new Set(project.project.files.map((file) => file.path));
+    const sources = [
+      ...project.project.files.filter((file) => file.compiled).map((file) => file.path),
+      ...(project.project.includeLearnerSources
+        ? (decodeFileBundle(project.code) ?? [])
+          .map((file) => file.path)
+          .filter((path) => !authored.has(path) && isCompiledSource(path, language))
+        : []),
+    ];
+    return `${language === 'C' ? 'gcc' : 'g++'} ${sources.join(' ')} -o main && ./main`;
+  }
   return language === 'C'
     ? 'gcc main.c -o main && ./main'
     : language === 'CPP'

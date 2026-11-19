@@ -1,4 +1,6 @@
 'use client';
+import { isFileBundle } from '@cove/shared';
+import { MultiFileEditor } from '@/components/editor/multi-file-editor';
 import { ProgrammingGradingPanel } from '@/components/programming-review/grading-panel';
 import { monacoLanguageFor } from '@/lib/workspace/exercise-language';
 import { QuizFeedback } from '@/components/workspace/quiz-feedback';
@@ -48,7 +50,7 @@ export function SubmissionReview({
 
   if (review.manualAssessment) return <div className="grid gap-5 p-4 lg:grid-cols-2">
     <section className="min-w-0 space-y-3"><h1 className="text-lg font-bold">{review.problemTitle}</h1><p className="text-sm text-sub">{review.studentName} · {formatDateTime(review.createdAt, locale, true)}</p>
-      <div className="h-[32rem] overflow-hidden rounded-xl border border-border"><MonacoEditor beforeMount={registerPaircodeTheme} height="100%" language={monacoLanguageFor(review.language)} theme="paircode-dark" value={review.code} options={{readOnly: true, domReadOnly: true, minimap: {enabled: false}, automaticLayout: true, fontSize: 14}}/></div>
+      <div className="flex h-[32rem] flex-col overflow-hidden rounded-xl border border-border">{isFileBundle(review.code) && (review.language === 'C' || review.language === 'CPP') ? <MultiFileEditor code={review.code} fontSize={14} language={review.language} /> : <MonacoEditor beforeMount={registerPaircodeTheme} height="100%" language={monacoLanguageFor(review.language)} theme="paircode-dark" value={review.code} options={{readOnly: true, domReadOnly: true, minimap: {enabled: false}, automaticLayout: true, fontSize: 14}}/>}</div>
     </section>
     <ProgrammingGradingPanel key={review.submissionId} academyId={academyId} classId={classId} submissionId={review.submissionId} initial={review.manualAssessment} canPublish={review.canPublishManualReview ?? false}/>
   </div>;
@@ -132,8 +134,10 @@ export function SubmissionReview({
           <h2 className="border-b border-border bg-card px-4 py-2.5 text-[13px] font-bold">
             {t('progress.review.code_heading')}
           </h2>
-          <div className="h-[26rem]">
-            <MonacoEditor
+          <div className="flex h-[26rem] flex-col">
+            {isFileBundle(review.code) && (review.language === 'C' || review.language === 'CPP') ? (
+              <MultiFileEditor code={review.code} fontSize={13} language={review.language} />
+            ) : <MonacoEditor
               beforeMount={registerPaircodeTheme}
               height="100%"
               language={monacoLanguageFor(review.language)}
@@ -155,7 +159,7 @@ export function SubmissionReview({
               }}
               theme="paircode-dark"
               value={review.code}
-            />
+            />}
           </div>
         </section>}
 

@@ -30,7 +30,7 @@ const db = new PrismaService(new ConfigService({ DATABASE_URL: database.href }))
 const ownership = await db.$queryRawUnsafe('SELECT fixture_id FROM native_qualification_fixture');
 if (ownership.length !== 1 || ownership[0].fixture_id !== process.env.COVE_NATIVE_FIXTURE_ID)
   throw Error('Disposable database ownership mismatch');
-const ids = Object.fromEntries(['organization', 'academy', 'manager', 'teacher', 'student', 'course', 'module', 'lecture', 'courseCpp', 'moduleCpp', 'lectureCpp', 'class', 'C', 'CPP', 'CPP10'].map(k => [k, randomUUID()]));
+const ids = Object.fromEntries(['organization', 'academy', 'manager', 'teacher', 'student', 'course', 'module', 'lecture', 'courseCpp', 'moduleCpp', 'lectureCpp', 'class', 'C', 'CPP', 'CPP10', 'MULTI'].map(k => [k, randomUUID()]));
 const identities = Object.fromEntries(['manager', 'teacher', 'student'].map(role => [role, { id: ids[role], authId: randomUUID() }]));
 const slug = 'cpp-local-' + ids.academy.slice(0, 8);
 await db.organization.create({ data: { id: ids.organization, name: 'Disposable C/C++ acceptance', slug } });
@@ -68,6 +68,28 @@ for (const [index, [key, language, count]] of [['C', 'C', 2], ['CPP', 'CPP', 2],
       })) } } },
   } });
 }
+// Elice's DC-C-1 Week 9 practice: main.cpp with sum.c (compiled as C++) and
+// a read-only sum.h; a hidden file the learner never sees is compiled too.
+const multiFiles = [
+  { path: 'main.cpp', content: '#include <cstdio>\n#include "sum.h"\n\nint main() {\n    int a, b;\n    if (scanf("%d %d", &a, &b) != 2) return 1;\n    printf("%d\\n", sum(a, b));\n    return 0;\n}\n', readOnly: false, hidden: false, openByDefault: true },
+  { path: 'sum.c', content: '#include "sum.h"\n\nint sum(int a, int b) {\n    /* Write your code here. */\n    return 0;\n}\n', readOnly: false, hidden: false, openByDefault: true },
+  { path: 'sum.h', content: '#ifndef SUM_H\n#define SUM_H\nint sum(int a, int b);\n#endif\n', readOnly: true, hidden: false, openByDefault: true },
+  { path: 'checks.c', content: 'int cove_hidden_marker(void) { return 0; }\n', readOnly: false, hidden: true, openByDefault: false },
+];
+const multiProject = { version: 1, files: multiFiles, sources: ['main.cpp', 'sum.c', 'checks.c'], includeLearnerSources: false, fileTree: 'OPEN' };
+const bundle = files => files.map(file => `//@cove-file ${file.path}\n${file.content}`).join('\n');
+const multiStarter = bundle(multiFiles.filter(file => !file.hidden));
+sources.MULTI = bundle(multiFiles.filter(file => !file.hidden).map(file => file.path === 'sum.c' ? { ...file, content: '#include "sum.h"\n\nint sum(int a, int b) {\n    return a + b;\n}\n' } : file));
+await db.material.create({ data: { id: ids.MULTI, lectureId: ids.lectureCpp, title: 'Sum in three files', type: 'PROGRAMMING_EXERCISE', position: 4, isVisible: true,
+  programmingExercise: { create: { externalKey: randomUUID(), language: 'CPP', difficulty: 'EASY', description: '<p>Write <code>sum</code> in <code>sum.c</code>. <code>main.cpp</code> reads two integers and prints their sum.</p>',
+    starterCode: multiStarter, sourceProject: multiProject, solutionCode: sources.MULTI,
+    timeLimitMs: 1000, memoryLimitMb: 512, gradingMode: 'ELICE_STDIO', gradingSemanticVersion: 'elice-v1', continuationPolicy: 'CONTINUE_WITHIN_BUDGET', exitStatusPolicy: 'FAIL_ON_RUNTIME_ERROR', totalTimeLimitMs: 60000, comparatorTimeLimitMs: 100,
+    materialMaximumHundredths: 10000, materialScorePolicy: 'PROPORTIONAL', solutions: { create: { position: 1, code: sources.MULTI } },
+    testCases: { create: [
+      { position: 1, input: '4 6\n', expectedOutput: '10', visibility: 'SAMPLE', weight: 1 },
+      { position: 2, input: '3 5\n', expectedOutput: '8', visibility: 'HIDDEN', weight: 1 },
+    ] } } },
+} });
 await db.$disconnect();
 const provider = nextAuthFixture(studio);
 const auth = Object.fromEntries(Object.entries(identities).map(([role, user]) => [role, provider.storageState(user, providerOrigin)]));
@@ -92,7 +114,7 @@ async function handlePlayground(request, response, url) {
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Local C and C++ Practice</title>
 <body style="font:17px/1.6 system-ui;max-width:760px;margin:60px auto;padding:0 24px;color:#172033;background:#f5f7fb">
 <h1>C and C++ Practice</h1><p>Your local Cove course is ready. Choose a problem to sign in as the student. No password is needed.</p>
-<ul><li><a href="/playground/login?role=student&problem=C">C — Add two numbers</a></li><li><a href="/playground/login?role=student&problem=CPP">C++ — Add two numbers</a></li><li><a href="/playground/login?role=student&problem=CPP10">C++ — Ten test cases</a></li></ul>
+<ul><li><a href="/playground/login?role=student&problem=C">C — Add two numbers</a></li><li><a href="/playground/login?role=student&problem=CPP">C++ — Add two numbers</a></li><li><a href="/playground/login?role=student&problem=CPP10">C++ — Ten test cases</a></li><li><a href="/playground/login?role=student&problem=MULTI">C++ — Sum in three files (main.cpp, sum.c, sum.h)</a></li></ul>
 <p>The starter code already works. Enter <code>40 2</code> in <strong>Program input</strong>, click <strong>Run</strong>, and expect <code>42</code>. Then try <strong>Test run</strong> and <strong>Submit</strong>.</p>
 <p>To try a compiler error, remove a semicolon. To try a runtime error, replace the code with <code>int main(void) { return 3; }</code>. Reset restores the working starter code.</p>
 <p><a href="/playground/login?role=teacher">Open the teacher's class</a> · <a href="/playground/login?role=manager">Open course authoring as manager</a></p>
@@ -105,7 +127,7 @@ async function handlePlayground(request, response, url) {
   const state = provider.storageState(identities[role], providerOrigin);
   if (role === 'student') await beginStudent(state);
   response.setHeader('Set-Cookie', state.cookies.map(cookie => `${cookie.name}=${cookie.value}; Path=/; SameSite=Lax; Max-Age=3600`));
-  const problem = ['C', 'CPP', 'CPP10'].includes(url.searchParams.get('problem')) ? url.searchParams.get('problem') : 'C';
+  const problem = ['C', 'CPP', 'CPP10', 'MULTI'].includes(url.searchParams.get('problem')) ? url.searchParams.get('problem') : 'C';
   const target = role === 'student' ? `/academy/${slug}/learn/exercises/${ids[problem]}?classId=${ids.class}`
     : role === 'teacher' ? `/academy/${slug}/teach/classes/${ids.class}/progress`
     : `/academy/${slug}/content/courses/${ids.course}`;

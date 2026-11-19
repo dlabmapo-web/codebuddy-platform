@@ -120,5 +120,26 @@
     "failed_title": "This activity could not be loaded",
     "failed_body": "Something went wrong while loading. Try again. Your saved work has not been changed.",
     "back": "Back to learning"
+  },
+  "source_files": {
+    "files": "Files",
+    "show_files": "Show files",
+    "hide_files": "Hide files",
+    "new_file": "New file",
+    "create": "Create",
+    "rename": "Rename",
+    "delete": "Delete",
+    "delete_confirm": "Delete {{path}}?",
+    "close_tab": "Close {{path}}",
+    "read_only": "This file is read-only.",
+    "not_compiled": "Not compiled",
+    "not_compiled_hint": "Not part of the build. Only the problem's own files are compiled.",
+    "reset_file": "Reset file",
+    "reset_file_confirm": "Discard your changes to {{path}}?",
+    "error_invalid": "Use letters, digits, _ - . and one of: {{extensions}}",
+    "error_duplicate": "That name is taken.",
+    "has_errors": "Has errors",
+    "upload": "Upload files",
+    "upload_skipped": "Not added: {{names}}"
   }
 }

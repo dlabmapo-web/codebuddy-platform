@@ -37,6 +37,7 @@ import { useEditorPreferences } from '@/lib/workspace/use-editor-preferences';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
 import { languageLabelKey } from '@/lib/workspace/exercise-language';
 import { LanguageTag } from '@/components/workspace/language-tag';
+import { isFileBundle } from '@cove/shared';
 import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
 import {
   STATEMENT_CANVAS_MIN_WIDTH,
@@ -646,6 +647,7 @@ export function LiveWorkspace({
                     language={shownLanguage}
                     readOnly={!live.canEditCode || !display.isLive}
                     text={live.text}
+                    multiFile={isFileBundle(liveExercise?.exercise.starterCode ?? '')}
                   />
                 )}
               </div>

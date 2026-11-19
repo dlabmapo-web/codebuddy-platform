@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 
 import { orpc } from '@/lib/orpc';
+import { coerceToBundle } from '@/lib/workspace/file-bundle';
 import { registerDraftFlush } from '@/lib/session/draft-flush';
 
 import {
@@ -84,16 +85,17 @@ export function useDraftAutosave({
     () => toSharedDocumentText(starterCode),
     [starterCode],
   );
+  // A draft from before the problem had several files becomes its bundle.
   const canonicalServerDraft = React.useMemo(
     () =>
       serverDraft
-        ? { ...serverDraft, code: toSharedDocumentText(serverDraft.code) }
+        ? { ...serverDraft, code: coerceToBundle(toSharedDocumentText(serverDraft.code), canonicalStarter) }
         : null,
-    [serverDraft],
+    [serverDraft, canonicalStarter],
   );
   const canonicalHistorical = React.useMemo(
-    () => (historicalCode === null ? null : toSharedDocumentText(historicalCode)),
-    [historicalCode],
+    () => (historicalCode === null ? null : coerceToBundle(toSharedDocumentText(historicalCode), canonicalStarter)),
+    [historicalCode, canonicalStarter],
   );
 
   const [code, setCodeState] = React.useState(

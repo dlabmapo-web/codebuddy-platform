@@ -1,5 +1,6 @@
 'use client';
-import type { ExerciseLanguage, ExerciseSolutionEntry } from '@cove/shared';
+import { isFileBundle, type ExerciseLanguage, type ExerciseSolutionEntry } from '@cove/shared';
+import { MultiFileEditor } from '@/components/editor/multi-file-editor';
 import dynamic from 'next/dynamic';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,8 +32,8 @@ export function SolutionAnswerBlock({ solution, index, fontSize, language }: { s
         catch { setCopied(false); setFailed(true); }
       }}>{copied ? tm('answer.copied') : tm('answer.copy')}</button>
     </div>
-    <div className="h-[280px] overflow-hidden rounded-xl border border-border">
-      {visible && <MonacoEditor beforeMount={registerPaircodeTheme} height="280px" language={monacoLanguageFor(language)} theme="paircode-dark" value={solution.code}
+    <div className="flex h-[280px] flex-col overflow-hidden rounded-xl border border-border">
+      {visible && isFileBundle(solution.code) && (language === 'C' || language === 'CPP') ? <MultiFileEditor code={solution.code} fontSize={fontSize} language={language} /> : visible && <MonacoEditor beforeMount={registerPaircodeTheme} height="280px" language={monacoLanguageFor(language)} theme="paircode-dark" value={solution.code}
         options={{ ariaLabel: t('answer', { number: index + 1 }), automaticLayout: true, fontFamily: EDITOR_FONT_FAMILY, fontSize, lineNumbers: 'on', minimap: { enabled: false }, readOnly: true, scrollBeyondLastLine: false, tabSize: 4, wordWrap: 'off' }} />}
     </div>
     {failed && <p role="alert" className="text-sm text-danger">{tm('answer.copy_failed')}</p>}

@@ -2,7 +2,7 @@ import { defaultEliceGradingProfile, defaultExerciseLanguage, inferSubmissionPol
 
 import { starterAfterLanguageChange } from '@/lib/workspace/exercise-language';
 
-import type { ExerciseSolutionEntry } from "@cove/shared";
+import type { ExerciseProject, ExerciseSolutionEntry } from "@cove/shared";
 import { exerciseSolutionsSchema } from "@cove/shared";
 import {
   quizDefinitionSchema,
@@ -79,6 +79,11 @@ export type ExerciseDraft = {
   outputFormat: string;
   constraints: string;
   starterCode: string;
+  /**
+   * A multi-file C/C++ problem's files; null for one file. While set,
+   * `starterCode` is its visible files' bundle, as the server derives it.
+   */
+  sourceProject?: ExerciseProject | null;
   /** Python, or C/C++ compiled on the native GCC runtime. */
   language: ExerciseLanguage;
   solutions: ExerciseSolutionEntry[];
@@ -114,6 +119,7 @@ export function contextToDraft(
       outputFormat: '',
       constraints: '',
       starterCode: '',
+      sourceProject: null,
       language: 'PYTHON',
       solutions: solutions.length ? solutions : [{ title: null, code: '' }],
       aiFeedbackEnabled: false,
@@ -137,6 +143,7 @@ export function contextToDraft(
     outputFormat: exercise.outputFormat,
     constraints: exercise.constraints,
     starterCode: exercise.starterCode,
+    sourceProject: exercise.sourceProject ?? null,
     language: exercise.language,
     solutions: exercise.quiz ? [] : solutions.length ? solutions : [{ title: null, code: '' }],
     aiFeedbackEnabled: exercise.aiFeedbackEnabled,
@@ -177,7 +184,10 @@ export function contextToDraft(
  * language's template, and anything an author wrote stays.
  */
 export function withLanguage(draft: ExerciseDraft, language: ExerciseLanguage): ExerciseDraft {
-  const next = { ...draft, language, starterCode: starterAfterLanguageChange(draft.starterCode, language) };
+  // Python has no projects; between C and C++ the files stay, and any name the
+  // new language cannot compile is reported in the file editor.
+  const next = { ...draft, language, starterCode: draft.sourceProject && isCompiledLanguage(language) ? draft.starterCode : starterAfterLanguageChange(draft.sourceProject ? '' : draft.starterCode, language),
+    sourceProject: isCompiledLanguage(language) ? draft.sourceProject : null };
   if (!isCompiledLanguage(language)) return next;
   return {
     ...next,
@@ -210,6 +220,8 @@ export function draftToPayload(draft: ExerciseDraft) {
     outputFormat: draft.outputFormat,
     constraints: draft.constraints,
     starterCode: draft.starterCode,
+    // Always sent for C and C++, so turning a project off really removes it.
+    ...(!draft.quiz && isCompiledLanguage(draft.language) ? { sourceProject: draft.sourceProject ?? null } : {}),
     // Checked by the server against the course: C or C++ in a C/C++ course.
     ...(draft.quiz ? {} : { language: draft.language }),
     solutions: draft.quiz ? [] : (draft.referencePdfMaterialId || draft.submissionPolicy === "MANUAL_REVIEW") ? draft.solutions.filter(solution => solution.code.trim() || solution.title?.trim()) : draft.solutions,

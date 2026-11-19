@@ -120,5 +120,26 @@
     "failed_title": "학습 자료를 불러오지 못했습니다",
     "failed_body": "불러오는 중 문제가 발생했습니다. 다시 시도해 주세요. 저장된 학습 내용은 변경되지 않았습니다.",
     "back": "학습으로 돌아가기"
+  },
+  "source_files": {
+    "files": "파일",
+    "show_files": "파일 보기",
+    "hide_files": "파일 숨기기",
+    "new_file": "새 파일",
+    "create": "만들기",
+    "rename": "이름 바꾸기",
+    "delete": "삭제",
+    "delete_confirm": "{{path}} 파일을 삭제할까요?",
+    "close_tab": "{{path}} 닫기",
+    "read_only": "읽기 전용 파일입니다.",
+    "not_compiled": "컴파일 안 됨",
+    "not_compiled_hint": "빌드에 포함되지 않습니다. 문제에 있는 파일만 컴파일됩니다.",
+    "reset_file": "파일 초기화",
+    "reset_file_confirm": "{{path}}의 변경 내용을 지울까요?",
+    "error_invalid": "영문, 숫자, _ - . 와 다음 확장자를 사용하세요: {{extensions}}",
+    "error_duplicate": "같은 이름의 파일이 있습니다.",
+    "has_errors": "오류 있음",
+    "upload": "파일 올리기",
+    "upload_skipped": "추가하지 못함: {{names}}"
   }
 }

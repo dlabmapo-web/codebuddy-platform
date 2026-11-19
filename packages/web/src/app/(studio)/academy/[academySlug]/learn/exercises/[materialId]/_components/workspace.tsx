@@ -398,7 +398,7 @@ function ProgrammingWorkspace({
       setCompileMarks(null);
       const result = await runInteractive(
         draft.code,
-        runCommandFor(exercise.language),
+        runCommandFor(exercise.language, exercise.project ? { project: exercise.project, code: draft.code } : null),
         {
           academyId,
           classId,
@@ -454,7 +454,7 @@ function ProgrammingWorkspace({
             .join('')
         : outcome.stdout,
     });
-  }, [academyId, classId, compiled, draft.code, exercise.gradingRevision, exercise.language, exercise.materialId, formatError, monitoring, runInteractive, runner]);
+  }, [academyId, classId, compiled, draft.code, exercise.gradingRevision, exercise.language, exercise.materialId, exercise.project, formatError, monitoring, runInteractive, runner]);
 
   /**
    * The mark lives exactly as long as the error does: a new run clears
@@ -463,9 +463,10 @@ function ProgrammingWorkspace({
   const marks = compileMarks?.materialId === exercise.materialId ? compileMarks.diagnostics : null;
   React.useEffect(() => {
     const editor = editorRef.current;
-    if (!editor || !editorReady) return;
+    // A multi-file editor marks each file itself, from the same messages.
+    if (!editor || !editorReady || exercise.project) return;
     return markCompileDiagnostics(editor, marks);
-  }, [editorReady, marks]);
+  }, [editorReady, marks, exercise.project]);
 
   const runnerError = runner.lastError;
   React.useEffect(() => {
@@ -767,11 +768,14 @@ function ProgrammingWorkspace({
                 monitoring.markActive();
                 draft.setCode(value);
               }}
-              onEditorMount={(editor) => {
+              onEditorMount={(editor, host) => {
                 editorRef.current = editor;
                 setEditorReady(true);
-                monitoring.registerEditor(editor);
+                monitoring.registerEditor(editor, host);
               }}
+              project={exercise.project ?? null}
+              starterCode={exercise.starterCode}
+              compileDiagnostics={marks}
               onFocusLine={handleFocusLine}
               onRun={() => void handleRun()}
               onRunSample={(index) => void handleRunSample(index)}

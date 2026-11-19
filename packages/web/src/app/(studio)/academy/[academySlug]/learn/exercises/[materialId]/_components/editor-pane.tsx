@@ -1,6 +1,6 @@
 'use client';
 
-import { isCompiledLanguage, type ExerciseLanguage, type LearnSampleTestCase } from '@cove/shared';
+import { isCompiledLanguage, type ExerciseLanguage, type LearnerProject, type LearnSampleTestCase } from '@cove/shared';
 import { RotateCcw, Send } from 'lucide-react';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +21,9 @@ import { useSplitPane } from '@/lib/workspace/use-split-pane';
 
 import type { SubmissionState } from '../_hooks/use-submission';
 import type { OnMount } from '@monaco-editor/react';
+
+import { MultiFileEditor } from '@/components/editor/multi-file-editor';
+import type { BundleHost } from '@/lib/monitoring/yjs-bundle';
 
 import { CodeEditor } from './code-editor';
 import { ErrorCoachPanel } from './error-coach-panel';
@@ -53,6 +56,9 @@ export function EditorPane({
   onFocusLine,
   serverCheck,
   language = 'PYTHON',
+  project = null,
+  starterCode,
+  compileDiagnostics = null,
 }: {
   onRunAll: () => void;
   onStop: () => void;
@@ -67,8 +73,11 @@ export function EditorPane({
   code: string;
   collaborating?: boolean;
   onCodeChange: (value: string) => void;
-  /** Lets live collaboration bind to the very model the student is typing in. */
-  onEditorMount?: (editor: Parameters<OnMount>[0]) => void;
+  /**
+   * Lets live collaboration bind to the very model the student is typing in;
+   * a multi-file exercise adds the host its files bind through.
+   */
+  onEditorMount?: (editor: Parameters<OnMount>[0], host?: BundleHost) => void;
   runner: PythonRunnerState;
   submission: SubmissionState;
   sampleTestCases: LearnSampleTestCase[];
@@ -82,7 +91,12 @@ export function EditorPane({
   /** A sample check judged on the server, which Stop must reach too. */
   serverCheck?: { active: boolean; stopping: boolean; stop: () => void };
   language?: ExerciseLanguage;
-  /** C/C++ only: the input a server Run sends, owned by the workspace. */
+  /** A multi-file C/C++ exercise: `code` is then its file bundle. */
+  project?: LearnerProject | null;
+  /** The starting code, for resetting one file of a project. */
+  starterCode?: string;
+  /** GCC's latest messages, which a multi-file editor marks per file. */
+  compileDiagnostics?: string | null;
 }) {
   const compiled = isCompiledLanguage(language);
   const { t } = useLayoutTranslation(['learn', 'common']);
@@ -121,14 +135,30 @@ export function EditorPane({
       {/* Named so a watching teacher's pointer can be drawn over the same
           pane on their screen, whatever size they have dragged it to. */}
       <div className="flex min-h-0 flex-1 flex-col" {...surfaceProps('editor')}>
-        <CodeEditor
-          code={code}
-          documentManaged={collaborating}
-          fontSize={preferences.fontSize}
-          language={monacoLanguageFor(language)}
-          onChange={onCodeChange}
-          onMount={onEditorMount}
-        />
+        {project && compiled ? (
+          <MultiFileEditor
+            code={code}
+            diagnostics={compileDiagnostics}
+            documentManaged={collaborating}
+            fontSize={preferences.fontSize}
+            language={language as 'C' | 'CPP'}
+            onChange={onCodeChange}
+            onMount={onEditorMount}
+            project={project}
+            starterCode={starterCode}
+          />
+        ) : (
+          <CodeEditor
+            code={code}
+            documentManaged={collaborating}
+            fontSize={preferences.fontSize}
+            language={monacoLanguageFor(language)}
+            onChange={onCodeChange}
+            // Monaco's mount passes its namespace second; only a multi-file
+            // editor hands over a host, so the single file passes the editor alone.
+            onMount={onEditorMount ? (editor) => onEditorMount(editor) : undefined}
+          />
+        )}
       </div>
 
       <div

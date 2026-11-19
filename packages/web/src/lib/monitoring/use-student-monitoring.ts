@@ -18,6 +18,7 @@ import type { TerminalEvent } from '@/lib/workspace/use-python-runner';
 import { expiresWhenIdle } from './awareness/pointer-lifecycle';
 import { useAwareness } from './awareness/use-awareness';
 import { bindYTextToMonaco, type MonacoCodeEditor, type YjsMonacoBinding } from './yjs-monaco';
+import { bindYTextToBundle, type BundleHost } from './yjs-bundle';
 import { useStudentPresence } from './student-presence';
 import { useTerminalMirrorPublisher } from './use-terminal-mirror-publisher';
 
@@ -168,6 +169,8 @@ export function useStudentMonitoring({
   // through a ref rather than closed over.
   const docRef = React.useRef(doc);
   const editorRef = React.useRef<MonacoCodeEditor | null>(null);
+  /** A multi-file exercise's files, which bind as one bundle rather than one model. */
+  const bundleHostRef = React.useRef<BundleHost | null>(null);
   const bindingRef = React.useRef<YjsMonacoBinding | null>(null);
   /** Whether this session's authoritative snapshot has arrived. */
   const syncedRef = React.useRef(false);
@@ -285,10 +288,13 @@ export function useStudentMonitoring({
     }
     const firstHandoff = !handedOffRef.current.has(current.draftId);
     handedOffRef.current.add(current.draftId);
-    bindingRef.current = bindYTextToMonaco(docRef.current.getText('code'), editor, {
-      seed: firstHandoff && seedFromModelRef.current ? 'model' : 'text',
-      pointerIdentity: { draftId: current.draftId, material: current.materialId },
-    });
+    const seed = firstHandoff && seedFromModelRef.current ? 'model' : 'text';
+    bindingRef.current = bundleHostRef.current
+      ? bindYTextToBundle(docRef.current.getText('code'), bundleHostRef.current, { seed })
+      : bindYTextToMonaco(docRef.current.getText('code'), editor, {
+        seed,
+        pointerIdentity: { draftId: current.draftId, material: current.materialId },
+      });
     publish({ ...current, phase: 'bound' });
     // The presence socket starts as resynchronizing. A validated document and
     // editor binding complete that handshake; otherwise the student's pointer
@@ -700,8 +706,10 @@ export function useStudentMonitoring({
       session.materialId === materialId ? session.materialId : null,
     /** Handed to the editor so collaboration can bind to the live model. */
     registerEditor: React.useCallback(
-      (instance: MonacoCodeEditor) => {
+      (instance: MonacoCodeEditor, host?: BundleHost) => {
         editorRef.current = instance;
+        // Only a real bundle host binds as files; anything else is one model.
+        bundleHostRef.current = host && typeof host.apply === 'function' && typeof host.read === 'function' ? host : null;
         setEditor(instance);
         // The snapshot may already be here: whichever arrived second binds.
         bindIfReady();

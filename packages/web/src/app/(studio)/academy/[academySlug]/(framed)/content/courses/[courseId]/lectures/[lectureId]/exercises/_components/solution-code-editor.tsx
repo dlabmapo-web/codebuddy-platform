@@ -3,7 +3,10 @@
 import { exerciseSolutionEntrySchema, exerciseSolutionsSchema, type ExerciseLanguage, type ExerciseSolutionEntry } from '@cove/shared';
 import { BadgeCheck } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { isFileBundle } from '@cove/shared';
+import { MultiFileEditor } from '@/components/editor/multi-file-editor';
+import { coerceToBundle } from '@/lib/workspace/file-bundle';
 import { useTranslation } from 'react-i18next';
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 import { monacoLanguageFor } from '@/lib/workspace/exercise-language';
@@ -12,11 +15,13 @@ import { SectionCard } from './authoring-fields';
 
 const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), { ssr: false });
 
-export function SolutionCodeEditor({ value, onChange, error, language = 'PYTHON' }: {
+export function SolutionCodeEditor({ value, onChange, error, language = 'PYTHON', starterBundle = null }: {
   value: ExerciseSolutionEntry[];
   onChange: (value: ExerciseSolutionEntry[]) => void;
   error: string | null;
   language?: ExerciseLanguage;
+  /** A multi-file problem's starting files: each answer is then a set of files. */
+  starterBundle?: string | null;
 }) {
   const { t } = useTranslation('solutions');
   const { t: common } = useLayoutTranslation('common');
@@ -26,6 +31,12 @@ export function SolutionCodeEditor({ value, onChange, error, language = 'PYTHON'
   const current = useRef(value);
   const currentKeys = useRef(keys);
   useLayoutEffect(() => { current.current = value; currentKeys.current = keys; }, [value, keys]);
+  // A multi-file problem's answers are file sets, starting from its files; an
+  // answer written for one file keeps its text as the first source.
+  useEffect(() => {
+    if (!starterBundle || current.current.every(entry => isFileBundle(entry.code))) return;
+    commit(current.current.map(entry => isFileBundle(entry.code) ? entry : { ...entry, code: coerceToBundle(entry.code, starterBundle) }));
+  }, [starterBundle]); // eslint-disable-line react-hooks/exhaustive-deps
   function commit(entries: ExerciseSolutionEntry[], entryKeys = currentKeys.current) {
     current.current = entries;
     currentKeys.current = entryKeys;
@@ -62,11 +73,13 @@ export function SolutionCodeEditor({ value, onChange, error, language = 'PYTHON'
         <label className="block text-sm">{t('name')}
           <input className="mt-1 w-full rounded-lg border border-border bg-canvas px-3 py-2" maxLength={80} value={entry.title ?? ''} onChange={event => change(keys[index], { title: event.target.value || null })} />
         </label>
-        <div className="overflow-hidden rounded-lg border border-border">
-          <MonacoEditor loading={common('state.loading')} beforeMount={registerPaircodeTheme} height="280px" language={monacoLanguageFor(language)} theme="paircode-dark" value={entry.code}
+        <div className="flex h-[320px] flex-col overflow-hidden rounded-lg border border-border">
+          {starterBundle && isFileBundle(entry.code) && (language === 'C' || language === 'CPP') ? (
+            <MultiFileEditor code={entry.code} fontSize={13} language={language} onChange={code => change(keys[index], { code })} />
+          ) : <MonacoEditor loading={common('state.loading')} beforeMount={registerPaircodeTheme} height="280px" language={monacoLanguageFor(language)} theme="paircode-dark" value={entry.code}
             onMount={editor => { if (focusNew.current && index === value.length - 1) { editor.focus(); focusNew.current = false; } }}
             onChange={code => change(keys[index], { code: code ?? '' })}
-            options={{ ariaLabel: t('answer', { number: index + 1 }), automaticLayout: true, fontFamily: EDITOR_FONT_FAMILY, fontSize: 13, lineNumbers: 'on', minimap: { enabled: false }, scrollBeyondLastLine: false, tabSize: 4, wordWrap: 'off' }} />
+            options={{ ariaLabel: t('answer', { number: index + 1 }), automaticLayout: true, fontFamily: EDITOR_FONT_FAMILY, fontSize: 13, lineNumbers: 'on', minimap: { enabled: false }, scrollBeyondLastLine: false, tabSize: 4, wordWrap: 'off' }} />}
         </div>
         {!exerciseSolutionEntrySchema.safeParse(entry).success && <p role="alert" className="text-sm text-danger">{t('invalid')}</p>}
       </section>)}
@@ -74,7 +87,7 @@ export function SolutionCodeEditor({ value, onChange, error, language = 'PYTHON'
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       <button type="button" className={button} disabled={value.length >= 10} onClick={() => {
         focusNew.current = true;
-        commit([...current.current, { title: null, code: '' }], [...currentKeys.current, nextKey.current++]);
+        commit([...current.current, { title: null, code: starterBundle ?? '' }], [...currentKeys.current, nextKey.current++]);
       }}>{t('add')}</button>
     </div>
   </SectionCard>;

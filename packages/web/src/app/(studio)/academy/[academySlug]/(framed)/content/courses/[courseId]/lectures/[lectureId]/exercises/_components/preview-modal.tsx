@@ -1,5 +1,6 @@
 'use client';
 
+import { decodeFileBundle } from '@cove/shared';
 import { EyeOff, Info, X } from 'lucide-react';
 import * as React from 'react';
 
@@ -225,9 +226,14 @@ export function PreviewModal({
 
             {draft.starterCode.trim() ? (
               <Section title={t('exercise.preview_starter')}>
-                <pre className="overflow-x-auto rounded-lg bg-[#0f172a] px-4 py-3.5 font-mono text-[13px] leading-[1.65] text-[#e2e8f0]">
-                  {draft.starterCode}
-                </pre>
+                {(decodeFileBundle(draft.starterCode) ?? [{ path: '', content: draft.starterCode }]).map((file) => (
+                  <div key={file.path} className="space-y-1">
+                    {file.path ? <p className="font-mono text-xs font-semibold text-sub">{file.path}</p> : null}
+                    <pre className="overflow-x-auto rounded-lg bg-[#0f172a] px-4 py-3.5 font-mono text-[13px] leading-[1.65] text-[#e2e8f0]">
+                      {file.content}
+                    </pre>
+                  </div>
+                ))}
               </Section>
             ) : null}
 

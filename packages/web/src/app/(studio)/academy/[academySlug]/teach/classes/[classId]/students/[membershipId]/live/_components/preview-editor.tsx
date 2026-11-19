@@ -5,6 +5,9 @@ import { monacoLanguageFor } from '@/lib/workspace/exercise-language';
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
 
+import { isFileBundle } from '@cove/shared';
+
+import { MultiFileEditor } from '@/components/editor/multi-file-editor';
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 
 const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), {
@@ -39,6 +42,9 @@ export function PreviewEditor({
   fontSize: number;
   language?: ExerciseLanguage;
 }) {
+  if (isFileBundle(code) && (language === 'C' || language === 'CPP')) {
+    return <MultiFileEditor key={code} code={code} fontSize={fontSize} language={language} />;
+  }
   return (
     <div className="min-h-0 flex-1 bg-editor-bg">
       <MonacoEditor

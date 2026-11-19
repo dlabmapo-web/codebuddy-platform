@@ -213,6 +213,7 @@
     "description": "Use this read-only solution while checking the student's work.",
     "loading": "Loading the correct answer…",
     "copy": "Copy",
+    "copy_file": "Copy {{file}}",
     "copied": "Copied",
     "copy_failed": "The answer could not be copied. Select the code and copy it manually.",
     "close": "Close",

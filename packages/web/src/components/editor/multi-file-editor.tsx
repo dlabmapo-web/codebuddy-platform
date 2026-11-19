@@ -56,6 +56,7 @@ export function MultiFileEditor({
   onMount,
   theme = 'paircode-dark',
   initialActive,
+  onActivePathChange,
 }: {
   /** The program as a file bundle. */
   code: string;
@@ -75,6 +76,8 @@ export function MultiFileEditor({
   onMount?: (editor: MonacoCodeEditor, host: BundleHost) => void;
   theme?: 'paircode-dark' | 'light';
   initialActive?: string;
+  /** The file on screen, whenever it changes: for actions on one file, like Copy. */
+  onActivePathChange?: (path: string) => void;
 }) {
   const { t } = useLayoutTranslation('common');
   const editable = Boolean(onChange) && !readOnly;
@@ -234,6 +237,10 @@ export function MultiFileEditor({
     if (state) editor.restoreViewState(state as Parameters<MonacoCodeEditor['restoreViewState']>[0]);
     shown.current = active;
   });
+
+  React.useEffect(() => {
+    if (active) onActivePathChange?.(active);
+  }, [active, onActivePathChange]);
 
   const activeAuthor = authorFiles.get(active);
   const activeReadOnly = !editable || Boolean(activeAuthor?.readOnly);

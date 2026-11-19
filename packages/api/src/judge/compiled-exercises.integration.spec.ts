@@ -281,9 +281,11 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
     await countedCourses.update(manager, { academyId: ids.academy, courseId: spare.courseId, title: "Spare course" });
     const renameStatements = statements;
     // A language change costs the course lock and one count over a plain
-    // update; a rename's title check costs one. Exercise creation reads the
-    // language from the lock it already takes: no statement of its own.
-    expect({ changeStatements, renameStatements, createStatements }).toEqual({ changeStatements: 14, renameStatements: 13, createStatements: 22 });
+    // update; a rename's title check costs one. Both return the course's
+    // summary, which reads its library sync state (one statement, since the
+    // library course sync release). Exercise creation reads the language from
+    // the lock it already takes: no statement of its own.
+    expect({ changeStatements, renameStatements, createStatements }).toEqual({ changeStatements: 15, renameStatements: 14, createStatements: 22 });
 
     // A quiz-style problem has no code and is stored as Python, but it is a
     // problem: a course holding only one is fixed too.
@@ -393,9 +395,9 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
     });
     // Exactly a Test's admission: the material read in its snapshot transaction
     // (begin, material, exercise, lecture, test cases, module, commit), the
-    // class context (membership, enrollment, class) and the academy for native
-    // admission. Nothing grows with the number of cases.
-    expect(statements).toBe(11);
+    // class context (membership, enrollment and class in one query) and the
+    // academy for native admission. Nothing grows with the number of cases.
+    expect(statements).toBe(9);
     expect(accepted).toMatchObject({ kind: "run", status: "QUEUED", position: null });
 
     const engine = gccEngine({ run: (stdin) => ({ stdout: `${2 * Number(stdin)}\nanything at all\n`, stderr: "", outcome: "PASSED", runtimeMs: 1 }) });
@@ -485,7 +487,7 @@ describe.skipIf(!databaseUrl || !redisUrl)("C and C++ exercises, end to end", ()
       academyId: ids.academy, classId: ids.klass, materialId, code: doubling, stdin: "21\n",
       workspaceRevision: revision, clientRequestId: randomUUID(), continues: first.checkId,
     });
-    expect(statements).toBe(11);
+    expect(statements).toBe(9);
     expect(next).toMatchObject({ kind: "run", status: "QUEUED" });
     expect(await tokens()).toBe(before);
     expect(await redis.exists(`cove:sample-check:rate:continue:${userId}`)).toBe(1);

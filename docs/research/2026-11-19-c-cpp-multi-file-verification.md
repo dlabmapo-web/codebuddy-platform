@@ -35,18 +35,25 @@ The new database integration tests prove:
 - **Grading revision:** editing an editable file's start keeps the revision;
   changing a hidden file bumps it; turning the project off clears it.
 
-## Existing failures, not caused by this change
+## Earlier statement-count failures, fixed
 
-Five tests in `compiled-exercises.integration.spec.ts` fail identically
-with this branch's changes stashed:
+Five tests in `compiled-exercises.integration.spec.ts` failed on `main`
+before this branch, because their statement counts predated two other
+changes:
 
-- **Course update:** statement counts are 15 where the spec expects 14.
-- **Run admission:** statement counts are 9 where it expects 11.
-- **Cascade:** the three Run tests after them see "a sample check is already
-  running".
+- **Course update** (language change 14 → 15, rename 13 → 14): the library
+  course sync release (`562b6cc0`) added the course's sync state to the
+  course summary every update returns. That is one fixed statement, not a
+  per-row read.
+- **Run and Test admission** (11 → 9): `4d6881de` folded the class context
+  (membership, enrollment, class) into one query.
+- **Cascade:** the three Run tests after them failed only because the first
+  Run test stopped early and left a check outstanding.
 
-The multi-file Run test therefore compares against a single-file Run measured
-in the same environment, rather than a fixed number.
+The assertions and their explanations were updated. The file now passes
+17/17, and the unmodified release harness
+(`COVE_CPP_NATIVE_IMAGE=cove-native-node:multi-file bash packages/api/scripts/test-c-cpp-local.sh`)
+passes end to end: integration 17/17, then the browser 10/10.
 
 ## Real grader and browser
 

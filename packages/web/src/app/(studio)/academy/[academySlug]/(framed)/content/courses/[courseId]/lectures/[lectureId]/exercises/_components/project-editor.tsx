@@ -11,11 +11,15 @@ import {
   type ExerciseProject,
   type ExerciseProjectFile,
 } from '@cove/shared';
-import { Code2, FileCode2, Plus, Trash2, Upload } from 'lucide-react';
+import { Code2, FileCode2, MoreVertical, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { Button } from '@/components/studio/button';
+import { ChoiceSelector } from '@/components/studio/choice-selector';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/studio/overlays';
+import { Modal, ModalContent } from '@/components/studio/primitives';
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
 import { projectTemplate } from '@/lib/workspace/file-bundle';
 
@@ -26,10 +30,10 @@ const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), { ssr: false }
 /**
  * A multi-file C/C++ problem's files, for a Team Lead or Manager.
  *
- * Elice's Skeleton Code and Compile and Run Script, without the script: the
- * author lists files, marks each read-only, hidden or open at start, ticks the
- * files that are compiled, and decides whether a student's own files are
- * compiled too. The command it amounts to is shown, read-only, beside them.
+ * The author lists files, marks each read-only, hidden or open at start, ticks
+ * the files that are compiled, and decides whether a student's own files are
+ * compiled too. Each file row has a ⋮ menu for Rename and Delete. The command
+ * it amounts to is shown, read-only, below.
  */
 export function ProjectEditor({
   project,
@@ -46,6 +50,7 @@ export function ProjectEditor({
   const [selected, setSelected] = React.useState(project.files[0]?.path ?? '');
   const [adding, setAdding] = React.useState<string | null>(null);
   const [renaming, setRenaming] = React.useState<{ from: string; value: string } | null>(null);
+  const [deleting, setDeleting] = React.useState<string | null>(null);
   const current = project.files.find((file) => file.path === selected) ?? project.files[0];
   const issues = exerciseProjectIssues(project, language);
   const compiled = new Set(project.sources);
@@ -86,7 +91,7 @@ export function ProjectEditor({
     setRenaming(null);
   };
   const deleteFile = (path: string) => {
-    if (!window.confirm(t('delete_confirm', { path }))) return;
+    setDeleting(null);
     onChange({ ...project, files: project.files.filter((file) => file.path !== path), sources: project.sources.filter((source) => source !== path) });
     setSelected(project.files.find((file) => file.path !== path)?.path ?? '');
   };
@@ -121,16 +126,43 @@ export function ProjectEditor({
                       onCancel={() => setRenaming(null)}
                     />
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setSelected(file.path)}
-                      onDoubleClick={() => editable && setRenaming({ from: file.path, value: file.path })}
-                      className={`flex w-full items-center gap-1.5 px-3 py-1 text-left ${file.path === current?.path ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}
-                    >
-                      <FileCode2 aria-hidden className={`size-3.5 ${file.path.endsWith('.h') || file.path.endsWith('.hpp') ? 'text-violet-300' : 'text-sky-300'}`} />
-                      <span className={`truncate ${file.hidden ? 'italic opacity-60' : ''}`}>{file.path}</span>
-                      {compiled.has(file.path) ? <span className="ml-auto rounded bg-emerald-400/15 px-1 text-[10px] text-emerald-300">{t('compiled')}</span> : null}
-                    </button>
+                    <div className={`group flex items-center ${file.path === current?.path ? 'bg-white/10 text-white' : 'hover:bg-white/5'}`}>
+                      <button
+                        type="button"
+                        onClick={() => setSelected(file.path)}
+                        onDoubleClick={() => editable && setRenaming({ from: file.path, value: file.path })}
+                        className="flex min-w-0 flex-1 items-center gap-1.5 py-1 pl-3 pr-1 text-left"
+                      >
+                        <FileCode2 aria-hidden className={`size-3.5 shrink-0 ${file.path.endsWith('.h') || file.path.endsWith('.hpp') ? 'text-violet-300' : 'text-sky-300'}`} />
+                        <span className={`truncate ${file.hidden ? 'italic opacity-60' : ''}`}>{file.path}</span>
+                        {compiled.has(file.path) ? <span className="ml-auto shrink-0 rounded bg-emerald-400/15 px-1 text-[10px] text-emerald-300">{t('compiled')}</span> : null}
+                      </button>
+                      {editable ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={t('file_actions', { path: file.path })}
+                              className={`mr-1 grid size-6 shrink-0 place-items-center rounded text-white/60 outline-none hover:bg-white/10 hover:text-white focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand/60 data-[state=open]:bg-white/10 data-[state=open]:opacity-100 ${file.path === current?.path ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                            >
+                              <MoreVertical aria-hidden className="size-3.5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-44 text-[14px]" onCloseAutoFocus={(event) => event.preventDefault()}>
+                            <DropdownMenuItem onSelect={() => setRenaming({ from: file.path, value: file.path })}>
+                              <Pencil />{t('rename')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={project.files.length === 1}
+                              className="text-danger focus:bg-danger/10 focus:text-danger"
+                              onSelect={() => setDeleting(file.path)}
+                            >
+                              <Trash2 />{t('delete')}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : null}
+                    </div>
                   )}
                 </li>
               ))}
@@ -192,12 +224,6 @@ export function ProjectEditor({
                     <input type="checkbox" disabled={!editable} checked={compiled.has(current.path)} onChange={(event) => setCompiled(current.path, event.target.checked)} />{t('compiled')}
                   </label>
                 ) : null}
-                {editable ? (
-                  <span className="ml-auto flex items-center gap-1">
-                    <button type="button" className="rounded px-2 py-0.5 text-xs hover:bg-white/10" onClick={() => setRenaming({ from: current.path, value: current.path })}>{t('rename')}</button>
-                    <button type="button" aria-label={t('delete')} disabled={project.files.length === 1} className="rounded p-1 text-red-300 hover:bg-white/10 disabled:opacity-30" onClick={() => deleteFile(current.path)}><Trash2 className="size-3.5" /></button>
-                  </span>
-                ) : null}
               </div>
               <div className="min-h-[280px] flex-1">
                 <MonacoEditor
@@ -218,14 +244,20 @@ export function ProjectEditor({
         <div className="grid gap-3 text-sm sm:grid-cols-2">
           <label className="flex items-start gap-2">
             <input type="checkbox" className="mt-1" disabled={!editable} checked={project.includeLearnerSources} onChange={(event) => onChange({ ...project, includeLearnerSources: event.target.checked })} />
-            <span>{t('learner_sources')}<span className="block text-xs text-sub">{t('learner_sources_help')}</span></span>
+            <span>{t('learner_sources')}<span className="block text-xs text-sub">{t(project.includeLearnerSources ? 'learner_sources_on' : 'learner_sources_off')}</span></span>
           </label>
-          <label className="block">
-            <span>{t('file_tree')}</span>
-            <select className="mt-1 w-full rounded-lg border border-border bg-canvas px-3 py-2" disabled={!editable} value={project.fileTree} onChange={(event) => onChange({ ...project, fileTree: event.target.value as ExerciseFileTreeMode })}>
-              {exerciseFileTreeModes.map((mode) => <option key={mode} value={mode}>{t(`file_tree_${mode.toLowerCase() as 'closed' | 'open' | 'disabled'}`)}</option>)}
-            </select>
-          </label>
+          <div>
+            <p>{t('file_tree')}</p>
+            <ChoiceSelector
+              label={t('file_tree')}
+              className="mt-1"
+              disabled={!editable}
+              selectedId={project.fileTree}
+              list={exerciseFileTreeModes.map((mode) => ({ id: mode, name: t(`file_tree_${treeKey(mode)}`) }))}
+              onSelect={(item) => onChange({ ...project, fileTree: item.id })}
+            />
+            <p className="mt-1 text-xs text-sub">{t(`file_tree_${treeKey(project.fileTree)}_help`)}</p>
+          </div>
         </div>
 
         <div className="text-sm">
@@ -242,8 +274,21 @@ export function ProjectEditor({
           </div>
         ) : null}
       </div>
+
+      <Modal open={deleting !== null} onOpenChange={(open) => { if (!open) setDeleting(null); }}>
+        <ModalContent title={t('delete_confirm', { path: deleting ?? '' })} description={t('delete_help')}>
+          <div className="flex justify-end gap-2 px-6 py-4">
+            <Button type="button" variant="ghost" onClick={() => setDeleting(null)}>{t('cancel')}</Button>
+            <Button type="button" variant="danger" onClick={() => deleting && deleteFile(deleting)}>{t('delete')}</Button>
+          </div>
+        </ModalContent>
+      </Modal>
     </SectionCard>
   );
+}
+
+function treeKey(mode: ExerciseFileTreeMode) {
+  return mode.toLowerCase() as 'closed' | 'open' | 'disabled';
 }
 
 /** A hidden file is never read-only or open at start; the switches follow. */

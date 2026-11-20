@@ -15,6 +15,7 @@
     "progress_started_other": "문제 {{count}}개 진행 중",
     "progress_none": "아직 시작하지 않음",
     "open": "코스 열기",
+    "theory_other": "이론 {{count}}개",
     "problems_other": "문제 {{count}}개",
     "structure_other": "모듈 {{modules}} · 강의 {{lectures}}",
     "start": "시작하기",
@@ -314,7 +315,6 @@
     "resources": "보충 자료",
     "open": "열기",
     "download": "다운로드",
-    "documents_other": "{{count}} PDF",
     "unavailable": "이 PDF를 사용할 수 없습니다."
   },
   "materials": {

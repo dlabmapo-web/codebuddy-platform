@@ -16,6 +16,8 @@
     "progress_started_other": "{{count}} problems started",
     "progress_none": "Not started yet",
     "open": "Open course",
+    "theory_one": "{{count}} theory lesson",
+    "theory_other": "{{count}} theory lessons",
     "problems_one": "{{count}} problem",
     "problems_other": "{{count}} problems",
     "structure_one": "{{modules}} module · {{lectures}} lectures",
@@ -327,8 +329,6 @@
     "resources": "Resources",
     "open": "Open",
     "download": "Download",
-    "documents_one": "{{count}} PDF",
-    "documents_other": "{{count}} PDFs",
     "unavailable": "This PDF is not available."
   },
   "materials": {

@@ -4,6 +4,7 @@ import {videoMetadata} from "../videos/video-metadata.js";
 import { pdfMetadata } from "../documents/pdf-metadata.js";
 import { Injectable } from "@nestjs/common";
 import {
+  pdfIsMain,
   progressStatusFromDraft,
   type CourseLanguage,
   type ExerciseProgressStatus,
@@ -336,8 +337,10 @@ export function courseSummaryFor(
           module.lectures.reduce(
             (n, lecture) =>
               n +
+              // Theory a student opens as a lesson. A supplementary-only PDF is
+              // reached from the course page, not by Next/Previous (QA S-02).
               lecture.materials.filter(
-                (m) => m.pdfDocument?.asset.state === "READY",
+                (m) => m.pdfDocument?.asset.state === "READY" && pdfIsMain(m.pdfDocument.placement),
               ).length,
             0,
           ),

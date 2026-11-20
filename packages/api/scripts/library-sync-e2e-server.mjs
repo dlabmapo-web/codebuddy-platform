@@ -10,6 +10,7 @@ import { nextAuthFixture } from "../../../deploy/native/next-auth-fixture.mjs";
 import { loopbackApplication } from "../../../deploy/native/loopback-application.mjs";
 
 const directory = process.env.COVE_LIBRARY_SYNC_BUILD_DIR;
+const academyCopy = process.env.COVE_LIBRARY_SYNC_SCENARIO === "academy-copy";
 const tenProblems = process.env.COVE_LIBRARY_SYNC_SCENARIO === "ten-problems";
 const database = new URL(process.env.DATABASE_URL ?? "http://invalid");
 if (
@@ -101,7 +102,7 @@ const auth = Object.fromEntries(
     provider.storageState(u, providerOrigin),
   ]),
 );
-const slug = tenProblems
+const slug = academyCopy ? "cove" : tenProblems
   ? "cove-development"
   : "sync-browser-" + ids.academy.slice(0, 8);
 let copyId, explanationId, exerciseId;
@@ -176,6 +177,43 @@ NestFactory.create = async (...args) => {
       );
       console.log("Cove Development ten-problem scenario ready");
     });
+  if (academyCopy) {
+    for (const broken of [true, false]) {
+      const title = broken ? "Copy fixture with hidden quiz" : "Copy fixture draft";
+      const course = await db.course.create({
+        data: { academyId: ids.academy, title, isVisible: true, createdByUserId: ids.manager },
+      });
+      const module = await db.courseModule.create({
+        data: { courseId: course.id, externalKey: "copy-m", title: "Practice module", position: 1, isVisible: true },
+      });
+      const lecture = await db.lecture.create({
+        data: { courseModuleId: module.id, externalKey: "copy-l", title: "Practice lesson", position: 1, isVisible: true },
+      });
+      if (broken) {
+        await db.material.create({
+          data: {
+            lectureId: lecture.id, type: "MULTIPLE_CHOICE", title: "Hidden quiz", position: 1, isVisible: false,
+            manualMaterial: { create: { multipleChoice: {
+              question: "Choose a number", selectionMode: "SINGLE",
+              options: ["One", "Two"].map((content) => ({ id: randomUUID(), content })),
+              correctOptionIds: [randomUUID()],
+            } } },
+          },
+        });
+      } else {
+        await db.material.create({
+          data: {
+            lectureId: lecture.id, title: "Draft exercise", position: 1, type: "PROGRAMMING_EXERCISE",
+            programmingExercise: { create: { externalKey: "draft", difficulty: "EASY" } },
+          },
+        });
+      }
+    }
+    return loopbackApplication(app, async () => {
+      await writeFile(resolve(directory, "browser.json"), JSON.stringify({ auth }), { mode: 0o600 });
+      console.log("Academy course copy acceptance ready");
+    });
+  }
   await db.course.create({
     data: {
       id: ids.master,

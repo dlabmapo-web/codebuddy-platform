@@ -1,13 +1,14 @@
-import { privateSolutions, prepareExerciseSolutions, solutionOrder } from "../exercise-solutions.js";
+import { exerciseSolutionRows, privateSolutions, prepareExerciseSolutions, solutionOrder } from "../exercise-solutions.js";
 import { AppException } from "../../common/app-exception.js";
 import { randomUUID } from "node:crypto";
 import { ConflictException, HttpStatus } from "@nestjs/common";
-import { multipleChoiceSchema } from "@cove/shared";
-import { lockPdfAssets } from "../../documents/pdf-document.service.js";
+import { multipleChoiceSchema, type MultipleChoiceDefinition } from "@cove/shared";
+import { readLockedPdfAssetStates } from "../../documents/pdf-document.service.js";
 import { Prisma } from "../../generated/prisma/client.js";
 
-function remapChoiceDefinition(raw: unknown) {
-  const definition = multipleChoiceSchema.parse(raw);
+import { importMediaIssue, invalidLibraryImport, type PreparedCopyMaterial } from "./library-import-validation.js";
+
+function remapChoiceDefinition(definition: MultipleChoiceDefinition) {
   const ids = new Map(
     definition.options.map((option) => [option.id, randomUUID()]),
   );
@@ -54,35 +55,6 @@ export type CourseCopySource = Prisma.CourseGetPayload<{
   include: typeof courseCopyInclude;
 }>;
 
-/** Preview needs definitions for validation, but never solutions, cases or hints. */
-export const courseImportPreviewInclude = {
-  modules: {
-    orderBy: courseCopyInclude.modules.orderBy,
-    include: {
-      lectures: {
-        orderBy: courseCopyInclude.modules.include.lectures.orderBy,
-        include: {
-          materials: {
-            orderBy: courseCopyInclude.modules.include.lectures.include.materials.orderBy,
-            include: {
-              explanationMaterial: true,
-              manualMaterial: true,
-              programmingExercise: { select: { quiz: true } },
-              pdfDocument: { include: { asset: { select: { state: true } } } },
-              videoLesson: {
-                include: { asset: { select: { id: true, academyId: true, state: true } } },
-              },
-            },
-          },
-        },
-      },
-    },
-  },
-} as const satisfies Prisma.CourseInclude;
-
-export type CourseImportPreviewSource = Prisma.CourseGetPayload<{
-  include: typeof courseImportPreviewInclude;
-}>;
 export type CourseCopyPolicy = "ACADEMY_ADOPTION" | "PRESERVE_VISIBILITY";
 
 /** Copies authored descendants only; authorization and course ownership stay with callers. */
@@ -91,6 +63,7 @@ export async function copyCourseTree(
   source: CourseCopySource,
   courseId: string,
   policy: CourseCopyPolicy,
+  prepared?: ReadonlyMap<string, PreparedCopyMaterial>,
 ): Promise<void> {
   const modules: Prisma.CourseModuleCreateManyInput[] = [];
   const lectures: Prisma.LectureCreateManyInput[] = [];
@@ -99,6 +72,7 @@ export async function copyCourseTree(
   const explanations: Prisma.ExplanationMaterialCreateManyInput[] = [];
   const materialIds = new Map<string, string>();
   const references: Array<{ exercise: Prisma.ProgrammingExerciseCreateManyInput; referenceId: string }> = [];
+  const media: Array<{ id: string; title: string; field: "pdf" | "video"; assetId: string }> = [];
   const copiedSolutions: Prisma.ProgrammingExerciseSolutionCreateManyInput[] = [];
   const videos: Prisma.VideoLessonCreateManyInput[] = [];
   const manuals: Prisma.ManualMaterialCreateManyInput[] = [];
@@ -133,6 +107,7 @@ export async function copyCourseTree(
 
       for (const material of lecture.materials) {
         const materialId = randomUUID();
+        const values = prepared?.get(material.id);
         materialIds.set(material.id, materialId);
         materials.push({
           id: materialId,
@@ -149,7 +124,8 @@ export async function copyCourseTree(
                 !material.manualMaterial?.multipleChoice,
         });
 
-        if (material.explanationMaterial) explanations.push({ materialId, body: material.explanationMaterial.body, sideBody: material.explanationMaterial.sideBody, revision: 1 });
+        const explanation = values?.explanation ?? material.explanationMaterial;
+        if (explanation) explanations.push({ materialId, body: explanation.body, sideBody: explanation.sideBody, revision: 1 });
         if (material.videoLesson) {
           const {
             assetId,
@@ -160,7 +136,8 @@ export async function copyCourseTree(
             thresholdBasisPoints,
             captions,
             assets,
-          } = material.videoLesson;
+          } = values?.video ?? material.videoLesson;
+          media.push({ id: material.id, title: material.title, field: "video", assetId });
           videos.push({
             materialId,
             assetId,
@@ -175,12 +152,14 @@ export async function copyCourseTree(
             requestKey: randomUUID(),
           });
         }
-        if (material.pdfDocument)
+        if (material.pdfDocument) {
+          media.push({ id: material.id, title: material.title, field: "pdf", assetId: material.pdfDocument.assetId });
           documents.push({
             materialId,
             assetId: material.pdfDocument.assetId,
             placement: material.pdfDocument.placement,
           });
+        }
         if (material.manualMaterial) {
           const {
             multipleChoice,
@@ -191,27 +170,35 @@ export async function copyCourseTree(
             assets,
             ...manual
           } = material.manualMaterial;
+          const config = values?.manual;
+          const choice = config
+            ? config.multipleChoice
+            : multipleChoice ? multipleChoiceSchema.parse(multipleChoice) : null;
+          const answer = config ? config.shortAnswer : shortAnswer;
+          const answerFiles = config ? config.solutionFiles : solutionFiles;
           manuals.push({
             ...manual,
-            multipleChoice: multipleChoice
-              ? remapChoiceDefinition(multipleChoice)
-              : Prisma.DbNull,
-            shortAnswer: shortAnswer
-              ? (shortAnswer as Prisma.InputJsonValue)
-              : Prisma.DbNull,
+            ...(config && {
+              description: config.description,
+              entryPoint: config.entryPoint,
+              hint: config.hint,
+              modelAnswer: config.modelAnswer,
+            }),
+            multipleChoice: choice ? remapChoiceDefinition(choice) : Prisma.DbNull,
+            shortAnswer: answer == null ? Prisma.DbNull : (answer as Prisma.InputJsonValue),
             materialId,
             revision: 1,
-            files: files as Prisma.InputJsonValue,
-            assets: assets as Prisma.InputJsonValue,
-            solutionAssets: solutionAssets as Prisma.InputJsonValue,
-            solutionFiles: solutionFiles
-              ? (solutionFiles as Prisma.InputJsonValue)
-              : Prisma.DbNull,
+            files: (config?.files ?? files) as Prisma.InputJsonValue,
+            assets: (config?.assets ?? assets) as Prisma.InputJsonValue,
+            solutionAssets: (config?.solutionAssets ?? solutionAssets) as Prisma.InputJsonValue,
+            solutionFiles: answerFiles == null ? Prisma.DbNull : (answerFiles as Prisma.InputJsonValue),
           });
         }
         const exercise = material.programmingExercise;
         if (!exercise) continue;
-        const preparedSolutions = prepareExerciseSolutions(materialId, privateSolutions(exercise.solutions));
+        const preparedSolutions = values
+          ? exerciseSolutionRows(materialId, values.solutions ?? [])
+          : prepareExerciseSolutions(materialId, privateSolutions(exercise.solutions));
         copiedSolutions.push(...preparedSolutions.rows);
         const copiedExercise: Prisma.ProgrammingExerciseCreateManyInput = {
           materialId,
@@ -221,7 +208,7 @@ export async function copyCourseTree(
           inputFormat: exercise.inputFormat,
           outputFormat: exercise.outputFormat,
           constraints: exercise.constraints,
-          ...(exercise.quiz ? { quiz: exercise.quiz } : {}),
+          ...(exercise.quiz ? { quiz: values?.quiz ?? exercise.quiz } : {}),
           starterCode: exercise.starterCode,
           sourceProject: exercise.sourceProject == null ? Prisma.DbNull : exercise.sourceProject,
           solutionCode: preparedSolutions.solutionCode,
@@ -278,24 +265,32 @@ export async function copyCourseTree(
     }
   }
 
+  // Lock in the same order for every copy. Report against source materials,
+  // including every item that shares a newly unavailable asset.
+  const assetIds = (field: "pdf" | "video") =>
+    [...new Set(media.filter((item) => item.field === field).map((item) => item.assetId))];
+  const pdfStates = await readLockedPdfAssetStates(tx, assetIds("pdf"));
+  const videoIds = assetIds("video");
+  const videoRows = videoIds.length
+    ? await tx.$queryRaw<Array<{ id: string; state: string }>>`
+        SELECT id, state FROM video_assets WHERE id = ANY(${videoIds}::uuid[]) ORDER BY id FOR UPDATE`
+    : [];
+  const videoStates = new Map(videoRows.map((row) => [row.id, row.state]));
+  const unavailable = media.flatMap((item) => {
+    const states = item.field === "pdf" ? pdfStates : videoStates;
+    const issue = importMediaIssue(item, item.field, states.get(item.assetId));
+    return issue ? [issue] : [];
+  });
+  if (unavailable.length) {
+    if (policy === "PRESERVE_VISIBILITY") throw invalidLibraryImport(unavailable);
+    if (unavailable.some((issue) => issue.field === "pdf"))
+      throw new AppException("PDF_UPLOAD_EXPIRED", HttpStatus.CONFLICT);
+    throw new ConflictException("Only ready video lessons can be adopted");
+  }
+
   if (modules.length) await tx.courseModule.createMany({ data: modules });
   if (lectures.length) await tx.lecture.createMany({ data: lectures });
   if (materials.length) await tx.material.createMany({ data: materials });
-  // One locking read per asset kind, not two round trips per asset: a course
-  // with a hundred PDFs otherwise spends the whole transaction budget here.
-  await lockPdfAssets(tx, documents.map((d) => d.assetId));
-  const videoAssetIds = [...new Set(videos.map((v) => v.assetId))];
-  if (videoAssetIds.length) {
-    const locked = await tx.$queryRaw<Array<{ state: string }>>`SELECT state FROM video_assets WHERE id = ANY(${videoAssetIds}::uuid[]) ORDER BY id FOR UPDATE`;
-    if (locked.length !== videoAssetIds.length || locked.some((asset) => asset.state !== "READY")) {
-      if (policy === "PRESERVE_VISIBILITY")
-        throw new AppException(
-          "LIBRARY_IMPORT_CONTENT_INVALID",
-          HttpStatus.CONFLICT,
-        );
-      throw new ConflictException("Only ready video lessons can be adopted");
-    }
-  }
   if (explanations.length) await tx.explanationMaterial.createMany({ data: explanations });
   if (videos.length) await tx.videoLesson.createMany({ data: videos });
   if (documents.length) await tx.pdfDocument.createMany({ data: documents });

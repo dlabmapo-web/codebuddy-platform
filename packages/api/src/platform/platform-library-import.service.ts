@@ -18,7 +18,7 @@ import {
   copyCourseTree,
   courseCopyInclude,
 } from "../content/library/course-tree-copy.js";
-import { libraryImportBlockers } from "../content/library/library-import-validation.js";
+import { invalidLibraryImport, validateLibraryImport } from "../content/library/library-import-validation.js";
 import {
   assertLibraryTitleAvailable,
   lockLibraryTitles,
@@ -129,15 +129,18 @@ export class PlatformLibraryImportService {
             }),
           })),
         }));
+        const { blockers, warnings } = await validateLibraryImport(tx, source);
         return {
           sourceAcademyId: source.academyId,
           sourceAcademyName: source.academy.name,
           sourceCourseId: source.id,
           sourceCourseTitle: source.title,
+          sourceIsVisible: source.isVisible,
           sourceContentRevision: source.contentRevision,
           materialCounts,
           modules,
-          blockers: await libraryImportBlockers(tx, source),
+          blockers,
+          warnings,
         };
       },
       {
@@ -172,17 +175,12 @@ export class PlatformLibraryImportService {
           organization: { slug: this.organizationSlug() },
         },
       },
-      select: librarySelect,
+      select: { ...librarySelect, academyId: true },
     });
     if (!course)
       throw new AppException("COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
     return {
-      academyId: (
-        await db.course.findUniqueOrThrow({
-          where: { id: course.id },
-          select: { academyId: true },
-        })
-      ).academyId,
+      academyId: course.academyId,
       course: toLibraryCourse(course),
     };
   }
@@ -236,13 +234,8 @@ export class PlatformLibraryImportService {
                 HttpStatus.CONFLICT,
               );
             await assertLibraryTitleAvailable(tx, library.id, input.title);
-            const blockers = await libraryImportBlockers(tx, source);
-            if (blockers.length)
-              throw new AppException(
-                "LIBRARY_IMPORT_CONTENT_INVALID",
-                HttpStatus.CONFLICT,
-                `${blockers[0]!.materialTitle}: ${blockers[0]!.reason}`,
-              );
+            const { blockers, prepared } = await validateLibraryImport(tx, source);
+            if (blockers.length) throw invalidLibraryImport(blockers);
             const courseId = randomUUID();
             const createdCourse = await tx.course.create({
               data: {
@@ -256,7 +249,7 @@ export class PlatformLibraryImportService {
                 createdByUserId: actor.userId,
               },
             });
-            await copyCourseTree(tx, source, courseId, "PRESERVE_VISIBILITY");
+            await copyCourseTree(tx, source, courseId, "PRESERVE_VISIBILITY", prepared);
             await tx.libraryCourseImport.create({
               data: {
                 libraryCourseId: courseId,
@@ -344,14 +337,6 @@ export class PlatformLibraryImportService {
           },
         );
       } catch (error) {
-        if (
-          error instanceof AppException &&
-          error.code === "PDF_UPLOAD_EXPIRED"
-        )
-          throw new AppException(
-            "LIBRARY_IMPORT_CONTENT_INVALID",
-            HttpStatus.CONFLICT,
-          );
         if (!isRetryableImportError(error)) throw error;
         // Unique-index races include first-library creation and a concurrent request receipt.
         const completed = await this.prisma.libraryCourseImport.findUnique({

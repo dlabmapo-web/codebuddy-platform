@@ -35,6 +35,7 @@ export const multipleChoiceSchema = publicChoiceSchema
       ctx.addIssue({
         code: "custom",
         message: "Options must have unique IDs and meaningful content",
+        path: ["options"],
       });
     if (
       new Set(value.correctOptionIds).size !== value.correctOptionIds.length ||
@@ -44,9 +45,10 @@ export const multipleChoiceSchema = publicChoiceSchema
       ctx.addIssue({
         code: "custom",
         message: "Select a valid correct answer key",
+        path: ["correctOptionIds"],
       });
     if (value.explanationEnabled && !meaningfulChoiceHtml(value.explanation))
-      ctx.addIssue({ code: "custom", message: "Enter an explanation" });
+      ctx.addIssue({ code: "custom", message: "Enter an explanation", path: ["explanation"] });
   });
 export type MultipleChoiceDefinition = z.infer<typeof multipleChoiceSchema>;
 export type PublicChoiceDefinition = z.infer<typeof publicChoiceSchema>;

@@ -1,17 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
 import { resolve } from "node:path";
+const scenario = process.env.COVE_LIBRARY_SYNC_SCENARIO;
+
 export default defineConfig({
   testDir: "./specs",
   testMatch:
-    process.env.COVE_LIBRARY_SYNC_SCENARIO === "ten-problems"
-      ? "library-sync-ten-problems.spec.ts"
-      : "library-sync.spec.ts",
+    scenario === "academy-copy"
+      ? "academy-library-copy.spec.ts"
+      : scenario === "ten-problems" ? "library-sync-ten-problems.spec.ts" : "library-sync.spec.ts",
   workers: 1,
   fullyParallel: false,
-  timeout:
-    process.env.COVE_LIBRARY_SYNC_SCENARIO === "ten-problems"
-      ? 600_000
-      : 180_000,
+  timeout: scenario === "ten-problems" ? 600_000 : scenario === "academy-copy" ? 360_000 : 180_000,
   expect: { timeout: 30_000 },
   reporter: "list",
   use: {

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { ORPCError } from '@orpc/client';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -52,6 +53,7 @@ const source = {
   title: 'Python',
   academyId: 'source-academy',
   academyName: 'Academy',
+  academySlug: 'academy',
 } as PlatformCourse;
 const fixture: AcademyCourseImportPreview = {
   sourceAcademyId: source.academyId,
@@ -83,7 +85,7 @@ const fixture: AcademyCourseImportPreview = {
           isVisible: true,
           materials: [
             {
-              id: 'material',
+              id: '61f98d95-bf53-4472-91ff-2c31cb27c68c',
               title: 'Video lesson',
               position: 1,
               isVisible: false,
@@ -230,7 +232,7 @@ describe('academy course copy dialog', () => {
       ...fixture,
       blockers: [
         {
-          materialId: 'material',
+          materialId: fixture.modules[0]!.lectures[0]!.materials[0]!.id,
           materialTitle: 'Video lesson',
           reason: 'ASSET_NOT_READY',
         },
@@ -246,6 +248,53 @@ describe('academy course copy dialog', () => {
     expect(button('import.confirm').disabled).toBe(true);
     await submit();
     expect(mocks.copy).not.toHaveBeenCalled();
+  });
+
+  it('shows warning-only issues without disabling draft creation', async () => {
+    mocks.preview.mockResolvedValue({
+      ...fixture,
+      warnings: [{
+        materialId: fixture.modules[0]!.lectures[0]!.materials[0]!.id,
+        materialTitle: 'An incomplete exercise',
+        reason: 'TESTS_MISSING',
+        field: 'tests',
+      }],
+    });
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ['library-import-preview'] });
+    });
+    await settle();
+    expect(host.textContent).toContain('import.blockers.TESTS_MISSING');
+    expect(button('import.confirm').disabled).toBe(false);
+    await submit();
+    expect(mocks.copy).toHaveBeenCalledOnce();
+  });
+
+  it('shows the material and recovery action for a blocker found while committing', async () => {
+    mocks.copy.mockRejectedValueOnce(new ORPCError('LIBRARY_IMPORT_CONTENT_INVALID', {
+      status: 409,
+      data: {
+        code: 'LIBRARY_IMPORT_CONTENT_INVALID',
+        blockers: [{
+          materialId: fixture.modules[0]!.lectures[0]!.materials[0]!.id,
+          materialTitle: 'Video lesson',
+          field: 'video',
+          reason: 'ASSET_NOT_READY',
+          mediaState: 'failed',
+        }],
+      },
+    }));
+    await submit();
+    const alert = host.querySelector('[role="alert"]')!;
+    expect(alert.textContent).toContain('Hidden chapter / Mixed lecture');
+    expect(alert.textContent).toContain('Video lesson');
+    expect(alert.textContent).toContain('import.hidden');
+    expect(alert.textContent).toContain('import.media_states.failed');
+    expect(alert.querySelector('a')!.getAttribute('href')).toContain('/admin/academies/academy/courses/');
+    expect(button('import.confirm').disabled).toBe(true);
+    await act(async () => button('import.refresh').click());
+    await settle();
+    expect(button('import.confirm').disabled).toBe(false);
   });
 
   it('prevents duplicate submits and closing while a copy is in flight', async () => {

@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { ConfigService } from "@nestjs/config";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { libraryImportErrorDataSchema, starterBundleFor } from "@cove/shared";
 import {
   afterAll,
   afterEach,
@@ -20,12 +22,14 @@ import { AcademyLibraryService } from "../content/library/academy-library.servic
 import { courseCopyInclude } from "../content/library/course-tree-copy.js";
 import { PrismaService } from "../database/prisma.service.js";
 import {
+  PrismaClient,
   type Course,
   type Academy,
   type User,
 } from "../generated/prisma/client.js";
 import { PlatformLibraryImportService } from "./platform-library-import.service.js";
 import { PlatformLibraryService } from "./platform-library.service.js";
+import { toORPCError } from "../orpc/error-mapping.js";
 
 // Run only against an explicitly supplied disposable PostgreSQL with migrations applied.
 const databaseUrl = process.env.COVE_INTEGRATION_DATABASE_URL;
@@ -39,6 +43,7 @@ describe.skipIf(!databaseUrl)(
     let audit: AuditService, access: AcademyAccessService;
     let admin: User, member: User, academy: Academy, source: Course;
     let organizationId: string, organizationSlug: string;
+    let statements = 0;
     let pdfId: string, videoId: string, imageId: string, captionId: string;
     const identity = (user: User) =>
       ({ authUserId: user.authUserId }) as SupabaseIdentity;
@@ -66,9 +71,12 @@ describe.skipIf(!databaseUrl)(
       });
 
     beforeAll(() => {
-      db = new PrismaService(
-        new ConfigService({ DATABASE_URL: databaseUrl }) as never,
-      );
+      const client = new PrismaClient({
+        adapter: new PrismaPg({ connectionString: databaseUrl }),
+        log: [{ emit: "event", level: "query" }],
+      });
+      client.$on("query", () => { statements += 1; });
+      db = client as unknown as PrismaService;
     });
     beforeEach(async () => {
       organizationSlug = `import-test-${randomUUID()}`;
@@ -394,6 +402,20 @@ describe.skipIf(!databaseUrl)(
           },
         },
       });
+      await db.material.create({
+        data: {
+          lectureId: lecture.id,
+          title: "Explanation",
+          type: "EXPLANATION",
+          position: 7,
+          explanationMaterial: {
+            create: {
+              body: `<p>Lesson</p><img src="cove-asset:${imageId}" alt="Diagram" onerror="remove()"/>`,
+              sideBody: "<p>Notes</p>",
+            },
+          },
+        },
+      });
       const config = new ConfigService({
         PLATFORM_ORGANIZATION_SLUG: organizationSlug,
       });
@@ -471,11 +493,11 @@ describe.skipIf(!databaseUrl)(
       await db.$disconnect();
     });
 
-    it("previews all six types and hidden descendants without private answers", async () => {
+    it("previews all seven types and hidden descendants without private answers", async () => {
       const preview = await service.preview(identity(admin), input());
       expect(preview.materialCounts).toEqual({
         PROGRAMMING_EXERCISE: 1,
-        EXPLANATION: 0,
+        EXPLANATION: 1,
         PDF_DOCUMENT: 1,
         VIDEO_LESSON: 1,
         TURTLE_EXERCISE: 1,
@@ -513,7 +535,7 @@ describe.skipIf(!databaseUrl)(
         originalMaterials.map((item) => item.isVisible),
       );
       expect(copiedMaterials.map((item) => item.position)).toEqual([
-        1, 2, 3, 4, 5, 6,
+        1, 2, 3, 4, 5, 6, 7,
       ]);
       for (const [index, material] of copiedMaterials.entries())
         expect(material.id).not.toBe(originalMaterials[index]!.id);
@@ -559,6 +581,12 @@ describe.skipIf(!databaseUrl)(
       expect(copiedMaterials[5]!.videoLesson!.requestKey).not.toBe(
         originalMaterials[5]!.videoLesson!.requestKey,
       );
+      expect(copiedMaterials[6]!.explanationMaterial).toMatchObject({
+        body: expect.stringContaining(imageId),
+        sideBody: "<p>Notes</p>",
+        revision: 1,
+      });
+      expect(copiedMaterials[6]!.explanationMaterial!.body).not.toContain("onerror");
       expect(
         await db.exerciseDraft.count({ where: { courseId: copied.id } }),
       ).toBe(0);
@@ -921,6 +949,184 @@ describe.skipIf(!databaseUrl)(
       await expect(
         service.importCourse(identity(member), request),
       ).rejects.toMatchObject({ code: "LIBRARY_IMPORT_REQUEST_CONFLICT" });
+    });
+
+    it("returns matching safe diagnostics for stored definitions and attached media", async () => {
+      const [program, pdf, turtle, written, choice, video, explanation] = (await tree(source.id))
+        .modules[0]!.lectures[0]!.materials;
+      const choiceDefinition = choice!.manualMaterial!.multipleChoice as Record<string, string>;
+      await Promise.all([
+        db.manualMaterial.update({ where: { materialId: choice!.id }, data: {
+          multipleChoice: { ...choiceDefinition, legacyUnknownField: "PRIVATE_LEGACY" },
+        } }),
+        db.manualMaterial.update({ where: { materialId: turtle!.id }, data: { entryPoint: "missing.py" } }),
+        db.manualMaterial.update({ where: { materialId: written!.id }, data: {
+          shortAnswer: { question: "What is two?", gradingMode: "EXACT", expectedAnswer: "" },
+        } }),
+        db.explanationMaterial.update({ where: { materialId: explanation!.id }, data: { sideBody: "<script>unusable</script>" } }),
+        db.programmingExercise.update({ where: { materialId: program!.id }, data: { referencePdfMaterialId: pdf!.id } }),
+        db.videoLesson.delete({ where: { materialId: video!.id } }),
+        db.pdfDocument.create({ data: { materialId: explanation!.id, assetId: pdfId, placement: "SUPPLEMENTARY" } }),
+      ]);
+      await db.pdfAsset.update({ where: { id: pdfId }, data: { state: "DELETING" } });
+      const preview = await service.preview(identity(admin), input());
+      expect(preview.blockers).toEqual(expect.arrayContaining([
+        expect.objectContaining({ materialId: program!.id, field: "pdf_reference", reason: "PDF_REFERENCE_INVALID" }),
+        expect.objectContaining({ materialId: turtle!.id, field: "turtle_entry" }),
+        expect.objectContaining({ materialId: written!.id, field: "short_answer_key" }),
+        expect.objectContaining({ materialId: choice!.id, field: "choice" }),
+        expect.objectContaining({ materialId: video!.id, reason: "SUBTYPE_MISSING" }),
+        expect.objectContaining({ materialId: explanation!.id, field: "explanation_side" }),
+        expect.objectContaining({ materialId: explanation!.id, field: "pdf", mediaState: "deleting" }),
+      ]));
+      const failure = await service.importCourse(identity(admin), input()).catch((error: unknown) => error);
+      const errorData = libraryImportErrorDataSchema.parse(toORPCError(failure).data);
+      expect(errorData.blockers).toEqual(preview.blockers);
+      expect(JSON.stringify(errorData)).not.toMatch(/PRIVATE_|missing\.py|unusable/);
+      expect(await db.libraryCourseImport.count({ where: { sourceCourseId: source.id } })).toBe(0);
+      expect(await db.academy.count({ where: { organizationId, kind: "LIBRARY" } })).toBe(0);
+    });
+
+    it("preserves inline and version-defaulted quiz definitions after an answer-key repair", async () => {
+      const [program, , , , choice] = (await tree(source.id)).modules[0]!.lectures[0]!.materials;
+      const choices = [{ id: "wrong", text: "Wrong" }, { id: "right", text: "Right" }];
+      const originalChoice = choice!.manualMaterial!.multipleChoice as { options: { id: string; content: string }[] };
+      await db.exerciseTestCase.deleteMany({ where: { exerciseMaterialId: program!.id } });
+      await db.programmingExerciseSolution.deleteMany({ where: { materialId: program!.id } });
+      await db.programmingExercise.update({ where: { materialId: program!.id }, data: {
+        gradingMode: "LEGACY_STDIO", gradingSemanticVersion: "legacy-v1", solutionCode: null,
+        quiz: { choices, correctChoiceId: "invalid", explanation: "PRIVATE_INLINE_EXPLANATION" },
+      } });
+      await db.manualMaterial.update({ where: { materialId: choice!.id }, data: {
+        multipleChoice: {
+          question: "Version predates explicit defaults", selectionMode: "SINGLE",
+          options: originalChoice.options, correctOptionIds: [originalChoice.options[0]!.id],
+        },
+      } });
+      expect((await service.preview(identity(admin), input())).blockers).toEqual([
+        expect.objectContaining({ materialId: program!.id, field: "quiz_answer" }),
+      ]);
+      await db.programmingExercise.update({ where: { materialId: program!.id }, data: {
+        quiz: { choices, correctChoiceId: "right", explanation: "PRIVATE_INLINE_EXPLANATION" },
+      } });
+      const preview = await service.preview(identity(admin), input());
+      expect(preview.blockers).toEqual([]);
+      expect(JSON.stringify(preview)).not.toContain("PRIVATE_INLINE_EXPLANATION");
+      const result = await service.importCourse(identity(admin), input());
+      const copied = (await tree(result.course.id)).modules[0]!.lectures[0]!.materials;
+      expect(copied[0]!.programmingExercise!.quiz).toMatchObject({ choices, correctChoiceId: "right" });
+      expect(copied[4]!.manualMaterial!.multipleChoice).toMatchObject({ version: 1, shuffleOptions: false });
+    });
+
+    it("reports out-of-course PDF references without disclosing the target course", async () => {
+      const [program, pdf] = (await tree(source.id)).modules[0]!.lectures[0]!.materials;
+      const outside = await db.course.create({
+        data: {
+          academyId: academy.id, title: "PRIVATE_OTHER_COURSE", createdByUserId: admin.id,
+          modules: { create: {
+            title: "Other module", position: 1, externalKey: "other-module",
+            lectures: { create: { title: "Other lecture", position: 1, externalKey: "other-lecture" } },
+          } },
+        },
+        include: { modules: { include: { lectures: true } } },
+      });
+      await db.material.update({
+        where: { id: pdf!.id },
+        data: { lectureId: outside.modules[0]!.lectures[0]!.id, title: "PRIVATE_OTHER_PDF" },
+      });
+      await db.pdfDocument.update({ where: { materialId: pdf!.id }, data: { placement: "SUPPLEMENTARY" } });
+      await db.programmingExercise.update({
+        where: { materialId: program!.id }, data: { referencePdfMaterialId: pdf!.id },
+      });
+      const preview = await service.preview(identity(admin), input());
+      expect(preview.blockers).toEqual([
+        expect.objectContaining({ materialId: program!.id, reason: "PDF_REFERENCE_INVALID", field: "pdf_reference" }),
+      ]);
+      expect(JSON.stringify(preview)).not.toContain("PRIVATE_OTHER_");
+      await expect(service.importCourse(identity(admin), input())).rejects.toMatchObject({
+        code: "LIBRARY_IMPORT_CONTENT_INVALID",
+      });
+    });
+
+    it("remaps attached references, preserves a legacy solution, and warns on incomplete or hidden dependencies", async () => {
+      const [program, pdf, , , , , explanation] = (await tree(source.id)).modules[0]!.lectures[0]!.materials;
+      const project = {
+        version: 1 as const,
+        files: [
+          { path: "main.c", content: "int main() { return 0; }", readOnly: false, hidden: false, openByDefault: true },
+          { path: "judge.c", content: "PRIVATE_HIDDEN", readOnly: false, hidden: true, openByDefault: false },
+        ],
+        sources: ["main.c", "judge.c"],
+        includeLearnerSources: false,
+        fileTree: "OPEN" as const,
+      };
+      // Use the canonical value from the source-project schema.
+      await db.course.update({ where: { id: source.id }, data: { language: "C_CPP" } });
+      await db.courseModule.updateMany({ where: { courseId: source.id }, data: { isVisible: true } });
+      await db.lecture.update({ where: { id: program!.lectureId }, data: { isVisible: true } });
+      await db.programmingExerciseSolution.deleteMany({ where: { materialId: program!.id } });
+      await db.exerciseTestCase.deleteMany({ where: { exerciseMaterialId: program!.id } });
+      await db.pdfDocument.create({
+        data: { materialId: explanation!.id, assetId: pdfId, placement: "SUPPLEMENTARY" },
+      });
+      await db.programmingExercise.update({
+        where: { materialId: program!.id },
+        data: {
+          language: "C", sourceProject: project, starterCode: starterBundleFor(project),
+          referencePdfMaterialId: explanation!.id,
+        },
+      });
+      const preview = await service.preview(identity(admin), input());
+      expect(preview.blockers).toEqual([]);
+      expect(preview.warnings?.map((warning) => warning.reason)).toEqual(["TESTS_MISSING", "PDF_REFERENCE_HIDDEN"]);
+      expect(JSON.stringify(preview)).not.toContain("PRIVATE_HIDDEN");
+      const result = await service.importCourse(identity(admin), input());
+      const copied = (await tree(result.course.id)).modules[0]!.lectures[0]!.materials;
+      expect(copied[0]!.programmingExercise).toMatchObject({
+        referencePdfMaterialId: copied[6]!.id,
+        starterCode: starterBundleFor(project),
+        sourceProject: project,
+        solutions: [{ title: null, code: "PRIVATE_SOLUTION" }],
+      });
+      expect(copied[1]!.id).not.toBe(pdf!.id);
+      expect(copied[6]!.pdfDocument).toMatchObject({ assetId: pdfId, placement: "SUPPLEMENTARY" });
+      expect(copied[6]!.isVisible).toBe(false);
+      await expect(courses.setVisibility(identity(admin), {
+        academyId: result.academyId, courseId: result.course.id, isVisible: true,
+      })).rejects.toMatchObject({ code: "PDF_REFERENCE_NOT_READY" });
+    });
+
+    it("keeps preview and copy statement counts constant as the course grows", async () => {
+      const [program] = (await tree(source.id)).modules[0]!.lectures[0]!.materials;
+      async function measure(title: string) {
+        const start = statements;
+        await service.preview(identity(admin), input());
+        const preview = statements - start;
+        const beforeCopy = statements;
+        await service.importCourse(identity(admin), input(title));
+        return { preview, copy: statements - beforeCopy };
+      }
+      // Measure the same existing-library path both times.
+      await service.importCourse(identity(admin), input("Create the library"));
+      const small = await measure("Small course copy");
+      await db.exerciseTestCase.createMany({
+        data: Array.from({ length: 2000 }, (_, index) => ({
+          exerciseMaterialId: program!.id, position: index + 2, input: "", expectedOutput: "", visibility: "HIDDEN",
+        })),
+      });
+      await db.material.createMany({
+        data: Array.from({ length: 100 }, (_, index) => ({
+          lectureId: program!.lectureId, type: "PDF_DOCUMENT", title: `Extra PDF ${index}`, position: index + 8,
+        })),
+      });
+      const pdfMaterials = await db.material.findMany({
+        where: { lectureId: program!.lectureId, position: { gte: 8 } },
+        select: { id: true },
+      });
+      await db.pdfDocument.createMany({ data: pdfMaterials.map(({ id }) => ({ materialId: id, assetId: pdfId })) });
+      const large = await measure("Large course copy");
+      expect(large).toEqual(small);
+      process.stdout.write(`Academy-to-library SQL small/large: preview ${small.preview}/${large.preview}, copy ${small.copy}/${large.copy}\n`);
     });
 
     it("copies thousands of rows using bulk writes within the transaction budget", async () => {

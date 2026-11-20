@@ -137,6 +137,7 @@ export const saveManualSchema = manualConfigSchema
       ctx.addIssue({
         code: "custom",
         message: "Multiple choice requires its own material and definition",
+        path: ["multipleChoice"],
       });
     if (x.multipleChoice) {
       const parsed = multipleChoiceSchema.safeParse(x.multipleChoice);
@@ -149,25 +150,27 @@ export const saveManualSchema = manualConfigSchema
         ctx.addIssue({
           code: "custom",
           message: "Short answers require written-response material",
+          path: ["shortAnswer"],
         });
       if (
         x.shortAnswer.gradingMode === "EXACT" &&
         !x.shortAnswer.expectedAnswer.trim()
       )
-        ctx.addIssue({ code: "custom", message: "Enter the correct answer" });
+        ctx.addIssue({ code: "custom", message: "Enter the correct answer", path: ["shortAnswer", "expectedAnswer"] });
       if (x.shortAnswer.gradingMode === "REGEX" && !x.shortAnswer.pattern)
-        ctx.addIssue({ code: "custom", message: "Enter a regular expression" });
+        ctx.addIssue({ code: "custom", message: "Enter a regular expression", path: ["shortAnswer", "pattern"] });
       if (
         x.shortAnswer.explanationEnabled &&
         !x.shortAnswer.explanation.replace(/<[^>]*>/g, "").trim() &&
         !/<img\b/i.test(x.shortAnswer.explanation)
       )
-        ctx.addIssue({ code: "custom", message: "Enter an explanation" });
+        ctx.addIssue({ code: "custom", message: "Enter an explanation", path: ["shortAnswer", "explanation"] });
     }
     if (x.includeInScore && !x.submitEnabled)
       ctx.addIssue({
         code: "custom",
         message: "Score-included work requires Submit",
+        path: ["includeInScore"],
       });
     if (
       x.type === "TURTLE_EXERCISE" &&
@@ -176,6 +179,7 @@ export const saveManualSchema = manualConfigSchema
       ctx.addIssue({
         code: "custom",
         message: "A Python entry point is required",
+        path: ["entryPoint"],
       });
   });
 export const manualWorkSchema = manualTargetSchema.extend({

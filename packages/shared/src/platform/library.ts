@@ -316,16 +316,43 @@ export const libraryImportMaterialTypes = [
 export const libraryImportMaterialTypeSchema = z.enum(
   libraryImportMaterialTypes,
 );
+export const libraryImportFieldSchema = z.enum([
+  "material", "quiz", "quiz_choices", "quiz_answer", "quiz_explanation",
+  "choice", "choice_options", "choice_answer", "choice_explanation",
+  "short_answer", "short_answer_key", "short_answer_explanation", "turtle_entry",
+  "files", "solution", "project", "starter_bundle", "grading", "instructions",
+  "explanation_main", "explanation_side", "public_assets", "solution_assets",
+  "pdf", "pdf_reference", "video", "captions", "tests",
+]);
 export const libraryImportBlockerSchema = z.object({
   materialId: z.uuid(),
   materialTitle: z.string(),
   reason: z.enum([
     "INVALID_DEFINITION",
+    "SUBTYPE_MISSING",
+    "SUBTYPE_UNSUPPORTED",
     "ASSET_NOT_READY",
     "ASSET_MISSING",
+    "ASSET_INCOMPATIBLE",
+    "ASSET_UNREFERENCED",
     "CAPTION_INVALID",
+    "PDF_REFERENCE_INVALID",
   ]),
+  field: libraryImportFieldSchema.optional(),
+  mediaState: z.enum(["processing", "failed", "deleting", "unavailable"]).optional(),
 });
+export const libraryImportWarningSchema = libraryImportBlockerSchema.omit({ reason: true, mediaState: true }).extend({
+  reason: z.enum(["TESTS_MISSING", "PDF_REFERENCE_HIDDEN"]),
+});
+export type LibraryImportBlocker = z.infer<typeof libraryImportBlockerSchema>;
+export type LibraryImportWarning = z.infer<typeof libraryImportWarningSchema>;
+export type LibraryImportField = z.infer<typeof libraryImportFieldSchema>;
+
+export const libraryImportErrorDataSchema = z.object({
+  code: z.literal("LIBRARY_IMPORT_CONTENT_INVALID"),
+  blockers: z.array(libraryImportBlockerSchema),
+});
+
 const importOutlineMaterialSchema = z.object({
   id: z.uuid(),
   title: z.string(),
@@ -339,12 +366,14 @@ export const academyCourseImportPreviewSchema = z.object({
   sourceAcademyName: z.string(),
   sourceCourseId: z.uuid(),
   sourceCourseTitle: z.string(),
+  sourceIsVisible: z.boolean().optional(),
   sourceContentRevision: z.number().int().positive(),
   materialCounts: z.record(
     libraryImportMaterialTypeSchema,
     z.number().int().nonnegative(),
   ),
   blockers: z.array(libraryImportBlockerSchema),
+  warnings: z.array(libraryImportWarningSchema).optional(),
   modules: z.array(
     z.object({
       id: z.uuid(),

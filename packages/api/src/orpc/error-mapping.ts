@@ -23,7 +23,7 @@ export function toORPCError(error: unknown): ORPCError<string, unknown> {
       {
         status,
         message: error.message,
-        data: appCode ? { code: appCode } : undefined,
+        data: error instanceof AppException ? { ...error.safeData, code: appCode } : undefined,
       },
     );
   }

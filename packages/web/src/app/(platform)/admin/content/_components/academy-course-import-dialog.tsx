@@ -1,6 +1,14 @@
 'use client';
 
-import { libraryImportMaterialTypes, type PlatformCourse } from '@cove/shared';
+import {
+  libraryImportErrorDataSchema,
+  libraryImportMaterialTypes,
+  type AcademyCourseImportPreview,
+  type LibraryImportBlocker,
+  type LibraryImportWarning,
+  type PlatformCourse,
+} from '@cove/shared';
+import { ORPCError } from '@orpc/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -46,11 +54,13 @@ export function AcademyCourseImportDialog({
     retry: false,
   });
   const data = preview.data;
+  const copyError = error instanceof ORPCError ? libraryImportErrorDataSchema.safeParse(error.data) : null;
+  const copyBlockers = copyError?.success ? copyError.data.blockers : [];
+  const blockers = copyBlockers.length ? copyBlockers : (data?.blockers ?? []);
   const close = () => {
     if (!submitting.current) onClose();
   };
   const refresh = async () => {
-    attempt.current = null;
     setError(null);
     const result = await preview.refetch();
     setStale(!result.isSuccess);
@@ -168,16 +178,7 @@ export function AcademyCourseImportDialog({
                     </div>
                   ))}
                 </dl>
-                {data.blockers.length ? (
-                  <ul role="alert" className="grid gap-1 text-sm text-danger">
-                    {data.blockers.map((blocker, index) => (
-                      <li key={`${blocker.materialId}-${index}`}>
-                        {blocker.materialTitle}:{' '}
-                        {t(`import.blockers.${blocker.reason}`)}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
+                <CopyDiagnostics preview={data} source={source} blockers={blockers} />
                 <ul className="grid gap-3 text-sm">
                   {data.modules.map((module) => (
                     <li key={module.id}>
@@ -256,5 +257,97 @@ export function AcademyCourseImportDialog({
         </form>
       </ModalContent>
     </Modal>
+  );
+}
+
+function CopyDiagnostics({
+  preview,
+  source,
+  blockers,
+}: {
+  preview: AcademyCourseImportPreview;
+  source: PlatformCourse;
+  blockers: LibraryImportBlocker[];
+}) {
+  const { t } = useTranslation('platform-library');
+  const issues = [...blockers, ...(preview.warnings ?? [])];
+  if (!issues.length) return null;
+  const locations = new Map(preview.modules.flatMap((module) =>
+    module.lectures.flatMap((lecture) => lecture.materials.map((material) => [
+      material.id,
+      {
+        path: `${module.title} / ${lecture.title}`,
+        type: material.type,
+        lectureId: lecture.id,
+        hidden: preview.sourceIsVisible === false || !module.isVisible || !lecture.isVisible || !material.isVisible,
+      },
+    ] as const)),
+  ));
+  const byMaterial = new Map<string, (LibraryImportBlocker | LibraryImportWarning)[]>();
+  for (const issue of issues) {
+    const group = byMaterial.get(issue.materialId);
+    if (group) group.push(issue);
+    else byMaterial.set(issue.materialId, [issue]);
+  }
+  const groupsInOutlineOrder = [
+    ...[...locations.keys()].filter((id) => byMaterial.has(id)),
+    ...[...byMaterial.keys()].filter((id) => !locations.has(id)),
+  ];
+  return (
+    <section className="grid gap-2 text-sm" role={blockers.length ? 'alert' : 'status'}>
+      {blockers.length ? (
+        <a
+          href={routes.adminAcademyCourse(source.academySlug, source.id)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-fit font-bold text-brand underline"
+        >
+          {t('import.review_source')}
+        </a>
+      ) : null}
+      {blockers.length ? <p className="text-sub">{t('import.repair_source')}</p> : null}
+      <ul className="grid gap-3">
+        {groupsInOutlineOrder.map((id, index) => {
+          const location = locations.get(id);
+          const group = byMaterial.get(id)!;
+          const previous = locations.get(groupsInOutlineOrder[index - 1] ?? '');
+          const exerciseUrl = location?.type === 'PROGRAMMING_EXERCISE'
+            ? routes.adminAcademyExercise(source.academySlug, source.id, location.lectureId, id)
+            : null;
+          return (
+            <li key={id}>
+              {location && location.lectureId !== previous?.lectureId ? <p className="text-sub">{location.path}</p> : null}
+              <p className="font-bold">
+                {exerciseUrl ? (
+                  <a href={exerciseUrl} target="_blank" rel="noopener noreferrer" className="text-brand underline">
+                    {group[0]!.materialTitle}
+                  </a>
+                ) : group[0]!.materialTitle}
+                {location ? ` · ${t(`import.types.${location.type}`)}` : ''}
+                {location?.hidden ? ` ${t('import.hidden')}` : ''}
+              </p>
+              <ul>
+                {group.map((issue) => {
+                  const warning = issue.reason === 'TESTS_MISSING' || issue.reason === 'PDF_REFERENCE_HIDDEN';
+                  const mediaState = 'mediaState' in issue ? issue.mediaState : undefined;
+                  return (
+                    <li key={`${issue.reason}:${issue.field ?? ''}`} className={warning ? 'text-sub' : 'text-danger'}>
+                      {issue.reason === 'INVALID_DEFINITION' && issue.field
+                        ? t(`import.fields.${issue.field}`)
+                        : mediaState
+                          ? t(`import.media_states.${mediaState}`)
+                          : t(`import.blockers.${issue.reason}`)}
+                      {issue.field && issue.reason !== 'INVALID_DEFINITION' && issue.field !== 'material'
+                        ? <span className="text-sub"> · {t(`import.labels.${issue.field}`)}</span>
+                        : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

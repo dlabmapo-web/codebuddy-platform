@@ -7,7 +7,10 @@ import { fingerprint, resolveItemKeys } from "./item-keys.js";
  * Entries that carry a `syncKey` keep it (a library copy carries its master's).
  */
 export function prepareExerciseSolutions(materialId: string, input: ExerciseSolutionEntry[]) {
-  const solutions = exerciseSolutionsSchema.parse(input);
+  return exerciseSolutionRows(materialId, exerciseSolutionsSchema.parse(input));
+}
+
+export function exerciseSolutionRows(materialId: string, solutions: readonly ExerciseSolutionEntry[]) {
   return {
     solutionCode: solutions[0]?.code ?? null,
     rows: solutions.map(({ title, code, syncKey }, position) => ({

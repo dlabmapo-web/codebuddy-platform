@@ -277,7 +277,6 @@
     "fit_page": "페이지 맞춤",
     "download": "PDF 다운로드",
     "fullscreen": "전체 화면 전환",
-    "resources": "보충 자료",
     "previous_lesson": "이전 학습",
     "next_lesson": "다음 학습",
     "lesson": "학습 {{current}} / {{total}}",

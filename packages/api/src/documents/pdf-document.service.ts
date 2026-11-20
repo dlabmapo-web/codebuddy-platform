@@ -11,7 +11,6 @@ import {
 import type { Request } from "express";
 import {
   pdfIsMain,
-  pdfIsResource,
   type SavePdf,
   type PdfReadResult,
 } from "@cove/shared";
@@ -374,7 +373,6 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
     });
     const outline = found && await withCurriculum(this.prisma, found);
     const materials: PdfReadResult["materials"] = [];
-    const resources: PdfReadResult["resources"] = [];
     for (const module of outline?.modules ?? [])
       for (const lecture of module.lectures)
         for (const row of lecture.materials) {
@@ -390,17 +388,6 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
               position: row.position,
               lectureId: lecture.id,
             });
-          if (
-            lecture.id === material.lectureId &&
-            row.pdfDocument?.asset.state === "READY" &&
-            pdfIsResource(row.pdfDocument.placement)
-          )
-            resources.push({
-              materialId: row.id,
-              title: row.title,
-              originalFilename: row.pdfDocument.asset.originalFilename,
-              byteSize: row.pdfDocument.asset.byteSize,
-            });
         }
     return {
       materialId: material.id,
@@ -415,7 +402,6 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
       course: { id: course.id, title: course.title },
       lecture: { id: material.lectureId, title: material.lecture.title },
       materials,
-      resources,
     };
   }
   async cleanup() {

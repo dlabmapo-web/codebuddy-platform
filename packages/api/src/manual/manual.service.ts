@@ -1,4 +1,5 @@
 import { assertNotArchived } from "../content/archived-content.js";
+import { deleteStudentWork } from "../content/student-work.js";
 import { AppException } from "../common/app-exception.js";
 import { ManualPracticeService } from "./manual-practice.service.js";
 import type { AcademyAccess } from "../authorization/academy-access.service.js";
@@ -384,10 +385,9 @@ export class ManualService {
       await tx.$queryRaw`SELECT id FROM courses WHERE id = ${courseId}::uuid FOR UPDATE`;
       if (visible === true) await assertNotArchived(tx, courseId, { materialIds: [row.id] });
       if (visible === undefined) {
-        if (await tx.manualSubmission.count({ where: { materialId: row.id } }))
-          throw new ConflictException(
-            "Submitted work must be hidden rather than deleted",
-          );
+        // Students' answers go with the material (QA-004): the confirm dialog
+        // has already said how many.
+        await deleteStudentWork(tx, { materialId: row.id });
         await tx.material.delete({ where: { id: row.id } });
         await compactMaterialPositions(tx, row.lectureId);
       } else

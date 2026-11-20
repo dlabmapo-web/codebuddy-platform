@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { useMemo, useState, type ReactNode } from 'react';
 
 import { DeleteConfirmDialog } from '@/components/studio/delete-confirm-dialog';
+import { DeleteImpactNotice } from '@/components/studio/delete-impact-notice';
 import { DataTable } from '@/components/studio/data-table';
 import { useContentBasePath } from '@/components/studio/content-base-path-provider';
 import {
@@ -94,10 +95,12 @@ function CountCell({ value }: { value: number }) {
 }
 
 export function CoursesTable({
+  academyId,
   canEdit,
   manager,
   toolbarActions,
 }: {
+  academyId: string;
   canEdit: boolean;
   manager: CoursesManagerState;
   toolbarActions?: ReactNode;
@@ -297,6 +300,14 @@ export function CoursesTable({
         cancelLabel={destructive('course.cancel')}
         confirmLabel={destructive('course.delete_confirm')}
         fieldLabel={destructive('course.delete_confirm_label', { name: toDelete?.title ?? '' })}
+        notice={
+          toDelete ? (
+            <DeleteImpactNotice
+              input={{ academyId, courseId: toDelete.id, target: { kind: 'course' } }}
+              open
+            />
+          ) : null
+        }
         workingLabel={destructive('course.delete_working')}
         confirmValue={toDelete?.title ?? ''}
         onClose={() => setToDelete(null)}

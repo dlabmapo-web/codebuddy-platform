@@ -320,10 +320,8 @@ function ExerciseRow({
         itemTitle={material.title}
         kind={material.type === 'EXPLANATION' ? 'explanation' : material.type === 'PDF_DOCUMENT' ? 'pdf' : 'exercise'}
         onCancel={() => setDeleting(false)}
-        onConfirm={() => {
-          setDeleting(false);
-          builder.deleteExercise(lectureId, material.id);
-        }}
+        impact={{ ...builder.target, target: { kind: 'material', id: material.id } }}
+        onConfirm={() => builder.deleteExercise(lectureId, material.id)}
         open={deleting}
       />
       {manualOpen ? <ManualAuthorDialog target={{...builder.target,lectureId}} material={material} onClose={()=>setManualOpen(false)} onSaved={builder.refresh}/> : null}
@@ -566,10 +564,8 @@ export function LectureRow({
           itemTitle={lecture.title}
           kind="lecture"
           onCancel={() => setDeleting(false)}
-          onConfirm={() => {
-            setDeleting(false);
-            builder.deleteLecture(lecture.id);
-          }}
+          impact={{ ...builder.target, target: { kind: 'lecture', id: lecture.id } }}
+          onConfirm={() => builder.deleteLecture(lecture.id)}
           open={deleting}
         />
         <VisibilityConfirmModal

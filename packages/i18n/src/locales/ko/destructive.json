@@ -2,7 +2,7 @@
   "course": {
     "delete": "코스 삭제",
     "delete_title": "{{name}}을(를) 삭제할까요?",
-    "delete_body": "코스와 그 안의 모든 모듈, 강의, 문제가 삭제됩니다. 학생 제출물이 있으면 거부되며, 그때는 숨기기를 사용하세요.",
+    "delete_body": "코스와 그 안의 모든 모듈, 강의, 문제가 학생 제출물·점수와 함께 삭제됩니다. 기록을 남기고 수업만 멈추려면 숨기기를 사용하세요.",
     "delete_confirm_label": "확인하려면 {{name}} 을(를) 입력하세요",
     "delete_confirm": "영구 삭제",
     "delete_working": "삭제하는 중…",
@@ -16,5 +16,14 @@
     "delete_confirm": "영구 삭제",
     "delete_working": "삭제하는 중…",
     "cancel": "취소"
+  },
+  "student_work": {
+    "heading": "학생 제출물도 함께 삭제됩니다",
+    "count_one": "{{from}} 제출 {{count}}건 (점수·피드백 포함)",
+    "count_other": "{{from}} 제출 {{count}}건 (점수·피드백 포함)",
+    "students_one": "학생 {{count}}명의",
+    "students_other": "학생 {{count}}명의",
+    "checking": "학생 제출물을 확인하는 중…",
+    "check_failed": "학생 제출물을 확인하지 못했습니다. 삭제하면 있는 제출물도 함께 삭제됩니다."
   }
 }

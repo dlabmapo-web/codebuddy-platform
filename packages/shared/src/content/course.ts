@@ -930,6 +930,28 @@ export type ExerciseAuthoringContext = z.infer<
  * lectures and problems somebody spent a term writing, and `setVisibility` is
  * the reversible answer for a course that should merely stop being taught.
  */
+/**
+ * What deleting a course, module, lecture or material would take with it
+ * (QA-004): students' submissions are deleted with the content, so the
+ * confirm dialog states how many first.
+ */
+export const deleteImpactInputSchema = courseIdInputSchema.extend({
+  target: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("course") }),
+    z.object({ kind: z.literal("module"), id: z.uuid() }),
+    z.object({ kind: z.literal("lecture"), id: z.uuid() }),
+    z.object({ kind: z.literal("material"), id: z.uuid() }),
+  ]),
+});
+export type DeleteImpactInput = z.infer<typeof deleteImpactInputSchema>;
+
+export const deleteImpactSchema = z.object({
+  submissions: z.number().int().nonnegative(),
+  manualSubmissions: z.number().int().nonnegative(),
+  students: z.number().int().nonnegative(),
+});
+export type DeleteImpact = z.infer<typeof deleteImpactSchema>;
+
 export const deleteCourseSchema = z
   .object({
     academyId: z.uuid(),

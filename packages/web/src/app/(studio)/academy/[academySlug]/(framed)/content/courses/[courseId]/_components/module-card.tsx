@@ -249,10 +249,8 @@ export function ModuleCard({
         itemTitle={courseModule.title}
         kind="module"
         onCancel={() => setDeleting(false)}
-        onConfirm={() => {
-          setDeleting(false);
-          builder.deleteModule(courseModule.id);
-        }}
+        impact={{ ...builder.target, target: { kind: 'module', id: courseModule.id } }}
+        onConfirm={() => builder.deleteModule(courseModule.id)}
         open={deleting}
       />
       <VisibilityConfirmModal

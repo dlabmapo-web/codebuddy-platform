@@ -17,6 +17,8 @@ import {
   moveExerciseSchema,
   moveLectureSchema,
   deleteCourseSchema,
+  deleteImpactInputSchema,
+  deleteImpactSchema,
   deleteCourseModuleSchema,
   deleteLectureSchema,
   reorderCourseModulesSchema,
@@ -99,6 +101,8 @@ export const academyCoursesContract = {
   deleteExercise: oc
     .input(deleteProgrammingExerciseSchema)
     .output(courseTreeSchema),
+  /** Students' work a delete would remove, for the confirm dialog (QA-004). */
+  deleteImpact: oc.input(deleteImpactInputSchema).output(deleteImpactSchema),
   reorderExercises: oc
     .input(reorderProgrammingExercisesSchema)
     .output(courseTreeSchema),

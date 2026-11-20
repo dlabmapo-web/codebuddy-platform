@@ -2,7 +2,7 @@ import { requireAcademyRoute } from '@/lib/academy-route';
 import Link from 'next/link';
 import { PageTranslationsProvider } from '@/i18n';
 import { initTranslations } from '@/i18n/init-translations';
-import { contentNamespaces } from '@/i18n/namespaces';
+import { contentNamespaces, destructiveNamespaces } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 
 import { StudioPage } from '@/app/(studio)/academy/[academySlug]/(framed)/_components/studio-page';
@@ -59,9 +59,10 @@ export async function StaffCoursePage({
 
   const locale = await getLocale();
   // A linked copy's rows can carry the archived badge, worded in `library-sync`.
+  // `destructive` carries the delete dialog's student-work warning (QA-004).
   const namespaces = initialTree?.course.provenance?.linked
-    ? [...contentNamespaces, 'library-sync' as const]
-    : [...contentNamespaces];
+    ? [...contentNamespaces, ...destructiveNamespaces, 'library-sync' as const]
+    : [...contentNamespaces, ...destructiveNamespaces];
   const { resources } = await initTranslations(locale, namespaces);
 
   return (

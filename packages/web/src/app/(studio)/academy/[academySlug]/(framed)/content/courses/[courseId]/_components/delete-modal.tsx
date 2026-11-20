@@ -1,10 +1,14 @@
 'use client';
 
+import type { DeleteImpactInput } from '@cove/shared';
 import { TriangleAlert } from 'lucide-react';
+import * as React from 'react';
 
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
+import { useErrorText } from '@/i18n/client/use-error-text';
+import { DeleteImpactNotice } from '@/components/studio/delete-impact-notice';
 
 /**
  * Deleting a module or lecture takes everything inside it with it. The count of
@@ -14,6 +18,7 @@ import { useLayoutTranslation } from '@/i18n';
 export function DeleteModal({
   cascade,
   dependencyTitles = [],
+  impact,
   itemTitle,
   kind,
   onCancel,
@@ -23,12 +28,41 @@ export function DeleteModal({
   /** How many children disappear along with this row. */
   dependencyTitles?: string[];
   cascade?: { lectures?: number; exercises?: number; documents?: number; explanations?: number };
+  /** What to count as students' work lost with this delete (QA-004). */
+  impact?: DeleteImpactInput;
   itemTitle: string;
   kind: 'module' | 'lecture' | 'exercise' | 'pdf' | 'explanation';
   onCancel: () => void;
-  onConfirm: () => void;
+  /**
+   * Resolves once the delete is done; the dialog then closes itself. A
+   * rejection keeps it open with the reason shown here, where the person is
+   * looking, rather than at the foot of a long course page (QA-004).
+   */
+  onConfirm: () => Promise<unknown>;
   open: boolean;
 }) {
+  const errorText = useErrorText();
+  const [pending, setPending] = React.useState(false);
+  const [error, setError] = React.useState<unknown>(null);
+  const confirm = () => {
+    setPending(true);
+    setError(null);
+    onConfirm().then(
+      () => {
+        setPending(false);
+        onCancel();
+      },
+      (reason: unknown) => {
+        setPending(false);
+        setError(reason);
+      },
+    );
+  };
+  const close = () => {
+    if (pending) return;
+    setError(null);
+    onCancel();
+  };
   const { t } = useTranslation(['content', 'common', 'pdf-practice', 'material-picker']);
   const lectures = cascade?.lectures ?? 0;
   const exercises = cascade?.exercises ?? 0;
@@ -37,7 +71,7 @@ export function DeleteModal({
   const losesChildren = lectures > 0 || exercises > 0 || documents > 0 || explanations > 0;
 
   return (
-    <Modal onOpenChange={(next) => (next ? null : onCancel())} open={open}>
+    <Modal onOpenChange={(next) => (next ? null : close())} open={open}>
       <ModalContent title={kind === 'explanation' ? t('material-picker:explanation.delete_title') : t(`delete.${kind}_title`)}>
         <div className="px-6 py-5">
           <p className="text-[14.5px] leading-6">
@@ -68,23 +102,31 @@ export function DeleteModal({
             </div>
           ) : null}
 
+          {impact ? <DeleteImpactNotice input={impact} open={open} /> : null}
+
           <p className="mt-4 text-[13.5px] text-sub">
             {t('delete.irreversible')}
           </p>
+          {error ? (
+            <p className="mt-3 text-[14px] font-semibold text-danger" role="alert">
+              {errorText(error)}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border bg-canvas px-6 py-4">
           <button
             className="h-11 rounded-lg border border-border bg-card px-4 text-[14.5px] font-bold text-ink transition-colors hover:bg-canvas"
-            onClick={onCancel}
+            disabled={pending}
+            onClick={close}
             type="button"
           >
             {t('common:action.cancel')}
           </button>
           <button
             className="h-11 rounded-lg bg-danger px-5 text-[14.5px] font-bold text-on-danger transition-colors hover:brightness-95"
-            disabled={dependencyTitles.length > 0}
-            onClick={onConfirm}
+            disabled={dependencyTitles.length > 0 || pending}
+            onClick={confirm}
             type="button"
           >
             {kind === 'explanation' ? t('material-picker:explanation.delete_confirm') : t(`delete.${kind}_confirm`)}

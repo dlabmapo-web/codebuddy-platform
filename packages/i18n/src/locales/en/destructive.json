@@ -2,7 +2,7 @@
   "course": {
     "delete": "Delete course",
     "delete_title": "Delete {{name}}?",
-    "delete_body": "This removes the course and every module, lecture and problem in it. Refused if any student has submitted through it — hide it instead.",
+    "delete_body": "This removes the course and every module, lecture and problem in it, together with students' submissions and scores. To stop teaching it without losing work, hide it instead.",
     "delete_confirm_label": "Type {{name}} to confirm",
     "delete_confirm": "Delete permanently",
     "delete_working": "Deleting…",
@@ -16,5 +16,14 @@
     "delete_confirm": "Delete permanently",
     "delete_working": "Deleting…",
     "cancel": "Cancel"
+  },
+  "student_work": {
+    "heading": "Student work will be deleted too",
+    "count_one": "{{count}} submission {{from}}, with its score and feedback",
+    "count_other": "{{count}} submissions {{from}}, with their scores and feedback",
+    "students_one": "from {{count}} student",
+    "students_other": "from {{count}} students",
+    "checking": "Checking for student submissions…",
+    "check_failed": "Could not check for student submissions. Deleting still removes any there are."
   }
 }

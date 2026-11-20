@@ -154,6 +154,11 @@ export function createContentRouters(os: ORPCImplementer, deps: ORPCDeps) {
             requestId: requestId(context.req),
           })
         ),
+      deleteImpact: os.academyCourses.deleteImpact
+        .use(access.authenticated)
+        .handler(({ context, input }) =>
+          deps.courseService.deleteImpact(context.identity, input)
+        ),
       reorderExercises: os.academyCourses.reorderExercises
         .use(access.authenticated)
         .handler(({ context, input }) =>

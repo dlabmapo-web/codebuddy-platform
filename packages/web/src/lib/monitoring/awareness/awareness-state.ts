@@ -13,6 +13,13 @@ export type ReceivedAwarenessState = {
   /** Last wire values remain after their visible marker expires. */
   receivedCursor: CollaborationCursor | null;
   receivedPointer: CollaborationPointer | null;
+  /**
+   * The width the student reads the statement at, in CSS pixels.
+   *
+   * Kept until the student sends another: it describes their layout, not a
+   * position, so pointer and caret expiry never clear it.
+   */
+  statementWidth: number | null;
 };
 
 export const idleAwarenessState: ReceivedAwarenessState = {
@@ -23,6 +30,7 @@ export const idleAwarenessState: ReceivedAwarenessState = {
   pointerMovedAt: 0,
   receivedCursor: null,
   receivedPointer: null,
+  statementWidth: null,
 };
 
 /**
@@ -43,6 +51,12 @@ export function receiveAwareness(
 
   return {
     draftId: event.draftId,
+    statementWidth:
+      event.statementWidth !== undefined
+        ? event.statementWidth
+        : sameDraft
+          ? current.statementWidth
+          : null,
     receivedCursor: event.cursor,
     receivedPointer: event.pointer,
     cursor: cursorChanged ? event.cursor : sameDraft ? current.cursor : null,

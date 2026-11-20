@@ -41,6 +41,7 @@ import { isFileBundle } from '@cove/shared';
 import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
 import {
   STATEMENT_CANVAS_MIN_WIDTH,
+  STATEMENT_CANVAS_WIDTH,
   STATEMENT_PANE,
 } from '@/lib/workspace/statement-canvas';
 import { useSplitPane } from '@/lib/workspace/use-split-pane';
@@ -578,6 +579,9 @@ export function LiveWorkspace({
               <ProblemStatement
                 collaborating={live.collaborating}
                 exercise={shown.exercise}
+                // The student's own reading width (QA S-10); 640 until it
+                // arrives, which is also what a not-yet-updated student uses.
+                mirrorWidth={live.remote.statementWidth ?? STATEMENT_CANVAS_WIDTH}
                 revealedHints={shown.exercise.hints.length}
               />
               </ExerciseImageProvider>

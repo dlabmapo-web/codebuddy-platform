@@ -5,6 +5,7 @@ import {
   STATEMENT_CANVAS_MIN_SCALE,
   STATEMENT_CANVAS_MIN_WIDTH,
   STATEMENT_CANVAS_WIDTH,
+  STATEMENT_MIRROR_MIN_SCALE,
   statementCanvasScale,
 } from './statement-canvas';
 
@@ -35,5 +36,15 @@ describe('statementCanvasScale', () => {
     expect(statementCanvasScale(STATEMENT_CANVAS_MIN_WIDTH)).toBeCloseTo(
       STATEMENT_CANVAS_MIN_SCALE,
     );
+  });
+});
+
+describe('statementCanvasScale for a mirrored layout', () => {
+  it('fits the student\'s width into the teacher\'s pane', () => {
+    expect(statementCanvasScale(424, 530, STATEMENT_MIRROR_MIN_SCALE)).toBeCloseTo(0.8);
+  });
+  it('shrinks further than the reading floor rather than clipping words', () => {
+    expect(statementCanvasScale(300, 900, STATEMENT_MIRROR_MIN_SCALE)).toBeCloseTo(1 / 3);
+    expect(statementCanvasScale(100, 900, STATEMENT_MIRROR_MIN_SCALE)).toBe(STATEMENT_MIRROR_MIN_SCALE);
   });
 });

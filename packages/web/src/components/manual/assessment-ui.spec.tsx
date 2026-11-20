@@ -23,6 +23,15 @@ describe('assessment answer and review surfaces', () => {
     expect(html).toContain('maxLength="10000"');
     expect(html).toContain('My response');
   });
+  it('shows the hint once, as the placeholder, and keeps it for screen readers (QA S-05)', () => {
+    const html = renderToStaticMarkup(<WrittenAnswerCard hint="Write the exact output" answer="" onChange={() => {}} />);
+    expect(html).toContain('placeholder="Write the exact output"');
+    expect(html).toMatch(/<p id="[^"]+-hint" class="sr-only">Write the exact output<\/p>/);
+    expect(html.match(/Write the exact output/g)).toHaveLength(2);
+    const plain = renderToStaticMarkup(<WrittenAnswerCard answer="" onChange={() => {}} />);
+    expect(plain).toContain('placeholder="ui.answer_placeholder"');
+    expect(plain).not.toContain('aria-describedby=');
+  });
 
   it('keeps publication state separate from edited feedback', () => {
     const props = { score: 90, maximum: 100, completed: true, feedback: 'Keep practicing', busy: false, saved: true, dirty: false, onScore: vi.fn(), onCompleted: vi.fn(), onFeedback: vi.fn(), onSubmit: vi.fn() };

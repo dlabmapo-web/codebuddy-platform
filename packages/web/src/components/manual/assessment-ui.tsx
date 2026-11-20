@@ -43,7 +43,8 @@ export function WrittenAnswerCard({ question, hint, answer, disabled, readOnly, 
   return <div {...surfaceProps('answer')} className="p-5 sm:p-6">
     <h2 id={`${id}-question`} className="mb-6 flex items-start gap-3 text-base font-bold leading-7"><span aria-hidden className="text-lg font-extrabold text-brand">Q.</span>{question || t('your_answer')}</h2>
     <label htmlFor={id} className="mb-2 flex items-center gap-2 text-xs font-semibold text-sub"><PenLine aria-hidden className="size-3.5" />{t('ui.write_answer')}</label>
-    {hint ? <p id={`${id}-hint`} className="mb-3 text-sm leading-relaxed text-sub">{hint}</p> : null}
+    {/* Seen once, as the placeholder (QA S-05); kept for screen readers, which still need it after the student starts typing. */}
+    {hint ? <p id={`${id}-hint`} className="sr-only">{hint}</p> : null}
     <textarea {...anchorProps('answer:response')} id={id} readOnly={readOnly} aria-label={answerLabel ?? t('your_answer')} aria-describedby={hint ? `${id}-hint` : undefined}
       className="min-h-44 w-full resize-y rounded-md border border-border bg-canvas p-4 text-base leading-7 outline-none transition-shadow placeholder:text-sub/60 focus:border-brand focus:ring-2 focus:ring-brand/15 disabled:opacity-60 sm:min-h-48"
       placeholder={hint || t('ui.answer_placeholder')} maxLength={10000} disabled={disabled} value={answer} onChange={e => onChange(e.target.value)} />

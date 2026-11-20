@@ -147,7 +147,7 @@ NestFactory.create = async (...args) => {
       {
         academyId: ids.academy,
         userId: ids.manager,
-        role: "TEAM_LEAD",
+        role: academyCopy ? "MANAGER" : "TEAM_LEAD",
         status: "ACTIVE",
       },
       {
@@ -209,8 +209,30 @@ NestFactory.create = async (...args) => {
         });
       }
     }
+    const legacy = await db.course.create({
+      data: {
+        academyId: ids.library, title: "Published legacy course", isVisible: true, createdByUserId: ids.admin,
+        modules: { create: { title: "Legacy module", externalKey: "legacy-module", position: 1 } },
+      },
+    });
+    const released = await db.course.create({
+      data: { academyId: ids.library, title: "Published course already copied", isVisible: true, createdByUserId: ids.admin },
+    });
+    await db.course.createMany({
+      data: [
+        { academyId: ids.library, title: "Library draft only", isVisible: false, createdByUserId: ids.admin },
+        { academyId: ids.library, title: "Withdrawn library course", isVisible: true, retiredAt: new Date(), createdByUserId: ids.admin },
+      ],
+    });
+    const access = new AcademyAccessService(db, new SupportGrantResolver(db));
+    await new AcademyLibraryService(db, access, audit).adopt(
+      { authUserId: identities.manager.authId },
+      { academyId: ids.academy, libraryCourseId: released.id, title: "Existing copy in this academy" },
+    );
+    if (await db.libraryRelease.count({ where: { libraryCourseId: legacy.id } }))
+      throw Error("Legacy catalog fixture must have no release");
     return loopbackApplication(app, async () => {
-      await writeFile(resolve(directory, "browser.json"), JSON.stringify({ auth }), { mode: 0o600 });
+      await writeFile(resolve(directory, "browser.json"), JSON.stringify({ auth, slug }), { mode: 0o600 });
       console.log("Academy course copy acceptance ready");
     });
   }

@@ -1,6 +1,5 @@
-import { releasedLibrary, availableRelease, previewRelease } from "../../library-sync/release-preview.js";
+import { readAvailableLibraryCourses, readLibraryCoursePreview } from "../../library-sync/release-preview.js";
 import { latestOrInitialRelease, releaseCourseDescription } from "../../library-sync/release-access.js";
-import { lockCourseRow } from "../../library-sync/release.js";
 import { runCopySync } from "../../library-sync/sync-run.js";
 import { SyncWriteError } from "../../library-sync/writer.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
@@ -47,8 +46,7 @@ export class AcademyLibraryService {
     const library = await this.libraryFor(input.academyId);
     if (!library) return { courses: [] };
 
-    const rows = await releasedLibrary(this.prisma, library, input.academyId);
-    return { courses: rows.map(availableRelease) };
+    return { courses: await readAvailableLibraryCourses(this.prisma, library, input.academyId) };
   }
 
   /**
@@ -69,15 +67,13 @@ export class AcademyLibraryService {
       "curriculum.review",
     );
 
-    const course = await this.requireAdoptableMaster(
-      input.academyId,
-      input.libraryCourseId,
-    );
-
     const library = await this.libraryFor(input.academyId);
-    const [row] = library ? await releasedLibrary(this.prisma, library, input.academyId, course.id) : [];
-    if (!row) throw new AppException("LIBRARY_COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
-    return previewRelease(row);
+    const preview = library
+      ? await readLibraryCoursePreview(this.prisma, library, input.libraryCourseId)
+      : null;
+    if (!preview)
+      throw new AppException("LIBRARY_COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
+    return preview;
   }
 
   /**
@@ -122,7 +118,12 @@ export class AcademyLibraryService {
     // the copy's link and sync state exist, so a concurrent publish either
     // fans out to this copy or completes before it picks its release.
     const created = await this.prisma.$transaction(async (tx) => {
-      await lockCourseRow(tx, master.id);
+      const [eligible] = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM courses
+        WHERE id = ${master.id}::uuid AND is_visible AND retired_at IS NULL
+        FOR UPDATE`;
+      if (!eligible)
+        throw new AppException("LIBRARY_COURSE_NOT_FOUND", HttpStatus.NOT_FOUND);
       const release = await latestOrInitialRelease(tx, master.id, this.audit);
       const description = await releaseCourseDescription(tx, release.id, master.id);
 

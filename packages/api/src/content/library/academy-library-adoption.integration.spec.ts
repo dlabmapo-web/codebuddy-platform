@@ -48,7 +48,7 @@ describe.skipIf(!databaseUrl)("adopting a library course (PostgreSQL)", () => {
     const asset = { academyId: library, courseId: id, lectureId, uploaderUserId: admin };
     const pdfAsset = randomUUID();
     const videoAsset = randomUUID();
-    await client.pdfAsset.create({ data: { ...asset, id: pdfAsset, originalFilename: "t.pdf", byteSize: 1, checksumSha256: "x", state: "READY", consumedAt: new Date(), objectKey: `p/${pdfAsset}` } });
+    await client.pdfAsset.create({ data: { ...asset, id: pdfAsset, originalFilename: "t.pdf", byteSize: 1, pageCount: 1, checksumSha256: "x", state: "READY", consumedAt: new Date(), objectKey: `p/${pdfAsset}` } });
     await client.videoAsset.create({ data: { ...asset, id: videoAsset, filename: "v.mp4", byteSize: 1, state: "READY", requestKey: randomUUID(), objectKey: `v/${videoAsset}`, outputs: ["main.mp4"] } });
     const pdf = randomUUID();
     const exercise = randomUUID();
@@ -128,6 +128,90 @@ describe.skipIf(!databaseUrl)("adopting a library course (PostgreSQL)", () => {
         } } } } } },
       },
     });
+
+  it("shows every published master and previews courses before their initial release", async () => {
+    const legacy = await master({ language: "C_CPP" });
+    const released = await master();
+    const adopted = await service.adopt(identity, { academyId: academy, libraryCourseId: released.id, title: "Existing academy copy" });
+    await client.course.update({
+      where: { id: released.id },
+      data: { title: "Unpublished working title", language: "WEB" },
+    });
+    const hidden = await master();
+    await client.course.update({ where: { id: hidden.id }, data: { isVisible: false } });
+    const retired = await master();
+    await client.course.update({ where: { id: retired.id }, data: { retiredAt: new Date() } });
+
+    const { courses } = await service.available(identity, { academyId: academy });
+    expect(courses.find((course) => course.id === legacy.id)).toMatchObject({
+      title: `Master ${legacy.id}`, language: "C_CPP", contentRevision: 5,
+      moduleCount: 1, lectureCount: 1, exerciseCount: 1, existingCopies: [],
+    });
+    expect(courses.find((course) => course.id === released.id)).toMatchObject({
+      title: `Master ${released.id}`, language: "PYTHON",
+      existingCopies: [{ courseId: adopted.id, title: "Existing academy copy" }],
+    });
+    expect(courses.some(({ id }) => id === hidden.id || id === retired.id || id === adopted.id)).toBe(false);
+
+    for (const masterId of [legacy.id, released.id]) {
+      const preview = await service.preview(identity, { academyId: academy, libraryCourseId: masterId });
+      expect(preview.course.title).toBe(`Master ${masterId}`);
+      expect(preview.modules[0]).toMatchObject({
+        title: "Variables",
+        lectures: [{ title: "Assignment", materials: [
+          { title: "Sum", programmingExercise: null },
+          { title: "Theory", pdfDocument: { placement: "BOTH" } },
+          { title: "Choice", isVisible: false },
+          { title: "Turtle", isVisible: true },
+          { title: "Video", videoLesson: { placement: "BOTH" } },
+        ] }],
+      });
+      expect(JSON.stringify(preview)).not.toMatch(/PRIVATE|Try a loop|print\(/);
+    }
+    await client.pdfAsset.update({ where: { id: legacy.pdfAsset }, data: { pageCount: 0 } });
+    const partialMetadata = await service.preview(identity, { academyId: academy, libraryCourseId: legacy.id });
+    expect(partialMetadata.modules[0]!.lectures[0]!.materials[1]).toMatchObject({ title: "Theory", pdfDocument: null });
+    await client.pdfAsset.update({ where: { id: legacy.pdfAsset }, data: { pageCount: 1 } });
+    for (const courseId of [hidden.id, retired.id, adopted.id]) {
+      await expect(service.preview(identity, { academyId: academy, libraryCourseId: courseId }))
+        .rejects.toMatchObject({ code: "LIBRARY_COURSE_NOT_FOUND" });
+    }
+    expect(await client.libraryRelease.count({ where: { libraryCourseId: legacy.id } })).toBe(0);
+    const first = await service.adopt(identity, { academyId: academy, libraryCourseId: legacy.id, title: "First legacy copy" });
+    expect((await service.available(identity, { academyId: academy })).courses.find((course) => course.id === legacy.id))
+      .toMatchObject({ existingCopies: [{ courseId: first.id, title: first.title }] });
+  });
+
+  it("keeps catalog and preview statement counts fixed as courses and copies grow", async () => {
+    const legacy = await master();
+    const released = await master();
+    await service.adopt(identity, { academyId: academy, libraryCourseId: released.id, title: "Catalog released copy" });
+    async function countRead(operation: () => Promise<unknown>) {
+      const before = statements;
+      await operation();
+      return statements - before;
+    }
+    const sample = async () => ({
+      catalog: await countRead(() => service.available(identity, { academyId: academy })),
+      released: await countRead(() => service.preview(identity, { academyId: academy, libraryCourseId: released.id })),
+      legacy: await countRead(() => service.preview(identity, { academyId: academy, libraryCourseId: legacy.id })),
+    });
+    const small = await sample();
+    await client.course.createMany({
+      data: Array.from({ length: 24 }, (_, index) => ({
+        academyId: library, title: `More published courses ${index}`, isVisible: true, createdByUserId: admin,
+      })),
+    });
+    await client.course.createMany({
+      data: Array.from({ length: 40 }, (_, index) => ({
+        academyId: academy, title: `Legacy academy copy ${index}`, sourceCourseId: legacy.id,
+        contentRevision: 1, sourceContentRevision: 5, baselineRevision: 1, createdByUserId: lead,
+      })),
+    });
+    const large = await sample();
+    expect(large).toEqual(small);
+    process.stdout.write(`Academy catalog SQL small/large ${small.catalog}/${large.catalog}, preview released ${small.released}/${large.released}, legacy ${small.legacy}/${large.legacy}\n`);
+  });
 
   it("copies every level of the latest release with full fidelity and no student history", async () => {
     const source = await master();

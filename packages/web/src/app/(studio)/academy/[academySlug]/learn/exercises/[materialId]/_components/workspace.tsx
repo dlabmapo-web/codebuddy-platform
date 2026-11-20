@@ -175,8 +175,11 @@ function ProgrammingWorkspace({
     academyId, userId,
     classId,
     materialId: exercise.materialId,
-    initialResult: selected?.result ?? bootstrap.workspace.latestResult ?? null,
-    initialLatest: bootstrap.workspace.latestSubmission,
+    // Seed from the exercise on screen. After an in-workspace transition the
+    // bootstrap still describes the exercise the page was loaded on, and its
+    // settled result would be cached as the new exercise's (QA-001b).
+    initialResult: selected?.result ?? workspace.latestResult ?? null,
+    initialLatest: workspace.latestSubmission,
     solveSessionId: solveSession.solveSessionId,
     reopenSolveSession: solveSession.reopen,
   });

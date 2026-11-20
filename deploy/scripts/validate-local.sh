@@ -64,6 +64,19 @@ assert set(c['services']['prometheus']['networks']) == {'monitoring'}
 assert any(v['target'] == '/etc/prometheus/optional/judge.yml' and v.get('read_only') for v in c['services']['prometheus']['volumes'])
 print('Optional judge metrics: private monitoring, unchanged quotas, guard disabled, isolated sandbox')
 PY
+converter_json="$(validation_compose config --format json)"
+python3 - "$converter_json" <<'PY'
+import json, sys
+services = json.loads(sys.argv[1])['services']
+converter, api = services['pdf-converter'], services['api']
+assert not converter.get('ports'), 'pdf-converter must not publish a port'
+assert set(converter['networks']) == {'backend'}, 'pdf-converter stays on the internal network'
+assert converter['read_only'] and float(converter['cpus']) <= .5
+assert int(converter['mem_limit']) <= 768 * 1024 * 1024
+assert '--libreoffice-auto-start=false' in converter['command']
+assert api['environment']['PDF_CONVERTER_URL'] == 'http://pdf-converter:3000'
+print('PDF converter: internal only, read-only, capped at half a CPU and 768 MB, idle until a deck arrives')
+PY
 learning_json="$(validation_compose --profile gui --profile video config --format json)"
 python3 - "$learning_json" <<'PY'
 import json, sys
@@ -193,9 +206,11 @@ print("Older release manifest restores the legacy DLAB origin")
 '
 mv "$validation_root/new-domain.env" "$validation_root/deployment.env"
 
-# Cloud VPS 6 has 12 GB RAM. Keep the sum of all always-on container limits at
-# or below 9 GiB so Ubuntu, Docker, filesystem cache, and deployments retain
-# roughly 3 GB of headroom. Profile-only operations containers are excluded by
+# Production runs on AWS Lightsail with 16 GB RAM (since 2026-11-06; the kernel
+# reports about 15.6 GiB). Keep the sum of all always-on container limits at or
+# below 12 GiB so Ubuntu, Docker, filesystem cache, and deployments retain
+# roughly 3.5 GB of headroom. Raised from 9 GiB (written for the 12 GB Contabo
+# VPS) when pdf-converter joined the stack. Profile-only operations containers are excluded by
 # `docker compose config` unless their profile is explicitly enabled.
 compose_json="$(validation_compose config --format json)"
 python3 - "$compose_json" <<'PY'
@@ -213,14 +228,14 @@ missing = sorted(set(services) - set(limits))
 if missing:
     raise SystemExit("services without memory limits: " + ", ".join(missing))
 
-budget = 9 * 1024**3
+budget = 12 * 1024**3
 allocated = sum(int(value) for value in limits.values())
 if allocated > budget:
     raise SystemExit(
         f"always-on memory ceilings total {allocated / 1024**3:.2f} GiB; "
-        "Cloud VPS 6 budget is 9.00 GiB"
+        "the 16 GB Lightsail budget is 12.00 GiB"
     )
-print(f"Always-on memory ceiling: {allocated / 1024**3:.2f} GiB / 9.00 GiB")
+print(f"Always-on memory ceiling: {allocated / 1024**3:.2f} GiB / 12.00 GiB")
 PY
 
 docker run --rm \

@@ -56,8 +56,10 @@ trap rollback_on_error ERR
 "$script_dir/render-monitoring-config.sh"
 "$script_dir/preflight.sh"
 
+# pdf-converter (PPT/PPTX → PDF) is about 1.7 GB on first pull; pulling it here
+# keeps that download out of the switchover below.
 compose pull home studio api judge-worker judge-sandbox migrate mvp caddy redis \
-  prometheus alertmanager grafana node-exporter cadvisor
+  pdf-converter prometheus alertmanager grafana node-exporter cadvisor
 if feature_enabled VIDEO_LESSONS_ENABLED; then
   compose pull video-worker
 fi

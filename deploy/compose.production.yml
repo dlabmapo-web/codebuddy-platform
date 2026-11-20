@@ -163,6 +163,8 @@ services:
       NATIVE_GRADING_ENABLED: ${NATIVE_GRADING_ENABLED:-true}
       NATIVE_GRADING_BRIDGE_ACK: filtered-compatibility-workers-v1
       NATIVE_GRADING_MANIFEST: /run/cove-native-shared/manifest.json
+      # PPT/PPTX uploads are converted to PDF once, by pdf-converter (QA-002).
+      PDF_CONVERTER_URL: http://pdf-converter:3000
     networks:
       - edge
       - backend
@@ -173,8 +175,9 @@ services:
     volumes:
       - native_manifest:/run/cove-native-shared:ro
     tmpfs:
-      # Two concurrent PDF uploads may each use 95 MB while validating.
-      - /tmp:rw,noexec,nosuid,size=256m,uid=1001,gid=1001
+      # Two concurrent uploads may each hold a 95 MB file while validating,
+      # and a PowerPoint upload also its converted PDF.
+      - /tmp:rw,noexec,nosuid,size=448m,uid=1001,gid=1001
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 20s
@@ -184,6 +187,36 @@ services:
     mem_limit: 1536m
     cpus: 1.25
     pids_limit: 512
+
+  # PPT/PPTX → PDF, once per upload (QA-002). LibreOffice starts only when a
+  # deck arrives (idle: about 14 MB); the API sends one deck at a time and
+  # readers only ever open the stored PDF. Hard caps keep a conversion from
+  # competing with grading: measured 2026-11-20, a 20-slide deck peaks at
+  # about 450 MB and takes 2–12 s at half a CPU. Internal network only.
+  pdf-converter:
+    <<: *application
+    image: gotenberg/gotenberg:8.40.0
+    command:
+      - gotenberg
+      - --api-timeout=120s
+      - --libreoffice-auto-start=false
+      - --libreoffice-restart-after=10
+      - --libreoffice-max-queue-size=2
+      - --chromium-auto-start=false
+    networks:
+      - backend
+    tmpfs:
+      - /tmp:rw,nosuid,size=512m
+      - /home/gotenberg:rw,nosuid,size=64m,uid=1001,gid=1001
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    mem_limit: 768m
+    cpus: 0.5
+    pids_limit: 256
 
   gui-service:
     <<: *application

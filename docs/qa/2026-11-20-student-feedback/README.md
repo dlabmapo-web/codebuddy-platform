@@ -15,8 +15,8 @@ This batch plans the seven UI items. S-06, S-07, S-10 and S-11 are features or r
 | S-07 | P1 | Grading mode that tells the student a teacher grades it by hand | **Already fixed** in `4d6881de` (2026-11-12, v2.0.62): submission policy **수동 채점** (`MANUAL_REVIEW`) beside 자유 연습 and 자동 채점; the student sees "코드를 제출하면 담당 선생님이 확인한 후 점수와 피드백을 등록합니다" and "수동 채점 대기" instead of a score, and staff record score and feedback. Verify on production and close | — |
 | S-08 | P1 | "보충 자료" strip under the PDF reader | **Fixed on `qa-feedback`**; checked on localhost | [s-08-pdf-supplementary-strip.md](s-08-pdf-supplementary-strip.md) |
 | S-09 | P1 | PDF page controls sit above the document; wanted at the bottom | **Fixed on `qa-feedback`**; checked on localhost; compared with Elice | [s-09-pdf-page-controls.md](s-09-pdf-page-controls.md) |
-| S-10 | P1 | Student's screen shrinks when a teacher joins it | Not planned yet; needs a two-session repro | — |
-| S-11 | P1 | Student back from a break, without F5, shows as not connected | Not planned yet | — |
+| S-10 | P1 | Student's screen shrinks when a teacher joins it | **Fixed on `qa-feedback`**: the student's own layout is the shared canvas; the teacher mirrors the student's width. Checked on localhost with two sessions; pointers within 1px both ways | [s-10-s-11-live-monitoring.md](s-10-s-11-live-monitoring.md) |
+| S-11 | P1 | Student back from a break, without F5, shows as not connected | **Not reproduced** on current code (4 break scenarios recover); likely fixed by `0f74f813` / `e05775a2` (v2.0.64). QA to retest on production | [s-10-s-11-live-monitoring.md](s-10-s-11-live-monitoring.md) |
 
 ## Groups
 

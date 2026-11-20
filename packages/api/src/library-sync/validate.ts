@@ -24,7 +24,7 @@ import {
  *
  * The complete definition goes through the editor's own save schema, so a
  * merge of two individually valid versions cannot exceed a limit the editor
- * enforces (64 source files, 50 test cases, 10 solutions, …), plus the
+ * enforces (64 source files, 200 test cases, 10 solutions, …), plus the
  * cross-field rules the schemas do not hold. Additions are checked the same
  * way: arriving verbatim from the library is no exemption.
  *

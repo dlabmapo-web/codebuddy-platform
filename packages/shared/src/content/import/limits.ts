@@ -45,7 +45,7 @@ export const CONTENT_IMPORT_MAX_SHEETS = 8;
 export const CONTENT_IMPORT_MAX_PROBLEMS = 200;
 
 /** §10 — matches the manual authoring cap, so a round trip cannot overflow. */
-export const CONTENT_IMPORT_MAX_TESTS_PER_PROBLEM = 50;
+export const CONTENT_IMPORT_MAX_TESTS_PER_PROBLEM = 200;
 export const CONTENT_IMPORT_MAX_HINTS_PER_PROBLEM = 20;
 
 /** §10 — across every sheet, header rows excluded. */

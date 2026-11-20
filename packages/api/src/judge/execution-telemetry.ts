@@ -5,7 +5,7 @@ export const executionStages = ["acquire", "prepare", "execute", "exit", "drain"
 export type ExecutionStage = typeof executionStages[number];
 export const executionKinds = ["sandbox", "official", "practice", "sample", "regrade", "run"] as const;
 export type ExecutionKind = typeof executionKinds[number];
-const caseBuckets = ["unknown", "1", "2_5", "6_10", "11_50"] as const;
+const caseBuckets = ["unknown", "1", "2_5", "6_10", "11_50", "51_100", "101_200"] as const;
 type CaseBucket = typeof caseBuckets[number];
 const context = new AsyncLocalStorage<{ kind: ExecutionKind; cases: CaseBucket; jobId?: string }>();
 export const withExecutionKind = <T>(kind: ExecutionKind, action: () => Promise<T>, jobId?: string) => context.run({ kind, cases: "unknown", jobId }, action);
@@ -16,7 +16,7 @@ export function executionLogContext() {
 }
 export const withExecutionCaseCount = <T>(count: number, action: () => Promise<T>) => context.run({
   kind: context.getStore()?.kind ?? "sandbox", jobId: context.getStore()?.jobId,
-  cases: count < 1 || count > 50 ? "unknown" : count === 1 ? "1" : count <= 5 ? "2_5" : count <= 10 ? "6_10" : "11_50",
+  cases: count < 1 || count > 200 ? "unknown" : count === 1 ? "1" : count <= 5 ? "2_5" : count <= 10 ? "6_10" : count <= 50 ? "11_50" : count <= 100 ? "51_100" : "101_200",
 }, action);
 export const durationBuckets = [.01, .025, .05, .1, .25, .5, 1, 1.5, 2, 4, 8, 15, 30, 60, 300] as const;
 const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);

@@ -121,6 +121,14 @@ export const materialScorePolicies = ["PROPORTIONAL", "ABSOLUTE_CAP"] as const;
 export const materialScorePolicySchema = z.enum(materialScorePolicies);
 export type MaterialScorePolicy = z.infer<typeof materialScorePolicySchema>;
 
+/**
+ * Test cases one problem may hold. 200, as on Elice, so imported problems keep
+ * every case (QA-005, 2026-11-20). The grading run stays bounded by the
+ * problem's total time limit and by `gradingDataLimits.testSetChars`, not by
+ * this count.
+ */
+export const maxExerciseTestCases = 200;
+
 const titleSchema = z.string().trim().min(1).max(200);
 const descriptionSchema = z.string().trim().max(10_000);
 export const programmingExerciseDescriptionMaxLength = 500_000;
@@ -761,7 +769,7 @@ export const exerciseDraftFieldsSchema = z.object({
    * only meant an author had to invent an answer before they could write down
    * the question.
    */
-  testCases: z.array(exerciseTestCaseDraftSchema).max(50),
+  testCases: z.array(exerciseTestCaseDraftSchema).max(maxExerciseTestCases),
   /** How the cases above are judged and scored. See `gradingProfileIssues`. */
   grading: exerciseGradingProfileSchema,
   hints: z.array(exerciseHintDraftSchema),

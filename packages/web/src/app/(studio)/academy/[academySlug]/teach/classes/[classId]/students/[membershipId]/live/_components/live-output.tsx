@@ -172,12 +172,16 @@ export function LiveOutput({
             <p className="shrink-0 border-b border-white/10 px-3 py-1.5 font-mono text-[11.5px] text-[#8C8C8C]">
               {t('workspace.run_private')}
             </p>
-            <div className="min-h-0 flex-1">
+            {/* The teacher's own run: never a shared pointer surface. Its lines
+                are not the student's, so pointing here must not put an arrow
+                on whatever the student has on the same line number. */}
+            <div className="min-h-0 flex-1" data-history-private>
               <TerminalPanel
                 awaitingInput={runner.awaitingInput}
                 lines={runner.lines}
                 onEndInput={runner.endInput}
                 onSubmitInput={runner.submitInput}
+                shared={false}
                 supported={runner.supported}
               />
             </div>

@@ -48,10 +48,6 @@ export function ModuleSection({
   const {t:vt}=useVideoTranslation();
   const slug = useAcademySlug();
   const { t } = useLayoutTranslation('learn');
-  const exerciseCount = module.lectures.reduce(
-    (total, lecture) => total + (courseLanguage === "WEB" ? (lecture.explanations?.length ?? 0) + (lecture.manualMaterials?.length ?? 0) + (lecture.videos?.length ?? 0) + (lecture.documents?.filter(d => d.pdf.placement !== "SUPPLEMENTARY").length ?? 0) : lecture.exercises.length),
-    0,
-  );
 
   return (
     <section
@@ -76,9 +72,6 @@ export function ModuleSection({
             <span className="mt-0.5 block truncate text-[15px] font-bold">
               {module.title}
             </span>
-          </span>
-          <span className="hidden shrink-0 text-[12px] text-sub sm:block">
-            {exerciseCount}
           </span>
           <ChevronDown
             className={`size-4 shrink-0 text-sub transition-transform ${

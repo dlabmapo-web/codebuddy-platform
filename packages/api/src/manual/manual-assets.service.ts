@@ -8,6 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { randomUUID, createHash } from "node:crypto";
 import type { Request } from "express";
 import { PrismaService } from "../database/prisma.service.js";
+import { remoteImageSources, rewriteRemoteImages, REMOTE_IMAGE_HOSTS } from "../content/lesson-images.js";
 const bucket = "turtle-assets";
 
 /** Picture types, keyed by the extensions each may carry. */
@@ -21,6 +22,82 @@ const images: Array<{ mime: string; extensions: string[]; matches: (bytes: Buffe
   { mime: "image/svg+xml", extensions: ["svg"], matches: () => true },
 ];
 const heifBrands = ["heic", "heix", "hevc", "hevx", "heim", "heis", "mif1", "msf1"];
+
+const MAX_ASSET_BYTES = 5_242_880;
+
+/**
+ * The raster type of downloaded bytes, by signature. Pictures from other sites
+ * are never stored as SVG: their content is not the author's to vouch for.
+ */
+export function rasterImageType(bytes: Buffer): { mime: string; extension: string } | null {
+  for (const image of images) {
+    if (image.mime === "image/svg+xml") continue;
+    if (image.matches(bytes)) return { mime: image.mime, extension: image.extensions[0]! };
+  }
+  return null;
+}
+
+/** A safe asset name from a picture URL's last path segment. */
+export function remoteImageName(url: URL, extension: string, index: number): string {
+  const last = decodeURIComponent(url.pathname.split("/").pop() ?? "").replace(/\.[a-z0-9]{1,5}$/i, "");
+  const base = last.replace(/[^a-zA-Z0-9_. -]/g, "_").replace(/^[^a-zA-Z0-9_-]+/, "").slice(0, 80);
+  return `${base || `image-${index + 1}`}.${extension}`;
+}
+
+/**
+ * Downloads one picture over HTTPS: no redirect off the allowed hosts, at most
+ * 5 MiB, 10 s. Resolves null for anything else, so one bad picture never
+ * fails a save.
+ */
+export async function downloadRemoteImage(href: string, fetcher: typeof fetch = fetch): Promise<Buffer | null> {
+  let url = new URL(href);
+  const signal = AbortSignal.timeout(10_000);
+  for (let hop = 0; hop < 4; hop++) {
+    if (url.protocol !== "https:" || !REMOTE_IMAGE_HOSTS.has(url.hostname.toLowerCase())) return null;
+    let response: Response;
+    try {
+      response = await fetcher(url, { redirect: "manual", signal, headers: { accept: "image/*" } });
+    } catch {
+      return null;
+    }
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      await response.body?.cancel().catch(() => undefined);
+      if (!location) return null;
+      url = new URL(location, url);
+      continue;
+    }
+    if (!response.ok || !response.body) {
+      await response.body?.cancel().catch(() => undefined);
+      return null;
+    }
+    if (Number(response.headers.get("content-length")) > MAX_ASSET_BYTES) {
+      await response.body.cancel().catch(() => undefined);
+      return null;
+    }
+    const parts: Buffer[] = [];
+    let size = 0;
+    try {
+      for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
+        size += chunk.byteLength;
+        if (size > MAX_ASSET_BYTES) return null;
+        parts.push(Buffer.from(chunk));
+      }
+    } catch {
+      return null;
+    }
+    return size ? Buffer.concat(parts) : null;
+  }
+  return null;
+}
+
+export type RemoteImageCopy = {
+  html: string;
+  /** Pictures now served from our storage. */
+  copied: string[];
+  /** Pictures that could not be fetched or were not images; left as they were. */
+  failed: string[];
+};
 
 /** The major and compatible brands of an ISO-BMFF (`ftyp`) file, or none. */
 function isoBrands(bytes: Buffer): string[] {
@@ -106,7 +183,7 @@ export class ManualAssetsService {
     let size = 0;
     for await (const chunk of request) {
       size += chunk.length;
-      if (size > 5242880) throw new BadRequestException("Asset exceeds 5 MiB");
+      if (size > MAX_ASSET_BYTES) throw new BadRequestException("Asset exceeds 5 MiB");
       parts.push(Buffer.from(chunk));
     }
     const bytes = Buffer.concat(parts);
@@ -138,6 +215,78 @@ export class ManualAssetsService {
     }
     return { assetId: id, name, byteSize: size };
   }
+  /**
+   * Copies pictures a statement shows from allowed outside hosts into this
+   * course's private assets and points the statement at the copies (QA-006).
+   *
+   * Four downloads at a time; a picture this course already holds (same
+   * bytes) is reused, not stored twice. Database cost: one read for the
+   * reusable assets and one insert for the new ones, however many pictures.
+   */
+  async copyRemoteImages(
+    academyId: string,
+    courseId: string,
+    html: string,
+    fetcher: typeof fetch = fetch,
+  ): Promise<RemoteImageCopy> {
+    const sources = remoteImageSources(html);
+    if (sources.length === 0) return { html, copied: [], failed: [] };
+
+    const downloads: Array<{ href: string; bytes: Buffer | null }> = [];
+    for (let at = 0; at < sources.length; at += 4) {
+      const batch = sources.slice(at, at + 4);
+      downloads.push(...(await Promise.all(batch.map(async (href) => ({ href, bytes: await downloadRemoteImage(href, fetcher) })))));
+    }
+    const pictures = downloads.flatMap(({ href, bytes }) => {
+      const type = bytes ? rasterImageType(bytes) : null;
+      return bytes && type ? [{ href, bytes, type, sha256: createHash("sha256").update(bytes).digest("hex") }] : [];
+    });
+    const failed = sources.filter((href) => !pictures.some((picture) => picture.href === href));
+    if (pictures.length === 0) return { html, copied: [], failed };
+
+    const existing = await this.db.manualAsset.findMany({
+      where: { academyId, courseId, sha256: { in: [...new Set(pictures.map((p) => p.sha256))] }, mimeType: { startsWith: "image/" } },
+      select: { id: true, sha256: true },
+    });
+    const assetBySha = new Map(existing.map((row) => [row.sha256, row.id]));
+    const created: Array<{ id: string; academyId: string; courseId: string; objectKey: string; name: string; byteSize: number; mimeType: string; sha256: string }> = [];
+    const uploaded: string[] = [];
+    for (const [index, picture] of pictures.entries()) {
+      if (assetBySha.has(picture.sha256)) continue;
+      const id = randomUUID();
+      const key = `${academyId}/${id}`;
+      const { error } = await this.client.storage
+        .from(bucket)
+        .upload(key, picture.bytes, { contentType: picture.type.mime, upsert: false });
+      if (error) continue;
+      uploaded.push(key);
+      assetBySha.set(picture.sha256, id);
+      created.push({
+        id, academyId, courseId, objectKey: key,
+        name: remoteImageName(new URL(picture.href), picture.type.extension, index),
+        byteSize: picture.bytes.length, mimeType: picture.type.mime, sha256: picture.sha256,
+      });
+    }
+    if (created.length) {
+      try {
+        await this.db.manualAsset.createMany({ data: created });
+      } catch (error) {
+        await this.client.storage.from(bucket).remove(uploaded);
+        throw error;
+      }
+    }
+    const assetIdByUrl = new Map<string, string>();
+    for (const picture of pictures) {
+      const id = assetBySha.get(picture.sha256);
+      if (id) assetIdByUrl.set(picture.href, id);
+    }
+    return {
+      html: rewriteRemoteImages(html, assetIdByUrl),
+      copied: [...assetIdByUrl.keys()],
+      failed: [...failed, ...pictures.filter((p) => !assetIdByUrl.has(p.href)).map((p) => p.href)],
+    };
+  }
+
   /** A stored picture as a data URL (same-origin, so it displays under COEP), or null for any other asset. */
   async imageDataUrls(assetIds: readonly string[]): Promise<Record<string, string | null>> {
     const ids = [...new Set(assetIds)];

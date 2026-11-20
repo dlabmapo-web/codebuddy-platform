@@ -22,7 +22,8 @@ import {
   type QuizDefinition,
 } from "@cove/shared";
 import { Prisma as PrismaValues } from "../generated/prisma/client.js";
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Logger, Optional } from "@nestjs/common";
+import { ManualAssetsService } from "../manual/manual-assets.service.js";
 import { randomUUID } from "node:crypto";
 import {
   gradingProfileIssues,
@@ -248,7 +249,24 @@ export class CourseService {
     private readonly access: AcademyAccessService,
     private readonly audit: AuditService,
     private readonly revocation: MonitoringRevocationService,
+    /** Copies pictures from Elice and other allowed hosts on save (QA-006). */
+    @Optional() private readonly lessonAssets?: ManualAssetsService,
   ) {}
+
+  private readonly logger = new Logger(CourseService.name);
+
+  /**
+   * The statement with its outside pictures copied into the course's own
+   * storage. Before the transaction: downloads must not hold the course lock.
+   * A picture that cannot be copied stays as it was and the save goes on.
+   */
+  private async withCopiedImages<T extends { academyId: string; courseId: string; description: string }>(input: T): Promise<T> {
+    if (!this.lessonAssets || !input.description) return input;
+    const copy = await this.lessonAssets.copyRemoteImages(input.academyId, input.courseId, input.description);
+    if (copy.failed.length)
+      this.logger.warn(`Pictures left on their original host (${copy.failed.length}): ${copy.failed.join(", ")}`);
+    return copy.html === input.description ? input : { ...input, description: copy.html };
+  }
 
   async list(identity: SupabaseIdentity, academyId: string) {
     await this.access.requirePermission(
@@ -1322,6 +1340,7 @@ export class CourseService {
     await this.requireLecture(input.courseId, input.lectureId);
     if (input.referencePdfMaterialId) await this.requireCurriculumManager(identity, input.academyId);
     assertGradingSupported(input, CREATED_EXERCISE_TIME_LIMIT_MS);
+    input = await this.withCopiedImages(input);
     const record = await this.prisma.$transaction(async (tx) => {
       // The course's language, read under its lock so a concurrent language
       // change cannot slip between the read and this exercise. A quiz has no
@@ -1414,6 +1433,7 @@ export class CourseService {
     if (exercise.updatedAt.toISOString() !== input.expectedUpdatedAt) {
       throw new AppException("CONTENT_EDIT_CONFLICT", HttpStatus.CONFLICT);
     }
+    input = await this.withCopiedImages(input);
     const submissionPolicy = input.submissionPolicy ?? exercise.submissionPolicy ?? "AUTOMATIC";
     // Checked against the limit this exercise actually has, which an imported
     // or migrated problem may not share with the authoring default.

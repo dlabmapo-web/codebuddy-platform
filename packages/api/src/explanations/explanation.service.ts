@@ -98,8 +98,11 @@ export class ExplanationService {
   }
   async save(identity: SupabaseIdentity, input: SaveExplanation) {
     const actor = await this.access.requirePermission(identity.authUserId, input.academyId, "curriculum.manage");
-    const body = sanitizeExplanation(input.body);
-    const sideBody = input.sideBody && hasExplanationContent(input.sideBody) ? sanitizeExplanation(input.sideBody) : null;
+    // Pictures from Elice and other allowed hosts are copied into the course's
+    // own storage before the course lock is taken (QA-006).
+    const copy = (html: string) => this.images.copyRemoteImages(input.academyId, input.courseId, html).then((result) => result.html);
+    const body = await copy(sanitizeExplanation(input.body));
+    const sideBody = input.sideBody && hasExplanationContent(input.sideBody) ? await copy(sanitizeExplanation(input.sideBody)) : null;
     const saved = await this.db.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM courses WHERE id = ${input.courseId}::uuid FOR UPDATE`;
       const lecture = await tx.lecture.findFirst({ where: { id: input.lectureId, courseModule: { courseId: input.courseId, course: { academyId: input.academyId } } }, select: { id: true } });

@@ -7,7 +7,7 @@ import { useTeacherDisplay } from './use-teacher-display';
 
 const setup = vi.hoisted(() => ({ preview: vi.fn(), handlers: new Map<string, (event: unknown) => void>() }));
 vi.mock('@/lib/orpc', () => ({ orpc: { monitoring: { getExercisePreview: setup.preview } } }));
-vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: undefined, isError: false, refetch: vi.fn() }) }));
+vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: undefined, isError: false, refetch: vi.fn() }), useQueryClient: () => ({ setQueryData: vi.fn() }) }));
 afterEach(() => { setup.handlers.clear(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 const path: NavigatorPath = {
   course: { id: 'course', title: 'Course' }, module: { id: 'module', title: 'Module' },

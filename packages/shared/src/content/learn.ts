@@ -757,6 +757,66 @@ export function mergeNavigatorProgress(
   };
 }
 
+/**
+ * One graded verdict, applied to the outline a watcher already holds.
+ *
+ * The same rule the server writes with (`nextProgress` in the API's
+ * `judge/grading.ts`): a pass solves the problem for good, a failure marks it
+ * in progress unless it was already solved, the best score only rises, and a
+ * fault, cancellation, queued or manual-review verdict changes nothing. A
+ * teacher watching live gets the student's new icon from the event they
+ * already received instead of waiting for the outline to be read again
+ * (QA T-02).
+ */
+export function applyVerdictToNavigator(
+  context: WorkspaceNavigatorContext,
+  verdict: {
+    materialId: string;
+    status: "QUEUED" | "RUNNING" | "PASSED" | "FAILED" | "ERRORED" | "CANCELLED" | "RECORDED";
+    score: number | null;
+  },
+): WorkspaceNavigatorContext {
+  if (verdict.status !== "PASSED" && verdict.status !== "FAILED") return context;
+  let changed = false;
+  let startedDelta = 0;
+  let solvedDelta = 0;
+  const modules = context.course.modules.map((courseModule) => ({
+    ...courseModule,
+    lectures: courseModule.lectures.map((lecture) => ({
+      ...lecture,
+      exercises: lecture.exercises.map((exercise) => {
+        if (exercise.materialId !== verdict.materialId) return exercise;
+        const status =
+          exercise.status === "SOLVED" || verdict.status === "PASSED"
+            ? ("SOLVED" as const)
+            : ("IN_PROGRESS" as const);
+        const bestScore = Math.max(exercise.bestScore ?? 0, verdict.score ?? 0);
+        if (status === exercise.status && bestScore === exercise.bestScore) return exercise;
+        changed = true;
+        // The header's "N of M solved" counts started including solved, the
+        // way the server's countProgress does.
+        if (exercise.status === "NOT_STARTED") startedDelta += 1;
+        if (status === "SOLVED" && exercise.status !== "SOLVED") solvedDelta += 1;
+        return { ...exercise, status, bestScore };
+      }),
+    })),
+  }));
+  if (!changed) return context;
+  const progress = context.course.progress;
+  return {
+    ...context,
+    course: {
+      ...context.course,
+      modules,
+      progress: {
+        ...progress,
+        started: Math.min(progress.total, progress.started + startedDelta),
+        solved: Math.min(progress.total, progress.solved + solvedDelta),
+      },
+    },
+  };
+}
+
 function orderedModules<T extends { position: number; id: string }>(
   modules: ReadonlyArray<T>,
 ): T[] {

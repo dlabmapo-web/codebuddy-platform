@@ -275,6 +275,13 @@ export function LiveWorkspace({
     triggerRef,
   } = useNavigatorPanel('live-curriculum');
 
+  // A verdict for any problem in the course updates the student's outline
+  // icon at once (QA T-02), not only the result tab.
+  const { applyVerdict } = display;
+  React.useEffect(() => {
+    if (live.result) applyVerdict(live.result);
+  }, [applyVerdict, live.result]);
+
   const previewed =
     display.display?.mode === 'preview' ? display.display.snapshot : null;
   // What the statement pane renders. Preview and live share the presentation

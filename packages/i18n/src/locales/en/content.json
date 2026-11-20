@@ -256,10 +256,10 @@
       "SUPPLEMENTARY": "Resources",
       "BOTH": "Main lesson and resources"
     },
-    "choose": "Choose a PDF or drop it here",
+    "choose": "Choose a PDF or PPT file, or drop it here",
     "replace": "Replace PDF (optional)",
-    "file": "PDF file",
-    "limit": "PDF only · maximum 95 MB",
+    "file": "PDF or PPT file",
+    "limit": "PDF, PPT or PPTX · maximum 95 MB",
     "save": "Save PDF",
     "cancel": "Cancel",
     "open": "Open PDF",
@@ -286,19 +286,6 @@
     "lesson": "Lesson {{current}} / {{total}}",
     "course": "Back to course",
     "contents": "Course contents",
-    "errors": {
-      "PDF_TOO_LARGE": "Choose a PDF no larger than 95 MB.",
-      "PDF_INVALID": "Choose a valid PDF without a password.",
-      "PDF_BUSY": "PDF validation is busy. Try again shortly.",
-      "PDF_STORAGE_FAILED": "Could not store the PDF. Try again.",
-      "PDF_NOT_AVAILABLE": "This PDF is not available.",
-      "PDF_UPLOAD_EXPIRED": "Upload the file again before saving.",
-      "PDF_EDIT_STALE": "The material changed. Reload before editing.",
-      "PDF_VALIDATION_LIMIT": "The PDF exceeds the processing limit.",
-      "PDF_REFERENCE_INVALID": "Choose a supplementary PDF in the same course for this Python exercise.",
-      "PDF_REFERENCE_IN_USE": "This PDF is linked to coding exercises. Detach or change their reference PDFs before deleting it or changing its placement.",
-      "PDF_REFERENCE_NOT_READY": "Publish the reference PDF and its parents before publishing this exercise."
-    },
     "remove_selection": "Remove selection",
     "preview": "Preview PDF",
     "edit_action": "Edit PDF",
@@ -315,7 +302,8 @@
         "SUPPLEMENTARY": "Open from the lesson resources.",
         "BOTH": "Available in the lesson and its resources."
       }
-    }
+    },
+    "converting": "Converting slides to PDF…"
   },
   "video": {
     "add": "Add video lesson",

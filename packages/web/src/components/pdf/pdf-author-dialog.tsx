@@ -3,6 +3,8 @@ import { useState, useRef, useEffect, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PdfMetadata, PdfPlacement } from '@cove/shared';
 import { pdfMaxUploadBytes } from '@cove/shared';
+import { appErrorCodes, type AppErrorCode } from '@cove/shared/errors';
+import { useErrorCode } from '@/i18n/client/use-error-text';
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { ChoiceSelector } from '@/components/studio/choice-selector';
 import { CheckCircle2, FileText, Pencil, UploadCloud, X } from 'lucide-react';
@@ -39,6 +41,11 @@ export function PdfAuthorDialog({
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string>();
+  // Messages come from the shared `errors` namespace, the same sentence the
+  // API's code maps to everywhere else.
+  const errorCode = useErrorCode();
+  const errorMessage = (code: string) =>
+    (appErrorCodes as readonly string[]).includes(code) ? errorCode(code as AppErrorCode) : t('pdf.unavailable');
   const [preview, setPreview] = useState(initialPreview);
   const inputId = useId();
   const [dragging, setDragging] = useState(false);
@@ -59,12 +66,13 @@ export function PdfAuthorDialog({
       setError('PDF_TOO_LARGE');
       return;
     }
-    if (!file.size || !/\.pdf$/i.test(file.name)) {
+    // PowerPoint decks are converted to PDF once on upload (QA-002).
+    if (!file.size || !/\.(pdf|pptx?)$/i.test(file.name)) {
       setError('PDF_INVALID');
       return;
     }
     setFile(file);
-    if (!title) setTitle(file.name.replace(/\.pdf$/i, ''));
+    if (!title) setTitle(file.name.replace(/\.(pdf|pptx?)$/i, ''));
   }
   function chooseFiles(files?: FileList | null) {
     if (files && files.length > 1) {
@@ -176,7 +184,7 @@ export function PdfAuthorDialog({
                   className="peer sr-only"
                   aria-label={t('pdf.file')}
                   type="file"
-                  accept=".pdf,application/pdf"
+                  accept=".pdf,.ppt,.pptx,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                   disabled={!editable || busy}
                   onChange={(e) => chooseFiles(e.target.files)}
                 />
@@ -203,14 +211,14 @@ export function PdfAuthorDialog({
                 <p role="status">
                   {progress < 100
                     ? t('pdf.uploading', { progress })
-                    : t('pdf.validating')}
+                    : file && /\.pptx?$/i.test(file.name)
+                      ? t('pdf.converting')
+                      : t('pdf.validating')}
                 </p>
               ) : null}
               {error ? (
                 <p role="alert" className="text-danger">
-                  {t(`pdf.errors.${error}`, {
-                    defaultValue: t('pdf.unavailable'),
-                  })}
+                  {errorMessage(error)}
                 </p>
               ) : null}
             </div>

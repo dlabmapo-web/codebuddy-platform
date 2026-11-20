@@ -117,8 +117,12 @@ function OrdinaryCurriculumNavigator({
   dockAt?: 'md' | 'lg';
   error?: boolean;
   unavailable?: boolean;
-  /** Where this role goes to leave: a course outline, or a class roster. */
-  footer: { href: string; label: string };
+  /**
+   * Where this role goes to leave, when the screen has no other exit: a
+   * teacher's way back to the class roster. Student lessons omit it because
+   * their header already carries Exit (QA S-01).
+   */
+  footer?: { href: string; label: string };
   onClose: () => void;
   onSelect: (materialId: string) => void;
   onRetry?: () => void;
@@ -269,18 +273,20 @@ function OrdinaryCurriculumNavigator({
         )}
       </div>
 
-      <footer
-        className="shrink-0 border-t border-border px-3 py-2"
-        {...anchorProps('outline:footer')}
-      >
-        <Link
-          className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-sub transition-colors hover:text-brand"
-          href={footer.href}
+      {footer ? (
+        <footer
+          className="shrink-0 border-t border-border px-3 py-2"
+          {...anchorProps('outline:footer')}
         >
-          <ChevronRight aria-hidden className="size-3.5 rotate-180" />
-          {footer.label}
-        </Link>
-      </footer>
+          <Link
+            className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-sub transition-colors hover:text-brand"
+            href={footer.href}
+          >
+            <ChevronRight aria-hidden className="size-3.5 rotate-180" />
+            {footer.label}
+          </Link>
+        </footer>
+      ) : null}
     </aside>
   );
 }

@@ -11,7 +11,6 @@ import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-
 import { CurriculumTrigger } from '@/components/workspace/curriculum-trigger';
 import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
 import { useMaterialNavigation } from '@/components/workspace/use-material-navigation';
-import { useLayoutTranslation } from '@/i18n';
 import { useRouter } from 'next/navigation';
 import { ManualStaffActions } from './manual-staff-actions';
 import { SubmissionSummary } from '@/components/workspace/submission-summary';
@@ -61,7 +60,6 @@ export function ManualWorkspace({
   const { t: mt } = useManualTranslation();
   const { t: pt } = usePracticeTranslation();
   const router = useRouter();
-  const { t: lt } = useLayoutTranslation('learn');
   const [deliveryClass, setDeliveryClass] = useState(classId);
   const [serverRead] = useState(() =>
     initialWorkspace && claimServerRead(initialWorkspace.token) ? initialWorkspace.workspace : undefined);
@@ -578,8 +576,7 @@ export function ManualWorkspace({
       ) : null}
       <div className="relative flex min-h-0 flex-1">
         <WorkspaceCurriculumNavigator context={navigation.context} displayedMaterialId={materialId} open={panelOpen} panelId={panelId}
-          onClose={closePanel} onSelect={id => void navigateMaterial(id)} disabled={busy} error={navigation.failed} unavailable={navigation.unavailable} onRetry={navigation.retry}
-          footer={{ href: navigation.courseHref, label: lt('navigator.footer_student') }} />
+          onClose={closePanel} onSelect={id => void navigateMaterial(id)} disabled={busy} error={navigation.failed} unavailable={navigation.unavailable} onRetry={navigation.retry} />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div role="status" className="flex shrink-0 items-center gap-2 border-b border-border bg-brand-soft/40 px-4 py-1.5 text-xs font-semibold text-brand">
         <ListChecks aria-hidden className="size-4" />{mt(choice || (short && short.gradingMode !== 'MANUAL') ? 'automatic_graded' : 'teacher_graded').replace(/\s*·\s*$/, '')} · {mt(!data.practice && data.config.includeInScore ? 'included_in_score' : 'excluded_from_score')}

@@ -156,7 +156,6 @@
     "elapsed_time": "Time on this problem",
     "reviewing": "Submitted {{submitted}}",
     "submission_unavailable": "That submission could not be loaded. This is the current version of the problem.",
-    "back_to_records": "Back to answer records",
     "hints_description": "Open them one at a time — try the earlier ones first.",
     "hints_none_yet": "No hints opened yet.",
     "run_tests": "Test run",
@@ -267,7 +266,6 @@
     "error": "The course outline could not be loaded.",
     "retry": "Try again",
     "live": "Live",
-    "footer_student": "Back to the course",
     "transition_failed": "That problem could not be opened. Your code is untouched.",
     "transition_retry": "Try again",
     "unavailable": "This activity is no longer available in the course outline. Return to the course or try again."

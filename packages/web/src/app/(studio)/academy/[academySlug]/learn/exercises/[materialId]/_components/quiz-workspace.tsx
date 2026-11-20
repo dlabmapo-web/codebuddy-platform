@@ -115,7 +115,6 @@ export function QuizWorkspace({
         disabled={submission.submitting}
         busyMaterialId={null}
         error={false}
-        footer={{ href: coursePath, label: t("course") }}
         onClose={closePanel}
         onRetry={() => router.refresh()}
         onSelect={(id) => void navigate(id)}

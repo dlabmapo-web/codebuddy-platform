@@ -9,7 +9,6 @@ import { WorkspaceCurriculumNavigator } from '@/components/workspace/curriculum-
 import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
 import { useMaterialNavigation } from '@/components/workspace/use-material-navigation';
 import { MediaStaffActions, type MediaStaffPermissions } from '@/components/workspace/media-staff-actions';
-import { useLayoutTranslation } from '@/i18n';
 import { PrivateImageContext } from "@/components/editor/private-image-context";
 import { videoMediaBase } from "@/lib/video-api";
 
@@ -63,7 +62,6 @@ export function VideoLesson({
     ? { ...query.data, canTrack: false, progress: null, classes: [] }
     : query.data;
   useMaterialObservation({ materialId, classId: chosen, courseId: data?.course.id, enabled: !preview && Boolean(data?.canTrack) });
-  const { t: lt } = useLayoutTranslation('learn');
   const navigation = useMaterialNavigation({ academyId, materialId, classId: chosen, preview, courseId: data?.course.id, materials: data?.materials });
   const { open: panelOpen, panelId, triggerRef, toggle: togglePanel, close: closePanel } = useNavigatorPanel('material-course-outline');
   useEffect(() => {
@@ -129,8 +127,7 @@ export function VideoLesson({
       </LessonHeader>
       <div className="relative flex min-h-0 flex-1">
         <WorkspaceCurriculumNavigator context={navigation.context} displayedMaterialId={materialId} open={panelOpen} panelId={panelId}
-          onClose={closePanel} onSelect={navigation.navigate} error={navigation.failed} onRetry={navigation.retry}
-          footer={{ href: navigation.courseHref, label: lt('navigator.footer_student') }} />
+          onClose={closePanel} onSelect={navigation.navigate} error={navigation.failed} onRetry={navigation.retry} />
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
       <div className="mx-auto grid w-full max-w-7xl gap-6 p-4">
         <section className="min-w-0 self-center">

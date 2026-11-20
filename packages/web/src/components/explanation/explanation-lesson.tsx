@@ -8,7 +8,6 @@ import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import { useQuery } from '@tanstack/react-query';
 import { BookOpen, PencilLine } from 'lucide-react';
 import type { ExplanationReadResult } from '@cove/shared';
-import { useLayoutTranslation } from '@/i18n';
 import { explanationApi } from '@/lib/explanation-api';
 import { claimServerRead, SERVER_READ_FRESH_MS } from '@/lib/server-read';
 import { useMaterialObservation, StudentObservationIndicator } from '@/lib/monitoring/use-material-observation';
@@ -24,7 +23,7 @@ export function ExplanationLesson({ academyId, materialId, classId, preview, can
   academyId: string; materialId: string; classId?: string; preview?: boolean; canAuthor: boolean; staff: boolean;
   initial?: { data: ExplanationReadResult; token: string } | null;
 }) {
-  const { t } = useExplanationTranslation(); const { t: lt } = useLayoutTranslation('learn');
+  const { t } = useExplanationTranslation();
   const [seed] = useState(() => claimServerRead(initial?.token) ? initial?.data : undefined);
   const slug = useAcademySlug();
   const query = useQuery({ queryKey: ['explanation', academyId, materialId, classId, Boolean(preview)], queryFn: () => explanationApi.read({ academyId, materialId, classId, preview }), initialData: seed, staleTime: SERVER_READ_FRESH_MS, retry: false, refetchOnWindowFocus: false });
@@ -49,7 +48,7 @@ export function ExplanationLesson({ academyId, materialId, classId, preview, can
       <StudentObservationIndicator materialId={materialId} classId={classId} />
     </LessonHeader>
     <div className="relative flex min-h-0 flex-1">
-      <WorkspaceCurriculumNavigator context={navigation.context} displayedMaterialId={materialId} open={open} panelId={panelId} onClose={close} onSelect={navigation.navigate} error={navigation.failed} onRetry={navigation.retry} footer={{ href: navigation.courseHref, label: lt('navigator.footer_student') }} />
+      <WorkspaceCurriculumNavigator context={navigation.context} displayedMaterialId={materialId} open={open} panelId={panelId} onClose={close} onSelect={navigation.navigate} error={navigation.failed} onRetry={navigation.retry} />
       <div className={data.sideBody ? "min-h-0 min-w-0 flex-1" : "min-w-0 flex-1 overflow-y-auto px-3 sm:px-6"}><ExplanationContent title={data.title} body={data.body} sideBody={data.sideBody} images={data.images} lectureTitle={data.lecture.title} onRetry={() => void query.refetch()} /></div>
     </div>
     <LessonFooter previous={navigation.previous} next={navigation.next} index={navigation.index} total={navigation.total} />

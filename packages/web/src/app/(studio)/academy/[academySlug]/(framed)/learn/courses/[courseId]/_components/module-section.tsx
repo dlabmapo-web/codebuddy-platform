@@ -10,7 +10,8 @@ import { routes } from '@/lib/routes';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import type { LearnCourseOutline } from '@cove/shared';
 import * as Collapsible from '@radix-ui/react-collapsible';
-import { Check, ChevronDown } from 'lucide-react';
+import { BadgeCheck, Check, ChevronDown, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 
 import { useLayoutTranslation } from '@/i18n';
 
@@ -84,7 +85,22 @@ export function ModuleSection({
       {expanded ? (
         <div className="border-t border-border bg-canvas/40 p-3">
           <div className="flex flex-col gap-4">
-            {module.lectures.map((lecture) => (
+            {module.lectures.map((lecture) => lecture.test ? (
+              <section key={lecture.id} id={`lecture-${lecture.id}`} className="overflow-hidden rounded-lg border border-border bg-card">
+                <Link href={routes.academyLearnTest(slug, lecture.id, { classId })}
+                  className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-canvas/70">
+                  <BadgeCheck aria-hidden className="size-5 shrink-0 text-brand" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[10.5px] font-bold uppercase tracking-[0.07em] text-brand">
+                      {t('outline.lecture_label', { position: lecture.position })}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[13.5px] font-bold text-ink">{lecture.title}</span>
+                  </span>
+                  <span className="shrink-0 text-[12px] font-semibold text-sub">{lecture.test.itemCount}</span>
+                  <ChevronRight aria-hidden className="size-4 shrink-0 text-sub" />
+                </Link>
+              </section>
+            ) : (
               <Collapsible.Root
                 asChild
                 key={lecture.id}

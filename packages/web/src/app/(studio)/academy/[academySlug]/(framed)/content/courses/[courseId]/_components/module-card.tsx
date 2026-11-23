@@ -13,6 +13,7 @@ import { ArchivedBadge, RowVisibility } from './builder-controls';
 import { DragHandle, DropIndicator, useOutlineRowDnd } from './builder-dnd';
 import { DeleteModal } from './delete-modal';
 import { MoveModal } from './move-modal';
+import { AddTestButton } from './test-builder';
 import { LectureRow } from './lecture-row';
 import { RenameModal } from './rename-modal';
 import { RowMenu } from './row-menu';
@@ -192,6 +193,7 @@ export function ModuleCard({
             >
               {t('lecture.add')}
             </button>
+            <AddTestButton builder={builder} moduleId={courseModule.id} title={builder.lectureTitle} />
             <button
               className="h-11 px-2 text-[14.5px] font-semibold text-sub transition-colors hover:text-ink"
               onClick={builder.cancelLecture}

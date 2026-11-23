@@ -56,6 +56,7 @@ export const MODEL_COVERAGE: Record<string, Record<string, Claim>> = {
     externalKey: unit("@externalKey"),
     title: unit("lecture.title"),
     description: unit("lecture.description"),
+    kind: unit("lecture.test"),
     position: POSITION,
     isVisible: VISIBLE,
     createdAt: STAMP,

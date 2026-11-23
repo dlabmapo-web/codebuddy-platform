@@ -134,7 +134,24 @@ export type ProjectedLecture = {
   description: string;
   position: number;
   isVisible: boolean;
+  kind: "STANDARD" | "TEST";
+  /** Set for a TEST lecture: its settings, points keyed by local material id. */
+  test: ProjectedTest | null;
   materials: ProjectedMaterial[];
+};
+
+export type ProjectedTest = {
+  guide: string;
+  summary: string;
+  testType: string;
+  timeLimitMinutes: number | null;
+  usePreparation: boolean;
+  reviewAfterEnd: boolean;
+  allowSelfRetake: boolean;
+  showScoreOnFinish: boolean;
+  languageReference: boolean;
+  showExplanations: boolean;
+  points: Record<string, number>;
 };
 
 export type ProjectedModule = {
@@ -230,7 +247,14 @@ export async function readCourseProjection(
         'position', cm.position, 'isVisible', cm.is_visible,
         'lectures', coalesce((SELECT json_agg(json_build_object(
           'id', l.id, 'externalKey', l.external_key, 'title', l.title, 'description', l.description,
-          'position', l.position, 'isVisible', l.is_visible,
+          'position', l.position, 'isVisible', l.is_visible, 'kind', l.kind,
+          'test', (SELECT json_build_object(
+              'guide', lt.guide, 'summary', lt.summary, 'testType', lt.test_type,
+              'timeLimitMinutes', lt.time_limit_minutes, 'usePreparation', lt.use_preparation,
+              'reviewAfterEnd', lt.review_after_end, 'allowSelfRetake', lt.allow_self_retake,
+              'showScoreOnFinish', lt.show_score_on_finish, 'languageReference', lt.language_reference,
+              'showExplanations', lt.show_explanations, 'points', lt.points)
+            FROM lecture_tests lt WHERE lt.lecture_id = l.id AND l.kind = 'TEST'),
           'materials', coalesce((SELECT json_agg(json_build_object(
             'id', mt.id, 'type', mt.type, 'title', mt.title, 'position', mt.position,
             'isRequired', mt.is_required, 'isVisible', mt.is_visible,

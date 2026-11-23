@@ -15,6 +15,7 @@ import { PrismaClient } from "../generated/prisma/client.js";
 import { ManualService } from "../manual/manual.service.js";
 import { MultipleChoiceService } from "../manual/multiple-choice.service.js";
 import { ShortAnswerService } from "../manual/short-answer.service.js";
+import { copyCourseTree, courseCopyInclude } from "../content/library/course-tree-copy.js";
 import { lockCourseRow } from "./release.js";
 import { publishRelease } from "./release-access.js";
 import { AcademyLibrarySyncService } from "./academy-sync.service.js";
@@ -1099,5 +1100,66 @@ describe.skipIf(!databaseUrl)("library course sync (PostgreSQL)", () => {
     const updated = await client.programmingExercise.findUniqueOrThrow({ where: { materialId: localId } });
     expect(updated.sourceProject).toEqual(second);
     expect(updated.starterCode).not.toContain("library_secret");
+  });
+
+  it("carries a test lecture, its settings and its points through copy, adoption and sync", async () => {
+    const master = randomUUID(), moduleId = randomUUID(), lectureId = randomUUID(), problem = randomUUID();
+    await client.course.create({ data: { id: master, academyId: ids.library, title: `Test course ${master.slice(0, 8)}`, description: "", isVisible: true, createdByUserId: ids.admin } });
+    await client.courseModule.create({ data: { id: moduleId, courseId: master, externalKey: "m1", title: "Exams", position: 1, isVisible: true } });
+    await client.lecture.create({
+      data: {
+        id: lectureId, courseModuleId: moduleId, externalKey: "t1", title: "Midterm", position: 1, isVisible: true, kind: "TEST",
+        test: { create: { guide: "Read carefully", testType: "SUMMATIVE", timeLimitMinutes: 45, showScoreOnFinish: true, points: { [problem]: 5000 } } },
+      },
+    });
+    await client.material.create({
+      data: {
+        id: problem, lectureId, type: "PROGRAMMING_EXERCISE", title: "Add two numbers", position: 1, isVisible: true,
+        programmingExercise: {
+          create: {
+            externalKey: `test-${problem}`, difficulty: "EASY", language: "PYTHON", gradingRevision: 1,
+            gradingMode: "ELICE_STDIO", inputPromptPolicy: "INCLUDE", gradingSemanticVersion: "elice-v1",
+            totalTimeLimitMs: 10000, comparatorTimeLimitMs: 1000, materialMaximumHundredths: 10000, materialScorePolicy: "PROPORTIONAL",
+            starterCode: "", solutionCode: "print(sum(map(int, input().split())))",
+            testCases: { create: [{ position: 1, input: "1 2\n", expectedOutput: "3", visibility: "HIDDEN" }] },
+          },
+        },
+      },
+    });
+
+    // A plain copy (academy → library import) keeps the test and remaps its points.
+    const source = await client.course.findUniqueOrThrow({ where: { id: master }, include: courseCopyInclude });
+    const imported = randomUUID();
+    await client.course.create({ data: { id: imported, academyId: ids.library, title: `Imported ${imported.slice(0, 8)}`, description: "", isVisible: false, createdByUserId: ids.admin } });
+    await client.$transaction((tx) => copyCourseTree(tx, source, imported, "PRESERVE_VISIBILITY"));
+    const importedLecture = await client.lecture.findFirstOrThrow({ where: { courseModule: { courseId: imported } }, include: { test: true, materials: { select: { id: true } } } });
+    expect(importedLecture.kind).toBe("TEST");
+    expect(importedLecture.test).toMatchObject({ guide: "Read carefully", testType: "SUMMATIVE", timeLimitMinutes: 45, showScoreOnFinish: true });
+    expect(importedLecture.test!.points).toEqual({ [importedLecture.materials[0]!.id]: 5000 });
+
+    const release = (note: string, requireChanges = true) => client.$transaction(async (tx) => {
+      await lockCourseRow(tx, master);
+      return publishRelease(tx, audit, { libraryCourseId: master, note, actorUserId: ids.admin, requireChanges });
+    }, { timeout: 60_000 });
+    await release("First", false);
+    const library = new AcademyLibraryService(db, new AcademyAccessService(db, new SupportGrantResolver(db)), audit);
+    const copy = (await library.adopt(identity, { academyId: ids.academy, libraryCourseId: master, title: "Test copy" })).id;
+    const linked = async (nodeKey: string) => (await client.librarySyncLink.findFirstOrThrow({ where: { copyCourseId: copy, nodeKey } })).localId!;
+    const copyLecture = await linked(lectureId);
+    const copyProblem = await linked(problem);
+    const adopted = await client.lecture.findUniqueOrThrow({ where: { id: copyLecture }, include: { test: true } });
+    expect(adopted.kind).toBe("TEST");
+    expect(adopted.test).toMatchObject({ guide: "Read carefully", timeLimitMinutes: 45, showScoreOnFinish: true });
+    expect(adopted.test!.points).toEqual({ [copyProblem]: 5000 });
+
+    // The library changes the test: the copy follows on the next release.
+    await client.lectureTest.update({ where: { lectureId }, data: { timeLimitMinutes: 30, points: { [problem]: 7000 } } });
+    await client.course.update({ where: { id: master }, data: { contentRevision: { increment: 1 } } });
+    await release("Shorter test");
+    expect(await jobs.drain()).toBeGreaterThanOrEqual(1);
+    const synced = await client.lectureTest.findUniqueOrThrow({ where: { lectureId: copyLecture } });
+    expect(synced.timeLimitMinutes).toBe(30);
+    expect(synced.points).toEqual({ [copyProblem]: 7000 });
+    expect((await client.courseSyncState.findUniqueOrThrow({ where: { courseId: copy } })).openConflictCount).toBe(0);
   });
 });

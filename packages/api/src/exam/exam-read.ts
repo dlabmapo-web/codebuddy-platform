@@ -252,7 +252,15 @@ export async function readStaffTest(db: Db, input: { academyId: string; courseId
   const [row] = await db.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
     SELECT l.id, l.title, l.is_visible, l.kind, cm.id AS module_id, cm.course_id, to_jsonb(lt) AS test,
       ${itemsSql(Prisma.sql`l.id`)} AS items,
-      (SELECT count(*) FROM test_attempts a WHERE a.lecture_id = l.id)::int AS attempt_count
+      (SELECT count(*) FROM test_attempts a WHERE a.lecture_id = l.id)::int AS attempt_count,
+      COALESCE((SELECT jsonb_agg(jsonb_build_object('class_id', k.id, 'name', k.name,
+          'taken', (SELECT count(DISTINCT a.user_id) FROM test_attempts a WHERE a.class_id = k.id AND a.lecture_id = l.id),
+          'ended', (SELECT count(DISTINCT a.user_id) FROM test_attempts a WHERE a.class_id = k.id AND a.lecture_id = l.id
+            AND (a.ended_at IS NOT NULL OR a.deadline_at <= now())),
+          'in_progress', (SELECT count(*) FROM test_attempts a WHERE a.class_id = k.id AND a.lecture_id = l.id
+            AND a.ended_at IS NULL AND (a.deadline_at IS NULL OR a.deadline_at > now()))) ORDER BY k.name, k.id)
+        FROM class_courses cc JOIN classes k ON k.id = cc.class_id
+        WHERE cc.course_id = cm.course_id AND k.status = 'ACTIVE'), '[]'::jsonb) AS classes
     FROM lectures l
     JOIN course_modules cm ON cm.id = l.course_module_id
     JOIN courses c ON c.id = cm.course_id
@@ -270,6 +278,10 @@ export async function readStaffTest(db: Db, input: { academyId: string; courseId
     settings: row.test ? toSettings(row.test as Record<string, unknown>) : null,
     items: toItems(row.items),
     attemptCount: row.attempt_count as number,
+    classes: (row.classes as Array<Record<string, unknown>>).map((k) => ({
+      classId: k.class_id as string, name: k.name as string,
+      taken: Number(k.taken), ended: Number(k.ended), inProgress: Number(k.in_progress),
+    })),
   };
 }
 

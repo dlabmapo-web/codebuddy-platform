@@ -189,6 +189,7 @@ export class ExamStaffService {
       totalPointsHundredths: items.filter((item) => item.type).reduce((sum, item) => sum + item.pointsHundredths, 0),
       locked: row.isVisible || row.attemptCount > 0,
       attemptCount: row.attemptCount,
+      classes: row.classes,
     };
   }
 

@@ -190,7 +190,9 @@ const sampleSchema = z.object({ input: z.string(), output: z.string() });
 export const examItemContentSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("CODE"), materialId: z.uuid(), title: z.string(), description: z.string(),
-    inputFormat: z.string(), outputFormat: z.string(), samples: z.array(sampleSchema),
+    inputFormat: z.string(), outputFormat: z.string(), constraints: z.string(), samples: z.array(sampleSchema),
+    /** How many graded cases stay hidden, as the normal workspace says. */
+    hiddenCount: z.number().int().min(0),
     language: z.string(), starterCode: z.string(),
     /** The last code submitted in this attempt, to restore after leaving. */
     lastAnswer: z.string().nullable(),
@@ -245,6 +247,14 @@ export const examStaffTestSchema = z.object({
   /** Published, or any attempt exists: points and the problem list are frozen. */
   locked: z.boolean(),
   attemptCount: z.number().int(),
+  /** Every class that learns this course, with how far it got: results live per class. */
+  classes: z.array(z.object({
+    classId: z.uuid(),
+    name: z.string(),
+    taken: z.number().int(),
+    ended: z.number().int(),
+    inProgress: z.number().int(),
+  })),
 });
 export type ExamStaffTest = z.infer<typeof examStaffTestSchema>;
 

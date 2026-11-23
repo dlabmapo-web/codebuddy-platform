@@ -193,8 +193,8 @@ export class ExamService {
           id: true, title: true, type: true,
           programmingExercise: {
             select: {
-              description: true, inputFormat: true, outputFormat: true, starterCode: true, language: true, quiz: true,
-              testCases: { where: { visibility: "SAMPLE" }, orderBy: { position: "asc" }, select: { input: true, expectedOutput: true } },
+              description: true, inputFormat: true, outputFormat: true, constraints: true, starterCode: true, language: true, quiz: true,
+              testCases: { orderBy: { position: "asc" }, select: { input: true, expectedOutput: true, visibility: true } },
             },
           },
           manualMaterial: { select: { description: true, multipleChoice: true, shortAnswer: true, revision: true } },
@@ -212,8 +212,11 @@ export class ExamService {
     }
     if (exercise) {
       return { type: "CODE", materialId: material.id, title: material.title, description: exercise.description,
-        inputFormat: exercise.inputFormat, outputFormat: exercise.outputFormat,
-        samples: exercise.testCases.map((testCase) => ({ input: testCase.input, output: testCase.expectedOutput })),
+        inputFormat: exercise.inputFormat, outputFormat: exercise.outputFormat, constraints: exercise.constraints,
+        // Hidden cases are counted, never sent.
+        samples: exercise.testCases.filter((testCase) => testCase.visibility === "SAMPLE")
+          .map((testCase) => ({ input: testCase.input, output: testCase.expectedOutput })),
+        hiddenCount: exercise.testCases.filter((testCase) => testCase.visibility !== "SAMPLE").length,
         language: exercise.language, starterCode: exercise.starterCode, lastAnswer };
     }
     const manual = material.manualMaterial;

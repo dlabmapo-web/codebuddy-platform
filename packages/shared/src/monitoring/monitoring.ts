@@ -737,7 +737,8 @@ export const monitoringPublicExerciseSchema = z.object({
   breadcrumb: z.object({
     course: z.object({ id: z.uuid(), title: z.string().min(1) }),
     module: z.object({ id: z.uuid(), title: z.string().min(1) }),
-    lecture: z.object({ id: z.uuid(), title: z.string().min(1) }),
+    /** TEST: the student is sitting an exam, so the teacher watches without helping. */
+    lecture: z.object({ id: z.uuid(), title: z.string().min(1), kind: z.enum(["STANDARD", "TEST"]).optional() }),
   }),
   exercise: learnExerciseSchema,
 });

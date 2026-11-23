@@ -360,4 +360,4 @@ export type PageNamespace =
 export const destructiveNamespaces = ['destructive'] as const;
 
 /** Exams (테스트): the student test card, wizard and test mode, authoring and results. */
-export const examNamespaces = ["exam", "sample-check", "errors"] as const;
+export const examNamespaces = ["exam", "sample-check", "monitoring", "errors"] as const;

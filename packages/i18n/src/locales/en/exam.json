@@ -58,6 +58,7 @@
     "starting": "Starting…"
   },
   "mode": {
+    "teacher_watching": "Teacher is watching",
     "guide": "Test guide",
     "remaining": "Time left: {{time}}",
     "no_deadline": "No time limit",

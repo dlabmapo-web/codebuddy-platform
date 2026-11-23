@@ -703,7 +703,8 @@ export function LiveWorkspace({
               </div>
             </div>}
 
-              <div className="shrink-0" {...surfaceProps('feedback')}>
+              {/* A note to a student sitting a test would be help during the exam: watch only. */}
+              {shown?.breadcrumb.lecture.kind === 'TEST' ? null : <div className="shrink-0" {...surfaceProps('feedback')}>
                 <FeedbackDock
                   canDraft={Boolean(shown) && live.state !== 'revoked'}
                   canSend={live.canEdit && display.isLive}
@@ -719,7 +720,7 @@ export function LiveWorkspace({
                   }}
                   teacherMembershipRef={teacherMembershipRef}
                 />
-              </div>
+              </div>}
           </section>
         </div>
         </MonitoringLiveContent>

@@ -153,6 +153,8 @@ export function TestMode({ academyId, initial }: { academyId: string; initial: E
               key={item.materialId}
               academyId={academyId}
               attemptId={shell.id}
+              classId={shell.classId}
+              courseId={shell.courseId}
               item={item}
               readOnly={!shell.open}
               onSubmitted={markSubmitted}

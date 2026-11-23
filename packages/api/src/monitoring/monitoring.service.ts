@@ -413,6 +413,7 @@ export class MonitoringService {
       material.courseId,
       material.academyId,
       material.studentUserId,
+      { includeTestProblems: true },
     );
     const navigator = outline && toNavigatorContext(outline, material.materialId);
     if (!navigator) {
@@ -733,6 +734,7 @@ export class MonitoringService {
           select: {
             id: true,
             title: true,
+            kind: true,
             courseModule: {
               select: {
                 id: true,
@@ -789,7 +791,7 @@ export class MonitoringService {
           id: material.lecture.courseModule.id,
           title: material.lecture.courseModule.title,
         },
-        lecture: { id: material.lecture.id, title: material.lecture.title },
+        lecture: { id: material.lecture.id, title: material.lecture.title, kind: material.lecture.kind },
       },
       exercise: {
         materialId: material.id,

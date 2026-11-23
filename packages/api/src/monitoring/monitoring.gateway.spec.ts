@@ -1656,7 +1656,12 @@ describe("direct live page watch", () => {
     expect(denied).toMatchObject({ ok: false, code: 'MONITORING_STUDENT_UNAVAILABLE' });
     expect(prisma.exerciseDraft.findFirst).not.toHaveBeenCalled();
   });
-  it.each([false, true])("authorizes the watch and its requested automatic editing (%s)", async (autoEdit) => {
+  it.each([
+    { autoEdit: false, test: false, mode: 'MONITORING' },
+    { autoEdit: true, test: false, mode: 'HELPING' },
+    // A test problem is watched only, even when the page asks to edit.
+    { autoEdit: true, test: true, mode: 'MONITORING' },
+  ])("authorizes the watch and its requested automatic editing ($autoEdit, test $test)", async ({ autoEdit, test, mode }) => {
     const { gateway, visits, watchSessions } = createGateway({
       snapshot: async () => ({ entries: [{ studentMembershipId, materialId }] }) as unknown as PresenceSnapshot,
     });
@@ -1667,6 +1672,7 @@ describe("direct live page watch", () => {
         requireMonitorableStudent: vi.fn().mockResolvedValue(claim),
         requireMonitorableMaterial: vi.fn().mockResolvedValue(claim),
       },
+      isTestMaterial: vi.fn().mockResolvedValue(test),
     });
     Object.assign(visits, { start: vi.fn().mockResolvedValue({ id: visitId, startedAt: new Date(), replaced: null }) });
     const socket = createSocket({});
@@ -1674,8 +1680,8 @@ describe("direct live page watch", () => {
       const result = await gateway.watchStart(socket, { eventId: crypto.randomUUID(), academyId, classId, studentMembershipId, sessionId, protocolVersion: 3, autoEdit,
         materialId: '80000000-0000-4000-8000-000000000099' });
       expect(result.ok).toBe(true);
-      if (result.ok) expect(result.data.mode).toBe(autoEdit ? 'HELPING' : 'MONITORING');
-      expect(watchSessions.register).toHaveBeenCalledWith(expect.objectContaining({ mode: autoEdit ? 'HELPING' : 'MONITORING', draftId }));
+      if (result.ok) expect(result.data.mode).toBe(mode);
+      expect(watchSessions.register).toHaveBeenCalledWith(expect.objectContaining({ mode, draftId }));
       expect((gateway as unknown as { access: { requireMonitorableMaterial: unknown } }).access.requireMonitorableMaterial).toHaveBeenCalledWith(claim, materialId);
       expect(socket.join).toHaveBeenCalledWith(expect.arrayContaining([monitoringRooms.teacher(academyId, teacherMembershipId)]));
     } finally {

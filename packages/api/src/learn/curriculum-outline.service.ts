@@ -92,11 +92,13 @@ export class CurriculumOutlineService {
     courseId: string,
     academyId: string,
     userId: string,
+    /** A watching teacher navigates a test's problems; a student never does. */
+    options: { includeTestProblems?: boolean } = {},
   ): Promise<LearnCourseOutline | null> {
     const course = await this.prisma.course.findFirst({
       where: { id: courseId, academyId, isVisible: true },
     });
-    return course ? this.outlineFor(await withCurriculum(this.prisma, course), userId) : null;
+    return course ? this.outlineFor(await withCurriculum(this.prisma, course), userId, undefined, false, options) : null;
   }
 
   /** The same fold, for a caller that already read the course graph. */
@@ -105,11 +107,12 @@ export class CurriculumOutlineService {
     userId: string,
     classId?: string,
     staffPractice = false,
+    options: { includeTestProblems?: boolean } = {},
   ): Promise<LearnCourseOutline> {
     const testItemCounts = new Map(course.modules.flatMap((m) => m.lectures)
       .filter((lecture) => lecture.kind === "TEST")
       .map((lecture) => [lecture.id, lecture.materials.length]));
-    const modules = nonemptyModules(course);
+    const modules = nonemptyModules(course, options);
     const materialIds = navigableMaterialIds({ ...course, modules });
     // One `userId + materialIds` query for the whole course. A per-row lookup
     // is what made v1's outline scale with the size of the curriculum.
@@ -359,12 +362,14 @@ export function courseSummaryFor(
 /** A lecture with no exercise is a heading; a module of those is not a module. */
 export function nonemptyModules(
   course: Pick<VisibleCourse, "modules">,
+  options: { includeTestProblems?: boolean } = {},
 ): VisibleCourse["modules"] {
   return course.modules.flatMap((courseModule) => {
     // A test is one outline item: its problems open only inside an attempt,
     // and they count toward neither navigation nor practice progress.
+    // A watching teacher is the exception: they follow the student's problem.
     const lectures = courseModule.lectures.map((lecture) =>
-      lecture.kind === "TEST" ? { ...lecture, materials: [] } : lecture,
+      lecture.kind === "TEST" && !options.includeTestProblems ? { ...lecture, materials: [] } : lecture,
     ).filter((lecture) => lecture.kind === "TEST" ||
       lecture.materials.some(
         (material) =>

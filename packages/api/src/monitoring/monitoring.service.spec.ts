@@ -955,6 +955,8 @@ describe("getStudentCurriculum", () => {
       courseId,
       academyId,
       studentUserId,
+      // A watching teacher follows the student into a test's problems.
+      { includeTestProblems: true },
     );
   });
 

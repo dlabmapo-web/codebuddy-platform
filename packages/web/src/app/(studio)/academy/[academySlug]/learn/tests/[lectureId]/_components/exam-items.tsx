@@ -24,10 +24,17 @@ import { useErrorText } from '@/i18n/client/use-error-text';
 import { toApiError } from '@/lib/api-errors';
 import { orpc } from '@/lib/orpc';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
+import { useStudentPresence } from '@/lib/monitoring/student-presence';
+import { useStudentMonitoring } from '@/lib/monitoring/use-student-monitoring';
+import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
+import { RemotePointer } from '@/components/monitoring/remote-pointer';
+import { MonitoringIndicator } from '../../../exercises/[materialId]/_components/monitoring-indicator';
 
 type Props = {
   academyId: string;
   attemptId: string;
+  classId: string;
+  courseId: string;
   item: ExamShellItem;
   readOnly: boolean;
   onSubmitted: (materialId: string, submittedAt: Date) => void;
@@ -65,6 +72,21 @@ export function ExamItemView(props: Props) {
   }
   if (!content) return <div className="grid h-full place-items-center text-[13px] text-sub">{t('mode.loading')}</div>;
   if (content.type === 'CODE') return <CodeItem {...props} content={content} />;
+  return <AnswerItem {...props} content={content} />;
+}
+
+/**
+ * Multiple choice and short answer. There is no editor to share, so live
+ * monitoring is the open-problem report alone: the teacher's roster shows
+ * which problem the student is on.
+ */
+function AnswerItem(props: Props & { content: Exclude<ExamItemContent, { type: 'CODE' }> }) {
+  const { content } = props;
+  const { setOpenMaterial } = useStudentPresence();
+  React.useEffect(() => {
+    if (props.readOnly) return;
+    return setOpenMaterial({ materialId: content.materialId, courseId: props.courseId, classId: props.classId }) ?? undefined;
+  }, [content.materialId, props.classId, props.courseId, props.readOnly, setOpenMaterial]);
   return (
     <div className="h-full overflow-y-auto px-4 py-6 sm:px-8">
       <div className="mx-auto w-full max-w-[760px]">
@@ -202,6 +224,30 @@ function CodeItem(props: Props & { content: Extract<ExamItemContent, { type: 'CO
   const language = (['PYTHON', 'C', 'CPP'].includes(content.language) ? content.language : 'PYTHON') as ExerciseLanguage;
   const python = language === 'PYTHON';
   const runner = usePythonRunner({ browserRuntime: python });
+  const { t: tm } = useTranslation('monitoring');
+  const codeRef = React.useRef(code);
+  React.useEffect(() => { codeRef.current = code; }, [code]);
+  // Sent to a watching teacher so their statement lays out at this width and
+  // both mouse arrows land on the same words.
+  const [statementReadingWidth, setStatementReadingWidth] = React.useState<number | null>(null);
+  // The same live monitoring as the normal workspace: the teacher sees this
+  // problem in the roster, follows the editor and the terminal. Editing is
+  // refused on the server for test problems, so a teacher can only watch.
+  const monitoring = useStudentMonitoring({
+    classId: props.classId,
+    courseId: props.courseId,
+    materialId: readOnly ? null : content.materialId,
+    statementWidth: statementReadingWidth,
+    ready: !readOnly,
+    // The shared document is seeded from the server draft, so the buffer is
+    // saved there before a teacher's view opens.
+    onBeforeCollaborate: async () => {
+      await orpc.learn.saveDraft({ academyId: props.academyId, materialId: content.materialId, code: codeRef.current }).catch(() => undefined);
+    },
+    onAfterCollaborate: (snapshot) => { setCode(snapshot.code); writeDraft(draftKey, snapshot.code); },
+    teacherLabel: tm('peer.teacher'),
+    terminal: { readTranscript: runner.readTranscript, subscribeTerminal: runner.subscribeTerminal },
+  });
   const preferences = useEditorPreferences();
   // The same panes, proportions and dividers as the normal problem workspace.
   const { size: statementWidth, dragging: draggingStatement, containerRef: paneRef, dividerProps: statementDivider } =
@@ -217,26 +263,40 @@ function CodeItem(props: Props & { content: Extract<ExamItemContent, { type: 'CO
     inputFormat: content.inputFormat, outputFormat: content.outputFormat, constraints: content.constraints,
     sampleTestCases, hiddenTestCaseCount: content.hiddenCount, hints: [],
   } as unknown as LearnExercise;
-  const change = (value: string) => { setCode(value); writeDraft(draftKey, value); };
+  const change = (value: string) => { monitoring.markActive(); setCode(value); writeDraft(draftKey, value); };
   const runSample = (index: number) => {
     setActiveSample(index);
     void runner.run(code, { stdin: content.samples[index]?.input ?? '' }).finally(() => setActiveSample(null));
   };
   return (
     <div className="flex h-full min-h-0 min-w-0 overflow-hidden" ref={paneRef}>
+      {/* Each watching teacher's mouse, as in the normal workspace. The panes
+          below are marked as the same named surfaces, which is also what
+          lets the student's own mouse show on the teacher's screen. */}
+      {monitoring.peers.map((peer) => (
+        <RemotePointer key={peer.peerId} name={peer.label ?? tm('peer.teacher')} materialId={content.materialId}
+          sourceMaterialId={monitoring.pointerMaterialId} pointer={peer.pointer} />
+      ))}
       <section className="@container hidden min-w-0 overflow-y-auto overflow-x-hidden bg-card md:block md:flex-none"
         style={{ flexBasis: `${statementWidth}%` }}>
-        <ProblemStatement exercise={exercise} revealedHints={0} />
+        <div {...surfaceProps('statement')}>
+          <ProblemStatement collaborating={monitoring.collaborating} exercise={exercise} onReadingWidth={setStatementReadingWidth} revealedHints={0} />
+        </div>
       </section>
       <div aria-hidden className={`hidden w-1 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-brand/40 md:block ${draggingStatement ? 'bg-brand/60' : ''}`}
         {...statementDivider} />
       <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" ref={editorRef}>
         <header className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#2d2d2d] px-3 py-1.5">
           <LanguageTag language={language} label={t(`workspace.${languageLabelKey(language)}`)} />
-          <div className="ml-auto"><FontSizeControls {...preferences} /></div>
+          <div className="ml-auto flex items-center gap-2">
+            {/* Watch-only during a test, so the student is never told they are being helped. */}
+            <MonitoringIndicator state={monitoring.indicator === 'HELPING' ? 'MONITORING' : monitoring.indicator} monitoringLabel={te('mode.teacher_watching')} />
+            <FontSizeControls {...preferences} />
+          </div>
         </header>
-        <div className="flex min-h-0 flex-1 flex-col">
-          <CodeEditor code={code} fontSize={preferences.fontSize} language={monacoLanguageFor(language)} readOnly={readOnly} onChange={change} />
+        <div className="flex min-h-0 flex-1 flex-col" {...surfaceProps('editor')}>
+          <CodeEditor code={code} fontSize={preferences.fontSize} language={monacoLanguageFor(language)} readOnly={readOnly} onChange={change}
+            documentManaged={monitoring.collaborating} onMount={(editor) => monitoring.registerEditor(editor)} />
         </div>
         <div aria-label={t('workspace.resize_terminal')} role="separator" {...outputDivider}
           className={`relative h-3 shrink-0 touch-none select-none cursor-row-resize bg-transparent before:absolute before:inset-x-0 before:top-1/2 before:h-px before:-translate-y-1/2 before:bg-border before:transition-all hover:before:h-0.5 hover:before:bg-brand/60 ${draggingOutput ? 'before:h-0.5 before:bg-brand' : ''}`} />
@@ -261,7 +321,7 @@ function CodeItem(props: Props & { content: Extract<ExamItemContent, { type: 'CO
                 : status ? <span className="text-[12px] text-white/70">{status}</span> : null}
             </>)}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto" role="region" aria-label={te('mode.output')}>
+          <div className="min-h-0 flex-1 overflow-y-auto" role="region" aria-label={te('mode.output')} {...surfaceProps('terminal')}>
             {python ? (
               <TerminalPanel awaitingInput={runner.awaitingInput} lines={runner.lines} onEndInput={runner.endInput}
                 onSubmitInput={runner.submitInput} supported={runner.supported} />

@@ -104,14 +104,13 @@ export function TestAuthoringPage({ academyId, initial }: { academyId: string; i
             className="h-12 rounded-lg border border-brand px-8 text-[15px] font-bold text-brand hover:bg-brand-soft">
             {t('authoring.edit')}
           </button>
-          <Link href={routes.academyTeachClasses(slug)} className="ml-auto text-[13px] font-semibold text-brand hover:underline">
-            {t('authoring.results_link')} →
-          </Link>
         </div>
         {notice ? (
           <p role={notice.tone === 'error' ? 'alert' : 'status'} className={`mt-4 text-[13px] font-semibold ${notice.tone === 'error' ? 'text-danger' : 'text-success'}`}>{notice.text}</p>
         ) : null}
       </section>
+
+      <ClassResults test={test} slug={slug} />
 
       <div role="tablist" className="mt-8 flex gap-1 border-b border-border">
         {(['guide', 'settings', 'problems'] as const).map((key) => (
@@ -355,5 +354,38 @@ function ProblemsTab({ test, busy, academySlug, onSave }: {
         <div className="pt-6"><SaveButton busy={busy} disabled={!changed || !valid} onClick={() => void onSave(parsed)} /></div>
       )}
     </div>
+  );
+}
+
+/**
+ * Where a manager or team lead reads how a test went: results live per class
+ * (each class sits it on its own period), so every class that learns the
+ * course is listed with who took it, who finished and who is still in it.
+ */
+function ClassResults({ test, slug }: { test: ExamStaffTest; slug: string }) {
+  const { t } = useTranslation('exam');
+  return (
+    <section className="mt-6 rounded-2xl border border-border bg-card p-6">
+      <h2 className="text-[16px] font-bold text-ink">{t('authoring.results_link')}</h2>
+      <p className="mt-1 text-[13px] text-sub">{t('authoring.results_hint')}</p>
+      {test.classes.length ? (
+        <ul className="mt-4 divide-y divide-border rounded-xl border border-border">
+          {test.classes.map((row) => (
+            <li key={row.classId}>
+              <Link href={routes.academyTeachClassTest(slug, row.classId, test.lectureId)}
+                className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-surface">
+                <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink">{row.name}</span>
+                <span className="text-[12.5px] text-sub">{t('results.taken', { count: row.taken })}</span>
+                <span className="text-[12.5px] font-semibold text-success">{t('authoring.results_ended', { count: row.ended })}</span>
+                {row.inProgress ? <span className="text-[12.5px] font-semibold text-brand">{t('results.in_progress_count', { count: row.inProgress })}</span> : null}
+                <span className="text-[13px] font-semibold text-brand">{t('authoring.results_open')} →</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-4 rounded-xl border border-dashed border-border px-4 py-6 text-center text-[13px] text-sub">{t('authoring.results_no_classes')}</p>
+      )}
+    </section>
   );
 }

@@ -185,7 +185,11 @@
       "open_editor": "편집기 열기",
       "add_problem": "코스 빌더에서 문제 추가"
     },
-    "results_link": "반별 결과"
+    "results_link": "반별 결과",
+    "results_hint": "반마다 응시 기간이 따로 있습니다. 반을 열어 응시 기간과 성적 공개를 설정하고 학생별 점수를 확인하세요.",
+    "results_ended": "종료 {{count}}명",
+    "results_open": "결과 보기",
+    "results_no_classes": "이 코스를 배우는 반이 아직 없습니다. 먼저 반에 코스를 배정하세요."
   },
   "results": {
     "tab": "테스트",

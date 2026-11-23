@@ -185,7 +185,11 @@
       "open_editor": "Open editor",
       "add_problem": "Add a problem in the course builder"
     },
-    "results_link": "Results by class"
+    "results_link": "Results by class",
+    "results_hint": "Each class sits the test on its own period. Open a class to set its period, release results, and see every student's score.",
+    "results_ended": "Finished {{count}}",
+    "results_open": "Open results",
+    "results_no_classes": "No class learns this course yet. Assign the course to a class first."
   },
   "results": {
     "tab": "Tests",

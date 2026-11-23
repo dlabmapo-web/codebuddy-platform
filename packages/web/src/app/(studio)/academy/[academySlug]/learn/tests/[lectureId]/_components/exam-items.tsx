@@ -1,11 +1,22 @@
 'use client';
 
-import type { ExamItemContent, ExamShellItem } from '@cove/shared';
-import { Copy, Play, Square } from 'lucide-react';
+import { meaningfulChoiceHtml, type ExamItemContent, type ExamShellItem, type ExerciseLanguage, type LearnExercise, type LearnSampleTestCase } from '@cove/shared';
+import { RotateCcw, Send } from 'lucide-react';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CodeEditor } from '@/components/editor/code-editor';
+import { FontSizeControls } from '@/components/workspace/font-size-controls';
+import { LanguageTag } from '@/components/workspace/language-tag';
+import { ProblemStatement } from '@/components/workspace/problem-statement';
+import { ResetConfirmDialog } from '@/components/workspace/reset-confirm-dialog';
+import { RunControls } from '@/components/workspace/run-controls';
+import { TerminalPanel } from '@/components/workspace/terminal-panel';
+import { useLayoutTranslation } from '@/i18n';
+import { languageLabelKey, monacoLanguageFor } from '@/lib/workspace/exercise-language';
+import { STATEMENT_PANE } from '@/lib/workspace/statement-canvas';
+import { useEditorPreferences } from '@/lib/workspace/use-editor-preferences';
+import { useSplitPane } from '@/lib/workspace/use-split-pane';
 import { ChoiceRich } from '@/components/manual/choice-options';
 import { RichTextFrame } from '@/components/studio/rich-text-frame';
 import { formatExamDate } from '@/components/exam/exam-format';
@@ -132,7 +143,7 @@ function ChoiceItem(props: Props & { content: Extract<ExamItemContent, { type: '
           <span className="text-brand">{t('mode.question_mark')}</span>
           <span className="min-w-0 whitespace-pre-wrap break-words">{question}</span>
         </h2>
-        {content.description.trim() ? (
+        {meaningfulChoiceHtml(content.description) ? (
           <div className="mt-4"><RichTextFrame content={content.description} title={question} minHeight={24} fallbackHeight={80} padding={0} /></div>
         ) : null}
         <div role={multiple ? 'group' : 'radiogroup'} aria-label={question} className="mt-6 space-y-3">
@@ -165,7 +176,7 @@ function ShortAnswerItem(props: Props & { content: Extract<ExamItemContent, { ty
     <section className="overflow-hidden rounded-2xl border border-border bg-card">
       <div className="px-6 py-6">
         <h2 className="flex gap-2 text-[17px] font-bold"><span className="text-brand">{t('mode.question_mark')}</span><span>{content.title}</span></h2>
-        {content.description.trim() ? (
+        {meaningfulChoiceHtml(content.description) ? (
           <div className="mt-4"><RichTextFrame content={content.description.replace(/\n/g, '<br>')} title={content.title} minHeight={24} fallbackHeight={80} padding={0} /></div>
         ) : null}
         <textarea value={answer} readOnly={readOnly} maxLength={10_000}
@@ -180,92 +191,92 @@ function ShortAnswerItem(props: Props & { content: Extract<ExamItemContent, { ty
 }
 
 function CodeItem(props: Props & { content: Extract<ExamItemContent, { type: 'CODE' }> }) {
-  const { t } = useTranslation('exam');
+  const { t } = useLayoutTranslation(['learn', 'common']);
+  const { t: te } = useTranslation('exam');
   const { content, readOnly } = props;
   const { busy, error, submit, status } = useSubmit(props);
   const draftKey = `cove-exam:${props.attemptId}:${content.materialId}`;
   const [code, setCode] = React.useState(() => readDraft(draftKey) ?? content.lastAnswer ?? content.starterCode);
-  const [stdin, setStdin] = React.useState(content.samples[0]?.input ?? '');
-  const python = content.language === 'PYTHON';
+  const [activeSample, setActiveSample] = React.useState<number | null>(null);
+  const [resetOpen, setResetOpen] = React.useState(false);
+  const language = (['PYTHON', 'C', 'CPP'].includes(content.language) ? content.language : 'PYTHON') as ExerciseLanguage;
+  const python = language === 'PYTHON';
   const runner = usePythonRunner({ browserRuntime: python });
-  const editorLanguage = content.language === 'C' ? 'c' : content.language === 'CPP' ? 'cpp' : 'python';
-  const output = runner.lines.map((line) => line.text).join('\n');
+  const preferences = useEditorPreferences();
+  // The same panes, proportions and dividers as the normal problem workspace.
+  const { size: statementWidth, dragging: draggingStatement, containerRef: paneRef, dividerProps: statementDivider } =
+    useSplitPane({ axis: 'horizontal', initial: STATEMENT_PANE.initialPercent, min: STATEMENT_PANE.minPercent, max: STATEMENT_PANE.maxPercent });
+  const { size: outputHeight, dragging: draggingOutput, containerRef: editorRef, dividerProps: outputDivider } =
+    useSplitPane({ axis: 'vertical', initial: 260, min: 80, max: 1_200 });
+  const sampleTestCases: LearnSampleTestCase[] = content.samples.map((sample, index) => ({
+    position: index + 1, input: sample.input, expectedOutput: sample.output, comparator: 'STDOUT',
+  }));
+  // ProblemStatement reads only these fields; hints and solutions never exist in a test.
+  const exercise = {
+    materialId: content.materialId, title: content.title, description: content.description,
+    inputFormat: content.inputFormat, outputFormat: content.outputFormat, constraints: content.constraints,
+    sampleTestCases, hiddenTestCaseCount: content.hiddenCount, hints: [],
+  } as unknown as LearnExercise;
+  const change = (value: string) => { setCode(value); writeDraft(draftKey, value); };
+  const runSample = (index: number) => {
+    setActiveSample(index);
+    void runner.run(code, { stdin: content.samples[index]?.input ?? '' }).finally(() => setActiveSample(null));
+  };
   return (
-    <div className="grid h-full min-h-0 grid-rows-[minmax(0,45%)_minmax(0,55%)] lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:grid-rows-1">
-      <article className="min-h-0 overflow-y-auto border-b border-border bg-card px-5 py-5 lg:border-b-0 lg:border-r">
-        <h2 className="text-center text-[18px] font-bold">{content.title}</h2>
-        {content.description.trim() ? (
-          <div className="mt-4"><RichTextFrame content={content.description} title={content.title} minHeight={24} fallbackHeight={120} padding={0} /></div>
-        ) : null}
-        {content.inputFormat.trim() ? <Block title={t('mode.input')}>{content.inputFormat}</Block> : null}
-        {content.outputFormat.trim() ? <Block title={t('mode.expected')}>{content.outputFormat}</Block> : null}
-        {content.samples.map((sample, index) => (
-          <div key={index} className="mt-5">
-            <h3 className="text-[14px] font-bold">{t('mode.example', { n: index + 1 })}</h3>
-            {sample.input ? <Sample label={t('mode.input')} value={sample.input} /> : null}
-            <Sample label={t('mode.expected')} value={sample.output} />
-          </div>
-        ))}
-      </article>
-      <section className="flex min-h-0 flex-col">
-        <div className="flex min-h-0 flex-[3] flex-col">
-          <CodeEditor code={code} fontSize={14} language={editorLanguage} readOnly={readOnly}
-            onChange={(value) => { setCode(value); writeDraft(draftKey, value); }} />
+    <div className="flex h-full min-h-0 min-w-0 overflow-hidden" ref={paneRef}>
+      <section className="@container hidden min-w-0 overflow-y-auto overflow-x-hidden bg-card md:block md:flex-none"
+        style={{ flexBasis: `${statementWidth}%` }}>
+        <ProblemStatement exercise={exercise} revealedHints={0} />
+      </section>
+      <div aria-hidden className={`hidden w-1 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-brand/40 md:block ${draggingStatement ? 'bg-brand/60' : ''}`}
+        {...statementDivider} />
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" ref={editorRef}>
+        <header className="flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#2d2d2d] px-3 py-1.5">
+          <LanguageTag language={language} label={t(`workspace.${languageLabelKey(language)}`)} />
+          <div className="ml-auto"><FontSizeControls {...preferences} /></div>
+        </header>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <CodeEditor code={code} fontSize={preferences.fontSize} language={monacoLanguageFor(language)} readOnly={readOnly} onChange={change} />
         </div>
-        <div className="flex min-h-0 flex-[2] flex-col border-t border-border bg-card">
-          <div className="flex items-center gap-2 border-b border-border px-4 py-2">
-            <span className="text-[13px] font-bold">{t('mode.output')}</span>
-            <span className="flex-1" />
-            {python ? (
-              runner.running ? (
-                <button type="button" onClick={() => runner.stop()} className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-3 text-[13px] font-semibold hover:bg-surface">
-                  <Square aria-hidden className="size-3.5" /> {t('mode.stop')}
-                </button>
-              ) : (
-                <button type="button" disabled={!runner.ready} onClick={() => void runner.run(code, { stdin })}
-                  className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-3 text-[13px] font-semibold hover:bg-surface disabled:opacity-40">
-                  <Play aria-hidden className="size-3.5" /> {runner.ready ? t('mode.run') : t('mode.running')}
-                </button>
-              )
-            ) : null}
+        <div aria-label={t('workspace.resize_terminal')} role="separator" {...outputDivider}
+          className={`relative h-3 shrink-0 touch-none select-none cursor-row-resize bg-transparent before:absolute before:inset-x-0 before:top-1/2 before:h-px before:-translate-y-1/2 before:bg-border before:transition-all hover:before:h-0.5 hover:before:bg-brand/60 ${draggingOutput ? 'before:h-0.5 before:bg-brand' : ''}`} />
+        <div className="flex shrink-0 flex-col overflow-hidden bg-editor-bg" style={{ height: outputHeight }}>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-white/10 bg-[#2d2d2d] px-2 py-1">
+            {readOnly ? (
+              <span className="px-1 text-[12px] text-white/70">{status}</span>
+            ) : (<>
+              <button type="button" disabled={runner.running || busy} onClick={() => setResetOpen(true)}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[12px] text-white disabled:opacity-50">
+                <RotateCcw className="size-3" />{t('workspace.reset')}
+              </button>
+              {python ? (
+                <RunControls activeSample={activeSample} onRun={() => void runner.run(code)} onRunSample={runSample}
+                  onStop={() => runner.stop()} ready={runner.ready && !busy} running={runner.running} sampleTestCases={sampleTestCases} />
+              ) : null}
+              <button type="button" disabled={!code.trim() || busy || runner.running} onClick={() => void submit({ kind: 'code', code })}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/20 px-2 py-1 text-[12px] text-white disabled:opacity-50">
+                <Send className="size-3" />{busy ? te('mode.submitting') : t('workspace.submit')}
+              </button>
+              {error ? <span role="alert" className="text-[12px] text-red-300">{error}</span>
+                : status ? <span className="text-[12px] text-white/70">{status}</span> : null}
+            </>)}
           </div>
-          <div className="grid min-h-0 flex-1 grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+          <div className="min-h-0 flex-1 overflow-y-auto" role="region" aria-label={te('mode.output')}>
             {python ? (
-              <textarea aria-label={t('mode.input')} value={stdin} onChange={(event) => setStdin(event.target.value)} placeholder={t('mode.input')}
-                className="min-h-16 resize-none border-b border-border bg-surface px-3 py-2 font-mono text-[12.5px] outline-none sm:border-b-0 sm:border-r" />
-            ) : null}
-            <pre className={`min-h-0 overflow-auto whitespace-pre-wrap px-3 py-2 font-mono text-[12.5px] ${python ? '' : 'sm:col-span-2'}`}>
-              {python ? output : t('mode.run_unavailable')}
-            </pre>
+              <TerminalPanel awaitingInput={runner.awaitingInput} lines={runner.lines} onEndInput={runner.endInput}
+                onSubmitInput={runner.submitInput} supported={runner.supported} />
+            ) : (
+              <p className="p-3 font-mono text-[12px] text-[#d4d4d4]">{te('mode.run_unavailable')}</p>
+            )}
           </div>
-          <SubmitBar disabled={!code.trim()} busy={busy} error={error} status={status} readOnly={readOnly}
-            onSubmit={() => void submit({ kind: 'code', code })} />
         </div>
       </section>
-    </div>
-  );
-}
-
-function Block({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="mt-5">
-      <h3 className="text-[14px] font-bold">{title}</h3>
-      <p className="mt-1.5 whitespace-pre-wrap text-[13.5px] leading-6 text-ink">{children}</p>
-    </div>
-  );
-}
-
-function Sample({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="mt-2">
-      <div className="text-[12px] font-semibold text-sub">{label}</div>
-      <div className="relative mt-1 rounded-lg bg-editor-bg">
-        <button type="button" onClick={() => void navigator.clipboard?.writeText(value)} aria-label="Copy"
-          className="absolute right-2 top-2 grid size-6 place-items-center rounded bg-white/10 text-white/70 hover:text-white">
-          <Copy aria-hidden className="size-3.5" />
-        </button>
-        <pre className="overflow-auto px-4 py-3 font-mono text-[12.5px] text-[#F5B870]">{value}</pre>
-      </div>
+      <ResetConfirmDialog
+        copy={{ title: t('workspace.reset'), body: t('workspace.reset_confirm'), cancel: t('common:action.cancel'), confirm: t('workspace.reset') }}
+        onCancel={() => setResetOpen(false)}
+        onConfirm={() => { setResetOpen(false); change(content.starterCode); }}
+        open={resetOpen}
+      />
     </div>
   );
 }

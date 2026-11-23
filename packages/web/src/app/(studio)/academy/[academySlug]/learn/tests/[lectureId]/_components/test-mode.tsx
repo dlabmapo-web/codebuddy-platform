@@ -36,6 +36,8 @@ export function TestMode({ academyId, initial }: { academyId: string; initial: E
   const [endOpen, setEndOpen] = React.useState(false);
   const [guideOpen, setGuideOpen] = React.useState(false);
   const [toast, setToast] = React.useState<string | null>(null);
+  /** Ended in this tab: the done screen comes first, even when review is allowed. */
+  const [finished, setFinished] = React.useState(false);
   const clock = useServerClock({ initialServerNow: initial.serverNow });
   const requested = Number(search.get('item') ?? '1');
   const [index, setIndex] = React.useState(() =>
@@ -54,6 +56,7 @@ export function TestMode({ academyId, initial }: { academyId: string; initial: E
 
   const endNow = React.useCallback(async () => {
     try { setShell(await orpc.exam.end({ academyId, attemptId: shell.id })); } catch { await refresh(); }
+    setFinished(true);
   }, [academyId, shell.id, refresh]);
 
   // A tab that slept past the deadline lands on the done screen when it wakes.
@@ -76,9 +79,12 @@ export function TestMode({ academyId, initial }: { academyId: string; initial: E
       items: current.items.map((row) => row.materialId === materialId ? { ...row, submitted: true, lastSubmittedAt: submittedAt } : row),
     }));
     showToast(t('mode.submitted_toast'));
+    // Like Elice: a submitted problem moves on to the next one by itself.
+    const position = shell.items.findIndex((row) => row.materialId === materialId);
+    if (position >= 0 && position < shell.items.length - 1) window.setTimeout(() => go(position + 1), 700);
   };
 
-  if (!shell.open && !shell.review) return <TestDone shell={shell} onNext={() => router.push(cardHref)} />;
+  if (!shell.open && (!shell.review || finished)) return <TestDone shell={shell} onNext={() => router.push(cardHref)} />;
 
   return (
     <div className="flex h-dvh min-h-0 bg-canvas text-ink">
@@ -131,7 +137,7 @@ export function TestMode({ academyId, initial }: { academyId: string; initial: E
               {t('mode.end')}
             </button>
           ) : (
-            <button type="button" onClick={() => router.push(cardHref)} className="h-8 shrink-0 rounded-md border border-border px-3 text-[13px] font-semibold hover:bg-surface">
+            <button type="button" onClick={() => router.push(cardHref)} aria-label={t('back')} title={t('back')} className="h-8 shrink-0 rounded-md border border-border px-3 text-[13px] font-semibold hover:bg-surface">
               <X aria-hidden className="size-4" />
             </button>
           )}

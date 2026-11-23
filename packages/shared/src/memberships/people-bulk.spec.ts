@@ -154,6 +154,21 @@ describe("bulkEligibility", () => {
     ).toEqual({ eligible: false, code: "not_suspended" });
   });
 
+  it("deletes active, suspended and invited members of any role", () => {
+    for (const status of ["ACTIVE", "SUSPENDED", "INVITED"]) {
+      for (const role of ["STUDENT", "TEACHER", "MANAGER"]) {
+        expect(bulkEligibility({ role, status }, { kind: "DELETE" }).eligible).toBe(true);
+      }
+    }
+  });
+
+  it("skips somebody who already left, and refuses a D-LAB managed member", () => {
+    expect(bulkEligibility({ role: "STUDENT", status: "LEFT" }, { kind: "DELETE" }))
+      .toEqual({ eligible: false, code: "already_in_state" });
+    expect(bulkEligibility({ role: "STUDENT", status: "ACTIVE", dlabManaged: true }, { kind: "DELETE" }))
+      .toEqual({ eligible: false, code: "managed_by_os" });
+  });
+
 });
 
 describe("wouldStrandAcademy", () => {

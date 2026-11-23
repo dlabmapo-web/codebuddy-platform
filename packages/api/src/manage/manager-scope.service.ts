@@ -57,6 +57,11 @@ import type {
 export type ManagerActor = {
   userId: string;
   academyId: string;
+  /**
+   * How the actor holds the Manager role here: their own membership, or Cove
+   * staff standing in the academy. Deleting people asks for more of the second.
+   */
+  via?: "membership" | "support" | "platform";
   /** The academy's own zone. Every local day on this page is drawn in it. */
   timeZone: string;
 };
@@ -92,7 +97,7 @@ export class ManagerScopeService {
     academyId: string,
     permission: AcademyPermission,
   ): Promise<ManagerActor> {
-    let actor: { userId: string; role: string };
+    let actor: { userId: string; role: string; via?: ManagerActor["via"] };
     try {
       actor = await this.access.requirePermission(
         identity.authUserId,
@@ -123,6 +128,7 @@ export class ManagerScopeService {
     return {
       userId: actor.userId,
       academyId,
+      via: actor.via,
       // The column, with the retiring constant as the fallback for a row
       // written before the migration. Nothing else in a request may consult a
       // zone: one response describes one set of local days.

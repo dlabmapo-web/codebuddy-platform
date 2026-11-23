@@ -727,6 +727,7 @@ export const academyAuditActions = [
   "academy.people.bulk.role_change",
   "academy.people.bulk.suspend",
   "academy.people.bulk.restore",
+  "academy.people.bulk.delete",
   "class.created",
   "class.updated",
   "class.archived",

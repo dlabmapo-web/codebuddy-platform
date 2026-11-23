@@ -381,6 +381,7 @@ enum PeopleBulkKind {
   ROLE_CHANGE
   SUSPEND
   RESTORE
+  DELETE
 }
 
 enum PeopleBulkStatus {

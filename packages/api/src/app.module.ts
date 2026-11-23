@@ -2,6 +2,7 @@ import { ExplanationsModule } from "./explanations/explanations.module.js";
 import { DlabModule } from "./integrations/dlab/dlab.module.js";
 import { TurtleTrialModule } from './turtle-trial/trial.module.js';
 import { ManualModule } from "./manual/manual.module.js";
+import { ExamModule } from "./exam/exam.module.js";
 import { VideosModule } from "./videos/videos.module.js";
 import { DocumentsModule } from "./documents/documents.module.js";
 import { Module } from "@nestjs/common";
@@ -42,6 +43,7 @@ import { TeachModule } from "./teach/teach.module.js";
     ExplanationsModule,
     VideosModule,
     ManualModule,
+    ExamModule,
     TurtleTrialModule,
     DraftsModule,
     AcademiesModule,

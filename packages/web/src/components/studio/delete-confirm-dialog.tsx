@@ -32,6 +32,7 @@ export function DeleteConfirmDialog({
   confirmLabel,
   confirmValue,
   fieldLabel,
+  notice,
   onClose,
   onConfirm,
   open,
@@ -46,6 +47,8 @@ export function DeleteConfirmDialog({
   /** The exact text the reader has to type: a course title, a class name. */
   confirmValue: string;
   fieldLabel: string;
+  /** Shown above the confirm field, e.g. the students' work that goes too. */
+  notice?: React.ReactNode;
   onClose: () => void;
   onConfirm: (typed: string) => Promise<unknown>;
   open: boolean;
@@ -92,6 +95,7 @@ export function DeleteConfirmDialog({
           }}
         >
           <div className="grid gap-1.5 px-6 py-5">
+            {notice ? <div className="-mt-3 mb-2">{notice}</div> : null}
             <label
               className="text-[13.5px] font-bold text-ink"
               htmlFor="delete-confirm-value"

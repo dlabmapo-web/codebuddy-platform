@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
   caseComparators,
   defaultExerciseTimeLimitMs,
+  maxExerciseTestCases,
   type CaseComparator,
   type ExerciseGradingProfile,
   type GradingIssue,
@@ -27,8 +28,6 @@ import { GradingSettings } from './grading-settings';
 import { ChoiceField } from '@/components/studio/choice-field';
 import { NumberField } from '@/components/studio/number-field';
 
-/** Mirrors the 50-case ceiling enforced by exerciseDraftFieldsSchema. */
-const MAX_TEST_CASES = 50;
 
 export function AnswersEditor({
   editable,
@@ -56,7 +55,7 @@ export function AnswersEditor({
         editable ? (
           <button
             className={`${secondaryButtonClass} disabled:cursor-not-allowed disabled:opacity-50`}
-            disabled={testCases.length >= MAX_TEST_CASES}
+            disabled={testCases.length >= maxExerciseTestCases}
             onClick={() =>
               update([...testCases, { ...newTestCaseDraft(newClientKey(), 'HIDDEN'), weight: weighted ? 100 : 1 }])
             }

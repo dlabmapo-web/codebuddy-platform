@@ -40,9 +40,14 @@ export function ClassOverviewCard({ detail }: { detail: ClassDetail }) {
 
   const visibleCourses = detail.courses.filter((course) => course.isVisible).length;
   const learning = detail.students.filter(enrollmentGrantsAccess).length;
-  // A stored teacher whose membership was suspended or moved off the role is
-  // the third state, and the one a bare name would misreport as staffed.
-  const teacherState = teacherAssignmentState(detail.assignedTeacher);
+  // Every teacher counts the same. One whose membership was suspended or moved
+  // off the role is flagged, because a bare name would misreport it as staffed.
+  const teacherNames = detail.teachers
+    .map((teacher) => teacherDisplayName(teacher, t('detail.teacher_panel.no_name')))
+    .join(', ');
+  const someUnavailable = detail.teachers.some(
+    (teacher) => teacherAssignmentState(teacher) === 'unavailable',
+  );
 
   return (
     <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
@@ -92,22 +97,15 @@ export function ClassOverviewCard({ detail }: { detail: ClassDetail }) {
         icon={GraduationCap}
         label={t('detail.overview.teacher')}
         note={
-          teacherState === 'none'
+          detail.teachers.length === 0
             ? t('detail.overview.teacher_none')
-            : teacherState === 'active'
-              ? t('detail.overview.teacher_active')
-              : t('detail.overview.teacher_unavailable')
+            : someUnavailable
+              ? t('detail.overview.teacher_unavailable')
+              : teacherNames
         }
         tint="orange"
-        tone={teacherState === 'unavailable' ? 'warn' : 'plain'}
-        value={
-          teacherState === 'none'
-            ? t('detail.overview.teacher_unassigned')
-            : teacherDisplayName(
-                detail.assignedTeacher,
-                t('detail.teacher_panel.no_name'),
-              )
-        }
+        tone={someUnavailable ? 'warn' : 'plain'}
+        value={detail.teachers.length}
       />
       <Fact
         icon={CalendarDays}

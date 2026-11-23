@@ -31,10 +31,7 @@ import { markCompileDiagnostics, runCommandFor } from '@/lib/workspace/exercise-
 import { createRunId, runSampleSequence } from '@/lib/workspace/sample-run';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
 import { useSampleRunner, type SampleRun } from '@/lib/workspace/use-sample-runner';
-import {
-  STATEMENT_CANVAS_MIN_WIDTH,
-  STATEMENT_PANE,
-} from '@/lib/workspace/statement-canvas';
+import { STATEMENT_PANE } from '@/lib/workspace/statement-canvas';
 import { useSplitPane } from '@/lib/workspace/use-split-pane';
 
 import { canSeedCollaboration } from '../_lib/draft-store';
@@ -175,8 +172,11 @@ function ProgrammingWorkspace({
     academyId, userId,
     classId,
     materialId: exercise.materialId,
-    initialResult: selected?.result ?? bootstrap.workspace.latestResult ?? null,
-    initialLatest: bootstrap.workspace.latestSubmission,
+    // Seed from the exercise on screen. After an in-workspace transition the
+    // bootstrap still describes the exercise the page was loaded on, and its
+    // settled result would be cached as the new exercise's (QA-001b).
+    initialResult: selected?.result ?? workspace.latestResult ?? null,
+    initialLatest: workspace.latestSubmission,
     solveSessionId: solveSession.solveSessionId,
     reopenSolveSession: solveSession.reopen,
   });
@@ -193,8 +193,12 @@ function ProgrammingWorkspace({
   // The student's own half of monitoring: signals out, a generic indicator
   // back. It publishes nothing the student cannot already see, and learns
   // nothing about who is watching.
+  // The width the statement is read at here, sent to watching teachers so
+  // they copy this layout; the student's own layout never changes (QA S-10).
+  const [statementReadingWidth, setStatementReadingWidth] = React.useState<number | null>(null);
   const monitoring = useStudentMonitoring({
     classId,
+    statementWidth: statementReadingWidth,
     courseId: workspace.breadcrumb.course.id,
     materialId: exercise.materialId,
     // Persists, but promotes nothing: a teacher opening a student who is
@@ -241,9 +245,8 @@ function ProgrammingWorkspace({
     axis: 'horizontal',
     initial: exercise.hasReferencePdf ? 45 : STATEMENT_PANE.initialPercent,
     min: STATEMENT_PANE.minPercent,
-    // While collaborating the statement lays out on a fixed canvas, which
-    // cannot be scaled below its floor and stay readable.
-    minPx: monitoring.collaborating ? STATEMENT_CANVAS_MIN_WIDTH : undefined,
+    // No collaborating minimum: being watched must not re-split the student's
+    // panes. The teacher mirrors whatever width the student chose.
     max: STATEMENT_PANE.maxPercent,
   });
   /**
@@ -683,10 +686,6 @@ function ProgrammingWorkspace({
           disabled={busy}
           displayedMaterialId={exercise.materialId}
           error={navigation.navigatorFailed}
-          footer={{
-            href: returnTo ?? routes.academyLearnCourse(academySlug, workspace.breadcrumb.course.id, { classId }),
-            label: returnTo ? t('workspace.back_to_records') : t('navigator.footer_student'),
-          }}
           onClose={closePanel}
           onRetry={navigation.loadCourse}
           onSelect={handleNavigate}
@@ -713,6 +712,7 @@ function ProgrammingWorkspace({
             <ProblemStatement
               collaborating={monitoring.collaborating}
               exercise={exercise}
+              onReadingWidth={setStatementReadingWidth}
               onRevealHint={handleRevealHint}
               revealedHints={revealedHints}
             />

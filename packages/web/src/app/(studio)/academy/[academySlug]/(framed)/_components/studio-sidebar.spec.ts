@@ -90,7 +90,7 @@ it.each([
   { canMonitor: true },
   { canManageClasses: true, canReadAcademyMembers: true },
   { canManageAcademy: true, canManageClasses: true, canRunMaintenance: true },
-])('never offers Overview for role capabilities %j', (capabilities) => {
+])('never offers Overview or My Page for role capabilities %j', (capabilities) => {
   const links = studioNavGroups({
     ...common,
     canManageAcademy: false,
@@ -100,6 +100,8 @@ it.each([
   }).flatMap(({ items }) => items);
   expect(links.some(({ labelKey }) => labelKey === 'link.overview')).toBe(false);
   expect(links.some(({ href }) => href === '/academy/cove-development')).toBe(false);
+  // QA-04 — My Page lives in the header's avatar menu only.
+  expect(links.some(({ href }) => href.endsWith('/me'))).toBe(false);
 });
 
 describe('studio application navigation', () => {

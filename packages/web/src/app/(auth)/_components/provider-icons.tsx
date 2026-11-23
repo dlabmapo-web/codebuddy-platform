@@ -29,3 +29,18 @@ export function NaverIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/**
+ * The boxed D·LAB mark, traced from the brand file DLAB supplied (QA-01).
+ *
+ * `currentColor` rather than black, so the mark follows the button's text
+ * colour and stays legible on the dark theme without a second asset.
+ */
+export function DlabLogo({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden className={className} fill="currentColor" viewBox="29 38 575 273" xmlns="http://www.w3.org/2000/svg">
+      <path d="M29 38H239V85H604V311H164V264H29ZM48 57V244H183V290H584V104H219V57ZM91 99H130A51 51 0 0 1 130 201H91ZM113 123.5V176.5H129.5A26.5 26.5 0 0 0 129.5 123.5ZM274 145H297V226H335V248H274ZM351.1 248L402 140.5L453.9 248H428.8L402.5 188.7L375.2 248ZM472 146H514C530 146 541 156 541 170.5C541 183 535 191 526 195.5C537 199 544 208 544 221.5C544 237 532 248 516 248H472ZM495 167V186H507.5A9.5 9.5 0 0 0 507.5 167ZM495 206V226H509A10 10 0 0 0 509 206Z" fillRule="evenodd" />
+      <circle cx="219.5" cy="188" r="13.75" />
+    </svg>
+  );
+}

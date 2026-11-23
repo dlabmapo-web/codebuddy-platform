@@ -78,6 +78,7 @@ export function ThemeControl({ className }: { className?: string }) {
 /** Account identity and navigation; staff capabilities never need a role-mode switch. */
 export function ProfileControl({
   className,
+  accountHref,
   academySlug,
   academyImageUrl,
   imageUrl,
@@ -87,6 +88,11 @@ export function ProfileControl({
   roles,
 }: {
   className?: string;
+  /**
+   * Overrides where My Page goes when there is no academy — the console sends
+   * `/account?from=admin` so the account page's back link returns there.
+   */
+  accountHref?: string;
   academyId?: string;
   /** Academy-scoped account destination. */
   academySlug?: string;
@@ -168,7 +174,11 @@ export function ProfileControl({
           */}
           <DropdownMenuItem asChild>
             <Link
-              href={academySlug ? routes.academyMe(academySlug) : routes.account}
+              href={
+                academySlug
+                  ? routes.academyMe(academySlug)
+                  : (accountHref ?? routes.account)
+              }
             >
               <UserRound aria-hidden className="size-4" strokeWidth={1.75} />
               {t('my_page')}
@@ -214,6 +224,7 @@ export function HeaderControls({
   notifications?: React.ReactNode;
   /** Absent on surfaces that have no session to describe. */
   account?: {
+    accountHref?: string;
     academyId?: string;
     academySlug?: string;
     academyImageUrl?: string | null;
@@ -232,6 +243,7 @@ export function HeaderControls({
       {identityLabel}
       {account ? (
         <ProfileControl
+          accountHref={account.accountHref}
           academyId={account.academyId}
           academySlug={account.academySlug}
           academyImageUrl={account.academyImageUrl}

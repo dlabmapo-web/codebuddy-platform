@@ -13,6 +13,7 @@ import {
   listClassesSchema,
   removeClassStudentSchema,
   setClassAssistantTeachersSchema,
+  setClassTeachersSchema,
   setClassCoursesSchema,
   deleteClassSchema,
   setClassStatusSchema,
@@ -64,4 +65,6 @@ export const academyClassesContract = {
   setAssistantTeachers: oc
     .input(setClassAssistantTeachersSchema)
     .output(classDetailSchema),
+  /** Every teacher of the class as one set, with no limit. What the class page uses. */
+  setTeachers: oc.input(setClassTeachersSchema).output(classDetailSchema),
 };

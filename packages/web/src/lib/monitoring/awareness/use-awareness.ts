@@ -79,6 +79,8 @@ export type RemoteAwareness = {
   cursorMovedAt: number;
   /** Changes only with the pointer, so cursor traffic cannot prolong it. */
   pointerMovedAt: number;
+  /** The width the student reads the statement at; null until they say. */
+  statementWidth: number | null;
 };
 
 /**
@@ -106,6 +108,7 @@ export function useAwareness({
   remotePointer,
   socket,
   publishEnabled = true,
+  statementWidth,
 }: {
   /** Null until a shared document exists; publishing is off until then. */
   draftId: string | null;
@@ -129,6 +132,11 @@ export function useAwareness({
   socket: Socket | null;
   /** Keep receiving the live document while a different lesson is displayed. */
   publishEnabled?: boolean;
+  /**
+   * The student's statement width, sent with every packet so a teacher can lay
+   * the statement out exactly as the student reads it. Students only.
+   */
+  statementWidth?: number | null;
 }): {
   /**
    * The peer to render when there can only be one.
@@ -143,6 +151,8 @@ export function useAwareness({
   /** Every peer on this document, each with independent markers. */
   peers: PeerAwarenessState[];
   publishCursor: (cursor: CollaborationCursor | null) => void;
+  /** Re-sends this side's state reliably, e.g. when another teacher joins. */
+  announce: () => void;
 } {
   const suppressed = useHistoryCovered() || !publishEnabled;
   const suppressedRef = React.useRef(suppressed);
@@ -167,6 +177,10 @@ export function useAwareness({
   React.useEffect(() => {
     identityRef.current = identity;
   }, [identity]);
+  const statementWidthRef = React.useRef(statementWidth);
+  React.useEffect(() => {
+    statementWidthRef.current = statementWidth;
+  }, [statementWidth]);
   const pointerRef = React.useRef<CollaborationPointer | null>(null);
   const cursorRef = React.useRef<CollaborationCursor | null>(null);
   const lastPointerAt = React.useRef(0);
@@ -248,11 +262,23 @@ export function useAwareness({
         cursor: suppressedRef.current ? null : cursorRef.current,
         pointer: suppressedRef.current || pointerRef.current?.code ? null : pointerRef.current,
         editorPointer: !suppressedRef.current && pointerRef.current?.code ? pointerRef.current : null,
+        ...(statementWidthRef.current !== undefined ? { statementWidth: statementWidthRef.current } : {}),
         ...(identityRef.current ? { identity: identityRef.current } : {}),
       });
     },
     [socket],
   );
+
+  // A new width is a new layout for every watching teacher; it goes out at
+  // once and reliably rather than waiting for the next mouse movement.
+  React.useEffect(() => {
+    if (statementWidth === undefined || !draftId) return;
+    send(true);
+  }, [statementWidth, draftId, send]);
+
+  const announce = React.useCallback(() => {
+    if (draftRef.current) send(true);
+  }, [send]);
 
   React.useEffect(() => {
     if (suppressed) { pointerRef.current = null; cursorRef.current = null; cancelCursorFlush(); cancelPointerFlush(); send(true); }
@@ -496,5 +522,5 @@ export function useAwareness({
     return () => disarms.forEach((disarm) => disarm());
   }, [cursorExpiryKey, peers, remoteCursor]);
 
-  return { remote, peers, publishCursor };
+  return { remote, peers, publishCursor, announce };
 }

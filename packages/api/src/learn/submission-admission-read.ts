@@ -45,7 +45,7 @@ export async function readSubmissionAdmission(db: Prisma.TransactionClient, mate
         FROM pdf_documents pd JOIN pdf_assets pa ON pa.id=pd.asset_id JOIN materials pm ON pm.id=pd.material_id
         JOIN lectures pl ON pl.id=pm.lecture_id JOIN course_modules pcm ON pcm.id=pl.course_module_id
         WHERE pd.material_id=pe.reference_pdf_material_id) ELSE NULL END AS reference,
-      jsonb_build_object('id',l.id,'title',l.title,'position',l.position,'course_module_id',l.course_module_id) AS lecture,
+      jsonb_build_object('id',l.id,'title',l.title,'position',l.position,'course_module_id',l.course_module_id,'kind',l.kind) AS lecture,
       jsonb_build_object('id',cm.id,'title',cm.title,'position',cm.position,'course_id',cm.course_id) AS module,
       jsonb_build_object('id',c.id,'title',c.title,'academy_id',c.academy_id,'language',c.language,'description',CASE WHEN ${Boolean(options.workspace)}::boolean THEN c.description ELSE '' END) AS course
     FROM materials m JOIN lectures l ON l.id=m.lecture_id

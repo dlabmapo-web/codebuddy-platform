@@ -53,13 +53,26 @@ export const STATEMENT_CANVAS_MIN_WIDTH =
  * applied identically to the content and to the pointer, so it divides out of
  * every shared coordinate. Neither side needs the other's number.
  */
-export function statementCanvasScale(paneWidth: number): number {
+export function statementCanvasScale(
+  paneWidth: number,
+  logicalWidth: number = STATEMENT_CANVAS_WIDTH,
+  minScale: number = STATEMENT_CANVAS_MIN_SCALE,
+): number {
   if (!Number.isFinite(paneWidth) || paneWidth <= 0) return 1;
+  if (!Number.isFinite(logicalWidth) || logicalWidth <= 0) return 1;
   return Math.min(
     STATEMENT_CANVAS_MAX_SCALE,
-    Math.max(STATEMENT_CANVAS_MIN_SCALE, paneWidth / STATEMENT_CANVAS_WIDTH),
+    Math.max(minScale, paneWidth / logicalWidth),
   );
 }
+
+/**
+ * How small a teacher's copy of the student's statement may be drawn.
+ *
+ * Lower than the student floor on purpose: the teacher is mirroring a layout
+ * they do not choose, and clipping it would hide words the student can see.
+ */
+export const STATEMENT_MIRROR_MIN_SCALE = 0.3;
 
 export type StatementCanvasMeasurement = {
   /** Width of the pane the canvas is being fitted into. */
@@ -76,17 +89,27 @@ export type StatementCanvasMeasurement = {
  * read from the same box. Reading the content height from the transformed box
  * would feed the scale back into itself.
  *
- * `engaged` is not the same as `active`. A pane narrower than the canvas can
- * honestly represent — a phone, or a layout with no split pane to clamp — stays
- * in ordinary reflowing space, and the position's `space` field is what keeps
- * the peer from drawing a canvas coordinate against it.
+ * `engaged` is `active` once the pane has been measured. The student's screen
+ * is never rescaled or widened for a watcher (QA S-10); a mirroring screen
+ * lays out at `logicalWidth` and scales, down to `STATEMENT_MIRROR_MIN_SCALE`.
  */
-export function useStatementCanvas(active: boolean, material = ''): {
+export function useStatementCanvas(
+  active: boolean,
+  material = '',
+  /**
+   * The width to lay the statement out at, when this screen mirrors someone
+   * else's layout (a teacher mirroring the student). Null on the student's own
+   * screen, where the natural box is the canvas and nothing is rescaled.
+   */
+  logicalWidth: number | null = null,
+): {
   paneRef: React.RefObject<HTMLDivElement | null>;
   canvasRef: React.RefObject<HTMLDivElement | null>;
   engaged: boolean;
   scale: number;
   contentHeight: number;
+  /** The width the statement is read at here, in CSS pixels. */
+  paneWidth: number;
 } {
   const paneRef = React.useRef<HTMLDivElement>(null);
   const canvasRef = React.useRef<HTMLDivElement>(null);
@@ -96,7 +119,10 @@ export function useStatementCanvas(active: boolean, material = ''): {
       contentHeight: 0,
     });
 
-  const engaged = active && measurement.paneWidth >= STATEMENT_CANVAS_MIN_WIDTH;
+  // QA S-10: the student's screen must not change when a teacher joins. The
+  // student's own box is the canvas (no minimum width, no transform); only a
+  // mirroring screen lays out at another width and scales.
+  const engaged = active && measurement.paneWidth > 0;
 
   React.useEffect(() => {
     // Measure in both modes. The mounted canvas survives watch transitions,
@@ -111,7 +137,9 @@ export function useStatementCanvas(active: boolean, material = ''): {
       // pass on entry, and `offsetHeight` forces one of its own.
       frame = requestAnimationFrame(() => {
         setMeasurement((current) => {
-          const paneWidth = pane.clientWidth;
+          // Sub-pixel: the width is copied to another screen, where a line
+          // that only just fits must still fit.
+          const paneWidth = pane.getBoundingClientRect().width;
           const contentHeight =
             canvasRef.current?.offsetHeight ?? current.contentHeight;
           if (
@@ -144,7 +172,10 @@ export function useStatementCanvas(active: boolean, material = ''): {
     paneRef,
     canvasRef,
     engaged,
-    scale: engaged ? statementCanvasScale(measurement.paneWidth) : 1,
+    scale: engaged && logicalWidth !== null
+      ? statementCanvasScale(measurement.paneWidth, logicalWidth, STATEMENT_MIRROR_MIN_SCALE)
+      : 1,
     contentHeight: measurement.contentHeight,
+    paneWidth: measurement.paneWidth,
   };
 }

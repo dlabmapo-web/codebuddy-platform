@@ -51,18 +51,9 @@ export type PdfReadResult = {
     position: number;
     lectureId: string;
   }>;
-  resources: Array<{
-    materialId: string;
-    title: string;
-    originalFilename: string;
-    byteSize: number;
-  }>;
 };
 export function pdfIsMain(placement: PdfPlacement) {
   return placement !== "SUPPLEMENTARY";
-}
-export function pdfIsResource(placement: PdfPlacement) {
-  return placement !== "MAIN";
 }
 
 /** Embedded delivery omits course navigation; access is checked against both materials. */

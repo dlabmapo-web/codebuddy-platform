@@ -4,13 +4,13 @@ import { isAssetRetained } from "../library-sync/asset-retention.js";
 import { randomUUID } from "node:crypto";
 import {
   Injectable,
+  Optional,
   type OnModuleInit,
   type OnModuleDestroy,
 } from "@nestjs/common";
 import type { Request } from "express";
 import {
   pdfIsMain,
-  pdfIsResource,
   type SavePdf,
   type PdfReadResult,
 } from "@cove/shared";
@@ -28,6 +28,12 @@ import {
 } from "../content/content-positions.js";
 import { PdfStorageService } from "./pdf-storage.service.js";
 import { receivePdf, safePdfFilename, validatePdf } from "./pdf-files.js";
+import { convertPresentation, documentKind } from "./presentation-converter.js";
+import { ConfigService } from "@nestjs/config";
+import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { withCurriculum } from "../learn/curriculum-read.js";
 
 type Target = { academyId: string; courseId: string; lectureId: string };
@@ -58,6 +64,7 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
     private readonly access: AcademyAccessService,
     private readonly storage: PdfStorageService,
     private readonly audit: AuditService,
+    @Optional() private readonly config?: ConfigService,
   ) {}
   onModuleInit() {
     this.timer = setInterval(() => {
@@ -102,6 +109,17 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
     let file: Awaited<ReturnType<typeof receivePdf>> | undefined;
     try {
       file = await receivePdf(request);
+      // A PowerPoint deck becomes a PDF here, once; readers only ever open
+      // the PDF (QA-002). Anything that is neither still fails validation.
+      const kind = await documentKind(file.path);
+      if (kind === "ppt" || kind === "pptx") {
+        const outputPath = join(dirname(file.path), "converted.pdf");
+        await convertPresentation({ path: file.path, kind, outputPath }, this.config?.get<string>("PDF_CONVERTER_URL"));
+        const hash = createHash("sha256");
+        for await (const chunk of createReadStream(outputPath)) hash.update(chunk as Buffer);
+        file = { ...file, path: outputPath, byteSize: (await stat(outputPath)).size, checksumSha256: hash.digest("hex") };
+        filename = filename.replace(/\.(pptx?|PPTX?)$/, "") + ".pdf";
+      }
       const pageCount = await validatePdf(file.path);
       const id = randomUUID();
       const objectKey = `${target.academyId}/${target.courseId}/${id}.pdf`;
@@ -351,7 +369,6 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
     });
     const outline = found && await withCurriculum(this.prisma, found);
     const materials: PdfReadResult["materials"] = [];
-    const resources: PdfReadResult["resources"] = [];
     for (const module of outline?.modules ?? [])
       for (const lecture of module.lectures)
         for (const row of lecture.materials) {
@@ -367,17 +384,6 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
               position: row.position,
               lectureId: lecture.id,
             });
-          if (
-            lecture.id === material.lectureId &&
-            row.pdfDocument?.asset.state === "READY" &&
-            pdfIsResource(row.pdfDocument.placement)
-          )
-            resources.push({
-              materialId: row.id,
-              title: row.title,
-              originalFilename: row.pdfDocument.asset.originalFilename,
-              byteSize: row.pdfDocument.asset.byteSize,
-            });
         }
     return {
       materialId: material.id,
@@ -392,7 +398,6 @@ export class PdfDocumentService implements OnModuleInit, OnModuleDestroy {
       course: { id: course.id, title: course.title },
       lecture: { id: material.lectureId, title: material.lecture.title },
       materials,
-      resources,
     };
   }
   async cleanup() {

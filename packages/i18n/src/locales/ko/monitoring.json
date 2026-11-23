@@ -12,9 +12,13 @@
     "unavailable_body": "서버가 응답하지 않았습니다. 잠시 후 다시 시도하세요.",
     "course_count_other": "코스 {{count}}개",
     "student_count_other": "학생 {{count}}명",
-    "online_count": "접속 {{count}}명",
-    "solving_count": "풀이 중 {{count}}명",
-    "open": "실시간 반 열기"
+    "open": "실시간 반 열기",
+    "live_badge": "수업 중",
+    "active_summary_other": "지금 수업 중인 반 {{count}}개",
+    "stat_courses": "코스",
+    "stat_students": "학생",
+    "stat_online": "접속",
+    "stat_solving": "풀이 중"
   },
   "roster": {
     "back": "내 반 들어가기",

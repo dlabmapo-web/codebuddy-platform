@@ -4,7 +4,6 @@ import {
   addClassStudentsSchema,
   assignedTeacherDetailSchema,
   assignmentGrantsAccess,
-  CLASS_MAX_TEACHERS,
   classDetailSchema,
   classSummarySchema,
   createClassSchema,
@@ -259,7 +258,7 @@ describe("assigned teacher output", () => {
     ]);
   });
 
-  it("refuses more teachers than a class may carry", () => {
+  it("takes any number of teachers", () => {
     const teacher = (index: number) => ({
       membershipId: `8888888${index}-8888-4888-8888-888888888888`,
       userId: `9999999${index}-9999-4999-8999-999999999999`,
@@ -274,20 +273,9 @@ describe("assigned teacher output", () => {
       classSummarySchema.safeParse({
         ...base,
         assignedTeacher: null,
-        teachers: Array.from({ length: CLASS_MAX_TEACHERS }, (_, i) =>
-          teacher(i),
-        ),
+        teachers: Array.from({ length: 8 }, (_, i) => teacher(i)),
       }).success,
     ).toBe(true);
-    expect(
-      classSummarySchema.safeParse({
-        ...base,
-        assignedTeacher: null,
-        teachers: Array.from({ length: CLASS_MAX_TEACHERS + 1 }, (_, i) =>
-          teacher(i),
-        ),
-      }).success,
-    ).toBe(false);
   });
 
   it("adds the email only on the detail shape", () => {

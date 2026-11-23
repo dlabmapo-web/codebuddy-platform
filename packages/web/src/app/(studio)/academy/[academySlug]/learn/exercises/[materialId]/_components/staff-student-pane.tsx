@@ -99,7 +99,7 @@ function StudentSession({ academyId, materialId, userId, student, context, start
       <button type="button" onClick={() => void close()} className="ml-auto inline-flex items-center gap-1 text-xs font-bold text-brand"><ArrowLeft className="size-3.5" />{t('tutoring_own_code')}</button>
     </div>
     <div className="h-44 min-h-24 shrink-0 overflow-hidden bg-editor-bg">
-      <TerminalPanel lines={terminal === 'you' ? runner.lines : live.terminal.lines} awaitingInput={terminal === 'you' ? runner.awaitingInput : live.terminal.awaitingInput} supported={runner.supported} mode={terminal === 'you' ? 'interactive' : 'mirror'} onSubmitInput={runner.submitInput} onEndInput={runner.endInput} />
+      <TerminalPanel lines={terminal === 'you' ? runner.lines : live.terminal.lines} awaitingInput={terminal === 'you' ? runner.awaitingInput : live.terminal.awaitingInput} supported={runner.supported} mode={terminal === 'you' ? 'interactive' : 'mirror'} shared={terminal !== 'you'} onSubmitInput={runner.submitInput} onEndInput={runner.endInput} />
     </div>
     {feedbackOpen ? feedback.isError ? <p role="alert" className="p-3 text-sm text-danger">{t('tutoring_feedback_error')}</p> : <div className="max-h-64 shrink-0 overflow-auto"><FeedbackDock canSend={synchronized} draft={note} feedback={notes} materialId={materialId} onDraftChange={setNote} onHydrate={setNote} onSend={async (body) => {
       const result = await live.sendFeedback(body);

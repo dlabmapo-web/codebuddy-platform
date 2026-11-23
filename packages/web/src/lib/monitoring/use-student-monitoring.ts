@@ -76,6 +76,7 @@ export function useStudentMonitoring({
   onAfterCollaborate,
   ready,
   hasLocalEdits = true,
+  statementWidth,
   terminal,
 }: {
   classId: string;
@@ -94,6 +95,11 @@ export function useStudentMonitoring({
   ready: boolean;
   /** Only an unsaved student buffer may seed a fresh shared document. */
   hasLocalEdits?: boolean;
+  /**
+   * The width the student reads the statement at. Sent to watching teachers
+   * so they mirror this layout instead of the student rescaling for them.
+   */
+  statementWidth?: number | null;
   /**
    * Persists the local draft, so the server seeds the document from it.
    *
@@ -130,6 +136,8 @@ export function useStudentMonitoring({
     report,
   } = useStudentPresence();
   const [indicator, setIndicator] = React.useState<StudentIndicatorState>('NONE');
+  /** Re-sends the student's awareness; set once the awareness hook exists. */
+  const announceRef = React.useRef<() => void>(() => undefined);
   /**
    * The last aggregate this workspace accepted.
    *
@@ -334,6 +342,9 @@ export function useStudentMonitoring({
       // under the student's cursor, and remount the statement they are
       // reading — all because somebody else opened a tab.
       if (!resync && current.draftId === event.draftId && current.phase === 'bound') {
+        // The newcomer has never seen this student's statement width or
+        // pointer; the first teacher has, so this is sent for the new one.
+        announceRef.current();
         // The summary that follows carries the authoritative indicator; this
         // is the optimistic half, so the student is not told "nobody" for the
         // width of a round trip.
@@ -606,13 +617,17 @@ export function useStudentMonitoring({
   // is working, not supervising, and an arrow parked over their code says
   // somebody is following along when nobody may be.
   const draftId = session.draftId;
-  const { peers, remote } = useAwareness({
+  const { peers, remote, announce } = useAwareness({
     draftId,
     peerOrigin: 'TEACHER',
     remoteCursor: expiresWhenIdle,
     remotePointer: expiresWhenIdle,
     socket,
+    statementWidth: statementWidth ?? null,
   });
+  React.useEffect(() => {
+    announceRef.current = announce;
+  }, [announce]);
 
   const [editor, setEditor] = React.useState<MonacoCodeEditor | null>(null);
   /**

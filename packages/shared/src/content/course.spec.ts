@@ -10,6 +10,7 @@ import {
   createProgrammingExerciseSchema,
   legacyCaseGrading,
   legacyGradingProfile,
+  maxExerciseTestCases,
   programmingExerciseDescriptionMaxLength,
   programmingExerciseSchema,
   updateProgrammingExerciseSchema,
@@ -219,10 +220,10 @@ describe("manual programming exercise schemas", () => {
     expect(hasSampleTestCase([])).toBe(false);
   });
 
-  it("rejects more than fifty test cases", () => {
+  it("rejects more than two hundred test cases", () => {
     const result = createProgrammingExerciseSchema.safeParse({
       ...validExercise,
-      testCases: Array.from({ length: 51 }, () => ({
+      testCases: Array.from({ length: 201 }, () => ({
         input: "1 2",
         expectedOutput: "3",
         visibility: "SAMPLE" as const,
@@ -231,6 +232,21 @@ describe("manual programming exercise schemas", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("test case count (QA-005)", () => {
+  const cases = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      input: String(index),
+      expectedOutput: String(index),
+      visibility: index === 0 ? ("SAMPLE" as const) : ("HIDDEN" as const),
+      ...legacy,
+    }));
+  it("allows 200 test cases, as Elice does, and refuses 201", () => {
+    expect(maxExerciseTestCases).toBe(200);
+    expect(createProgrammingExerciseSchema.safeParse({ ...validExercise, testCases: cases(200) }).success).toBe(true);
+    expect(createProgrammingExerciseSchema.safeParse({ ...validExercise, testCases: cases(201) }).success).toBe(false);
   });
 });
 

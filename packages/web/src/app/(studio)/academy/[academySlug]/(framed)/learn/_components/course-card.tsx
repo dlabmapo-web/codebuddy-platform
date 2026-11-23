@@ -57,6 +57,10 @@ export function CourseCard({
   // still here — a student told they have this course should find it — but
   // "Start →" would be a promise the outline behind it cannot keep.
   const notReady = counts.exercises === 0 && !counts.documents && !counts.explanations;
+  // PDFs and explanations are both reading material, which Elice and QA call
+  // 이론; it leads, then the problems (QA S-02). A reading-only course does
+  // not lead with "0 problems".
+  const theory = (counts.documents ?? 0) + (counts.explanations ?? 0);
 
   return (
     <Link
@@ -107,8 +111,8 @@ export function CourseCard({
       <div className="mt-auto flex items-end justify-between gap-3 border-t border-border pt-5">
         <div className="min-w-0">
           {/*
-           * The problem count is what a student actually compares courses by,
-           * and it was the smallest, greyest text on the card. It leads now.
+           * What the course holds is what a student compares courses by, and
+           * it was the smallest, greyest text on the card. It leads now.
            *
            * Kept as one phrase rather than a big numeral with a noun beside it:
            * Korean puts the count after the noun and closes it with a counter
@@ -117,9 +121,10 @@ export function CourseCard({
            * Weight carries the emphasis instead of layout.
            */}
           <p className="text-[15px] font-extrabold tracking-[-0.01em] tabular">
-            {t('catalog.problems', { count: counts.exercises })}
-            {counts.documents ? ` · ${t('pdf.documents', { count: counts.documents })}` : ''}
-            {counts.explanations ? ` · ${t('materials.explanation')} ${counts.explanations}` : ''}
+            {[
+              theory ? t('catalog.theory', { count: theory }) : null,
+              counts.exercises || !theory ? t('catalog.problems', { count: counts.exercises }) : null,
+            ].filter(Boolean).join(' · ')}
           </p>
           <p className="mt-1 truncate text-[12px] text-sub">
             {t('catalog.structure', {

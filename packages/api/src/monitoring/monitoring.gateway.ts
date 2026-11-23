@@ -601,6 +601,14 @@ export class MonitoringGateway
    * Split out so the serialization above wraps one function rather than the
    * acknowledgement machinery around it.
    */
+  /** Whether a material is a problem inside a test lecture. One statement. */
+  private async isTestMaterial(materialId: string): Promise<boolean> {
+    const [row] = await this.prisma.$queryRaw<Array<{ test: boolean }>>`
+      SELECT l.kind = 'TEST' AS test FROM materials m JOIN lectures l ON l.id = m.lecture_id
+      WHERE m.id = ${materialId}::uuid`;
+    return row?.test === true;
+  }
+
   private async openWatch(
     socket: MonitoringSocket,
     payload: {
@@ -664,7 +672,10 @@ export class MonitoringGateway
       sessionId: payload.sessionId,
       replacesVisitId: null,
     });
-    const mode: MonitoringWatchMode = payload.autoEdit ? 'HELPING' : 'MONITORING';
+    // A test problem is only ever watched: auto-edit opens it read-only, the
+    // same rule `watchMode` enforces when editing is switched on later.
+    const mode: MonitoringWatchMode =
+      payload.autoEdit && !(await this.isTestMaterial(claim.materialId)) ? 'HELPING' : 'MONITORING';
     const lease: WatchLease = {
       visitId: visit.id,
       sessionId: payload.sessionId,
@@ -838,6 +849,11 @@ export class MonitoringGateway
         // moment a read-only session becomes a writing one, and an assignment
         // that changed since the watch opened must be caught here.
         await this.revalidate(socket, watch.claim);
+        // A test problem is watched, never edited: helping a student write an
+        // exam answer would make the answer the teacher's.
+        if (payload.mode === "HELPING" && (await this.isTestMaterial(watch.claim.materialId))) {
+          throw publicError("MONITORING_EDIT_NOT_ENABLED");
+        }
         const renewed = await this.watchSessions.renew(leaseOf(watch), payload.mode);
         if (!renewed) throw publicError("MONITORING_ACCESS_DENIED");
         watch.mode = payload.mode;

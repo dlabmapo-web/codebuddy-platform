@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({ upload: vi.fn(), save: vi.fn() }));
 vi.mock('@/lib/pdf-api', () => ({ pdfApi: api }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('./pdf-reader', () => ({ PdfReader: () => <div /> }));
+vi.mock('@/i18n/client/use-error-text', () => ({ useErrorCode: () => (code: string) => `errors.${code}` }));
 const roots: Array<ReturnType<typeof createRoot>> = [];
 afterEach(async () => {
   for (const root of roots.splice(0)) await act(() => root.unmount());
@@ -46,11 +47,17 @@ it('connects the browse label to its input, shows a chosen file and saves its se
 it('rejects invalid and multiple files and lets the user clear their selection', async () => {
   await render();
   await choose([new File(['bad'], 'notes.txt')]);
-  expect(document.querySelector('[role=alert]')?.textContent).toBe('pdf.errors.PDF_INVALID');
+  expect(document.querySelector('[role=alert]')?.textContent).toBe('errors.PDF_INVALID');
   await choose([new File(['a'], 'a.pdf'), new File(['b'], 'b.pdf')]);
-  expect(document.querySelector('[role=alert]')?.textContent).toBe('pdf.errors.PDF_INVALID');
+  expect(document.querySelector('[role=alert]')?.textContent).toBe('errors.PDF_INVALID');
   await choose([new File(['ok'], 'a.pdf')]);
   expect(document.querySelector('[role=alert]')).toBeNull();
+  // PowerPoint decks are accepted and converted on upload (QA-002).
+  await choose([new File(['deck'], 'lesson.pptx')]);
+  expect(document.querySelector('[role=alert]')).toBeNull();
+  await choose([new File(['deck'], 'old.PPT')]);
+  expect(document.querySelector('[role=alert]')).toBeNull();
+  await choose([new File(['ok'], 'a.pdf')]);
   await act(() => document.querySelector<HTMLButtonElement>('button[aria-label="pdf.remove_selection"]')!.click());
   expect(document.body.textContent).not.toContain('a.pdf');
   expect(document.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled).toBe(true);

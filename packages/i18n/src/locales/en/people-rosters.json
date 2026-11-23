@@ -41,12 +41,12 @@
       "employee_number": "Employee no.",
       "joined": "Joined"
     },
-    "assistant_suffix": "(assistant)",
     "no_class": "None",
     "multi_role_note": "Someone who teaches and also leads or manages is listed here once, with every role they hold.",
     "empty_academy_title": "No teachers yet",
     "empty_academy_body": "Invite teachers from the Members page.",
     "empty_title": "No teachers match",
     "empty_body": "Try a different search or clear a filter."
-  }
+  },
+  "delete_member": "Delete {{name}}"
 }

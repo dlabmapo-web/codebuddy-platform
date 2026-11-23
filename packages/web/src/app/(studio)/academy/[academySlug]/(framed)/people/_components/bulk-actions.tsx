@@ -15,6 +15,7 @@ import {
   Download,
   LayoutGrid,
   ShieldOff,
+  Trash2,
   TriangleAlert,
   UserCheck,
   UserCog,
@@ -133,6 +134,12 @@ export function BulkActions({
           onClick={() => setPending({ kind: 'RESTORE' })}
           tone="success"
         />
+        <ActionButton
+          icon={Trash2}
+          label={t('bulk.action_delete')}
+          onClick={() => setPending({ kind: 'DELETE' })}
+          tone="danger"
+        />
 
         <button
           aria-label={t('bulk.clear')}
@@ -171,13 +178,14 @@ function ActionButton({
   icon: typeof LayoutGrid;
   label: string;
   onClick: () => void;
-  tone: 'brand' | 'peer' | 'warning' | 'success';
+  tone: 'brand' | 'peer' | 'warning' | 'success' | 'danger';
 }) {
   const styles = {
     brand: 'hover:border-brand hover:text-brand',
     peer: 'hover:border-peer hover:text-peer',
     warning: 'hover:border-warning hover:text-warning',
     success: 'hover:border-success hover:text-success',
+    danger: 'text-danger hover:border-danger',
   }[tone];
   return (
     <button
@@ -208,7 +216,7 @@ function ActionButton({
  * Confirm stays disabled until a preview has landed and reports somebody to
  * change. A manager cannot approve a number the server has not yet produced.
  */
-function BulkConfirmDialog({
+export function BulkConfirmDialog({
   academyId,
   classes,
   initialOptions,
@@ -222,7 +230,8 @@ function BulkConfirmDialog({
   initialOptions: BulkOptions;
   onApplied: () => void;
   onClose: () => void;
-  peopleRevision: number;
+  /** The roster revision the page loaded; a roster without one uses the preview's. */
+  peopleRevision?: number;
   selection: PeopleSelection;
 }) {
   const { t } = useTranslation('people-ops');
@@ -243,6 +252,9 @@ function BulkConfirmDialog({
   const [idempotencyKey] = React.useState(() => crypto.randomUUID());
 
   const ready = options.kind !== 'ENROLL' || options.classId !== '';
+  const deleting = options.kind === 'DELETE';
+  // Deleting cannot be undone, so it asks for an explicit acknowledgement.
+  const [acknowledged, setAcknowledged] = React.useState(false);
 
   const preview = useQuery({
     queryKey: ['bulk-preview', academyId, JSON.stringify({ selection, options })],
@@ -259,7 +271,7 @@ function BulkConfirmDialog({
         selection,
         options,
         idempotencyKey,
-        peopleRevision,
+        peopleRevision: peopleRevision ?? preview.data?.peopleRevision ?? 0,
       }),
     onSuccess: (next) => {
       setResult(next);
@@ -295,7 +307,7 @@ function BulkConfirmDialog({
       >
         <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
           <h2 className="text-[16px] font-extrabold" id={headingId}>
-            {result ? t('bulk.result_title') : t('bulk.confirm_title')}
+            {result ? t('bulk.result_title') : deleting ? t('bulk.delete_title') : t('bulk.confirm_title')}
           </h2>
           <button
             aria-label={t('bulk.cancel')}
@@ -312,6 +324,11 @@ function BulkConfirmDialog({
           <BulkResultBody onClose={onClose} result={result} />
         ) : (
           <div className="px-5 py-4">
+            {deleting ? (
+              <p className="mb-3 rounded-lg border border-danger/25 bg-danger/5 px-3.5 py-2.5 text-[13px] leading-5 text-danger">
+                {t('bulk.delete_warning')}
+              </p>
+            ) : null}
             {options.kind === 'ENROLL' ? (
               <Picker
                 label={t('bulk.choose_class')}
@@ -352,6 +369,14 @@ function BulkConfirmDialog({
               <div className="h-24 animate-pulse rounded-lg bg-accent motion-reduce:animate-none" />
             ) : null}
 
+            {deleting && preview.data && preview.data.affected > 0 ? (
+              <label className="mt-3 flex items-center gap-2 text-[13px] font-semibold text-ink">
+                <input type="checkbox" className="size-4 accent-[var(--danger)]" checked={acknowledged}
+                  onChange={(event) => setAcknowledged(event.target.checked)} />
+                {t('bulk.delete_ack')}
+              </label>
+            ) : null}
+
             {run.isError ? (
               <p
                 className="mt-3 rounded-lg border border-danger/25 bg-danger/5 px-3.5 py-2.5 text-[13px] text-danger"
@@ -371,17 +396,23 @@ function BulkConfirmDialog({
                 {t('bulk.cancel')}
               </button>
               <button
-                className="h-9 rounded-lg bg-primary px-4 text-[13px] font-bold text-on-primary transition-opacity hover:opacity-90 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                className={cn(
+                  'h-9 rounded-lg px-4 text-[13px] font-bold transition-opacity hover:opacity-90 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                  deleting ? 'bg-danger text-on-danger' : 'bg-primary text-on-primary',
+                )}
                 // Never enabled on a number the server has not produced.
                 disabled={
                   run.isPending ||
                   !preview.data ||
-                  preview.data.affected === 0
+                  preview.data.affected === 0 ||
+                  (deleting && !acknowledged)
                 }
                 onClick={() => run.mutate()}
                 type="button"
               >
-                {run.isPending ? t('bulk.confirming') : t('bulk.confirm')}
+                {run.isPending
+                  ? t(deleting ? 'bulk.deleting' : 'bulk.confirming')
+                  : t(deleting ? 'bulk.delete_confirm' : 'bulk.confirm')}
               </button>
             </div>
           </div>
@@ -465,7 +496,7 @@ function ConsequenceList({ preview }: { preview: BulkPreview }) {
  * painting all six red would make none of them mean anything.
  */
 function severity(kind: BulkConsequenceKind): 'high' | 'normal' {
-  return kind === 'teacher_assignments_stranded' || kind === 'enrollments_dropped'
+  return kind === 'teacher_assignments_stranded' || kind === 'enrollments_dropped' || kind === 'accounts_deleted'
     ? 'high'
     : 'normal';
 }

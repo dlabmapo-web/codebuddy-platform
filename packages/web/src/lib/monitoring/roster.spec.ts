@@ -73,7 +73,7 @@ describe('mergeRoster', () => {
     const [row] = mergeRoster(
       [student({ membershipId: 'a' })],
       [presence('a', { state: 'SOLVING', materialId })],
-      [{ materialId, number: 1, title: 'Coding exercise' }],
+      [{ materialId, number: 1, outlineNumber: '1-1-1', title: 'Coding exercise' }],
     );
     expect(row).toMatchObject({
       state: 'SOLVING',
@@ -86,12 +86,12 @@ describe('mergeRoster', () => {
     const [idle] = mergeRoster(
       [student({ membershipId: 'a' })],
       [presence('a', { state: 'IDLE', materialId })],
-      [{ materialId, number: 1, title: 'Coding exercise' }],
+      [{ materialId, number: 1, outlineNumber: '1-1-1', title: 'Coding exercise' }],
     );
     const [online] = mergeRoster(
       [student({ membershipId: 'b' })],
       [presence('b', { state: 'ONLINE', materialId })],
-      [{ materialId, number: 1, title: 'Coding exercise' }],
+      [{ materialId, number: 1, outlineNumber: '1-1-1', title: 'Coding exercise' }],
     );
     expect(idle!.canOpenLive).toBe(true);
     expect(online!.canOpenLive).toBe(true);
@@ -101,9 +101,9 @@ describe('mergeRoster', () => {
     const [row] = mergeRoster(
       [student({ membershipId: 'a' })],
       [presence('a', { state: 'SOLVING', materialId })],
-      [{ materialId, number: 14, title: 'Deque' }],
+      [{ materialId, number: 14, outlineNumber: '1-1-14', title: 'Deque' }],
     );
-    expect(row!.exercise).toEqual({ materialId, number: 14, title: 'Deque' });
+    expect(row!.exercise).toEqual({ materialId, number: 14, outlineNumber: '1-1-14', title: 'Deque' });
   });
 
   /**
@@ -115,7 +115,7 @@ describe('mergeRoster', () => {
     const [row] = mergeRoster(
       [student({ membershipId: 'a' })],
       [presence('a', { state: 'SOLVING', materialId })],
-      [{ materialId: 'another-material', number: 1, title: 'Elsewhere' }],
+      [{ materialId: 'another-material', number: 1, outlineNumber: '1-1-1', title: 'Elsewhere' }],
     );
     expect(row!.exercise).toBeNull();
     expect(row!.materialId).toBe(materialId);
@@ -126,7 +126,7 @@ describe('mergeRoster', () => {
     const [row] = mergeRoster(
       [student({ membershipId: 'a' })],
       [presence('a', { state: 'ONLINE', materialId: null })],
-      [{ materialId, number: 1, title: 'Deque' }],
+      [{ materialId, number: 1, outlineNumber: '1-1-1', title: 'Deque' }],
     );
     expect(row!.exercise).toBeNull();
   });

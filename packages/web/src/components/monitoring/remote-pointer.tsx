@@ -19,6 +19,7 @@ import {
   pointDirection,
   toViewportPoint,
   visibleBoxWithin,
+  visibleSurfaceBox,
 } from '@/lib/monitoring/awareness/surfaces';
 
 /**
@@ -344,7 +345,9 @@ function measure(pointer: CollaborationPointer): Placement['view'] {
   const point = canvas
     ? fromCanvasPosition(pointer, box)
     : toViewportPoint(pointer, box);
-  const direction = pointDirection(point, surfaceBox);
+  // Against what is visible, not the surface's full box: a tall statement runs
+  // on under its scroll container, and a point down there is "below".
+  const direction = pointDirection(point, visibleSurfaceBox(surfaceElement));
   return direction
     ? { kind: 'direction', direction }
     : { kind: 'arrow', ...point };
@@ -361,14 +364,24 @@ function scrollPointerIntoView(pointer: CollaborationPointer): void {
   const canvas = findCanvasElement(pointer.surface);
   if (!surfaceElement || !canvas) return;
 
-  const surfaceBox = surfaceElement.getBoundingClientRect();
+  // The pane that actually scrolls: the surface element is usually its tall
+  // content, which does not scroll itself, so scrolling it did nothing.
+  let scroller: HTMLElement | null = surfaceElement;
+  while (scroller && scroller !== document.body) {
+    const overflowY = getComputedStyle(scroller).overflowY;
+    if ((overflowY === 'auto' || overflowY === 'scroll') && scroller.scrollHeight > scroller.clientHeight) break;
+    scroller = scroller.parentElement;
+  }
+  if (!scroller || scroller === document.body) return;
+
+  const visible = visibleSurfaceBox(surfaceElement);
   const { top } = fromCanvasPosition(pointer, canvas.getBoundingClientRect());
   // Centred rather than flush to the edge: the sentence around the position is
   // what makes it legible, and an edge-aligned target arrives with half of it
   // still off screen.
-  surfaceElement.scrollBy({
+  scroller.scrollBy({
     behavior: 'smooth',
-    top: top - (surfaceBox.top + surfaceBox.height / 2),
+    top: top - (visible.top + visible.height / 2),
   });
 }
 

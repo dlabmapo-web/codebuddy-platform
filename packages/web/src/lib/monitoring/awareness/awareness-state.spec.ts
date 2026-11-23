@@ -100,3 +100,19 @@ describe('receiveAwareness', () => {
     expect(replacement.cursorMovedAt).toBe(200);
   });
 });
+
+describe('statement width (QA S-10)', () => {
+  it('keeps the student\'s width across packets that do not carry it', () => {
+    const sized = receiveAwareness(idleAwarenessState, event({ statementWidth: 530 }), 100);
+    expect(sized.statementWidth).toBe(530);
+    const moved = receiveAwareness(sized, event({ pointer }), 200);
+    expect(moved.statementWidth).toBe(530);
+    expect(expirePointer(moved).statementWidth).toBe(530);
+    expect(receiveAwareness(moved, event({ statementWidth: 612 }), 300).statementWidth).toBe(612);
+  });
+  it('forgets it on another draft', () => {
+    const sized = receiveAwareness(idleAwarenessState, event({ statementWidth: 530 }), 100);
+    const other = receiveAwareness(sized, event({ draftId: '10000000-0000-4000-8000-000000000002' }), 200);
+    expect(other.statementWidth).toBeNull();
+  });
+});

@@ -418,6 +418,8 @@ export class TeamLeadOverviewRepository {
         WHERE cls.academy_id = ${academyId}::uuid
           AND cls.status = 'ACTIVE'
           AND cls.teacher_membership_id IS NULL
+          -- A class's teachers are one list: any teacher means it has one.
+          AND NOT EXISTS (SELECT 1 FROM class_assistant_teachers a WHERE a.class_id = cls.id)
       `,
       "class",
     );

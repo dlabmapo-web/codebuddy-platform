@@ -7,6 +7,7 @@ import type { CanonicalValue } from "./canonical.js";
 import {
   isGradingUnit,
   isLocalKey,
+  LOCAL_PREFIX,
   MANUAL_TYPES,
   type NodeKind,
   type SyncNode,
@@ -26,6 +27,10 @@ import type {
   PlannedUnit,
   ReleaseNodeView,
 } from "./merge/plan.js";
+import type { ProjectedTest } from "./projection.js";
+
+/** The `lecture.test` unit: a test's settings, points keyed by material key. */
+type TestUnit = ProjectedTest;
 
 /**
  * Applying a validated plan to one copy, inside the run's transaction
@@ -198,6 +203,8 @@ export async function applyPlan(
   const pdfs: Prisma.PdfDocumentCreateManyInput[] = [];
   const manuals: Prisma.ManualMaterialCreateManyInput[] = [];
   const exercises: Prisma.ProgrammingExerciseCreateManyInput[] = [];
+  /** Test settings to upsert once every material has its local id. */
+  const tests: Array<{ lectureId: string; unit: TestUnit }> = [];
   const testCases: Prisma.ExerciseTestCaseCreateManyInput[] = [];
   const hints: Prisma.ExerciseHintCreateManyInput[] = [];
   const solutions: Prisma.ProgrammingExerciseSolutionCreateManyInput[] = [];
@@ -247,7 +254,10 @@ export async function applyPlan(
         description: (merged["lecture.description"] ?? "") as string,
         position: tempPosition(index),
         isVisible,
+        kind: merged["lecture.test"] ? "TEST" : "STANDARD",
       });
+      if (merged["lecture.test"])
+        tests.push({ lectureId: id, unit: merged["lecture.test"] as TestUnit });
       return;
     }
     if (theirs.kind !== "MATERIAL") return;
@@ -633,12 +643,18 @@ export async function applyPlan(
         title: merged["module.title"],
         description: merged["module.description"],
       });
-    else if (view.kind === "LECTURE")
+    else if (view.kind === "LECTURE") {
       lectureRows.push({
         id,
         title: merged["lecture.title"],
         description: merged["lecture.description"],
+        // A test the library drops becomes a lecture again; its settings row
+        // stays, since attempts may reference it.
+        kind: merged["lecture.test"] ? "TEST" : "STANDARD",
       });
+      if (merged["lecture.test"])
+        tests.push({ lectureId: id, unit: merged["lecture.test"] as TestUnit });
+    }
     else
       writeTypeRow({ id, key, type: view.materialType!, merged, isNew: false });
   }
@@ -666,6 +682,48 @@ export async function applyPlan(
   if (modules.length) await tx.courseModule.createMany({ data: modules });
   if (lectures.length) await tx.lecture.createMany({ data: lectures });
   if (materials.length) await tx.material.createMany({ data: materials });
+  if (tests.length) {
+    // One statement for every test this run adds or changes. Points come keyed
+    // by master material key and are stored by this copy's material ids.
+    const payload = JSON.stringify(
+      tests.map(({ lectureId, unit }) => ({
+        lecture_id: lectureId,
+        guide: unit.guide,
+        summary: unit.summary,
+        test_type: unit.testType,
+        time_limit_minutes: unit.timeLimitMinutes,
+        use_preparation: unit.usePreparation,
+        review_after_end: unit.reviewAfterEnd,
+        allow_self_retake: unit.allowSelfRetake,
+        show_score_on_finish: unit.showScoreOnFinish,
+        language_reference: unit.languageReference,
+        show_explanations: unit.showExplanations,
+        points: Object.fromEntries(
+          Object.entries(unit.points ?? {}).flatMap(([key, value]) => {
+            const local = isLocalKey(key) ? key.slice(LOCAL_PREFIX.length) : localOf(key);
+            return local ? [[local, value]] : [];
+          }),
+        ),
+      })),
+    );
+    await tx.$executeRaw`
+      INSERT INTO lecture_tests (lecture_id, guide, summary, test_type, time_limit_minutes,
+        use_preparation, review_after_end, allow_self_retake, show_score_on_finish,
+        language_reference, show_explanations, points)
+      SELECT v.lecture_id, v.guide, v.summary, v.test_type::"TestType", v.time_limit_minutes,
+        v.use_preparation, v.review_after_end, v.allow_self_retake, v.show_score_on_finish,
+        v.language_reference, v.show_explanations, v.points
+      FROM jsonb_to_recordset(${payload}::jsonb) AS v(lecture_id uuid, guide text, summary text,
+        test_type text, time_limit_minutes int, use_preparation boolean, review_after_end boolean,
+        allow_self_retake boolean, show_score_on_finish boolean, language_reference boolean,
+        show_explanations boolean, points jsonb)
+      ON CONFLICT (lecture_id) DO UPDATE SET guide = EXCLUDED.guide, summary = EXCLUDED.summary,
+        test_type = EXCLUDED.test_type, time_limit_minutes = EXCLUDED.time_limit_minutes,
+        use_preparation = EXCLUDED.use_preparation, review_after_end = EXCLUDED.review_after_end,
+        allow_self_retake = EXCLUDED.allow_self_retake, show_score_on_finish = EXCLUDED.show_score_on_finish,
+        language_reference = EXCLUDED.language_reference, show_explanations = EXCLUDED.show_explanations,
+        points = EXCLUDED.points, updated_at = now()`;
+  }
   if (explanations.length)
     await tx.explanationMaterial.createMany({ data: explanations });
   if (videos.length) await tx.videoLesson.createMany({ data: videos });
@@ -707,6 +765,7 @@ export async function applyPlan(
       columns: [
         ["title", "text"],
         ["description", "text"],
+        ["kind", `"LectureKind"`],
       ],
       also: ["updated_at = now()"],
     },

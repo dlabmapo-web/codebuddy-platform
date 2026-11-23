@@ -15,8 +15,11 @@ import { cn } from '@/lib/utils';
  */
 export function MonitoringIndicator({
   state,
+  monitoringLabel,
 }: {
   state: StudentIndicatorState;
+  /** Replaces the watching text, as a test does ("Teacher is watching"). */
+  monitoringLabel?: string;
 }) {
   const { t } = useTranslation('monitoring');
   if (state === 'NONE') return null;
@@ -46,7 +49,7 @@ export function MonitoringIndicator({
         ? t('indicator.helping')
         : state === 'RECONNECTING'
           ? t('indicator.reconnecting')
-          : t('indicator.monitoring')}
+          : (monitoringLabel ?? t('indicator.monitoring'))}
     </span>
   );
 }

@@ -22,6 +22,7 @@ import { DeleteModal } from './delete-modal';
 import { MoveAnywhereModal } from './move-anywhere-modal';
 import { RenameModal } from './rename-modal';
 import { RowMenu } from './row-menu';
+import { TestRowBadge, useConvertToTest } from './test-builder';
 import { NewMaterialDialog } from './new-material-dialog';
 import { availableMaterialKinds, unavailableMaterialKinds, type MaterialCreationKind } from '../_lib/material-creation';
 
@@ -320,10 +321,8 @@ function ExerciseRow({
         itemTitle={material.title}
         kind={material.type === 'EXPLANATION' ? 'explanation' : material.type === 'PDF_DOCUMENT' ? 'pdf' : 'exercise'}
         onCancel={() => setDeleting(false)}
-        onConfirm={() => {
-          setDeleting(false);
-          builder.deleteExercise(lectureId, material.id);
-        }}
+        impact={{ ...builder.target, target: { kind: 'material', id: material.id } }}
+        onConfirm={() => builder.deleteExercise(lectureId, material.id)}
         open={deleting}
       />
       {manualOpen ? <ManualAuthorDialog target={{...builder.target,lectureId}} material={material} onClose={()=>setManualOpen(false)} onSaved={builder.refresh}/> : null}
@@ -367,7 +366,12 @@ export function LectureRow({
   const contentPaths = useContentBasePath();
   const [pdfAdding, setPdfAdding] = useState(false);
   const router = useRouter();
-  const materialKinds = availableMaterialKinds({ ...publicConfig, courseLanguage: builder.tree.course.language, editable: builder.editable, exerciseEditable: builder.exerciseEditable });
+  const allMaterialKinds = availableMaterialKinds({ ...publicConfig, courseLanguage: builder.tree.course.language, editable: builder.editable, exerciseEditable: builder.exerciseEditable });
+  // A test holds only gradable problems.
+  const materialKinds = lecture.kind === 'TEST'
+    ? allMaterialKinds.filter((kind) => kind === 'python' || kind === 'multipleChoice' || kind === 'shortAnswer')
+    : allMaterialKinds;
+  const convertItems = useConvertToTest(builder, lecture);
   function chooseMaterial(kind: MaterialCreationKind) {
     switch (kind) {
       case 'explanation': router.push(contentPaths.explanation(builder.target.courseId, lecture.id, 'new')); break;
@@ -464,6 +468,7 @@ export function LectureRow({
               {lecture.title}
             </p>
             {builder.isArchivedRoot(lecture.id) ? <ArchivedBadge /> : null}
+            <TestRowBadge builder={builder} lecture={lecture} />
             {/* The count sits with the title it describes, not off at the edge. */}
             <span className="shrink-0 text-[13px] text-sub">
               {hasExercises
@@ -503,6 +508,7 @@ export function LectureRow({
               onDelete={() => setDeleting(true)}
               onMove={canMove && !archived ? () => setMoving(true) : undefined}
               onRename={() => setRenaming(true)}
+              extraItems={convertItems}
             />
           ) : null}
         </div>
@@ -566,10 +572,8 @@ export function LectureRow({
           itemTitle={lecture.title}
           kind="lecture"
           onCancel={() => setDeleting(false)}
-          onConfirm={() => {
-            setDeleting(false);
-            builder.deleteLecture(lecture.id);
-          }}
+          impact={{ ...builder.target, target: { kind: 'lecture', id: lecture.id } }}
+          onConfirm={() => builder.deleteLecture(lecture.id)}
           open={deleting}
         />
         <VisibilityConfirmModal

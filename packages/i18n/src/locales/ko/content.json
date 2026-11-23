@@ -253,10 +253,10 @@
       "SUPPLEMENTARY": "보충 자료",
       "BOTH": "주 학습 및 보충 자료"
     },
-    "choose": "PDF를 선택하거나 여기에 놓으세요",
+    "choose": "PDF·PPT 파일을 선택하거나 여기에 놓으세요",
     "replace": "PDF 교체 (선택 사항)",
-    "file": "PDF 파일",
-    "limit": "PDF만 가능 · 최대 95 MB",
+    "file": "PDF·PPT 파일",
+    "limit": "PDF·PPT·PPTX 가능 · 최대 95 MB",
     "save": "PDF 저장",
     "cancel": "취소",
     "open": "PDF 열기",
@@ -277,25 +277,11 @@
     "fit_page": "페이지 맞춤",
     "download": "PDF 다운로드",
     "fullscreen": "전체 화면 전환",
-    "resources": "보충 자료",
     "previous_lesson": "이전 학습",
     "next_lesson": "다음 학습",
     "lesson": "학습 {{current}} / {{total}}",
     "course": "강좌로 돌아가기",
     "contents": "강좌 목차",
-    "errors": {
-      "PDF_TOO_LARGE": "95 MB 이하의 PDF를 선택하세요.",
-      "PDF_INVALID": "암호가 없는 올바른 PDF를 선택하세요.",
-      "PDF_BUSY": "PDF 검증이 진행 중입니다. 잠시 후 다시 시도하세요.",
-      "PDF_STORAGE_FAILED": "PDF를 저장하지 못했습니다. 다시 시도하세요.",
-      "PDF_NOT_AVAILABLE": "이 PDF를 사용할 수 없습니다.",
-      "PDF_UPLOAD_EXPIRED": "저장 전에 파일을 다시 업로드하세요.",
-      "PDF_EDIT_STALE": "자료가 변경되었습니다. 새로고침 후 수정하세요.",
-      "PDF_VALIDATION_LIMIT": "PDF 처리 제한을 초과했습니다.",
-      "PDF_REFERENCE_INVALID": "이 Python 실습과 같은 과정의 보조 PDF를 선택해 주세요.",
-      "PDF_REFERENCE_IN_USE": "이 PDF를 사용하는 코딩 실습이 있습니다. 실습의 참고 PDF 연결을 해제하거나 변경한 후 삭제하거나 배치를 변경해 주세요.",
-      "PDF_REFERENCE_NOT_READY": "실습을 공개하기 전에 참고 PDF와 상위 콘텐츠를 공개해 주세요."
-    },
     "remove_selection": "파일 선택 취소",
     "preview": "PDF 미리보기",
     "edit_action": "PDF 수정",
@@ -311,7 +297,8 @@
         "SUPPLEMENTARY": "수업 참고 자료에서 엽니다.",
         "BOTH": "수업 본문과 참고 자료 모두에서 볼 수 있습니다."
       }
-    }
+    },
+    "converting": "슬라이드를 PDF로 변환하는 중…"
   },
   "video": {
     "add": "동영상 수업 추가",

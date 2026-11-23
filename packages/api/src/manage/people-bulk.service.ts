@@ -3,6 +3,7 @@ import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import {
   BULK_MAX_TARGETS,
   bulkEligibility,
+  platformRoleHasPermission,
   wouldStrandAcademy,
   type BulkConsequence,
   type BulkOptions,
@@ -15,6 +16,7 @@ import {
 } from "@cove/shared";
 
 import { AuditService } from "../academies/audit.service.js";
+import { SupabaseAuthService } from "../auth/supabase-auth.service.js";
 import { RateLimitService } from "../academies/rate-limit.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { AppException } from "../common/app-exception.js";
@@ -70,6 +72,7 @@ export class PeopleBulkService {
     private readonly audit: AuditService,
     private readonly rateLimit: RateLimitService,
     private readonly revocation: MonitoringRevocationService,
+    private readonly supabaseAuth: SupabaseAuthService,
   ) {}
 
   /* ------------------------------------------------------------- preview */
@@ -84,6 +87,7 @@ export class PeopleBulkService {
       input.academyId,
       "academy.members.manage",
     );
+    if (input.options.kind === "DELETE") await this.assertMayDelete(actor);
 
     const targets = await this.resolveTargets(
       input.academyId,
@@ -100,6 +104,7 @@ export class PeopleBulkService {
       targets,
       input.options,
       this.prisma,
+      actor.userId,
     );
 
     return {
@@ -127,6 +132,7 @@ export class PeopleBulkService {
       "academy.members.manage",
     );
     this.rateLimit.assert(`bulk-run:${input.academyId}`, 20, 60_000);
+    if (input.options.kind === "DELETE") await this.assertMayDelete(actor);
 
     // Idempotent replay, checked before any work. §14 — the same key returns
     // the original result, which is the only safe answer when the first
@@ -173,6 +179,7 @@ export class PeopleBulkService {
         targets,
         input.options,
         transaction,
+        actor.userId,
       );
 
       if (decided.eligible.length === 0) {
@@ -196,7 +203,7 @@ export class PeopleBulkService {
         },
       });
 
-      const rows = await this.apply({
+      const { rows, deletedAuthUserIds } = await this.apply({
         actor,
         academyId: input.academyId,
         eligible: decided.eligible,
@@ -241,6 +248,7 @@ export class PeopleBulkService {
         revokeMemberships: decided.eligible
           .filter(() => needsRevocation(input.options))
           .map((member) => member.id),
+        deletedAuthUserIds,
       };
     }).catch(async (error: unknown) => {
       // A concurrent retry can pass the optimistic lookup before the first
@@ -259,7 +267,7 @@ export class PeopleBulkService {
       if (!replay || replay.status === "PENDING") {
         throw new AppException("BULK_OPERATION_IN_PROGRESS", HttpStatus.CONFLICT);
       }
-      return { operation: replay, replayed: true, revokeMemberships: [] };
+      return { operation: replay, replayed: true, revokeMemberships: [], deletedAuthUserIds: [] };
     });
 
     // §12 — monitoring revocation publishes only after the commit. Revoking
@@ -280,6 +288,27 @@ export class PeopleBulkService {
           }`,
         ),
       );
+    }
+
+    // A deleted account's sign-in goes too, after the commit for the same
+    // reason as revocation: a network call must not be able to roll back the
+    // roster. The account row is already DELETED, which every access check
+    // refuses, so a failure here leaves nobody able to sign in.
+    const signInsDeleted: string[] = [];
+    for (const authUserId of outcome.deletedAuthUserIds) {
+      try {
+        await this.supabaseAuth.deleteUser(authUserId);
+        signInsDeleted.push(authUserId);
+      } catch (error) {
+        this.logger.warn(`auth user delete after bulk failed: ${error instanceof Error ? error.message : "unknown"}`);
+      }
+    }
+    // One statement for every account whose sign-in went.
+    if (signInsDeleted.length > 0) {
+      await this.prisma.user.updateMany({
+        where: { authUserId: { in: signInsDeleted }, status: "DELETED" },
+        data: { authUserId: null },
+      });
     }
 
     this.logger.log(
@@ -329,7 +358,14 @@ export class PeopleBulkService {
         id: true,
         role: true,
         status: true,
-        user: { select: { displayName: true, username: true, email: true } },
+        userId: true,
+        user: {
+          select: {
+            displayName: true, username: true, email: true, platformRole: true,
+            // Any other academy the person still belongs to keeps the account.
+            memberships: { where: { academyId: { not: academyId }, status: { not: "LEFT" } }, select: { id: true }, take: 1 },
+          },
+        },
         memberProfile: { select: { academyDisplayName: true } },
         extraRoles: { select: { role: true } },
         dlabBinding: { select: { localSuspendedAt: true, sourceAccessStatus: true } },
@@ -363,6 +399,10 @@ export class PeopleBulkService {
 
     return members.map((member) => ({
       id: member.id,
+      userId: member.userId,
+      // Cove staff are never deleted from an academy page, and someone who
+      // still belongs to another academy keeps their account there.
+      accountDeletable: member.user.platformRole === "USER" && member.user.memberships.length === 0,
       role: member.role,
       status: member.status,
       displayName: memberDisplayName(member),
@@ -391,11 +431,17 @@ export class PeopleBulkService {
     targets: TargetMember[],
     options: BulkOptions,
     client: Pick<PrismaService, "academyMembership">,
+    actorUserId?: string,
   ): Promise<Decided> {
     const eligible: TargetMember[] = [];
     const blocked: BlockedMember[] = [];
 
     for (const target of targets) {
+      // Nobody deletes themselves from here: it would end the session doing it.
+      if (options.kind === "DELETE" && target.userId === actorUserId) {
+        blocked.push({ member: target, code: "self" });
+        continue;
+      }
       const verdict = bulkEligibility(target, options);
       if (verdict.eligible) eligible.push(target);
       else blocked.push({ member: target, code: verdict.code });
@@ -403,6 +449,7 @@ export class PeopleBulkService {
 
     const removesManagers =
       options.kind === "SUSPEND" ||
+      options.kind === "DELETE" ||
       (options.kind === "ROLE_CHANGE" && options.role !== "MANAGER");
     if (removesManagers) {
       const losing = eligible.filter(
@@ -468,6 +515,19 @@ export class PeopleBulkService {
         "monitoring_revoked",
         decided.eligible.filter(holdsTeacher),
       );
+    }
+
+    if (options.kind === "DELETE") {
+      add(
+        "teacher_assignments_stranded",
+        decided.eligible.filter((member) => member.teachesClassIds.length > 0),
+      );
+      add(
+        "enrollments_dropped",
+        decided.eligible.filter((member) => member.enrolledClassIds.length > 0),
+      );
+      add("monitoring_revoked", decided.eligible.filter(holdsTeacher));
+      add("accounts_deleted", decided.eligible.filter((member) => member.accountDeletable));
     }
 
     if (options.kind === "ROLE_CHANGE") {
@@ -543,12 +603,51 @@ export class PeopleBulkService {
     blocked: BlockedMember[];
     options: BulkOptions;
     transaction: Prisma.TransactionClient;
-  }): Promise<BulkResultRow[]> {
+  }): Promise<{ rows: BulkResultRow[]; deletedAuthUserIds: string[] }> {
     const { transaction, options } = input;
     const ids = input.eligible.map((member) => member.id);
     const now = new Date();
+    let deletedAuthUserIds: string[] = [];
 
     switch (options.kind) {
+      case "DELETE": {
+        // Out of the academy: the membership is history (LEFT), which every
+        // people list and access check already leaves out.
+        await transaction.academyMembership.updateMany({
+          where: { id: { in: ids }, academyId: input.academyId },
+          data: { status: "LEFT", suspendedAt: null },
+        });
+        await transaction.classEnrollment.deleteMany({ where: { membershipId: { in: ids } } });
+        // A class they taught keeps its other teachers: the next one takes the
+        // class's answerable seat, as removing a teacher from the class does.
+        await transaction.$executeRaw`
+          UPDATE classes c SET teacher_membership_id = (
+            SELECT a.membership_id FROM class_assistant_teachers a
+            WHERE a.class_id = c.id AND a.membership_id <> ALL(${ids}::uuid[])
+            ORDER BY a.created_at, a.membership_id LIMIT 1), updated_at = now()
+          WHERE c.academy_id = ${input.academyId}::uuid AND c.teacher_membership_id = ANY(${ids}::uuid[])`;
+        await transaction.$executeRaw`
+          DELETE FROM class_assistant_teachers a USING classes c
+          WHERE a.class_id = c.id AND c.academy_id = ${input.academyId}::uuid
+            AND (a.membership_id = ANY(${ids}::uuid[]) OR a.membership_id = c.teacher_membership_id)`;
+        // The account itself, when nothing else holds it. Kept as a row so past
+        // work still names a person; status DELETED refuses every sign-in, and
+        // the email and username are released for reuse.
+        const accounts = input.eligible.filter((member) => member.accountDeletable).map((member) => member.userId);
+        if (accounts.length > 0) {
+          const users = await transaction.user.findMany({
+            where: { id: { in: accounts }, platformRole: "USER" },
+            select: { id: true, authUserId: true },
+          });
+          await transaction.user.updateMany({
+            where: { id: { in: users.map((user) => user.id) } },
+            data: { status: "DELETED", email: null, username: null },
+          });
+          deletedAuthUserIds = users.flatMap((user) => (user.authUserId ? [user.authUserId] : []));
+        }
+        break;
+      }
+
       case "SUSPEND":
         await transaction.academyMembership.updateMany({
           where: { id: { in: ids }, academyId: input.academyId },
@@ -637,13 +736,14 @@ export class PeopleBulkService {
 
     }
 
-    return [
+    const rows = [
       ...input.eligible.map(
         (member): BulkResultRow => ({
           membershipId: member.id,
           displayName: member.displayName,
           outcome: "changed",
-          code: options.kind === 'RESTORE' && member.sourceBlocked ? 'source_blocked' : 'ok',
+          code: options.kind === 'RESTORE' && member.sourceBlocked ? 'source_blocked'
+            : options.kind === "DELETE" && member.accountDeletable ? "account_deleted" : 'ok',
         }),
       ),
       ...input.blocked.map(
@@ -656,6 +756,19 @@ export class PeopleBulkService {
         }),
       ),
     ];
+    return { rows, deletedAuthUserIds };
+  }
+
+  /**
+   * Cove staff standing in an academy may delete people only with the right
+   * the admin console asks for too; a manager's own membership is enough.
+   */
+  private async assertMayDelete(actor: ManagerActor) {
+    if (!actor.via || actor.via === "membership") return;
+    const user = await this.prisma.user.findUnique({ where: { id: actor.userId }, select: { platformRole: true } });
+    if (!user || !platformRoleHasPermission(user.platformRole, "platform.users.delete")) {
+      throw new AppException("PERMISSION_DENIED", HttpStatus.FORBIDDEN);
+    }
   }
 }
 
@@ -670,6 +783,9 @@ function isUniqueViolation(error: unknown): boolean {
 
 type TargetMember = {
   id: string;
+  userId: string;
+  /** Deleting them also deletes the account: no other academy, not Cove staff. */
+  accountDeletable: boolean;
   role: string;
   status: string;
   displayName: string;
@@ -711,7 +827,7 @@ function holdsTeacherAfterRoleChange(
 
 /** Which kinds end a member's ability to hold a live monitoring session. */
 function needsRevocation(options: BulkOptions): boolean {
-  return options.kind === "SUSPEND" || options.kind === "ROLE_CHANGE";
+  return options.kind === "SUSPEND" || options.kind === "ROLE_CHANGE" || options.kind === "DELETE";
 }
 
 function toResult(

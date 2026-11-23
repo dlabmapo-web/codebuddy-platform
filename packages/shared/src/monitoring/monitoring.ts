@@ -197,9 +197,10 @@ const normalizedCoordinateSchema = z.number().min(0).max(1);
  *
  * `surface` is the pane's visible box, which is a scroll container for most
  * surfaces — the same fraction means a different place to a reader who has
- * scrolled elsewhere. `canvas` is the fixed-width logical canvas the statement
- * renders into while collaborating, whose layout is a function of the content
- * alone and is therefore identical on both screens.
+ * scrolled elsewhere. `canvas` is the statement laid out at the student's own
+ * reading width: the student renders it untouched and a teacher lays it out at
+ * that width (sent as `statementWidth`) and scales it, so the layout is
+ * identical on both screens without changing what the student sees.
  *
  * Both are numbers in `0..1`, and mixing them silently is exactly the bug this
  * discriminator exists to make unrepresentable. A receiver that is not in the
@@ -218,7 +219,7 @@ export type PointerSpace = z.infer<typeof pointerSpaceSchema>;
  * two people can be rendering statements of different heights (a teacher sees
  * every hint, a student only what they have opened), and dividing by a number
  * that differs between them is what put the two arrows on different lines.
- * The width is fixed by `STATEMENT_CANVAS_WIDTH` and identical on both.
+ * The width is the student's statement width, laid out identically on both.
  */
 export const canvasOrdinateMax = 64;
 const canvasOrdinateSchema = z.number().min(0).max(canvasOrdinateMax);
@@ -693,8 +694,13 @@ export type MonitoringRosterStudent = z.infer<
 export const monitoringRosterExerciseSchema = z.object({
   materialId: z.uuid(),
   type: materialTypeSchema.optional(),
-  /** Course-relative and 1-based, matching the student's navigator. */
+  /** Course-relative and 1-based walk order; the roster sorts by it. */
   number: z.number().int().positive(),
+  /**
+   * `module-lecture-material`, the number every screen prints for this
+   * exercise (QA-03). Null only when a stored position is missing.
+   */
+  outlineNumber: z.string().nullable(),
   title: z.string().min(1),
 });
 export type MonitoringRosterExercise = z.infer<
@@ -731,7 +737,8 @@ export const monitoringPublicExerciseSchema = z.object({
   breadcrumb: z.object({
     course: z.object({ id: z.uuid(), title: z.string().min(1) }),
     module: z.object({ id: z.uuid(), title: z.string().min(1) }),
-    lecture: z.object({ id: z.uuid(), title: z.string().min(1) }),
+    /** TEST: the student is sitting an exam, so the teacher watches without helping. */
+    lecture: z.object({ id: z.uuid(), title: z.string().min(1), kind: z.enum(["STANDARD", "TEST"]).optional() }),
   }),
   exercise: learnExerciseSchema,
 });

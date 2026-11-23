@@ -16,6 +16,7 @@
     "academy.people.bulk.enroll": "일괄 반 등록",
     "academy.people.bulk.role_change": "일괄 역할 변경",
     "academy.people.bulk.suspend": "일괄 정지",
+    "academy.people.bulk.delete": "구성원 삭제",
     "academy.people.bulk.restore": "일괄 복구",
     "class.created": "반 생성",
     "class.updated": "반 수정",
@@ -30,6 +31,7 @@
     "class.teacher.replaced": "담당 선생님 교체",
     "class.teacher.removed": "담당 선생님 해제",
     "class.assistants.updated": "수업의 보조 교사를 변경함",
+    "class.teachers.updated": "반 강사 변경",
     "platform.academy.first_manager_invited": "Cove가 첫 매니저를 초대했습니다",
     "platform.academy.first_manager_invitation_resent": "Cove가 첫 매니저 초대를 다시 보냈습니다",
     "fallback": "{{action}}"

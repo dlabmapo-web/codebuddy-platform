@@ -29,6 +29,8 @@ export const courseCopyInclude = {
       lectures: {
         orderBy: [{ position: "asc" }, { id: "asc" }],
         include: {
+          // A test's settings travel with it; class schedules and attempts never do.
+          test: true,
           materials: {
             orderBy: [{ position: "asc" }, { id: "asc" }],
             include: {
@@ -79,6 +81,7 @@ export async function copyCourseTree(
   const exercises: Prisma.ProgrammingExerciseCreateManyInput[] = [];
   const testCases: Prisma.ExerciseTestCaseCreateManyInput[] = [];
   const hints: Prisma.ExerciseHintCreateManyInput[] = [];
+  const tests: Array<{ row: Prisma.LectureTestCreateManyInput; points: Record<string, number> }> = [];
 
   for (const courseModule of source.modules) {
     const moduleId = randomUUID();
@@ -103,7 +106,12 @@ export async function copyCourseTree(
         description: lecture.description,
         position: lecture.position,
         isVisible: policy === "PRESERVE_VISIBILITY" ? lecture.isVisible : true,
+        kind: lecture.kind,
       });
+      if (lecture.kind === "TEST" && lecture.test) {
+        const { lectureId: _source, createdAt: _created, updatedAt: _updated, points, ...settings } = lecture.test;
+        tests.push({ row: { ...settings, lectureId }, points: (points ?? {}) as Record<string, number> });
+      }
 
       for (const material of lecture.materials) {
         const materialId = randomUUID();
@@ -291,6 +299,19 @@ export async function copyCourseTree(
   if (modules.length) await tx.courseModule.createMany({ data: modules });
   if (lectures.length) await tx.lecture.createMany({ data: lectures });
   if (materials.length) await tx.material.createMany({ data: materials });
+  // Points are keyed by material id, so they follow each problem to its copy.
+  if (tests.length)
+    await tx.lectureTest.createMany({
+      data: tests.map(({ row, points }) => ({
+        ...row,
+        points: Object.fromEntries(
+          Object.entries(points).flatMap(([id, value]) => {
+            const target = materialIds.get(id);
+            return target ? [[target, value]] : [];
+          }),
+        ),
+      })),
+    });
   if (explanations.length) await tx.explanationMaterial.createMany({ data: explanations });
   if (videos.length) await tx.videoLesson.createMany({ data: videos });
   if (documents.length) await tx.pdfDocument.createMany({ data: documents });

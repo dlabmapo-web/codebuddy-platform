@@ -193,6 +193,18 @@ export const appErrorCodes = [
      button. */
   "OPERATION_RUN_NOT_PENDING",
   "OPERATION_PLAN_TOO_LARGE",
+  "EXAM_NOT_FOUND",
+  "EXAM_NOT_STARTED",
+  "EXAM_ENDED",
+  "EXAM_ITEM_NOT_IN_ATTEMPT",
+  "EXAM_PERIOD_NOT_OPEN",
+  "EXAM_PERIOD_CLOSED",
+  "EXAM_ENTRY_CLOSED",
+  "EXAM_EXIT_NOT_YET",
+  "EXAM_LOCKED",
+  "EXAM_RETAKE_NOT_ALLOWED",
+  "EXAM_FEATURE_OFF",
+  "EXAM_INVALID_MATERIAL",
 ] as const;
 
 export type AppErrorCode = (typeof appErrorCodes)[number];
@@ -505,4 +517,16 @@ export const appErrorFallbacks: Record<AppErrorCode, string> = {
   PDF_UPLOAD_EXPIRED: "This upload expired. Choose the file again.",
   PDF_EDIT_STALE: "The document changed. Refresh before editing.",
   PDF_VALIDATION_LIMIT: "This PDF exceeds the validation time or memory limit.",
+  EXAM_NOT_FOUND: "This test was not found.",
+  EXAM_NOT_STARTED: "Start the test before opening or submitting its problems.",
+  EXAM_ENDED: "This test has ended. Answers can no longer be submitted.",
+  EXAM_ITEM_NOT_IN_ATTEMPT: "This problem is not part of your test.",
+  EXAM_PERIOD_NOT_OPEN: "This test is not open yet.",
+  EXAM_PERIOD_CLOSED: "The test period has ended.",
+  EXAM_ENTRY_CLOSED: "The entry deadline for this test has passed.",
+  EXAM_EXIT_NOT_YET: "You cannot end the test yet.",
+  EXAM_LOCKED: "The test is published or has attempts, so its problems and points cannot change.",
+  EXAM_RETAKE_NOT_ALLOWED: "You have already taken this test.",
+  EXAM_FEATURE_OFF: "Tests are not enabled for this academy.",
+  EXAM_INVALID_MATERIAL: "A test can only hold multiple choice, short answer and code problems.",
 };

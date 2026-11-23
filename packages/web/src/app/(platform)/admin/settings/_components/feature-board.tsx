@@ -8,7 +8,7 @@ import type {
 import { academyFeatureNames, academyFeatureRequires } from '@cove/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClipboardCheck, Coins, Eye, Trophy, Users } from 'lucide-react';
+import { ClipboardCheck, BadgeCheck, Coins, Eye, Trophy, Users } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -94,6 +94,13 @@ const featureStyles: Record<
     chip: 'bg-brand-soft text-brand',
     meter: 'bg-brand',
     icon: ClipboardCheck,
+  },
+  EXAMS: {
+    tone: 'teal',
+    dot: 'bg-teal',
+    chip: 'bg-teal-soft text-teal',
+    meter: 'bg-teal',
+    icon: BadgeCheck,
   },
 };
 

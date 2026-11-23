@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyVerdictToNavigator,
   flattenNavigatorExercises,
   mergeNavigatorProgress,
   navigatorPathFor,
@@ -188,5 +189,44 @@ describe("mergeNavigatorProgress", () => {
     other.course.id = id("c2");
     const incoming = toNavigatorContext(other, id("e1"))!;
     expect(mergeNavigatorProgress(current, incoming)).toBe(incoming);
+  });
+});
+
+describe("applyVerdictToNavigator (QA T-02)", () => {
+  const context = toNavigatorContext(outline, id("e1"))!;
+  const row = (next: typeof context, seed: string) =>
+    flattenNavigatorExercises(next).find((candidate) => candidate.materialId === id(seed));
+
+  it("turns a passed problem green with its score, and counts it in the header", () => {
+    const next = applyVerdictToNavigator(context, { materialId: id("e1"), status: "PASSED", score: 100 });
+    expect(row(next, "e1")).toMatchObject({ status: "SOLVED", bestScore: 100 });
+    expect(next.course.progress.solved).toBe(Math.min(context.course.progress.total, context.course.progress.solved + 1));
+    expect(next.course.progress.started).toBe(Math.min(context.course.progress.total, context.course.progress.started + 1));
+    const fromProgress = applyVerdictToNavigator(context, { materialId: id("e2"), status: "PASSED", score: 100 });
+    expect(fromProgress.course.progress.started).toBe(context.course.progress.started);
+  });
+
+  it("marks a failed attempt in progress and keeps the best score", () => {
+    const fresh = applyVerdictToNavigator(context, { materialId: id("e1"), status: "FAILED", score: 40 });
+    expect(row(fresh, "e1")).toMatchObject({ status: "IN_PROGRESS", bestScore: 40 });
+    const worse = applyVerdictToNavigator(context, { materialId: id("e2"), status: "FAILED", score: 20 });
+    expect(row(worse, "e2")).toMatchObject({ status: "IN_PROGRESS", bestScore: 60 });
+  });
+
+  it("never demotes a solved problem", () => {
+    const next = applyVerdictToNavigator(context, { materialId: id("e3"), status: "FAILED", score: 0 });
+    expect(row(next, "e3")).toMatchObject({ status: "SOLVED", bestScore: 100 });
+    expect(next).toBe(context);
+  });
+
+  it.each(["QUEUED", "RUNNING", "ERRORED", "CANCELLED", "RECORDED"] as const)(
+    "leaves the outline alone for %s",
+    (status) => {
+      expect(applyVerdictToNavigator(context, { materialId: id("e1"), status, score: 100 })).toBe(context);
+    },
+  );
+
+  it("ignores a material that is not in the outline", () => {
+    expect(applyVerdictToNavigator(context, { materialId: id("elsewhere"), status: "PASSED", score: 100 })).toBe(context);
   });
 });

@@ -39,7 +39,7 @@ export const authNamespaces = ["auth"] as const;
  * Mounted by the `(framed)/content` layout, and by the two platform-console
  * surfaces that render the same builder against the shared library.
  */
-export const contentNamespaces = ["solutions", "pdf-practice", "quiz", "content", "grading", "common", "courses", "material-picker", "exercise-files"] as const;
+export const contentNamespaces = ["solutions", "pdf-practice", "quiz", "content", "grading", "common", "courses", "material-picker", "exercise-files", "exam"] as const;
 
 /**
  * The student exercise workspace.
@@ -157,6 +157,8 @@ export const peopleOpsNamespaces = [
 export const peopleRosterNamespaces = [
   "manager",
   "people-rosters",
+  // The delete confirmation is the Members page's bulk dialog.
+  "people-ops",
   "errors",
 ] as const;
 
@@ -346,7 +348,8 @@ export type PageNamespace =
   | (typeof pointsNamespaces)[number]
   | (typeof academyLibraryNamespaces)[number]
   | (typeof lobbyNamespaces)[number]
-  | (typeof notificationNamespaces)[number];
+  | (typeof notificationNamespaces)[number]
+  | (typeof examNamespaces)[number];
 
 /**
  * The confirmation copy for deleting a course or a class.
@@ -357,3 +360,6 @@ export type PageNamespace =
  * `@cove/i18n`'s `locales.spec.ts` asked for exactly this split.
  */
 export const destructiveNamespaces = ['destructive'] as const;
+
+/** Exams (테스트): the student test card, wizard and test mode, authoring and results. */
+export const examNamespaces = ["exam", "sample-check", "monitoring", "errors"] as const;

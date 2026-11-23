@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, open, readFile, rm } from "node:fs/promises";
+import { mkdtemp, open, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, execFile } from "node:child_process";
@@ -62,9 +62,10 @@ const parser = `
 import { readFile } from 'node:fs/promises';
 const { getDocument } = await import(process.argv[2]);
 try {
- const data = new Uint8Array(await readFile(process.argv[1]));
+ const file = await readFile(process.argv[1]);
+ const data = new Uint8Array(file.buffer, file.byteOffset, file.byteLength);
  if (new TextDecoder().decode(data.slice(0,5)) !== '%PDF-') process.exit(2);
- const task = getDocument({data, isEvalSupported:false, stopAtErrors:true, verbosity:0, useSystemFonts:false, disableFontFace:true});
+ const task = getDocument({data, isEvalSupported:false, stopAtErrors:true, verbosity:0, useSystemFonts:false, disableFontFace:true, maxImageSize:1});
  const doc = await task.promise;
  if (doc.numPages < 1) process.exit(2);
  for(let n=1; n<=doc.numPages; n++) { const page=await doc.getPage(n); await page.getOperatorList(); page.cleanup(); }
@@ -73,13 +74,40 @@ try {
 } catch { process.exit(2); }
 `;
 
-/** Separate heap, wall-clock deadline, and RSS ceiling: uploaded PDFs never run in the API process. */
-export async function validatePdf(path: string): Promise<number> {
+const MB = 1024 * 1024;
+/** The checker's memory ceiling grows with the file it holds, up to 1 GB. */
+export function pdfValidationLimits(byteSize: number) {
+  const fileMb = Math.ceil(byteSize / MB);
+  return {
+    rssKb: Math.min(256 + 2 * fileMb, 1024) * 1024,
+    heapMb: Math.min(192 + fileMb, 768),
+  };
+}
+
+let validationQueue: Promise<unknown> = Promise.resolve();
+
+/**
+ * Separate heap, wall-clock deadline, and RSS ceiling: uploaded PDFs never run
+ * in the API process. One check at a time, so two large uploads never add up.
+ *
+ * Pictures are not decoded (`maxImageSize: 1`): the check proves the file
+ * parses and counts its pages; readers' browsers draw the pictures. Decoding
+ * them here is what pushed image-heavy decks of 4 MB and more past the
+ * ceiling (QA-002: 11–27 MB decks peaked at 317–333 MB, 135–184 MB without).
+ */
+export function validatePdf(path: string): Promise<number> {
+  const run = validationQueue.then(() => validatePdfNow(path));
+  validationQueue = run.catch(() => undefined);
+  return run;
+}
+
+async function validatePdfNow(path: string): Promise<number> {
+  const limits = pdfValidationLimits((await stat(path)).size);
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
       [
-        "--max-old-space-size=192",
+        `--max-old-space-size=${limits.heapMb}`,
         "--input-type=module",
         "-e",
         parser,
@@ -122,7 +150,7 @@ export async function validatePdf(path: string): Promise<number> {
                     ])
                   ).stdout.trim(),
                 );
-          if (rss > 256 * 1024) kill();
+          if (rss > limits.rssKb) kill();
         } catch {
           /* Child may already have exited. */
         } finally {

@@ -193,6 +193,19 @@ export const routes = {
     materialId: string,
     query?: Record<string, QueryValue>,
   ) => withQuery(`${academyRoot(academySlug)}/learn/exercises/${segment(materialId)}`, query),
+  /** Exams (테스트): the student card, the preparation wizard and test mode. */
+  academyLearnTest: (academySlug: string, lectureId: string, query?: Record<string, QueryValue>) =>
+    withQuery(`${academyRoot(academySlug)}/learn/tests/${segment(lectureId)}`, query),
+  academyLearnTestPrepare: (academySlug: string, lectureId: string, query?: Record<string, QueryValue>) =>
+    withQuery(`${academyRoot(academySlug)}/learn/tests/${segment(lectureId)}/prepare`, query),
+  academyLearnTestAttempt: (academySlug: string, lectureId: string, attemptId: string, query?: Record<string, QueryValue>) =>
+    withQuery(`${academyRoot(academySlug)}/learn/tests/${segment(lectureId)}/attempts/${segment(attemptId)}`, query),
+  academyContentTest: (academySlug: string, courseId: string, lectureId: string) =>
+    `${academyRoot(academySlug)}/content/courses/${segment(courseId)}/lectures/${segment(lectureId)}/test`,
+  academyTeachClassTests: (academySlug: string, classId: string) =>
+    `${academyRoot(academySlug)}/teach/classes/${segment(classId)}/tests`,
+  academyTeachClassTest: (academySlug: string, classId: string, lectureId: string) =>
+    `${academyRoot(academySlug)}/teach/classes/${segment(classId)}/tests/${segment(lectureId)}`,
   academyTeachManual:(academySlug:string,classId:string,materialId:string)=>`${academyRoot(academySlug)}/teach/classes/${segment(classId)}/manual/${segment(materialId)}`,
   academyClassroom: (academySlug: string, classId: string) =>
     `${academyRoot(academySlug)}/teach/classes/${segment(classId)}/classroom`,

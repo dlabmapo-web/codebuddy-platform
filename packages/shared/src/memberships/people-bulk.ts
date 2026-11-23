@@ -35,6 +35,12 @@ export const peopleBulkKinds = [
   "ROLE_CHANGE",
   "SUSPEND",
   "RESTORE",
+  /**
+   * Removes the people from the academy and, for anyone who belongs to no
+   * other academy and is not Cove staff, deletes the account itself. Their
+   * past work stays in the records.
+   */
+  "DELETE",
 ] as const;
 export const peopleBulkKindSchema = z.enum(peopleBulkKinds);
 export type PeopleBulkKind = z.infer<typeof peopleBulkKindSchema>;
@@ -105,6 +111,8 @@ export const bulkConsequenceKinds = [
   "ineligible",
   /** Live monitoring sessions that will be revoked after the commit. */
   "monitoring_revoked",
+  /** Accounts that belong to no other academy and will be deleted outright. */
+  "accounts_deleted",
 ] as const;
 export const bulkConsequenceKindSchema = z.enum(bulkConsequenceKinds);
 export type BulkConsequenceKind = z.infer<typeof bulkConsequenceKindSchema>;
@@ -159,6 +167,7 @@ export const bulkOptionsSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("ROLE_CHANGE"), role: academyRoleSchema }).strict(),
   z.object({ kind: z.literal("SUSPEND") }).strict(),
   z.object({ kind: z.literal("RESTORE") }).strict(),
+  z.object({ kind: z.literal("DELETE") }).strict(),
 ]);
 export type BulkOptions = z.infer<typeof bulkOptionsSchema>;
 
@@ -275,6 +284,11 @@ export function bulkEligibility(
       if (member.status !== "SUSPENDED") {
         return { eligible: false, code: "not_suspended" };
       }
+      return { eligible: true, code: "ok" };
+    case "DELETE":
+      // A D-LAB member is owned by the source system, which would bring them back.
+      if (member.dlabManaged) return { eligible: false, code: "managed_by_os" };
+      if (member.status === "LEFT") return { eligible: false, code: "already_in_state" };
       return { eligible: true, code: "ok" };
   }
 }

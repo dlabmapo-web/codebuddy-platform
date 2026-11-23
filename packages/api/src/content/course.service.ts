@@ -1,5 +1,5 @@
 import { courseCounts, emptyCourseCounts } from "./course-counts.js";
-import type { CourseContentCounts } from "@cove/shared";
+import type { CourseContentCounts, DeleteImpact, DeleteImpactInput } from "@cove/shared";
 import { defaultExerciseLanguage, defaultExerciseTimeLimitMs, exerciseLanguagesFor, inferSubmissionPolicy, isCompiledLanguage, type CourseLanguage, type ExerciseLanguage, type SubmissionPolicy } from "@cove/shared";
 import { rolesHavePermission } from "@cove/shared";
 import { taughtMaterialWhere } from "../classes/assigned-course-access.js";
@@ -12,6 +12,7 @@ import { storedExerciseProject } from "./exercise-project.js";
 import { validatePdfReference, assertPublishedPdfReferences, detachSubtreePdfReferences } from "../documents/pdf-reference.js";
 import { archivedRows, assertNotArchived } from "./archived-content.js";
 import { assertLessonImages } from "./lesson-images.js";
+import { countStudentWork, deleteStudentWork } from "./student-work.js";
 import { lockLibraryTitles, assertLibraryTitleAvailable } from "./library/library-title-lock.js";
 import {videoMetadata} from "../videos/video-metadata.js";
 import { pdfMetadata } from "../documents/pdf-metadata.js";
@@ -21,7 +22,8 @@ import {
   type QuizDefinition,
 } from "@cove/shared";
 import { Prisma as PrismaValues } from "../generated/prisma/client.js";
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Logger, Optional } from "@nestjs/common";
+import { ManualAssetsService } from "../manual/manual-assets.service.js";
 import { randomUUID } from "node:crypto";
 import {
   gradingProfileIssues,
@@ -167,7 +169,7 @@ const outlineInclude = {
       lectures: {
         orderBy: [{ position: "asc" }, { id: "asc" }],
         select: {
-          id: true, title: true, description: true, position: true, isVisible: true,
+          id: true, title: true, description: true, position: true, isVisible: true, kind: true,
           materials: {
             orderBy: [{ position: "asc" }, { id: "asc" }],
             select: {
@@ -247,7 +249,24 @@ export class CourseService {
     private readonly access: AcademyAccessService,
     private readonly audit: AuditService,
     private readonly revocation: MonitoringRevocationService,
+    /** Copies pictures from Elice and other allowed hosts on save (QA-006). */
+    @Optional() private readonly lessonAssets?: ManualAssetsService,
   ) {}
+
+  private readonly logger = new Logger(CourseService.name);
+
+  /**
+   * The statement with its outside pictures copied into the course's own
+   * storage. Before the transaction: downloads must not hold the course lock.
+   * A picture that cannot be copied stays as it was and the save goes on.
+   */
+  private async withCopiedImages<T extends { academyId: string; courseId: string; description: string }>(input: T): Promise<T> {
+    if (!this.lessonAssets || !input.description) return input;
+    const copy = await this.lessonAssets.copyRemoteImages(input.academyId, input.courseId, input.description);
+    if (copy.failed.length)
+      this.logger.warn(`Pictures left on their original host (${copy.failed.length}): ${copy.failed.join(", ")}`);
+    return copy.html === input.description ? input : { ...input, description: copy.html };
+  }
 
   async list(identity: SupabaseIdentity, academyId: string) {
     await this.access.requirePermission(
@@ -642,10 +661,10 @@ export class CourseService {
   /**
    * Destroy a course and everything under it.
    *
-   * Refused while any student has submitted through it — the same rule the
-   * module and lecture deletes apply, for the same reason: student work is not
-   * the academy's to destroy as a side effect of tidying its curriculum. A
-   * course that should merely stop being taught is hidden, which is reversible.
+   * Students' submissions go with it, as with a module, lecture or problem:
+   * Managers and Team Leads decide that, after the confirm dialog has said how
+   * much work is lost (QA-004). A course that should merely stop being taught
+   * is hidden, which is reversible.
    *
    * The title is typed back. This is the largest thing a Team Lead can delete,
    * and the only lock worth having is one nobody performs by accident.
@@ -673,13 +692,6 @@ export class CourseService {
       );
     }
 
-    const submissions = await this.prisma.submission.count({
-      where: { courseId: course.id },
-    });
-    if (submissions > 0) {
-      throw new AppException("CONTENT_HAS_SUBMISSIONS", HttpStatus.CONFLICT);
-    }
-
     // A master some academy has already adopted is not the platform's to
     // destroy. `courses_source_course_id_fkey` is RESTRICT, so the database
     // refuses this anyway — but it refuses with a foreign-key violation, and
@@ -693,8 +705,9 @@ export class CourseService {
 
     await this.prisma.$transaction(async (tx) => {
       // Ordered, because `Submission.course` and the draft relations are the
-      // ones the schema refuses to cascade. The submission count above proves
-      // the first is empty; the drafts are the author's own working copies.
+      // ones the schema refuses to cascade. Student work goes with the course
+      // (QA-004); the drafts are the author's own working copies.
+      const deletedStudentWork = await deleteStudentWork(tx, { courseId: course.id });
       await tx.exerciseCollaborationDocument.deleteMany({
         where: { draft: { courseId: course.id } },
       });
@@ -723,6 +736,7 @@ export class CourseService {
         targetId: course.id,
         requestId: context.requestId,
         before: { title: course.title, isVisible: course.isVisible },
+        after: { deletedStudentWork },
       });
     });
 
@@ -739,9 +753,9 @@ export class CourseService {
       input.academyId,
     );
     const current = await this.requireModule(input.courseId, input.moduleId);
-    await this.assertNoSubmissions({ moduleId: current.id });
     await this.prisma.$transaction(async (tx) => {
       await lockCourse(tx, input.courseId);
+      const deletedStudentWork = await deleteStudentWork(tx, { moduleId: current.id });
       await detachSubtreePdfReferences(tx, { lecture: { courseModuleId: current.id } });
       await tx.courseModule.delete({ where: { id: current.id } });
       await compactModulePositions(tx, input.courseId);
@@ -753,6 +767,7 @@ export class CourseService {
         targetId: current.id,
         requestId: context.requestId,
         before: moduleAudit(current),
+        after: { deletedStudentWork },
       });
       // §9.2 — the course's content moved, so any import preview taken
       // against the old revision is now stale and will be refused.
@@ -910,9 +925,9 @@ export class CourseService {
       input.academyId,
     );
     const current = await this.requireLecture(input.courseId, input.lectureId);
-    await this.assertNoSubmissions({ lectureId: current.id });
     await this.prisma.$transaction(async (tx) => {
       await lockCourse(tx, input.courseId);
+      const deletedStudentWork = await deleteStudentWork(tx, { lectureId: current.id });
       await detachSubtreePdfReferences(tx, { lectureId: current.id });
       await tx.lecture.delete({ where: { id: current.id } });
       await compactLecturePositions(tx, current.courseModuleId);
@@ -924,6 +939,7 @@ export class CourseService {
         targetId: current.id,
         requestId: context.requestId,
         before: lectureAudit(current),
+        after: { deletedStudentWork },
       });
       // §9.2 — the course's content moved, so any import preview taken
       // against the old revision is now stale and will be refused.
@@ -1324,6 +1340,7 @@ export class CourseService {
     await this.requireLecture(input.courseId, input.lectureId);
     if (input.referencePdfMaterialId) await this.requireCurriculumManager(identity, input.academyId);
     assertGradingSupported(input, CREATED_EXERCISE_TIME_LIMIT_MS);
+    input = await this.withCopiedImages(input);
     const record = await this.prisma.$transaction(async (tx) => {
       // The course's language, read under its lock so a concurrent language
       // change cannot slip between the read and this exercise. A quiz has no
@@ -1416,6 +1433,7 @@ export class CourseService {
     if (exercise.updatedAt.toISOString() !== input.expectedUpdatedAt) {
       throw new AppException("CONTENT_EDIT_CONFLICT", HttpStatus.CONFLICT);
     }
+    input = await this.withCopiedImages(input);
     const submissionPolicy = input.submissionPolicy ?? exercise.submissionPolicy ?? "AUTOMATIC";
     // Checked against the limit this exercise actually has, which an imported
     // or migrated problem may not share with the authoring default.
@@ -1589,6 +1607,33 @@ export class CourseService {
     return this.currentTree(input);
   }
 
+  /**
+   * Students' work a delete would remove, for the confirm dialog (QA-004).
+   * Who may ask is who may delete: course, module and lecture deletes need
+   * `curriculum.manage`, a material delete `exercises.manage`. Two reads: the
+   * permission and one count statement; the target is checked by that count's
+   * own join, so an id of another course simply counts nothing.
+   */
+  async deleteImpact(
+    identity: SupabaseIdentity,
+    input: DeleteImpactInput,
+  ): Promise<DeleteImpact> {
+    const { target } = input;
+    if (target.kind === "material")
+      await this.requireExerciseManager(identity, input.academyId);
+    else await this.requireCurriculumManager(identity, input.academyId);
+    await this.requireCourse(input.academyId, input.courseId);
+    const scope =
+      target.kind === "course"
+        ? { courseId: input.courseId }
+        : target.kind === "module"
+          ? { moduleId: target.id }
+          : target.kind === "lecture"
+            ? { lectureId: target.id }
+            : { materialId: target.id };
+    return countStudentWork(this.prisma, scope, input.courseId);
+  }
+
   async deleteExercise(
     identity: SupabaseIdentity,
     input: {
@@ -1601,8 +1646,8 @@ export class CourseService {
   ) {
     const actor = await this.requireExerciseManager(identity, input.academyId);
     const current = await this.requireExercise(input);
-    await this.assertNoSubmissions({ materialId: current.id });
     await this.prisma.$transaction(async (tx) => {
+      const deletedStudentWork = await deleteStudentWork(tx, { materialId: current.id });
       await tx.material.delete({ where: { id: current.id } });
       await compactMaterialPositions(tx, input.lectureId);
       await this.audit.write(tx, {
@@ -1613,6 +1658,7 @@ export class CourseService {
         targetId: current.id,
         requestId: context.requestId,
         before: exerciseRecordAudit(current),
+        after: { deletedStudentWork },
       });
       // §9.2 — the course's content moved, so any import preview taken
       // against the old revision is now stale and will be refused.
@@ -1780,23 +1826,6 @@ export class CourseService {
     });
     if (duplicate) {
       throw new AppException("COURSE_TITLE_CONFLICT", HttpStatus.CONFLICT);
-    }
-  }
-
-  private async assertNoSubmissions(input: {
-    moduleId?: string;
-    lectureId?: string;
-    materialId?: string;
-  }) {
-    const count = await this.prisma.submission.count({
-      where: input.materialId
-        ? { materialId: input.materialId }
-        : input.lectureId
-          ? { material: { lectureId: input.lectureId } }
-          : { material: { lecture: { courseModuleId: input.moduleId! } } },
-    });
-    if (count > 0) {
-      throw new AppException("CONTENT_HAS_SUBMISSIONS", HttpStatus.CONFLICT);
     }
   }
 
@@ -2239,6 +2268,7 @@ function toCourseTree(course: CourseRecord) {
         description: lecture.description,
         position: lecture.position,
         isVisible: lecture.isVisible,
+        kind: lecture.kind,
         materials: lecture.materials.map((material) => ({
           id: material.id,
           type: material.type,

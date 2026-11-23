@@ -41,6 +41,7 @@ import { isFileBundle } from '@cove/shared';
 import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
 import {
   STATEMENT_CANVAS_MIN_WIDTH,
+  STATEMENT_CANVAS_WIDTH,
   STATEMENT_PANE,
 } from '@/lib/workspace/statement-canvas';
 import { useSplitPane } from '@/lib/workspace/use-split-pane';
@@ -273,6 +274,13 @@ export function LiveWorkspace({
     toggle: togglePanel,
     triggerRef,
   } = useNavigatorPanel('live-curriculum');
+
+  // A verdict for any problem in the course updates the student's outline
+  // icon at once (QA T-02), not only the result tab.
+  const { applyVerdict } = display;
+  React.useEffect(() => {
+    if (live.result) applyVerdict(live.result);
+  }, [applyVerdict, live.result]);
 
   const previewed =
     display.display?.mode === 'preview' ? display.display.snapshot : null;
@@ -578,6 +586,9 @@ export function LiveWorkspace({
               <ProblemStatement
                 collaborating={live.collaborating}
                 exercise={shown.exercise}
+                // The student's own reading width (QA S-10); 640 until it
+                // arrives, which is also what a not-yet-updated student uses.
+                mirrorWidth={live.remote.statementWidth ?? STATEMENT_CANVAS_WIDTH}
                 revealedHints={shown.exercise.hints.length}
               />
               </ExerciseImageProvider>
@@ -692,7 +703,8 @@ export function LiveWorkspace({
               </div>
             </div>}
 
-              <div className="shrink-0" {...surfaceProps('feedback')}>
+              {/* A note to a student sitting a test would be help during the exam: watch only. */}
+              {shown?.breadcrumb.lecture.kind === 'TEST' ? null : <div className="shrink-0" {...surfaceProps('feedback')}>
                 <FeedbackDock
                   canDraft={Boolean(shown) && live.state !== 'revoked'}
                   canSend={live.canEdit && display.isLive}
@@ -708,7 +720,7 @@ export function LiveWorkspace({
                   }}
                   teacherMembershipRef={teacherMembershipRef}
                 />
-              </div>
+              </div>}
           </section>
         </div>
         </MonitoringLiveContent>

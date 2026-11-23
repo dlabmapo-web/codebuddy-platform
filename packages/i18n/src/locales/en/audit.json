@@ -16,6 +16,7 @@
     "academy.people.bulk.enroll": "Enrolled members in bulk",
     "academy.people.bulk.role_change": "Changed roles in bulk",
     "academy.people.bulk.suspend": "Suspended members in bulk",
+    "academy.people.bulk.delete": "Deleted people",
     "academy.people.bulk.restore": "Restored members in bulk",
     "class.created": "Created a class",
     "class.updated": "Updated a class",
@@ -30,6 +31,7 @@
     "class.teacher.replaced": "Replaced the teacher",
     "class.teacher.removed": "Removed the teacher",
     "class.assistants.updated": "Changed a class's assistant teachers",
+    "class.teachers.updated": "Changed a class's teachers",
     "platform.academy.first_manager_invited": "Cove invited the first manager",
     "platform.academy.first_manager_invitation_resent": "Cove resent the first manager invitation",
     "fallback": "{{action}}"

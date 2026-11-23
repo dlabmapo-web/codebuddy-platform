@@ -14,9 +14,14 @@
     "course_count_other": "{{count}} courses",
     "student_count_one": "{{count}} student",
     "student_count_other": "{{count}} students",
-    "online_count": "{{count}} online",
-    "solving_count": "{{count}} solving",
-    "open": "Open live class"
+    "open": "Open live class",
+    "live_badge": "Live",
+    "active_summary_one": "{{count}} class live now",
+    "active_summary_other": "{{count}} classes live now",
+    "stat_courses": "Courses",
+    "stat_students": "Students",
+    "stat_online": "Online",
+    "stat_solving": "Solving"
   },
   "roster": {
     "back": "Enter My Classes",

@@ -33,17 +33,27 @@ function Section({
 export function ProblemStatement({
   collaborating = false,
   exercise,
+  mirrorWidth = null,
+  onReadingWidth,
   revealedHints,
   onRevealHint,
 }: {
   /**
    * Whether a teacher and this reader are sharing a document right now.
    *
-   * Switches the statement onto the fixed canvas so a shared pointer has a box
-   * both screens agree on. False is the ordinary reading experience.
+   * Marks the statement as the box a shared pointer is measured against. The
+   * student's own layout never changes for it.
    */
   collaborating?: boolean;
   exercise: LearnExercise;
+  /**
+   * On a teacher's screen, the width the watched student reads the statement
+   * at; the statement is laid out at it and scaled to fit. Null (the student's
+   * own screen) leaves the layout untouched.
+   */
+  mirrorWidth?: number | null;
+  /** Reports the width this reader sees the statement at (student only). */
+  onReadingWidth?: (width: number) => void;
   /** Owned by the workspace, so navigation can reset it in one place. */
   revealedHints: number;
   /**
@@ -67,7 +77,9 @@ export function ProblemStatement({
   return (
     <StatementCanvas
       active={collaborating}
+      logicalWidth={mirrorWidth}
       material={exercise.materialId}
+      onReadingWidth={onReadingWidth}
       surface="statement"
     >
       <div

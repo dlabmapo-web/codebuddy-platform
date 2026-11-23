@@ -66,6 +66,16 @@ function ownedSubmissionWhere(input: {
   };
 }
 
+/**
+ * A test problem is submitted only through an exam attempt, and an attempt
+ * only submits test problems. `kind` comes from the admission read itself.
+ */
+export function assertExamAdmission(lecture: { kind?: string }, examAttemptId: string | undefined): void {
+  const isTest = lecture.kind === "TEST";
+  if (isTest && !examAttemptId) throw new AppException("EXAM_NOT_STARTED", HttpStatus.FORBIDDEN);
+  if (!isTest && examAttemptId) throw new AppException("EXAM_ITEM_NOT_IN_ATTEMPT", HttpStatus.FORBIDDEN);
+}
+
 @Injectable()
 export class SubmissionService {
   private nativeAdmission?: NativeAdmission;
@@ -93,6 +103,12 @@ export class SubmissionService {
       solveSessionId?: string;
       requestId?: string;
       manualAssessmentVersion?: 1;
+      /**
+       * The exam attempt this submission belongs to. Only `ExamService` sets
+       * it, after checking the attempt is the caller's, open and holds this
+       * problem; a test problem without it is refused.
+       */
+      examAttemptId?: string;
     },
   ): Promise<{ submissionId: string; totalCount: number; result?: SubmissionResult }> {
     const actor = await this.access.requirePermission(
@@ -122,6 +138,7 @@ export class SubmissionService {
         const material = await readSubmissionAdmission(tx, input.materialId, input.academyId);
         const exercise = material?.programmingExercise;
         if (!material || material.type !== "PROGRAMMING_EXERCISE" || !exercise) throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
+        assertExamAdmission(material.lecture, input.examAttemptId);
         if (material && exercise) {
           await this.classContext.resolveWith(tx, { academyId: input.academyId, userId,
             courseId: material.lecture.courseModule.courseId, requestedClassId: input.classId });
@@ -148,6 +165,7 @@ export class SubmissionService {
               classId: input.classId, requestId: input.requestId, code: input.code, language: exercise.language,
               gradingRevision: exercise.gradingRevision, timeLimitMs: exercise.timeLimitMs, memoryLimitMb: exercise.memoryLimitMb,
               submissionPolicy: 'MANUAL_REVIEW', status: 'RECORDED', score: null, totalCount: 0,
+              testAttemptId: input.examAttemptId ?? null,
               engineVersion: 'manual-record-v1', manualAssessmentSnapshot: {
                 version: 1, messageVersion: 1, maximumHundredths: exercise.manualMaximumHundredths,
                 includeInScore: exercise.manualIncludeInScore,
@@ -230,6 +248,7 @@ export class SubmissionService {
             ...(quiz ? { quizSnapshot: { version: 1, title: material.title, description: exercise.description, definition: quiz } } : {}),
             code: input.code,
             requestId: input.requestId,
+            testAttemptId: input.examAttemptId ?? null,
             totalCount: quiz ? 1 : exercise.testCases.length,
             engineVersion: descriptor ? nativeRuntimeVersion(descriptor) : engineVersion,
             ...(descriptor ? { executionQueue: runtimeQueueName("official", descriptor) } : {}),

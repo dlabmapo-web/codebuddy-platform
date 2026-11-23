@@ -6,7 +6,7 @@ import type {
   ExerciseProgressStatus,
   WorkspaceNavigatorContext,
 } from '@cove/shared';
-import { flattenNavigatorExercises } from '@cove/shared';
+import { flattenNavigatorExercises, teacherOutlineNumber } from '@cove/shared';
 import {
   CheckCircle2,
   ChevronDown,
@@ -42,6 +42,37 @@ import {
  * is looking at one exercise while the student is on another, and collapsing
  * those into one "current" would make the panel lie about one of them.
  */
+
+/**
+ * `module-lecture-material` for every material in the course, from stored
+ * positions — the number the course editor, the student outline and every
+ * teacher report print (QA-03). Not a running count over what this viewer can
+ * see: that gave the same problem `320` here and `1-1-1` everywhere else.
+ */
+export function materialOutlineNumbers(
+  context: WorkspaceNavigatorContext | null,
+): Map<string, string> {
+  const numbers = new Map<string, string>();
+  for (const courseModule of context?.course.modules ?? []) {
+    for (const lecture of courseModule.lectures) {
+      for (const material of [
+        ...(lecture.explanations ?? []),
+        ...lecture.exercises,
+        ...(lecture.videos ?? []),
+        ...(lecture.manualMaterials ?? []),
+        ...(lecture.documents ?? []),
+      ]) {
+        const number = teacherOutlineNumber({
+          modulePosition: courseModule.position,
+          lecturePosition: lecture.position,
+          problemPosition: material.position,
+        });
+        if (number) numbers.set(material.materialId, number);
+      }
+    }
+  }
+  return numbers;
+}
 
 const statusIcons: Record<
   ExerciseProgressStatus,
@@ -86,8 +117,12 @@ function OrdinaryCurriculumNavigator({
   dockAt?: 'md' | 'lg';
   error?: boolean;
   unavailable?: boolean;
-  /** Where this role goes to leave: a course outline, or a class roster. */
-  footer: { href: string; label: string };
+  /**
+   * Where this role goes to leave, when the screen has no other exit: a
+   * teacher's way back to the class roster. Student lessons omit it because
+   * their header already carries Exit (QA S-01).
+   */
+  footer?: { href: string; label: string };
   onClose: () => void;
   onSelect: (materialId: string) => void;
   onRetry?: () => void;
@@ -100,27 +135,10 @@ function OrdinaryCurriculumNavigator({
     () => (context ? flattenNavigatorExercises(context) : []),
     [context],
   );
-  const materialNumbers = React.useMemo(() => {
-    const numbers = new Map<string, number>();
-    for (const courseModule of context?.course.modules ?? []) {
-      for (const lecture of courseModule.lectures) {
-        const materials = [
-          ...(allowPdfNavigation ? lecture.explanations ?? [] : []),
-          ...lecture.exercises,
-          ...(allowPdfNavigation?lecture.videos??[]:[]),
-          ...(allowPdfNavigation ? lecture.manualMaterials??[] : []),
-          ...(allowPdfNavigation
-            ? (lecture.documents ?? []).filter(
-                (document) => document.pdf.placement !== 'SUPPLEMENTARY',
-              )
-            : []),
-        ].sort((a, b) => a.position - b.position);
-        for (const material of materials)
-          numbers.set(material.materialId, numbers.size + 1);
-      }
-    }
-    return numbers;
-  }, [context, allowPdfNavigation]);
+  const materialNumbers = React.useMemo(
+    () => materialOutlineNumbers(context),
+    [context],
+  );
 
   const displayedBranch = React.useMemo(
     () => rows.find((row) => row.materialId === displayedMaterialId) ?? (context?.path.exercise.materialId === displayedMaterialId
@@ -255,18 +273,20 @@ function OrdinaryCurriculumNavigator({
         )}
       </div>
 
-      <footer
-        className="shrink-0 border-t border-border px-3 py-2"
-        {...anchorProps('outline:footer')}
-      >
-        <Link
-          className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-sub transition-colors hover:text-brand"
-          href={footer.href}
+      {footer ? (
+        <footer
+          className="shrink-0 border-t border-border px-3 py-2"
+          {...anchorProps('outline:footer')}
         >
-          <ChevronRight aria-hidden className="size-3.5 rotate-180" />
-          {footer.label}
-        </Link>
-      </footer>
+          <Link
+            className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-sub transition-colors hover:text-brand"
+            href={footer.href}
+          >
+            <ChevronRight aria-hidden className="size-3.5 rotate-180" />
+            {footer.label}
+          </Link>
+        </footer>
+      ) : null}
     </aside>
   );
 }
@@ -294,7 +314,7 @@ function ModuleBranch({
   liveMaterialId: string | null;
   onSelect: (materialId: string) => void;
   onToggle: (id: string) => void;
-  materialNumbers: ReadonlyMap<string, number>;
+  materialNumbers: ReadonlyMap<string, string>;
 }) {
   const { t } = useLayoutTranslation('learn');
   const open = expanded.has(courseModule.id);
@@ -350,7 +370,7 @@ function ModuleBranch({
                         row.kind === 'exercise' ? (
                           <ExerciseRow key={row.exercise.materialId} busy={busyMaterialId === row.exercise.materialId}
                             disabled={disabled} exercise={row.exercise} live={liveMaterialId === row.exercise.materialId}
-                            number={materialNumbers.get(row.exercise.materialId) ?? row.exercise.position}
+                            number={materialNumbers.get(row.exercise.materialId)}
                             onSelect={onSelect} selected={displayedMaterialId === row.exercise.materialId} />
                         ) : (
                           <li key={(row.kind === 'explanation' ? row.explanation : row.kind === 'video' ? row.video : row.kind === 'pdf' ? row.doc : row.manual).materialId} className="my-1">
@@ -449,7 +469,7 @@ function ExerciseRow({
   disabled: boolean;
   exercise: WorkspaceNavigatorContext['course']['modules'][number]['lectures'][number]['exercises'][number];
   live: boolean;
-  number: number;
+  number: string | undefined;
   onSelect: (materialId: string) => void;
   selected: boolean;
 }) {

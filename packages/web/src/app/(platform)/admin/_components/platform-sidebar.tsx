@@ -19,11 +19,9 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 
-import { MyPageRow, type MyPageViewer } from '@/components/studio/nav/my-page-row';
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -57,7 +55,7 @@ type NavGroup = { id: string; label: string; items: NavLink[] };
  * A studio sidebar switches academies at the top because a member can belong to
  * several. An operator belongs to none, so the header states where they are
  * instead — which is the only thing that has to be different here. Everything
- * below is the studio's own furniture, including the footer's sign-out, so the
+ * below is the studio's own furniture, including the header's sign-out, so the
  * console does not become the one page in Cove where a person cannot leave.
  *
  * The rows were written as a list for exactly this: the account directory
@@ -65,12 +63,10 @@ type NavGroup = { id: string; label: string; items: NavLink[] };
  * headings of its own — the same grouped shape the studio rail uses, so an
  * operator who works in both is not reading two different kinds of navigation.
  *
- * My Page closes the last difference between the two rails. It was always
- * reachable here — the header's avatar menu has linked `/account` all along —
- * but the studio carries it in *both* places, and an operator who learns the
- * rail in one product should not have to learn a different one here.
+ * My Page is not a rail row, here or in the studio (QA-04): both products reach
+ * it from the header's avatar menu only.
  */
-export function PlatformSidebar({ viewer }: { viewer: MyPageViewer | null }) {
+export function PlatformSidebar() {
   const { t } = useTranslation('platform');
   const pathname = usePathname();
   const from = useSearchParams().get('from');
@@ -289,14 +285,6 @@ export function PlatformSidebar({ viewer }: { viewer: MyPageViewer | null }) {
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <SidebarFooter className="shrink-0 gap-0 border-t border-border bg-sidebar p-0 pb-[env(safe-area-inset-bottom)]">
-        {/* Account uses its own shell, so this rail cannot be active there. */}
-        <MyPageRow
-          href={routes.accountFrom('admin')}
-          isActive={false}
-          viewer={viewer}
-        />
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

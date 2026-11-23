@@ -8,6 +8,7 @@ import { CourseService } from "./course.service.js";
 import { ContentImportController } from "./import/content-import.controller.js";
 import { ContentImportService } from "./import/content-import.service.js";
 import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.module.js";
+import { ManualAssetsService } from "../manual/manual-assets.service.js";
 
 /**
  * Curriculum authoring, by hand and by workbook.
@@ -29,7 +30,7 @@ import { MonitoringRevocationModule } from "../monitoring/monitoring-revocation.
     MonitoringRevocationModule,
   ],
   controllers: [ContentImportController],
-  providers: [AcademyLibraryService, CourseService, ContentImportService],
+  providers: [AcademyLibraryService, CourseService, ContentImportService, ManualAssetsService],
   exports: [AcademyLibraryService, CourseService, ContentImportService],
 })
 export class ContentModule {}

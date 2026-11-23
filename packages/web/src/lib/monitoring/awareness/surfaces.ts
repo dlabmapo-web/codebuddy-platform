@@ -252,6 +252,38 @@ export function pointDirection(
   return null;
 }
 
+/**
+ * The part of a surface the reader can actually see.
+ *
+ * A surface element can be taller than its pane: the statement's content box
+ * runs on under the scroll container that clips it. Judging "is the peer's
+ * point on screen" against that box drew an arrow over the lesson bar, or off
+ * the bottom of the window, for text the reader had scrolled past, and never
+ * offered the above/below hint. Clipped by every scrolling or clipping
+ * ancestor and by the window.
+ */
+export function visibleSurfaceBox(surface: HTMLElement): Box {
+  const own = surface.getBoundingClientRect();
+  let top = own.top;
+  let bottom = own.top + own.height;
+  const root = surface.ownerDocument;
+  for (
+    let element = surface.parentElement;
+    element && element !== root.body && element !== root.documentElement;
+    element = element.parentElement
+  ) {
+    const overflowY = getComputedStyle(element).overflowY;
+    if (!['auto', 'scroll', 'hidden', 'clip', 'overlay'].includes(overflowY)) continue;
+    const box = element.getBoundingClientRect();
+    top = Math.max(top, box.top);
+    bottom = Math.min(bottom, box.top + box.height);
+  }
+  const viewportHeight = surface.ownerDocument.defaultView?.innerHeight ?? bottom;
+  top = Math.max(top, 0);
+  bottom = Math.min(bottom, viewportHeight);
+  return { left: own.left, top, width: own.width, height: Math.max(0, bottom - top) };
+}
+
 /** Avoid asserting a document coordinate while authored content is still loading. */
 export function canvasLayoutReady(canvas: HTMLElement): boolean {
   for (const image of canvas.querySelectorAll('img')) {
@@ -337,7 +369,8 @@ export function fromAnchorPosition(
  * the box, and a position outside what is left is off screen.
  */
 export function visibleBoxWithin(anchor: HTMLElement, surface: HTMLElement): Box {
-  const surfaceBox = surface.getBoundingClientRect();
+  // Starts from what is visible of the surface itself (see visibleSurfaceBox).
+  const surfaceBox = visibleSurfaceBox(surface);
   let top = surfaceBox.top;
   let bottom = surfaceBox.top + surfaceBox.height;
   for (

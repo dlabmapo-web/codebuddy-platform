@@ -768,30 +768,6 @@ describe("CourseService direct problem editing", () => {
     });
   });
 
-  it("blocks deleting a lecture that has descendant submissions", async () => {
-    const prisma = {
-      lecture: {
-        findFirst: vi.fn().mockResolvedValue({ id: lectureId, courseModuleId: moduleId }),
-      },
-      submission: { count: vi.fn().mockResolvedValue(1) },
-      $transaction: vi.fn(),
-    } as unknown as PrismaService;
-    const access = {
-      requirePermission: vi.fn().mockResolvedValue({ userId: actorUserId }),
-    } as unknown as AcademyAccessService;
-    const audit = { write: vi.fn() } as unknown as AuditService;
-    const service = new CourseService(
-      prisma,
-      access,
-      audit,
-      { revokeClass: vi.fn().mockResolvedValue(undefined) } as never,
-    );
-
-    await expect(
-      service.deleteLecture(identity, { academyId, courseId, lectureId }),
-    ).rejects.toMatchObject({ code: "CONTENT_HAS_SUBMISSIONS" });
-    expect(prisma.$transaction).not.toHaveBeenCalled();
-  });
 });
 
 /**

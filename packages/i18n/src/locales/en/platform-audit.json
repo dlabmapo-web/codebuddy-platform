@@ -60,7 +60,8 @@
           "enroll": "Members enrolled in bulk",
           "restore": "Members restored in bulk",
           "role_change": "Member roles changed in bulk",
-          "suspend": "Members suspended in bulk"
+          "suspend": "Members suspended in bulk",
+          "delete": "People deleted in bulk"
         }
       },
       "profile": {
@@ -110,7 +111,10 @@
       },
       "updated": "Class updated",
       "archived": "Class archived",
-      "restored": "Class reopened"
+      "restored": "Class reopened",
+      "teachers": {
+        "updated": "Class teachers changed"
+      }
     },
     "content": {
       "course": {
@@ -180,6 +184,11 @@
         "resumed": "Library sync resumed",
         "legacy_linked": "Existing course linked to library updates",
         "link_resolved": "Library material identity reviewed"
+      },
+      "test": {
+        "created": "Test added",
+        "converted": "Lecture turned into a test",
+        "updated": "Test edited"
       }
     },
     "platform": {
@@ -276,6 +285,19 @@
     "user": {
       "provision_failed": "OS account synchronization failed",
       "provisioned": "OS account synchronized"
+    },
+    "exam": {
+      "attempt": {
+        "started": "Test started",
+        "ended": "Test ended",
+        "ended_by_staff": "Test ended by staff"
+      },
+      "retake": {
+        "granted": "Test retake allowed"
+      },
+      "schedule": {
+        "updated": "Test period or results changed"
+      }
     }
   }
 }

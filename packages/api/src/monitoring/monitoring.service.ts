@@ -1,7 +1,7 @@
 import { privateSolutions, solutionOrder } from "../content/exercise-solutions.js";
 import type { ExerciseSolutionEntry } from "@cove/shared";
 import { referencePdfMetadata } from "../documents/pdf-reference.js";
-import { publicQuiz } from "@cove/shared";
+import { publicQuiz, teacherOutlineNumber } from "@cove/shared";
 import { publicChoiceSchema, sourceFilesSchema, type ObservedMaterial } from '@cove/shared';
 import { ManualAssetsService } from "../manual/manual-assets.service.js";
 import { lessonImageIds } from "../content/lesson-images.js";
@@ -237,10 +237,14 @@ export class MonitoringService {
         id: true,
         title: true,
         type: true,
+        position: true,
         pdfDocument: { select: { placement: true } },
         videoLesson: { select: { placement: true } },
         lecture: {
-          select: { courseModule: { select: { courseId: true } } },
+          select: {
+            position: true,
+            courseModule: { select: { courseId: true, position: true } },
+          },
         },
       },
       orderBy: [
@@ -259,7 +263,17 @@ export class MonitoringService {
       const courseId = material.lecture.courseModule.courseId;
       const number = (counted.get(courseId) ?? 0) + 1;
       counted.set(courseId, number);
-      return { materialId: material.id, number, title: material.title, type: material.type };
+      return {
+        materialId: material.id,
+        number,
+        outlineNumber: teacherOutlineNumber({
+          modulePosition: material.lecture.courseModule.position,
+          lecturePosition: material.lecture.position,
+          problemPosition: material.position,
+        }),
+        title: material.title,
+        type: material.type,
+      };
     });
   }
 
@@ -399,6 +413,7 @@ export class MonitoringService {
       material.courseId,
       material.academyId,
       material.studentUserId,
+      { includeTestProblems: true },
     );
     const navigator = outline && toNavigatorContext(outline, material.materialId);
     if (!navigator) {
@@ -719,6 +734,7 @@ export class MonitoringService {
           select: {
             id: true,
             title: true,
+            kind: true,
             courseModule: {
               select: {
                 id: true,
@@ -775,7 +791,7 @@ export class MonitoringService {
           id: material.lecture.courseModule.id,
           title: material.lecture.courseModule.title,
         },
-        lecture: { id: material.lecture.id, title: material.lecture.title },
+        lecture: { id: material.lecture.id, title: material.lecture.title, kind: material.lecture.kind },
       },
       exercise: {
         materialId: material.id,

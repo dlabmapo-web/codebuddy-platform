@@ -8,7 +8,7 @@ import type { SampleRun } from '@/lib/workspace/use-sample-runner';
 
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
 
-const mocks = vi.hoisted(() => ({ runSample: vi.fn(), publishRun: vi.fn(), submit: vi.fn() }));
+const mocks = vi.hoisted(() => ({ runSample: vi.fn(), publishRun: vi.fn(), submit: vi.fn(), submissionInput: vi.fn(), navigated: null as unknown }));
 vi.mock('@/components/studio/academy-route-provider', () => ({ useAcademySlug: () => 'test' }));
 vi.mock('@/i18n', () => ({ useLocale: () => 'en', useLayoutTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -19,10 +19,10 @@ vi.mock('@/lib/workspace/use-split-pane', () => ({ useSplitPane: () => ({ size: 
 vi.mock('@/lib/workspace/use-navigator-panel', () => ({ useNavigatorPanel: () => ({}) }));
 vi.mock('@/lib/monitoring/use-student-monitoring', () => ({ useStudentMonitoring: () => ({ peers: [], publishRun: mocks.publishRun }) }));
 vi.mock('@/lib/monitoring/use-student-feedback', () => ({ useStudentFeedback: () => ({ messages: [] }) }));
-vi.mock('../_hooks/use-exercise-navigation', () => ({ useExerciseNavigation: ({ bootstrap }: { bootstrap: LearnExerciseBootstrap }) => ({ workspace: bootstrap.workspace }) }));
+vi.mock('../_hooks/use-exercise-navigation', () => ({ useExerciseNavigation: ({ bootstrap }: { bootstrap: LearnExerciseBootstrap }) => ({ workspace: mocks.navigated ?? bootstrap.workspace }) }));
 vi.mock('../_hooks/use-draft-autosave', () => ({ useDraftAutosave: () => ({ code: 'student code', hydrated: true }) }));
 vi.mock('../_hooks/use-solve-session', () => ({ useSolveSession: () => ({}) }));
-vi.mock('../_hooks/use-submission', () => ({ useSubmission: () => ({ submit: mocks.submit }) }));
+vi.mock('../_hooks/use-submission', () => ({ useSubmission: (input: unknown) => { mocks.submissionInput(input); return { submit: mocks.submit }; } }));
 vi.mock('../_lib/python-error-lines', () => ({ usePythonErrorLines: () => vi.fn(), usePythonErrorHeadline: () => vi.fn() }));
 // Keep the real Workspace, batch sequence, EditorPane and RunControls. Stub
 // unrelated sockets, persistence, Monaco and layout so the click exercises
@@ -55,7 +55,7 @@ const bootstrap = {
 } as unknown as LearnExerciseBootstrap;
 let root: ReturnType<typeof createRoot>;
 let host: HTMLDivElement;
-afterEach(async () => { if (root) await act(async () => root.unmount()); host?.remove(); vi.clearAllMocks(); });
+afterEach(async () => { if (root) await act(async () => root.unmount()); host?.remove(); vi.clearAllMocks(); mocks.navigated = null; });
 
 async function run(result: SampleRun, mode: "LEGACY_STDIO" | "ELICE_STDIO" = "LEGACY_STDIO") {
   const input = structuredClone(bootstrap); input.workspace.exercise.gradingMode = mode;
@@ -97,5 +97,27 @@ describe('workspace server sample results', () => {
     const text = await run({ outcome: { stdout: 'ok', stopped: false, failed: false, error: null }, verdict: { kind: 'match' } });
     expect(text).toContain('workspace.sample_match');
     expect(mocks.publishRun).toHaveBeenLastCalledWith(expect.objectContaining({ lifecycle: 'COMPLETED', passedCount: 1 }));
+  });
+});
+
+describe('moving to another exercise inside the workspace (QA-001b)', () => {
+  it('seeds the last submission from the exercise on screen, not the one first loaded', async () => {
+    const loaded = structuredClone(bootstrap) as LearnExerciseBootstrap & { workspace: { latestSubmission: unknown; latestResult: unknown } };
+    loaded.workspace.latestSubmission = { submissionId: 'first-exercise-attempt', score: 79 } as never;
+    loaded.workspace.latestResult = { submissionId: 'first-exercise-attempt' } as never;
+    mocks.navigated = {
+      ...loaded.workspace,
+      exercise: { ...loaded.workspace.exercise, materialId: 'third-exercise' },
+      latestSubmission: { submissionId: 'third-exercise-attempt', score: 50 },
+      latestResult: null,
+    };
+    host = document.createElement('div'); document.body.append(host);
+    root = createRoot(host);
+    await act(async () => root.render(<Workspace academyId="academy" bootstrap={loaded} classId="class" userId="student" returnTo={null} />));
+    expect(mocks.submissionInput).toHaveBeenLastCalledWith(expect.objectContaining({
+      materialId: 'third-exercise',
+      initialLatest: { submissionId: 'third-exercise-attempt', score: 50 },
+      initialResult: null,
+    }));
   });
 });

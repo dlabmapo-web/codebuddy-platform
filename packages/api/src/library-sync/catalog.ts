@@ -174,6 +174,19 @@ export function projectNodes(
         units: {
           "lecture.title": lecture.title,
           "lecture.description": lecture.description,
+          // Only tests carry the unit, so no ordinary lecture's hashes change.
+          ...(lecture.kind === "TEST" && lecture.test
+            ? {
+                "lecture.test": {
+                  ...lecture.test,
+                  points: Object.fromEntries(
+                    Object.entries(lecture.test.points ?? {})
+                      .map(([id, value]) => [materialKeys.get(id) ?? `${LOCAL_PREFIX}${id}`, value] as const)
+                      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0)),
+                  ),
+                },
+              }
+            : {}),
           "@externalKey": lecture.externalKey,
         },
       });

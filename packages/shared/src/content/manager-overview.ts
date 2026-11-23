@@ -727,6 +727,7 @@ export const academyAuditActions = [
   "academy.people.bulk.role_change",
   "academy.people.bulk.suspend",
   "academy.people.bulk.restore",
+  "academy.people.bulk.delete",
   "class.created",
   "class.updated",
   "class.archived",
@@ -740,6 +741,7 @@ export const academyAuditActions = [
   "class.teacher.replaced",
   "class.teacher.removed",
   "class.assistants.updated",
+  "class.teachers.updated",
   // Platform acts that land on an academy-scoped invitation row, and so reach
   // the manager's Recent changes panel through its `AcademyInvitation`
   // allow-list. Named here because the first thing a new manager sees would

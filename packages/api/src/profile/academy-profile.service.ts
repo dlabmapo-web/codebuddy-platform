@@ -749,7 +749,11 @@ export class AcademyProfileService {
       where: {
         academyId: membership.academyId,
         status: "ACTIVE",
-        teacherMembershipId: membership.id,
+        // Every class they teach: a class's teachers are one list.
+        OR: [
+          { teacherMembershipId: membership.id },
+          { assistantTeachers: { some: { membershipId: membership.id } } },
+        ],
       },
       include: {
         courseAssignments: { select: { courseId: true } },

@@ -217,7 +217,9 @@ else
   total_kb="$(( $(sysctl -n hw.memsize) / 1024 ))"
   available_kb="$total_kb"
 fi
-(( total_kb >= 10 * 1024 * 1024 )) || fail "production requires a VPS with at least 10 GiB total memory"
+# The container limits add up to as much as 12 GiB (validate-local.sh), sized
+# for the 16 GB Lightsail host, which reports about 15.6 GiB.
+(( total_kb >= 15 * 1024 * 1024 )) || fail "production requires a host with at least 15 GiB total memory (16 GB class)"
 reserved_available_kb=$((2 * 1024 * 1024))
 if feature_enabled VIDEO_LESSONS_ENABLED; then
   reserved_available_kb=$((reserved_available_kb + 2 * 1024 * 1024))

@@ -158,27 +158,6 @@ export function PdfCanvas({
     >
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-canvas/80 px-3 py-2.5" role="group" aria-label={t('pdf.controls')}>
         <div className={group}>
-          <button type="button" className={button} title={t('pdf.previous_page')} aria-label={t('pdf.previous_page')}
-            disabled={page <= 1} onClick={() => setPage((n) => n - 1)}>
-            <ChevronLeft aria-hidden className="size-4" />
-          </button>
-          <label className="flex h-9 items-center gap-1.5 pr-1 text-xs tabular-nums text-sub">
-            <span className="sr-only">{t('pdf.page')}</span>
-            <input aria-label={t('pdf.page')} className={`${numberInput} w-11`} type="number" min={1} max={data.pdf.pageCount} value={page}
-              onChange={(e) => {
-                const n = Number(e.target.value);
-                if (n >= 1 && n <= data.pdf.pageCount && Number.isInteger(n)) {
-                  setPage(n); setInputError(false);
-                } else setInputError(true);
-              }} />
-            <span className="whitespace-nowrap">/ {data.pdf.pageCount}</span>
-          </label>
-          <button type="button" className={button} title={t('pdf.next_page')} aria-label={t('pdf.next_page')}
-            disabled={page >= data.pdf.pageCount} onClick={() => setPage((n) => n + 1)}>
-            <ChevronRight aria-hidden className="size-4" />
-          </button>
-        </div>
-        <div className={group}>
           <button type="button" className={button} title={t('pdf.zoom_out')} aria-label={t('pdf.zoom_out')}
             disabled={shownZoom <= 25} onClick={() => changeZoom(shownZoom - 25)}>
             <Minus aria-hidden className="size-4" />
@@ -210,11 +189,6 @@ export function PdfCanvas({
             onClick={() => void fullscreen()}><Maximize aria-hidden className="size-4" /></button>
         </div>
       </div>
-      {inputError ? (
-        <p role="alert" className="p-2 text-sm text-danger">
-          {t('pdf.invalid_page', { total: data.pdf.pageCount })}
-        </p>
-      ) : null}
       {error ? (
         <p role="alert" className="p-2 text-danger">
           {t('pdf.unavailable')}
@@ -259,6 +233,37 @@ export function PdfCanvas({
             loading={<p role="status">{t('pdf.loading')}</p>}
           /></div>
         </Document>
+      </div>
+      {/* Page turning sits under the page, where reading ends (QA S-09). It
+          stays inside the reader's frame, with icon arrows and the page
+          input, so it does not read as the lesson bar's 이전/다음 below. */}
+      <div className="flex shrink-0 flex-col items-center gap-1 border-t border-border bg-canvas/80 px-3 py-2" role="group" aria-label={t('pdf.page')}>
+        <div className={group}>
+          <button type="button" className={button} title={t('pdf.previous_page')} aria-label={t('pdf.previous_page')}
+            disabled={page <= 1} onClick={() => setPage((n) => n - 1)}>
+            <ChevronLeft aria-hidden className="size-4" />
+          </button>
+          <label className="flex h-9 items-center gap-1.5 pr-1 text-xs tabular-nums text-sub">
+            <span className="sr-only">{t('pdf.page')}</span>
+            <input aria-label={t('pdf.page')} className={`${numberInput} w-11`} type="number" min={1} max={data.pdf.pageCount} value={page}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                if (n >= 1 && n <= data.pdf.pageCount && Number.isInteger(n)) {
+                  setPage(n); setInputError(false);
+                } else setInputError(true);
+              }} />
+            <span className="whitespace-nowrap">/ {data.pdf.pageCount}</span>
+          </label>
+          <button type="button" className={button} title={t('pdf.next_page')} aria-label={t('pdf.next_page')}
+            disabled={page >= data.pdf.pageCount} onClick={() => setPage((n) => n + 1)}>
+            <ChevronRight aria-hidden className="size-4" />
+          </button>
+        </div>
+        {inputError ? (
+          <p role="alert" className="text-xs text-danger">
+            {t('pdf.invalid_page', { total: data.pdf.pageCount })}
+          </p>
+        ) : null}
       </div>
     </div>
   );

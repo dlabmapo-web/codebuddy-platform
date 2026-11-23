@@ -395,12 +395,9 @@ export function useCourseBuilder({
   const structuralError = [
     createModuleMutation,
     updateModuleMutation,
-    deleteModuleMutation,
     reorderModulesMutation,
     createLectureMutation,
     updateLectureMutation,
-    deleteLectureMutation,
-    deleteExerciseMutation,
     setExerciseVisibilityMutation,
     setCourseVisibilityMutation,
     setContentVisibilityMutation,
@@ -468,15 +465,17 @@ export function useCourseBuilder({
         setExerciseVisibilityMutation.variables?.materialId === id),
     setModuleVisible: (moduleId: string, isVisible: boolean) =>
       updateModuleMutation.mutate({ moduleId, isVisible }),
-    deleteModule: (moduleId: string) => deleteModuleMutation.mutate(moduleId),
+    // Deletes resolve or reject for the dialog that asked, which shows the
+    // reason beside the row instead of at the foot of the page (QA-004).
+    deleteModule: (moduleId: string) => deleteModuleMutation.mutateAsync(moduleId),
     renameLecture: (lectureId: string, title: string) =>
       updateLectureMutation.mutate({ lectureId, title }),
     setLectureVisible: (lectureId: string, isVisible: boolean) =>
       updateLectureMutation.mutate({ lectureId, isVisible }),
     deleteLecture: (lectureId: string) =>
-      deleteLectureMutation.mutate(lectureId),
+      deleteLectureMutation.mutateAsync(lectureId),
     deleteExercise: (lectureId: string, materialId: string) =>
-      deleteExerciseMutation.mutate({ lectureId, materialId }),
+      deleteExerciseMutation.mutateAsync({ lectureId, materialId }),
     /*
      * The three moves. Each rebuilds the whole sibling ordering from the tree
      * already in hand, because the endpoint verifies the set it receives

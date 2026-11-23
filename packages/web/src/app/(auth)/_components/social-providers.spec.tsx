@@ -110,3 +110,36 @@ describe('SocialLoginButtons', () => {
     expect(html).toContain('grid-cols-3');
   });
 });
+
+describe('SocialLoginButtons with DLAB (QA-01)', () => {
+  beforeEach(() => {
+    config.naverAuthEnabled = false;
+  });
+
+  it('puts Google and DLAB side by side in two equal columns', () => {
+    const html = renderToStaticMarkup(<SocialLoginButtons dlab />);
+
+    expect(html).toContain('grid-cols-2');
+    expect(html).toContain('href="/sso/start"');
+    expect(html).toContain('aria-label="dlab.login"');
+    // Google keeps its name at phone width when there are only two columns.
+    expect(html).not.toContain('hidden sm:inline');
+    expect(html.indexOf('Google')).toBeLessThan(html.indexOf('/sso/start'));
+  });
+
+  it('keeps DLAB as a full-width row when no social provider is configured', () => {
+    config.googleAuthEnabled = false;
+
+    const html = renderToStaticMarkup(<SocialLoginButtons dlab />);
+
+    expect(html).toContain('grid-cols-1');
+    expect(html).toContain('href="/sso/start"');
+  });
+
+  it('offers no DLAB link unless the deployment enables it', () => {
+    const html = renderToStaticMarkup(<SocialLoginButtons />);
+
+    expect(html).toContain('grid-cols-1');
+    expect(html).not.toContain('/sso/start');
+  });
+});

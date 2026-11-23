@@ -1,12 +1,15 @@
 'use client';
 
 import {
+  applyVerdictToNavigator,
   monitoringServerEvents,
   navigatorPathFromBreadcrumb,
   type NavigatorPath,
+  type ResultChangedEvent,
   type StudentContextChangedEvent,
+  type WorkspaceNavigatorContext,
 } from '@cove/shared';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 import type { Socket } from 'socket.io-client';
 
@@ -150,6 +153,26 @@ export function useTeacherDisplay({
     void curriculumQuery.refetch();
   }, [curriculumQuery]);
 
+  /**
+   * A graded verdict, applied to the outline already on screen (QA T-02).
+   *
+   * The outline is read once per course, so without this the student's icon
+   * stayed orange after a passing submission until something re-read it; a
+   * reload before grading finished read "in progress" again. The event carries
+   * the material, status and score, so no read is needed.
+   */
+  const queryClient = useQueryClient();
+  const applyVerdict = React.useCallback(
+    (verdict: Pick<ResultChangedEvent, 'materialId' | 'status' | 'score'>) => {
+      if (!courseId) return;
+      queryClient.setQueryData<WorkspaceNavigatorContext>(
+        ['academy', academyId, 'live-curriculum', membershipId, courseId],
+        (current) => (current ? applyVerdictToNavigator(current, verdict) : current),
+      );
+    },
+    [academyId, courseId, membershipId, queryClient],
+  );
+
   /* -------------------------------------------------------------- preview */
 
   /**
@@ -266,6 +289,7 @@ export function useTeacherDisplay({
     isLive: isLiveDisplay(state),
     canReturnToLive: canReturnToLive(state),
     live: state.live,
+    applyVerdict,
     loadCurriculum,
     navigator,
     navigatorFailed: curriculumQuery.isError,

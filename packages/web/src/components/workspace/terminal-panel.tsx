@@ -42,6 +42,7 @@ export function TerminalPanel({
   lines,
   mode = 'interactive',
   onEndInput,
+  shared = true,
   onSubmitInput,
   supported,
   synchronizing,
@@ -56,6 +57,12 @@ export function TerminalPanel({
   onEndInput?: () => void;
   supported: boolean;
   mode?: 'interactive' | 'mirror';
+  /**
+   * Whether these lines are the student's run, the one both people see. A
+   * teacher's private run is not: its line N is unrelated to the student's
+   * line N, so it carries no shared line anchors.
+   */
+  shared?: boolean;
   /** What an empty terminal says. Whose terminal it is decides the wording. */
   emptyHint?: string;
   /** How a waiting program is described when nobody here can answer it. */
@@ -149,7 +156,7 @@ export function TerminalPanel({
               // The student's terminal and the teacher's mirror fold the same
               // events into the same lines, so an index names the same output
               // on both screens even when their panes are different heights.
-              {...anchorProps(`terminal-line:${index}`)}
+              {...(shared ? anchorProps(`terminal-line:${index}`) : {})}
             >
               {line.text}
             </span>

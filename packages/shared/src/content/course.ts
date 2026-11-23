@@ -121,6 +121,14 @@ export const materialScorePolicies = ["PROPORTIONAL", "ABSOLUTE_CAP"] as const;
 export const materialScorePolicySchema = z.enum(materialScorePolicies);
 export type MaterialScorePolicy = z.infer<typeof materialScorePolicySchema>;
 
+/**
+ * Test cases one problem may hold. 200, as on Elice, so imported problems keep
+ * every case (QA-005, 2026-11-20). The grading run stays bounded by the
+ * problem's total time limit and by `gradingDataLimits.testSetChars`, not by
+ * this count.
+ */
+export const maxExerciseTestCases = 200;
+
 const titleSchema = z.string().trim().min(1).max(200);
 const descriptionSchema = z.string().trim().max(10_000);
 export const programmingExerciseDescriptionMaxLength = 500_000;
@@ -272,6 +280,8 @@ export const lectureSchema = z.object({
   description: descriptionSchema,
   position: positionSchema,
   isVisible: z.boolean(),
+  /** TEST: an exam lecture whose problems are taken in one timed attempt. */
+  kind: z.enum(["STANDARD", "TEST"]).default("STANDARD"),
   materials: z.array(materialSchema),
 });
 
@@ -761,7 +771,7 @@ export const exerciseDraftFieldsSchema = z.object({
    * only meant an author had to invent an answer before they could write down
    * the question.
    */
-  testCases: z.array(exerciseTestCaseDraftSchema).max(50),
+  testCases: z.array(exerciseTestCaseDraftSchema).max(maxExerciseTestCases),
   /** How the cases above are judged and scored. See `gradingProfileIssues`. */
   grading: exerciseGradingProfileSchema,
   hints: z.array(exerciseHintDraftSchema),
@@ -922,6 +932,28 @@ export type ExerciseAuthoringContext = z.infer<
  * lectures and problems somebody spent a term writing, and `setVisibility` is
  * the reversible answer for a course that should merely stop being taught.
  */
+/**
+ * What deleting a course, module, lecture or material would take with it
+ * (QA-004): students' submissions are deleted with the content, so the
+ * confirm dialog states how many first.
+ */
+export const deleteImpactInputSchema = courseIdInputSchema.extend({
+  target: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("course") }),
+    z.object({ kind: z.literal("module"), id: z.uuid() }),
+    z.object({ kind: z.literal("lecture"), id: z.uuid() }),
+    z.object({ kind: z.literal("material"), id: z.uuid() }),
+  ]),
+});
+export type DeleteImpactInput = z.infer<typeof deleteImpactInputSchema>;
+
+export const deleteImpactSchema = z.object({
+  submissions: z.number().int().nonnegative(),
+  manualSubmissions: z.number().int().nonnegative(),
+  students: z.number().int().nonnegative(),
+});
+export type DeleteImpact = z.infer<typeof deleteImpactSchema>;
+
 export const deleteCourseSchema = z
   .object({
     academyId: z.uuid(),

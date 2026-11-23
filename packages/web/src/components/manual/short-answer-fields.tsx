@@ -47,17 +47,21 @@ export function ShortAnswerFields({
       {locked ? (
         <p className="text-xs text-sub">{t("definition_locked")}</p>
       ) : null}
-      <label>
-        <input
-          type="checkbox"
-          disabled={locked}
-          checked={value.gradingMode === "MANUAL"}
-          onChange={(e) =>
-            field("gradingMode", e.target.checked ? "MANUAL" : mode)
-          }
-        />{" "}
-        {t("grade_manually")}
-      </label>
+      {/* Not a direct child: the fieldset stretches those into full-width grids. */}
+      <div>
+        <label className="flex w-fit items-center gap-2 text-sm font-semibold">
+          <input
+            className="size-4 shrink-0 accent-brand"
+            type="checkbox"
+            disabled={locked}
+            checked={value.gradingMode === "MANUAL"}
+            onChange={(e) =>
+              field("gradingMode", e.target.checked ? "MANUAL" : mode)
+            }
+          />
+          {t("grade_manually")}
+        </label>
+      </div>
       <div
         role="tablist"
         aria-label={t("matching_mode")}
@@ -138,14 +142,18 @@ export function ShortAnswerFields({
           <p role="status">{result}</p>
         </div>
       ) : null}
-      <label>
-        <input
-          type="checkbox"
-          checked={value.explanationEnabled}
-          onChange={(e) => field("explanationEnabled", e.target.checked)}
-        />{" "}
-        {t("write_explanation")}
-      </label>
+      {/* Not a direct child: the fieldset stretches those into full-width grids. */}
+      <div>
+        <label className="flex w-fit items-center gap-2 text-sm font-semibold">
+          <input
+            className="size-4 shrink-0 accent-brand"
+            type="checkbox"
+            checked={value.explanationEnabled}
+            onChange={(e) => field("explanationEnabled", e.target.checked)}
+          />
+          {t("write_explanation")}
+        </label>
+      </div>
       {value.explanationEnabled ? (
         <div>
           <p className="mb-2 text-xs text-sub">{t("explanation_help")}</p>

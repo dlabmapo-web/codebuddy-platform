@@ -260,6 +260,16 @@ export const awarenessUpdatePayloadSchema = z.object({
   editorPointer: collaborationPointerSchema.refine(
     (pointer) => pointer.surface === "editor" && pointer.material !== null && !!pointer.code,
   ).nullable().optional(),
+  /**
+   * The width, in CSS pixels (to 0.01px, because a line that only just fits
+   * must break in the same place), of the student's statement as they read it.
+   *
+   * The student's own layout is the shared canvas: they never rescale for a
+   * watcher, and a teacher lays the statement out at this width and scales it
+   * to their pane, so a canvas fraction means the same word on both screens.
+   * Sent by students only; absent from older clients and from teachers.
+   */
+  statementWidth: z.number().min(160).max(4096).nullable().optional(),
 });
 
 /**

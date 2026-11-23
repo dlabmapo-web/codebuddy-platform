@@ -3386,6 +3386,9 @@ model LectureTest {
   usePreparation   Boolean  @default(true) @map("use_preparation")
   reviewAfterEnd   Boolean  @default(false) @map("review_after_end")
   allowSelfRetake  Boolean  @default(false) @map("allow_self_retake")
+  /// Show each student's score as soon as their attempt ends; off waits for
+  /// staff to release results for the class.
+  showScoreOnFinish Boolean @default(false) @map("show_score_on_finish")
   /// {materialId: pointsHundredths}. Snapshotted into each attempt at start.
   points           Json     @default("{}")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)

@@ -198,6 +198,19 @@ describe.skipIf(!databaseUrl)("exams against PostgreSQL", () => {
     expect(csv.csv.split("\r\n")).toHaveLength(41);
   });
 
+  it("shows a finished student's score on finish when the test says so, without a release", async () => {
+    const student = students[6]!;
+    const attempt = await client.testAttempt.findFirstOrThrow({ where: { userId: student.id }, orderBy: { attemptNo: "desc" } });
+    await exams.end(identity(student.auth), { academyId, attemptId: attempt.id });
+    await staff.updateSchedule(identity(managerAuth), { ...base, schedule: { opensAt: null, closesAt: null, resultsReleasedAt: null } });
+    expect((await exams.studentTest(identity(student.auth), base)).score).toBeNull();
+    await staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId, settings: { showScoreOnFinish: true } });
+    const card = await exams.studentTest(identity(student.auth), base);
+    expect(card.resultsVisible).toBe(true);
+    expect(card.score).toMatchObject({ possibleHundredths: 10000 });
+    await staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId, settings: { showScoreOnFinish: false } });
+  });
+
   it("lets a teacher end an attempt and grant one retake", async () => {
     const student = students[10]!;
     await staff.endAttempt(identity(managerAuth), { ...base, userId: student.id });

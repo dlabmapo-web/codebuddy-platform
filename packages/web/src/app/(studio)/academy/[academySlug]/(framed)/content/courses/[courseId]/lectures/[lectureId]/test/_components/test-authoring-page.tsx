@@ -8,8 +8,8 @@ import {
   type TestType,
 } from '@cove/shared';
 import {
-  BadgeCheck, CalendarClock, ChevronDown, ClipboardList, Code2, DoorClosed, DoorOpen, FileQuestion, Hourglass,
-  IdCard, Layers, Library, ListChecks, PenLine, RefreshCcw, ShieldCheck, Timer, TriangleAlert, Undo2, Video,
+  BadgeCheck, CalendarClock, ChevronDown, ClipboardList, Code2, FileQuestion, Hourglass,
+  ListChecks, PenLine, RefreshCcw, ShieldCheck, Timer, TriangleAlert, Undo2,
 } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
@@ -91,7 +91,7 @@ export function TestAuthoringPage({ academyId, initial }: { academyId: string; i
           <dt className="text-sub">{t('authoring.rows.period')}</dt>
           <dd className="text-ink">{t('authoring.rows.period_value')}</dd>
           <dt className="text-sub">{t('authoring.rows.results')}</dt>
-          <dd className="text-ink">{t('authoring.rows.results_value')}</dd>
+          <dd className="text-ink">{test.settings.showScoreOnFinish ? t('authoring.rows.results_auto') : t('authoring.rows.results_value')}</dd>
           <dt className="text-sub">{t('authoring.rows.review')}</dt>
           <dd className="text-ink">{yesNo(test.settings.reviewAfterEnd)}</dd>
           <dt className="text-sub">{t('authoring.rows.retake')}</dt>
@@ -224,18 +224,16 @@ function SaveButton({ busy, disabled, onClick }: { busy: boolean; disabled: bool
   );
 }
 
-function SettingRow({ icon: Icon, title, help, checked, onChange, disabled = false, soon = false, children }: {
+function SettingRow({ icon: Icon, title, help, checked, onChange, disabled = false, children }: {
   icon: typeof Timer; title: string; help: string; checked: boolean; onChange?: (next: boolean) => void;
-  disabled?: boolean; soon?: boolean; children?: React.ReactNode;
+  disabled?: boolean; children?: React.ReactNode;
 }) {
-  const { t } = useTranslation('exam');
   return (
     <div className={`flex gap-4 px-3 py-4 ${disabled ? 'rounded-lg bg-surface opacity-70' : ''}`}>
       <span className="grid size-9 shrink-0 place-items-center rounded-full bg-surface text-ink"><Icon aria-hidden className="size-4" /></span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-[14.5px] font-bold text-ink">
           {title}
-          {soon ? <span className="rounded bg-border px-1.5 py-0.5 text-[11px] font-semibold text-sub">{t('authoring.settings.coming_soon')}</span> : null}
         </div>
         <p className="mt-0.5 text-[12.5px] text-sub">{help}</p>
         {children}
@@ -255,15 +253,10 @@ function SettingsTab({ test, busy, onSave }: { test: ExamStaffTest; busy: boolea
   const next: ExamSettings = { ...draft, timeLimitMinutes: limitOn ? parsedMinutes : null };
   const changed = JSON.stringify(next) !== JSON.stringify(test.settings);
   const set = (patch: Partial<ExamSettings>) => setDraft((current) => ({ ...current, ...patch }));
-  const soon = (icon: typeof Timer, key: 'entry_deadline' | 'exit_time' | 'group' | 'prerequisite' | 'monitoring' | 'id_card' | 'language_reference') => (
-    <SettingRow key={key} icon={icon} title={t(`authoring.settings.${key}`)} help={t(`authoring.settings.${key}_help`)} checked={false} disabled soon />
-  );
   return (
     <div className="divide-y divide-border">
       <SettingRow icon={ClipboardList} title={t('authoring.settings.preparation')} help={t('authoring.settings.preparation_help')}
         checked={draft.usePreparation} onChange={(usePreparation) => set({ usePreparation })} />
-      {soon(DoorOpen, 'entry_deadline')}
-      {soon(DoorClosed, 'exit_time')}
       <SettingRow icon={Hourglass} title={t('authoring.settings.time_limit')} help={t('authoring.settings.time_limit_help')}
         checked={limitOn} onChange={(on) => set({ timeLimitMinutes: on ? Number(minutes) || 60 : null })}>
         {limitOn ? (
@@ -275,16 +268,12 @@ function SettingsTab({ test, busy, onSave }: { test: ExamStaffTest; busy: boolea
           </label>
         ) : null}
       </SettingRow>
-      <SettingRow icon={CalendarClock} title={t('authoring.rows.results')} help={t('authoring.rows.results_value')} checked={false} disabled />
+      <SettingRow icon={CalendarClock} title={t('authoring.settings.show_score')} help={t('authoring.settings.show_score_help')}
+        checked={draft.showScoreOnFinish} onChange={(showScoreOnFinish) => set({ showScoreOnFinish })} />
       <SettingRow icon={ListChecks} title={t('authoring.settings.review')} help={t('authoring.settings.review_help')}
         checked={draft.reviewAfterEnd} onChange={(reviewAfterEnd) => set({ reviewAfterEnd })} />
       <SettingRow icon={RefreshCcw} title={t('authoring.settings.retake')} help={t('authoring.settings.retake_help')}
         checked={draft.allowSelfRetake} onChange={(allowSelfRetake) => set({ allowSelfRetake })} />
-      {soon(Layers, 'prerequisite')}
-      {soon(Layers, 'group')}
-      {soon(Video, 'monitoring')}
-      {soon(IdCard, 'id_card')}
-      {soon(Library, 'language_reference')}
       <div className="pt-6">
         <SaveButton busy={busy} disabled={!changed || !minutesValid} onClick={() => void onSave(next)} />
       </div>

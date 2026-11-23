@@ -112,6 +112,8 @@ export const examSettingsSchema = z.object({
   usePreparation: z.boolean(),
   reviewAfterEnd: z.boolean(),
   allowSelfRetake: z.boolean(),
+  /** Show the score as soon as the attempt ends, without waiting for a release. */
+  showScoreOnFinish: z.boolean(),
 });
 export type ExamSettings = z.infer<typeof examSettingsSchema>;
 
@@ -171,6 +173,8 @@ export const examAttemptShellSchema = z.object({
   id: z.uuid(),
   lectureId: z.uuid(),
   classId: z.uuid(),
+  /** For live monitoring, which keys a student's open problem by course. */
+  courseId: z.uuid(),
   title: z.string(),
   guide: z.string(),
   startedAt: isoDate,

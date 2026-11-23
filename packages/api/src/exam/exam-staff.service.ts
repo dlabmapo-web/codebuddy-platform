@@ -145,6 +145,7 @@ export class ExamStaffService {
           ...(settings.usePreparation !== undefined ? { usePreparation: settings.usePreparation } : {}),
           ...(settings.reviewAfterEnd !== undefined ? { reviewAfterEnd: settings.reviewAfterEnd } : {}),
           ...(settings.allowSelfRetake !== undefined ? { allowSelfRetake: settings.allowSelfRetake } : {}),
+          ...(settings.showScoreOnFinish !== undefined ? { showScoreOnFinish: settings.showScoreOnFinish } : {}),
           ...(input.points ? { points: { ...pointsOf(current), ...input.points } } : {}),
         },
       });
@@ -397,6 +398,7 @@ function settingsOf(settings: ExamSettingsRow): ExamSettings {
     guide: settings.guide, summary: settings.summary, testType: settings.testType,
     timeLimitMinutes: settings.timeLimitMinutes, usePreparation: settings.usePreparation,
     reviewAfterEnd: settings.reviewAfterEnd, allowSelfRetake: settings.allowSelfRetake,
+    showScoreOnFinish: settings.showScoreOnFinish,
   };
 }
 

@@ -137,7 +137,8 @@
       "review": "Test accessible after completion",
       "retake": "Enable retaking test",
       "yes": "Yes",
-      "no": "No"
+      "no": "No",
+      "results_auto": "Automatic when the student finishes"
     },
     "tabs": {
       "guide": "Test introduction",
@@ -150,10 +151,6 @@
     "settings": {
       "preparation": "Use test preparation",
       "preparation_help": "Use the test preparation steps before the test starts.",
-      "entry_deadline": "Entry deadline",
-      "entry_deadline_help": "When set, test takers cannot start the test after this time.",
-      "exit_time": "Exit time setting",
-      "exit_time_help": "Set when test takers can leave after starting the test.",
       "time_limit": "Time limit",
       "time_limit_help": "The test can be taken for a set time.",
       "minutes": "min",
@@ -161,17 +158,8 @@
       "review_help": "After finishing, students can view the problems but cannot submit.",
       "retake": "Allow retaking test",
       "retake_help": "Students may retake the test on their own.",
-      "group": "Use group questions",
-      "group_help": "Show one random question per group.",
-      "prerequisite": "Test prerequisite",
-      "prerequisite_help": "Students must meet a course-progress condition first.",
-      "monitoring": "Monitoring features",
-      "monitoring_help": "Webcam and screen sharing.",
-      "id_card": "Check identity card",
-      "id_card_help": "ID upload and verification.",
-      "language_reference": "Language reference",
-      "language_reference_help": "Link the language documentation.",
-      "coming_soon": "Coming soon"
+      "show_score": "Show the score when the test ends",
+      "show_score_help": "On: each student sees their score as soon as they finish. Off: students see it only after a teacher, team lead or manager releases results for their class."
     },
     "problems": {
       "reorder_hint": "Reorder problems in the course builder.",
@@ -254,6 +242,7 @@
       "MULTIPLE_CHOICE": "Multiple choice",
       "SHORT_ANSWER": "Short answer"
     },
-    "open_test_settings": "Test settings"
+    "open_test_settings": "Test settings",
+    "release_auto": "This test shows each student's score automatically when they finish."
   }
 }

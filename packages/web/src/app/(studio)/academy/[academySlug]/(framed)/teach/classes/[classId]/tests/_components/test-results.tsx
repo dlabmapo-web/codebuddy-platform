@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { formatClock, formatDuration } from '@/components/exam/exam-format';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
+import { Dialog } from '@/components/exam/exam-dialog';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
 import { routes } from '@/lib/routes';
@@ -168,6 +169,15 @@ function StudentRow({ student, results, slug, onEnd, onRetake }: {
   student: Student; results: ExamResults; slug: string; onEnd: () => Promise<boolean>; onRetake: () => Promise<boolean>;
 }) {
   const { t } = useTranslation('exam');
+  // Cove's own dialog, not the browser's: it matches the app and stays inside a fullscreen page.
+  const [confirming, setConfirming] = React.useState<'end' | 'retake' | null>(null);
+  const [busy, setBusy] = React.useState(false);
+  const confirm = async () => {
+    setBusy(true);
+    await (confirming === 'end' ? onEnd() : onRetake());
+    setBusy(false);
+    setConfirming(null);
+  };
   // As of the last read; the grid refreshes every 30 s while anyone is sitting the test.
   const now = new Date(results.serverNow).getTime();
   const status = student.status === 'NOT_STARTED' ? t('results.state_not_started')
@@ -200,15 +210,30 @@ function StudentRow({ student, results, slug, onEnd, onRetake }: {
       })}
       <td className="whitespace-nowrap px-5 py-3 text-right">
         {student.status === 'IN_PROGRESS' ? (
-          <button type="button" onClick={() => { if (window.confirm(t('results.end_attempt_confirm', { name: student.name }))) void onEnd(); }}
+          <button type="button" onClick={() => setConfirming('end')}
             className="rounded-md border border-danger/40 px-2.5 py-1 text-[12px] font-semibold text-danger hover:bg-danger/10">{t('results.end_attempt')}</button>
         ) : student.status === 'ENDED' ? (
           student.retakeGranted ? <span className="text-[12px] font-semibold text-success">{t('results.retake_granted')}</span> : (
-            <button type="button" onClick={() => { if (window.confirm(t('results.grant_retake_confirm', { name: student.name }))) void onRetake(); }}
+            <button type="button" onClick={() => setConfirming('retake')}
               className="rounded-md border border-border px-2.5 py-1 text-[12px] font-semibold hover:bg-surface">{t('results.grant_retake')}</button>
           )
         ) : null}
       </td>
+      {confirming ? (
+        <td className="p-0">
+          <Dialog title={confirming === 'end' ? t('results.end_attempt') : t('results.grant_retake')} onClose={() => setConfirming(null)} footer={
+            <div className="ml-auto flex gap-2">
+              <button type="button" onClick={() => setConfirming(null)} className="h-10 rounded-lg border border-border px-4 text-[14px] font-semibold hover:bg-surface">{t('authoring.cancel')}</button>
+              <button type="button" disabled={busy} onClick={() => void confirm()}
+                className={`h-10 rounded-lg px-5 text-[14px] font-bold disabled:opacity-40 ${confirming === 'end' ? 'bg-danger text-on-danger' : 'bg-brand text-on-brand hover:bg-brand-deep'}`}>
+                {confirming === 'end' ? t('results.end_attempt') : t('results.grant_retake')}
+              </button>
+            </div>
+          }>
+            <p className="text-[14px] text-ink">{t(confirming === 'end' ? 'results.end_attempt_confirm' : 'results.grant_retake_confirm', { name: student.name })}</p>
+          </Dialog>
+        </td>
+      ) : null}
     </tr>
   );
 }
@@ -265,6 +290,9 @@ function ScheduleCard({ results, onSave }: { results: ExamResults; onSave: (sche
         </fieldset>
         <fieldset>
           <legend className="text-[13px] font-semibold text-sub">{t('results.release')}</legend>
+          {results.settings.showScoreOnFinish ? (
+            <p className="mt-2 rounded-lg bg-success/10 px-3 py-2 text-[12.5px] font-semibold text-success">{t('results.release_auto')}</p>
+          ) : null}
           <div className="mt-2 flex flex-wrap gap-4 text-[13.5px]">
             {(['hidden', 'now', 'at'] as const).map((value) => (
               <label key={value} className="flex items-center gap-2">

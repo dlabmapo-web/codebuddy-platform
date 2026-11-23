@@ -87,7 +87,8 @@ export class ExamService {
     const now = row.serverNow;
     const items = examItems(row.items, row.settings.points);
     const period = periodState({ ...row.schedule, now });
-    const released = resultsVisible({ resultsReleasedAt: row.schedule.resultsReleasedAt, now });
+    // Either the test shows scores on finish, or staff released this class's results.
+    const released = row.settings.showScoreOnFinish || resultsVisible({ resultsReleasedAt: row.schedule.resultsReleasedAt, now });
     const latestOpen = latest ? attemptIsOpen({ ...latest, now }) : false;
     const latestEnded = Boolean(latest && !latestOpen);
     const canRetake = latestEnded && period === "OPEN" && (row.settings.allowSelfRetake || Boolean(latest?.retakeGrantedAt));
@@ -337,13 +338,14 @@ export class ExamService {
   ): ExamAttemptShell {
     const { attempt, settings, schedule, serverNow: now } = read;
     const open = attemptIsOpen({ ...attempt, now });
-    const released = resultsVisible({ resultsReleasedAt: schedule.resultsReleasedAt, now });
+    const released = settings.showScoreOnFinish || resultsVisible({ resultsReleasedAt: schedule.resultsReleasedAt, now });
     const byMaterial = new Map(read.items.map((item) => [item.materialId, item]));
     const lastByMaterial = new Map(last.map((row) => [row.materialId, row]));
     return {
       id: attempt.id,
       lectureId: attempt.lectureId,
       classId: attempt.classId,
+      courseId: read.courseId,
       title: read.title,
       guide: settings.guide,
       startedAt: attempt.startedAt,
@@ -374,11 +376,12 @@ export class ExamService {
 }
 
 /** The guide stays; the points map is staff-only. */
-function publicSettings(settings: { guide: string; summary: string; testType: ExamStudentTest["settings"]["testType"]; timeLimitMinutes: number | null; usePreparation: boolean; reviewAfterEnd: boolean; allowSelfRetake: boolean }) {
+function publicSettings(settings: { guide: string; summary: string; testType: ExamStudentTest["settings"]["testType"]; timeLimitMinutes: number | null; usePreparation: boolean; reviewAfterEnd: boolean; allowSelfRetake: boolean; showScoreOnFinish: boolean }) {
   return {
     guide: settings.guide, summary: settings.summary, testType: settings.testType,
     timeLimitMinutes: settings.timeLimitMinutes, usePreparation: settings.usePreparation,
     reviewAfterEnd: settings.reviewAfterEnd, allowSelfRetake: settings.allowSelfRetake,
+    showScoreOnFinish: settings.showScoreOnFinish,
   };
 }
 

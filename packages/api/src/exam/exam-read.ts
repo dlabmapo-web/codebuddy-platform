@@ -34,6 +34,7 @@ export type ExamSettingsRow = {
   usePreparation: boolean;
   reviewAfterEnd: boolean;
   allowSelfRetake: boolean;
+  showScoreOnFinish: boolean;
   points: Record<string, number>;
 };
 
@@ -90,6 +91,7 @@ export function toSettings(raw: Record<string, unknown>): ExamSettingsRow {
     usePreparation: raw.use_preparation as boolean,
     reviewAfterEnd: raw.review_after_end as boolean,
     allowSelfRetake: raw.allow_self_retake as boolean,
+    showScoreOnFinish: Boolean(raw.show_score_on_finish),
     points: (raw.points as Record<string, number>) ?? {},
   };
 }

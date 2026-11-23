@@ -27,7 +27,10 @@
     "results_pending": "Grading in progress",
     "review": "Review problems",
     "in_progress": "You have a test in progress.",
-    "no_problems": "This test has no problems yet."
+    "no_problems": "This test has no problems yet.",
+    "entry_until": "Entry closes at {{date}}",
+    "exit_from": "You can end the test from {{date}}",
+    "entry_closed": "Entry is closed."
   },
   "prepare": {
     "title": "Prepare for the test",
@@ -89,7 +92,10 @@
     "retry": "Try again",
     "review_banner": "Review: your last submitted answers. Submitting is closed.",
     "score_item": "{{earned}} / {{possible}} pts",
-    "question_mark": "Q."
+    "question_mark": "Q.",
+    "exit_from": "You can end the test from {{date}}",
+    "reference": "Reference",
+    "explanation": "Explanation"
   },
   "end_dialog": {
     "title": "End test",
@@ -139,7 +145,8 @@
       "retake": "Enable retaking test",
       "yes": "Yes",
       "no": "No",
-      "results_auto": "Automatic when the student finishes"
+      "results_auto": "Automatic when the student finishes",
+      "reference": "Language reference"
     },
     "tabs": {
       "guide": "Test introduction",
@@ -160,10 +167,15 @@
       "retake": "Allow retaking test",
       "retake_help": "Students may retake the test on their own.",
       "show_score": "Show the score when the test ends",
-      "show_score_help": "On: each student sees their score as soon as they finish. Off: students see it only after a teacher, team lead or manager releases results for their class."
+      "show_score_help": "On: each student sees their score as soon as they finish. Off: students see it only after a teacher, team lead or manager releases results for their class.",
+      "explanations": "Show explanations after the test",
+      "explanations_help": "Once results are visible, students reviewing the test see each problem's explanation. Needs 'Allow test access after completion'.",
+      "reference": "Language reference",
+      "reference_help": "During the test, code problems link to the reference site for their language.",
+      "timing_per_class": "The entry deadline and exit time are set per class, next to the test period. Open a class under 'Results by class'."
     },
     "problems": {
-      "reorder_hint": "Reorder problems in the course builder.",
+      "reorder_hint": "Use the arrows to change the order. Students who already started keep their order.",
       "points": "pts",
       "total": "Total:",
       "total_hint": "The sum of the points of the problems in this test.",
@@ -172,13 +184,16 @@
       "empty": "Add multiple choice, short answer or code problems to this lecture in the course builder.",
       "invalid": "Not allowed in a test",
       "open_editor": "Open editor",
-      "add_problem": "Add a problem in the course builder"
+      "add_problem": "Add a problem in the course builder",
+      "move_up": "Move {{title}} up",
+      "move_down": "Move {{title}} down"
     },
     "results_link": "Results by class",
     "results_hint": "Each class sits the test on its own period. Open a class to set its period, release results, and see every student's score.",
     "results_ended": "Finished {{count}}",
     "results_open": "Open results",
-    "results_no_classes": "No class learns this course yet. Assign the course to a class first."
+    "results_no_classes": "No class learns this course yet. Assign the course to a class first.",
+    "course_report": "Download course report"
   },
   "results": {
     "tab": "Tests",
@@ -244,6 +259,14 @@
       "SHORT_ANSWER": "Short answer"
     },
     "open_test_settings": "Test settings",
-    "release_auto": "This test shows each student's score automatically when they finish."
+    "release_auto": "This test shows each student's score automatically when they finish.",
+    "avg_runs": "Avg. runs",
+    "cell_submissions": "{{count}} submissions",
+    "cell_runs": "{{count}} runs",
+    "entry_closes_at": "Entry deadline",
+    "entry_closes_help": "Nobody can start after this. Empty: until the period ends.",
+    "exit_opens_at": "Exit time",
+    "exit_opens_help": "Students cannot end the test before this. Empty: any time.",
+    "timing_outside": "The entry deadline and exit time must be inside the test period."
   }
 }

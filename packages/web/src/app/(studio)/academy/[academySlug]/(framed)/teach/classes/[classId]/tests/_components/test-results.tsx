@@ -86,7 +86,7 @@ export function TestResults({ academyId, initial, canManageContent }: { academyI
       </div>
 
       <section className="overflow-x-auto rounded-2xl border border-border bg-card">
-        <table className="w-full min-w-[640px] text-[13.5px]">
+        <table className="w-full min-w-[720px] text-[13.5px]">
           <thead>
             <tr className="border-b border-border text-left text-[12.5px] font-semibold text-sub">
               <th className="px-5 py-3">{t('results.problem')}</th>
@@ -94,7 +94,8 @@ export function TestResults({ academyId, initial, canManageContent }: { academyI
               <th className="px-3 py-3 text-right">{t('results.points')}</th>
               <th className="px-3 py-3 text-right">{t('results.avg')}</th>
               <th className="px-3 py-3 text-right">{t('results.full_rate')}</th>
-              <th className="px-5 py-3 text-right">{t('results.avg_submissions')}</th>
+              <th className="px-3 py-3 text-right">{t('results.avg_submissions')}</th>
+              <th className="px-5 py-3 text-right">{t('results.avg_runs')}</th>
             </tr>
           </thead>
           <tbody>
@@ -105,7 +106,8 @@ export function TestResults({ academyId, initial, canManageContent }: { academyI
                 <td className="px-3 py-3 text-right">{formatPoints(item.pointsHundredths)}</td>
                 <td className="px-3 py-3 text-right">{item.averageHundredths == null ? '—' : formatPoints(Math.round(item.averageHundredths))}</td>
                 <td className="px-3 py-3 text-right">{item.fullScoreRate == null ? '—' : `${Math.round(item.fullScoreRate * 100)}%`}</td>
-                <td className="px-5 py-3 text-right">{item.averageSubmissions == null ? '—' : item.averageSubmissions.toFixed(1)}</td>
+                <td className="px-3 py-3 text-right">{item.averageSubmissions == null ? '—' : item.averageSubmissions.toFixed(1)}</td>
+                <td className="px-5 py-3 text-right">{item.averageRuns == null ? '—' : item.averageRuns.toFixed(1)}</td>
               </tr>
             ))}
           </tbody>
@@ -203,7 +205,9 @@ function StudentRow({ student, results, slug, onEnd, onRetake }: {
           : cell.scoreHundredths == null ? '—' : formatPoints(cell.scoreHundredths);
         return (
           <td key={cell.materialId} className="whitespace-nowrap px-3 py-3 text-center"
-            title={cell.submitted ? `${cell.submissionCount}` : t('results.not_submitted')}>
+            title={[cell.submitted ? t('results.cell_submissions', { count: cell.submissionCount }) : t('results.not_submitted'),
+              results.items.find((row) => row.materialId === cell.materialId)?.type === 'CODE' ? t('results.cell_runs', { count: cell.runCount }) : null]
+              .filter(Boolean).join(' · ')}>
             {href ? <Link href={href} className="font-semibold text-brand hover:underline">{text}</Link> : <span className="text-sub">{text}</span>}
           </td>
         );
@@ -254,13 +258,22 @@ function ScheduleCard({ results, onSave }: { results: ExamResults; onSave: (sche
   const released = schedule.resultsReleasedAt ? new Date(schedule.resultsReleasedAt) : null;
   const [release, setRelease] = React.useState<Release>(!released ? 'hidden' : released.getTime() <= new Date(results.serverNow).getTime() ? 'now' : 'at');
   const [releaseAt, setReleaseAt] = React.useState(toLocalInput(schedule.resultsReleasedAt));
+  const [entryClosesAt, setEntryClosesAt] = React.useState(toLocalInput(schedule.entryClosesAt));
+  const [exitOpensAt, setExitOpensAt] = React.useState(toLocalInput(schedule.exitOpensAt));
   const [saved, setSaved] = React.useState(false);
   const invalid = !always && Boolean(opensAt && closesAt && new Date(opensAt) >= new Date(closesAt));
+  // Both times must fall inside the period, as the server also checks.
+  const outside = (value: string) => Boolean(value) && !always && (
+    (opensAt !== '' && new Date(value) < new Date(opensAt)) || (closesAt !== '' && new Date(value) > new Date(closesAt)));
+  const entryInvalid = outside(entryClosesAt);
+  const exitInvalid = outside(exitOpensAt);
   const save = async () => {
     setSaved(false);
     const ok = await onSave({
       opensAt: always || !opensAt ? null : new Date(opensAt),
       closesAt: always || !closesAt ? null : new Date(closesAt),
+      entryClosesAt: entryClosesAt ? new Date(entryClosesAt) : null,
+      exitOpensAt: exitOpensAt ? new Date(exitOpensAt) : null,
       resultsReleasedAt: release === 'hidden' ? null : release === 'now' ? (released && release === 'now' && released <= new Date() ? released : new Date()) : releaseAt ? new Date(releaseAt) : null,
     });
     setSaved(ok);
@@ -287,6 +300,19 @@ function ScheduleCard({ results, onSave }: { results: ExamResults; onSave: (sche
               </label>
             </div>
           ) : null}
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <label className="text-[12px] text-sub">{t('results.entry_closes_at')}
+              <input type="datetime-local" value={entryClosesAt} onChange={(event) => setEntryClosesAt(event.target.value)} aria-invalid={entryInvalid}
+                className="mt-1 h-10 w-full rounded-lg border border-border bg-card px-2 text-[13px] text-ink aria-[invalid=true]:border-danger" />
+              <span className="mt-1 block text-[11.5px]">{t('results.entry_closes_help')}</span>
+            </label>
+            <label className="text-[12px] text-sub">{t('results.exit_opens_at')}
+              <input type="datetime-local" value={exitOpensAt} onChange={(event) => setExitOpensAt(event.target.value)} aria-invalid={exitInvalid}
+                className="mt-1 h-10 w-full rounded-lg border border-border bg-card px-2 text-[13px] text-ink aria-[invalid=true]:border-danger" />
+              <span className="mt-1 block text-[11.5px]">{t('results.exit_opens_help')}</span>
+            </label>
+          </div>
+          {entryInvalid || exitInvalid ? <p role="alert" className="mt-1 text-[12px] font-semibold text-danger">{t('results.timing_outside')}</p> : null}
         </fieldset>
         <fieldset>
           <legend className="text-[13px] font-semibold text-sub">{t('results.release')}</legend>
@@ -309,7 +335,7 @@ function ScheduleCard({ results, onSave }: { results: ExamResults; onSave: (sche
       </div>
       <div className="mt-4 flex items-center justify-end gap-3">
         {saved ? <span role="status" className="text-[13px] font-semibold text-success">{t('results.saved')}</span> : null}
-        <button type="button" onClick={() => void save()} disabled={invalid || (release === 'at' && !releaseAt)}
+        <button type="button" onClick={() => void save()} disabled={invalid || entryInvalid || exitInvalid || (release === 'at' && !releaseAt)}
           className="h-10 rounded-lg bg-brand px-5 text-[14px] font-bold text-on-brand hover:bg-brand-deep disabled:opacity-40">{t('results.save')}</button>
       </div>
     </section>

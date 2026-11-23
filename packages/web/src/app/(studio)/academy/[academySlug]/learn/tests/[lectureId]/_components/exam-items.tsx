@@ -1,7 +1,7 @@
 'use client';
 
-import { meaningfulChoiceHtml, type ExamItemContent, type ExamShellItem, type ExerciseLanguage, type LearnExercise, type LearnSampleTestCase } from '@cove/shared';
-import { RotateCcw, Send } from 'lucide-react';
+import { languageReferenceUrl, meaningfulChoiceHtml, type ExamItemContent, type ExamShellItem, type ExerciseLanguage, type LearnExercise, type LearnSampleTestCase } from '@cove/shared';
+import { BookOpen, Lightbulb, RotateCcw, Send } from 'lucide-react';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -37,6 +37,8 @@ type Props = {
   courseId: string;
   item: ExamShellItem;
   readOnly: boolean;
+  /** Code problems link to the language reference (a test setting). */
+  languageReference?: boolean;
   onSubmitted: (materialId: string, submittedAt: Date) => void;
   onEnded: () => void;
 };
@@ -183,8 +185,21 @@ function ChoiceItem(props: Props & { content: Extract<ExamItemContent, { type: '
           })}
         </div>
       </div>
+      {content.type === 'MULTIPLE_CHOICE' ? <Explanation html={content.explanation} title={question} /> : null}
       <SubmitBar disabled={selected.length === 0} busy={busy} error={error} status={status} onSubmit={onSubmit} readOnly={readOnly} />
     </section>
+  );
+}
+
+/** The problem's explanation, in review after the test when the test shows them. */
+function Explanation({ html, title }: { html: string | null; title: string }) {
+  const { t } = useTranslation('exam');
+  if (!html || !meaningfulChoiceHtml(html)) return null;
+  return (
+    <div className="mx-6 mb-6 rounded-xl border border-brand/30 bg-brand-soft px-5 py-4">
+      <h3 className="flex items-center gap-1.5 text-[13.5px] font-bold text-brand"><Lightbulb aria-hidden className="size-4" />{t('mode.explanation')}</h3>
+      <div className="mt-2"><RichTextFrame content={html} title={`${title} ${t('mode.explanation')}`} minHeight={24} fallbackHeight={80} padding={0} /></div>
+    </div>
   );
 }
 
@@ -206,6 +221,7 @@ function ShortAnswerItem(props: Props & { content: Extract<ExamItemContent, { ty
           placeholder={content.placeholder || t('mode.answer_placeholder')}
           className="mt-6 h-48 w-full resize-y rounded-lg border border-border bg-surface px-4 py-3 text-[14px] outline-none focus:border-brand" />
       </div>
+      <Explanation html={content.explanation} title={content.title} />
       <SubmitBar disabled={!answer.trim()} busy={busy} error={error} status={status} readOnly={readOnly}
         onSubmit={() => void submit({ kind: 'text', text: answer, contentRevision: content.contentRevision })} />
     </section>
@@ -214,7 +230,7 @@ function ShortAnswerItem(props: Props & { content: Extract<ExamItemContent, { ty
 
 function CodeItem(props: Props & { content: Extract<ExamItemContent, { type: 'CODE' }> }) {
   const { t } = useLayoutTranslation(['learn', 'common']);
-  const { t: te } = useTranslation('exam');
+  const { t: te, i18n } = useTranslation('exam');
   const { content, readOnly } = props;
   const { busy, error, submit, status } = useSubmit(props);
   const draftKey = `cove-exam:${props.attemptId}:${content.materialId}`;
@@ -264,8 +280,14 @@ function CodeItem(props: Props & { content: Extract<ExamItemContent, { type: 'CO
     sampleTestCases, hiddenTestCaseCount: content.hiddenCount, hints: [],
   } as unknown as LearnExercise;
   const change = (value: string) => { monitoring.markActive(); setCode(value); writeDraft(draftKey, value); };
+  // Each run is counted for the results' average runs; a lost count never blocks running.
+  const countRun = () => {
+    if (readOnly) return;
+    void orpc.exam.recordRun({ academyId: props.academyId, attemptId: props.attemptId, materialId: content.materialId }).catch(() => undefined);
+  };
   const runSample = (index: number) => {
     setActiveSample(index);
+    countRun();
     void runner.run(code, { stdin: content.samples[index]?.input ?? '' }).finally(() => setActiveSample(null));
   };
   return (
@@ -290,6 +312,12 @@ function CodeItem(props: Props & { content: Extract<ExamItemContent, { type: 'CO
           <LanguageTag language={language} label={t(`workspace.${languageLabelKey(language)}`)} />
           <div className="ml-auto flex items-center gap-2">
             {/* Watch-only during a test, so the student is never told they are being helped. */}
+            {props.languageReference ? (
+              <a href={languageReferenceUrl(language, i18n.language)} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-semibold text-white/80 hover:bg-white/10 hover:text-white">
+                <BookOpen aria-hidden className="size-3.5" />{te('mode.reference')}
+              </a>
+            ) : null}
             <MonitoringIndicator state={monitoring.indicator === 'HELPING' ? 'MONITORING' : monitoring.indicator} monitoringLabel={te('mode.teacher_watching')} />
             <FontSizeControls {...preferences} />
           </div>
@@ -310,7 +338,7 @@ function CodeItem(props: Props & { content: Extract<ExamItemContent, { type: 'CO
                 <RotateCcw className="size-3" />{t('workspace.reset')}
               </button>
               {python ? (
-                <RunControls activeSample={activeSample} onRun={() => void runner.run(code)} onRunSample={runSample}
+                <RunControls activeSample={activeSample} onRun={() => { countRun(); void runner.run(code); }} onRunSample={runSample}
                   onStop={() => runner.stop()} ready={runner.ready && !busy} running={runner.running} sampleTestCases={sampleTestCases} />
               ) : null}
               <button type="button" disabled={!code.trim() || busy || runner.running} onClick={() => void submit({ kind: 'code', code })}

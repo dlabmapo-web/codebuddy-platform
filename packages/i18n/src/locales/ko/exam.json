@@ -27,7 +27,10 @@
     "results_pending": "채점 중",
     "review": "문제 다시 보기",
     "in_progress": "응시 중인 테스트가 있습니다.",
-    "no_problems": "아직 문제가 없는 테스트입니다."
+    "no_problems": "아직 문제가 없는 테스트입니다.",
+    "entry_until": "입장 마감: {{date}}",
+    "exit_from": "퇴실 가능 시간: {{date}}부터",
+    "entry_closed": "입장이 마감되었습니다."
   },
   "prepare": {
     "title": "테스트 준비하기",
@@ -89,7 +92,10 @@
     "retry": "다시 시도",
     "review_banner": "다시 보기: 마지막으로 제출한 답안입니다. 제출은 마감되었습니다.",
     "score_item": "{{earned}} / {{possible}} 점",
-    "question_mark": "Q."
+    "question_mark": "Q.",
+    "exit_from": "{{date}}부터 테스트를 종료할 수 있습니다",
+    "reference": "언어 레퍼런스",
+    "explanation": "해설"
   },
   "end_dialog": {
     "title": "테스트 종료",
@@ -139,7 +145,8 @@
       "retake": "셀프 재응시 허용",
       "yes": "가능",
       "no": "불가능",
-      "results_auto": "종료 즉시 자동 공개"
+      "results_auto": "종료 즉시 자동 공개",
+      "reference": "언어 레퍼런스"
     },
     "tabs": {
       "guide": "테스트 안내",
@@ -160,10 +167,15 @@
       "retake": "셀프 재응시 허용",
       "retake_help": "학생이 스스로 테스트를 다시 응시할 수 있습니다.",
       "show_score": "테스트 종료 즉시 점수 공개",
-      "show_score_help": "켜면 학생이 테스트를 마치는 즉시 자신의 점수를 봅니다. 끄면 선생님, 팀장 또는 관리자가 반별로 성적을 공개한 뒤에만 볼 수 있습니다."
+      "show_score_help": "켜면 학생이 테스트를 마치는 즉시 자신의 점수를 봅니다. 끄면 선생님, 팀장 또는 관리자가 반별로 성적을 공개한 뒤에만 볼 수 있습니다.",
+      "explanations": "응시 후 해설 보기",
+      "explanations_help": "성적이 공개되면 문제 다시 보기에서 각 문제의 해설을 보여줍니다. '응시 후 문제 다시 보기'가 켜져 있어야 합니다.",
+      "reference": "언어 레퍼런스",
+      "reference_help": "테스트 중 코드 문제에 해당 언어의 레퍼런스 사이트 링크를 보여줍니다.",
+      "timing_per_class": "입장 마감과 퇴실 시간은 응시 기간과 함께 반별로 설정합니다. '반별 결과'에서 반을 여세요."
     },
     "problems": {
-      "reorder_hint": "문제 순서는 코스 빌더에서 바꿀 수 있습니다.",
+      "reorder_hint": "화살표로 순서를 바꿉니다. 이미 응시를 시작한 학생은 기존 순서를 유지합니다.",
       "points": "점",
       "total": "총점:",
       "total_hint": "이 테스트에 포함된 문제의 배점 총합이 표시됩니다.",
@@ -172,13 +184,16 @@
       "empty": "코스 빌더에서 이 수업에 객관식, 주관식, 코드 문제를 추가해 주세요.",
       "invalid": "테스트에 사용할 수 없음",
       "open_editor": "편집기 열기",
-      "add_problem": "코스 빌더에서 문제 추가"
+      "add_problem": "코스 빌더에서 문제 추가",
+      "move_up": "{{title}} 위로 이동",
+      "move_down": "{{title}} 아래로 이동"
     },
     "results_link": "반별 결과",
     "results_hint": "반마다 응시 기간이 따로 있습니다. 반을 열어 응시 기간과 성적 공개를 설정하고 학생별 점수를 확인하세요.",
     "results_ended": "종료 {{count}}명",
     "results_open": "결과 보기",
-    "results_no_classes": "이 코스를 배우는 반이 아직 없습니다. 먼저 반에 코스를 배정하세요."
+    "results_no_classes": "이 코스를 배우는 반이 아직 없습니다. 먼저 반에 코스를 배정하세요.",
+    "course_report": "코스 리포트 다운로드"
   },
   "results": {
     "tab": "테스트",
@@ -244,6 +259,14 @@
       "SHORT_ANSWER": "주관식"
     },
     "open_test_settings": "테스트 설정",
-    "release_auto": "이 테스트는 학생이 마치는 즉시 점수를 자동으로 보여 줍니다."
+    "release_auto": "이 테스트는 학생이 마치는 즉시 점수를 자동으로 보여 줍니다.",
+    "avg_runs": "평균 실행 횟수",
+    "cell_submissions": "제출 {{count}}회",
+    "cell_runs": "실행 {{count}}회",
+    "entry_closes_at": "입장 마감",
+    "entry_closes_help": "이 시간 이후에는 테스트를 시작할 수 없습니다. 비워두면 응시 기간 종료까지입니다.",
+    "exit_opens_at": "퇴실 시간",
+    "exit_opens_help": "이 시간 전에는 테스트를 종료할 수 없습니다. 비워두면 언제든지 종료할 수 있습니다.",
+    "timing_outside": "입장 마감과 퇴실 시간은 응시 기간 안이어야 합니다."
   }
 }

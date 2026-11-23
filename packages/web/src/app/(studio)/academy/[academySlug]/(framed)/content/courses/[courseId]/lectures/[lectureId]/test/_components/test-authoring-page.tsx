@@ -8,8 +8,8 @@ import {
   type TestType,
 } from '@cove/shared';
 import {
-  BadgeCheck, CalendarClock, ChevronDown, ClipboardList, Code2, FileQuestion, Hourglass,
-  ListChecks, PenLine, RefreshCcw, ShieldCheck, Timer, TriangleAlert, Undo2,
+  ArrowDown, ArrowUp, BadgeCheck, BookOpen, CalendarClock, ChevronDown, ClipboardList, Code2, Download, FileQuestion, Hourglass,
+  Lightbulb, ListChecks, PenLine, RefreshCcw, ShieldCheck, Timer, TriangleAlert, Undo2,
 } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
@@ -56,6 +56,20 @@ export function TestAuthoringPage({ academyId, initial }: { academyId: string; i
     }
   };
 
+  // Reordered with the course builder's own operation, then the test is read again.
+  const reorder = async (orderedMaterialIds: string[]) => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      await orpc.academyCourses.reorderExercises({ ...target, orderedMaterialIds });
+      setTest(await orpc.exam.staffTest(target));
+    } catch (caught) {
+      setNotice({ tone: 'error', text: errorText(caught) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const gradable = test.items.filter((item) => item.type);
   const yesNo = (value: boolean) => (value ? t('authoring.rows.yes') : t('authoring.rows.no'));
 
@@ -96,6 +110,8 @@ export function TestAuthoringPage({ academyId, initial }: { academyId: string; i
           <dd className="text-ink">{yesNo(test.settings.reviewAfterEnd)}</dd>
           <dt className="text-sub">{t('authoring.rows.retake')}</dt>
           <dd className="text-ink">{yesNo(test.settings.allowSelfRetake)}</dd>
+          <dt className="text-sub">{t('authoring.rows.reference')}</dt>
+          <dd className="text-ink">{yesNo(test.settings.languageReference)}</dd>
         </dl>
 
         <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -110,7 +126,7 @@ export function TestAuthoringPage({ academyId, initial }: { academyId: string; i
         ) : null}
       </section>
 
-      <ClassResults test={test} slug={slug} />
+      <ClassResults test={test} slug={slug} academyId={academyId} />
 
       <div role="tablist" className="mt-8 flex gap-1 border-b border-border">
         {(['guide', 'settings', 'problems'] as const).map((key) => (
@@ -124,7 +140,8 @@ export function TestAuthoringPage({ academyId, initial }: { academyId: string; i
       <section className="rounded-b-2xl border border-t-0 border-border bg-card p-6 sm:p-8">
         {tab === 'guide' ? <GuideTab test={test} busy={busy} onSave={(guide) => update({ settings: { guide } })} />
           : tab === 'settings' ? <SettingsTab test={test} busy={busy} onSave={(settings) => update({ settings })} />
-            : <ProblemsTab key={test.items.map((item) => item.pointsHundredths).join(',')} test={test} busy={busy} academySlug={slug} onSave={(points) => update({ points })} />}
+            : <ProblemsTab key={test.items.map((item) => `${item.materialId}:${item.pointsHundredths}`).join(',')} test={test} busy={busy} academySlug={slug}
+              onSave={(points) => update({ points })} onReorder={reorder} />}
       </section>
 
       {editing ? (
@@ -274,6 +291,11 @@ function SettingsTab({ test, busy, onSave }: { test: ExamStaffTest; busy: boolea
         checked={draft.reviewAfterEnd} onChange={(reviewAfterEnd) => set({ reviewAfterEnd })} />
       <SettingRow icon={RefreshCcw} title={t('authoring.settings.retake')} help={t('authoring.settings.retake_help')}
         checked={draft.allowSelfRetake} onChange={(allowSelfRetake) => set({ allowSelfRetake })} />
+      <SettingRow icon={Lightbulb} title={t('authoring.settings.explanations')} help={t('authoring.settings.explanations_help')}
+        checked={draft.showExplanations} disabled={!draft.reviewAfterEnd} onChange={(showExplanations) => set({ showExplanations })} />
+      <SettingRow icon={BookOpen} title={t('authoring.settings.reference')} help={t('authoring.settings.reference_help')}
+        checked={draft.languageReference} onChange={(languageReference) => set({ languageReference })} />
+      <p className="px-3 py-4 text-[12.5px] text-sub">{t('authoring.settings.timing_per_class')}</p>
       <div className="pt-6">
         <SaveButton busy={busy} disabled={!changed || !minutesValid} onClick={() => void onSave(next)} />
       </div>
@@ -281,8 +303,9 @@ function SettingsTab({ test, busy, onSave }: { test: ExamStaffTest; busy: boolea
   );
 }
 
-function ProblemsTab({ test, busy, academySlug, onSave }: {
+function ProblemsTab({ test, busy, academySlug, onSave, onReorder }: {
   test: ExamStaffTest; busy: boolean; academySlug: string; onSave: (points: Record<string, number>) => Promise<boolean>;
+  onReorder: (orderedMaterialIds: string[]) => Promise<void>;
 }) {
   const { t } = useTranslation('exam');
   const initial = React.useMemo(() => Object.fromEntries(test.items.map((item) => [item.materialId, formatPoints(item.pointsHundredths)])), [test.items]);
@@ -311,13 +334,25 @@ function ProblemsTab({ test, busy, academySlug, onSave }: {
         </p>
       ) : null}
       <ul className="mt-3 divide-y divide-border border-y border-border">
-        {test.items.map((item) => {
+        {test.items.map((item, index) => {
+          const move = (by: number) => {
+            const ids = test.items.map((row) => row.materialId);
+            [ids[index], ids[index + by]] = [ids[index + by]!, ids[index]!];
+            void onReorder(ids);
+          };
           const Icon = item.type === 'CODE' ? Code2 : item.type === 'SHORT_ANSWER' ? PenLine : FileQuestion;
           const editorHref = item.materialType === 'PROGRAMMING_EXERCISE'
             ? `${routes.academyCourse(academySlug, test.courseId)}/lectures/${test.lectureId}/exercises/${item.materialId}`
             : routes.academyLearnCourse(academySlug, test.courseId);
           return (
             <li key={item.materialId} className="flex items-center gap-3 py-2.5">
+              <span className="flex shrink-0 flex-col">
+                <button type="button" disabled={busy || index === 0} onClick={() => move(-1)} aria-label={t('authoring.problems.move_up', { title: item.title })}
+                  className="grid size-5 place-items-center rounded text-sub hover:bg-surface hover:text-ink disabled:opacity-30"><ArrowUp aria-hidden className="size-3.5" /></button>
+                <button type="button" disabled={busy || index === test.items.length - 1} onClick={() => move(1)} aria-label={t('authoring.problems.move_down', { title: item.title })}
+                  className="grid size-5 place-items-center rounded text-sub hover:bg-surface hover:text-ink disabled:opacity-30"><ArrowDown aria-hidden className="size-3.5" /></button>
+              </span>
+              <span className="w-5 shrink-0 text-right text-[13px] font-bold text-sub">{index + 1}</span>
               <Icon aria-hidden className="size-4 shrink-0 text-sub" />
               <Link href={editorHref} className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink hover:text-brand">{item.title}</Link>
               {!item.type ? <span className="text-[12px] font-semibold text-danger">{t('authoring.problems.invalid')}</span> : (
@@ -351,11 +386,40 @@ function ProblemsTab({ test, busy, academySlug, onSave }: {
  * (each class sits it on its own period), so every class that learns the
  * course is listed with who took it, who finished and who is still in it.
  */
-function ClassResults({ test, slug }: { test: ExamStaffTest; slug: string }) {
+function ClassResults({ test, slug, academyId }: { test: ExamStaffTest; slug: string; academyId: string }) {
   const { t } = useTranslation('exam');
+  const errorText = useErrorText();
+  const [downloading, setDownloading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const download = async () => {
+    setDownloading(true);
+    setError(null);
+    try {
+      const { filename, csv } = await orpc.exam.exportCourseReport({ academyId, courseId: test.courseId, lectureId: test.lectureId });
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (caught) {
+      setError(errorText(caught));
+    } finally {
+      setDownloading(false);
+    }
+  };
   return (
     <section className="mt-6 rounded-2xl border border-border bg-card p-6">
-      <h2 className="text-[16px] font-bold text-ink">{t('authoring.results_link')}</h2>
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="flex-1 text-[16px] font-bold text-ink">{t('authoring.results_link')}</h2>
+        {test.classes.length ? (
+          <button type="button" disabled={downloading} onClick={() => void download()}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-[13px] font-semibold hover:bg-surface disabled:opacity-50">
+            <Download aria-hidden className="size-4" /> {t('authoring.course_report')}
+          </button>
+        ) : null}
+      </div>
+      {error ? <p role="alert" className="mt-2 text-[13px] font-semibold text-danger">{error}</p> : null}
       <p className="mt-1 text-[13px] text-sub">{t('authoring.results_hint')}</p>
       {test.classes.length ? (
         <ul className="mt-4 divide-y divide-border rounded-xl border border-border">

@@ -31,6 +31,9 @@ export function TestCard({ academyId, initial }: { academyId: string; initial: E
   const latest = test.latestAttempt;
   const ended = Boolean(latest && !latest.open);
   const classQuery = { classId: test.classId };
+  // As of the server's answer; the server refuses a late start either way.
+  const entryClosed = test.periodState === 'OPEN' && Boolean(test.schedule.entryClosesAt
+    && new Date(test.serverNow).getTime() >= new Date(test.schedule.entryClosesAt).getTime());
 
   // Without the preparation steps, consent is one checkbox on this card.
   const startDirectly = async () => {
@@ -93,6 +96,12 @@ export function TestCard({ academyId, initial }: { academyId: string; initial: E
           <div className="mt-6">
             <ExamInfoTiles schedule={test.schedule} timeLimitMinutes={test.settings.timeLimitMinutes} itemCount={test.itemCount} icons />
           </div>
+          {test.schedule.entryClosesAt || test.schedule.exitOpensAt ? (
+            <ul className="mt-3 space-y-1 text-[13px] text-sub">
+              {test.schedule.entryClosesAt ? <li>{t('card.entry_until', { date: formatExamDate(test.schedule.entryClosesAt) })}</li> : null}
+              {test.schedule.exitOpensAt ? <li>{t('card.exit_from', { date: formatExamDate(test.schedule.exitOpensAt) })}</li> : null}
+            </ul>
+          ) : null}
           <div className="mt-4">
             <ExamRules guide={test.settings.guide} compact />
           </div>
@@ -111,6 +120,7 @@ export function TestCard({ academyId, initial }: { academyId: string; initial: E
               <span className="text-[13px] font-semibold text-sub">{t('card.opens_at', { date: formatExamDate(test.schedule.opensAt) })}</span>
             ) : null}
             {test.periodState === 'AFTER' && !ended ? <span className="text-[13px] font-semibold text-sub">{t('card.closed')}</span> : null}
+            {entryClosed && !latest?.open ? <span className="text-[13px] font-semibold text-sub">{t('card.entry_closed')}</span> : null}
             {test.itemCount === 0 ? <span className="text-[13px] font-semibold text-sub">{t('card.no_problems')}</span> : null}
             {ended && latest && test.settings.reviewAfterEnd ? (
               <Link href={routes.academyLearnTestAttempt(slug, test.lectureId, latest.id)}

@@ -7,6 +7,7 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Dialog } from '@/components/exam/exam-dialog';
+import { formatExamDate } from '@/components/exam/exam-format';
 import { ExamRules } from '@/components/exam/exam-info';
 import { formatClock } from '@/components/exam/exam-format';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
@@ -43,6 +44,8 @@ export function TestMode({ academyId, initial }: { academyId: string; initial: E
   const [index, setIndex] = React.useState(() =>
     Number.isInteger(requested) && requested >= 1 && requested <= initial.items.length ? requested - 1 : 0);
   const item = shell.items[index];
+  // Re-evaluated every second with the clock, so the button unlocks on time.
+  const exitLocked = Boolean(shell.exitOpensAt && clock.serverNow() < new Date(shell.exitOpensAt).getTime());
   const cardHref = routes.academyLearnTest(slug, shell.lectureId, { classId: shell.classId });
 
   const showToast = React.useCallback((message: string) => {
@@ -132,8 +135,14 @@ export function TestMode({ academyId, initial }: { academyId: string; initial: E
             <Info aria-hidden className="size-4" /> {t('mode.guide')}
           </button>
           {shell.open ? <Countdown shell={shell} serverNow={clock.serverNow} onExpire={() => void endNow()} onWarn={showToast} /> : null}
+          {shell.open && exitLocked ? (
+            // 퇴실 시간: ending is refused on the server until then; the button says when.
+            <span className="hidden text-[12px] font-semibold text-sub sm:inline">{t('mode.exit_from', { date: formatExamDate(shell.exitOpensAt!) })}</span>
+          ) : null}
           {shell.open ? (
-            <button type="button" onClick={() => setEndOpen(true)} className="h-8 shrink-0 rounded-md bg-danger px-3 text-[13px] font-bold text-on-danger hover:opacity-90">
+            <button type="button" onClick={() => setEndOpen(true)} disabled={exitLocked}
+              title={exitLocked ? t('mode.exit_from', { date: formatExamDate(shell.exitOpensAt!) }) : undefined}
+              className="h-8 shrink-0 rounded-md bg-danger px-3 text-[13px] font-bold text-on-danger hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">
               {t('mode.end')}
             </button>
           ) : (
@@ -157,6 +166,7 @@ export function TestMode({ academyId, initial }: { academyId: string; initial: E
               courseId={shell.courseId}
               item={item}
               readOnly={!shell.open}
+              languageReference={shell.languageReference}
               onSubmitted={markSubmitted}
               onEnded={() => void refresh()}
             />

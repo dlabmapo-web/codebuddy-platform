@@ -20,6 +20,7 @@ export const academyFeatureNames = [
   "STUDENT_POINTS",
   "STUDENT_CLASS_LEADERBOARD",
   "SERVER_SAMPLE_CHECKS",
+  "EXAMS",
 ] as const;
 
 export const academyFeatureNameSchema = z.enum(academyFeatureNames);
@@ -36,6 +37,7 @@ export type AcademyFeatureName = z.infer<typeof academyFeatureNameSchema>;
  */
 export const academyRolloutFeatures: ReadonlySet<AcademyFeatureName> = new Set([
   "SERVER_SAMPLE_CHECKS",
+  "EXAMS",
 ]);
 
 /**

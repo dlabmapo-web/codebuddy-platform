@@ -26,3 +26,5 @@ export * from "./pdf.js";
 export * from "./solutions.js";
 
 export * from "./programming-review.js";
+
+export * from "./exam.js";

@@ -280,6 +280,8 @@ export const lectureSchema = z.object({
   description: descriptionSchema,
   position: positionSchema,
   isVisible: z.boolean(),
+  /** TEST: an exam lecture whose problems are taken in one timed attempt. */
+  kind: z.enum(["STANDARD", "TEST"]).default("STANDARD"),
   materials: z.array(materialSchema),
 });
 

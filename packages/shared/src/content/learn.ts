@@ -84,6 +84,8 @@ export type LearnExerciseSummary = z.infer<typeof learnExerciseSummarySchema>;
 
 export const learnManualSummarySchema=z.object({materialId:z.uuid(),title:titleSchema,position:positionSchema,type:z.enum(['TURTLE_EXERCISE','WRITTEN_RESPONSE','MULTIPLE_CHOICE']),includeInScore:z.boolean(),status:exerciseProgressStatusSchema,pending:z.boolean(),scoreHundredths:z.number().int().nullable(),maximumHundredths:z.number().int().positive()});
 export const learnLectureSchema = z.object({
+  /** Set on a test (테스트): one outline item that opens the test card. */
+  test: z.object({ itemCount: z.number().int().min(0) }).optional(),
   explanations: z.array(z.object({ materialId: z.uuid(), title: titleSchema, position: positionSchema, status: z.enum(["NOT_STARTED", "SOLVED"]).optional() })).optional(),
   id: z.uuid(),
   title: titleSchema,

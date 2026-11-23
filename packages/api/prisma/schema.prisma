@@ -129,6 +129,32 @@ enum AcademyFeature {
   /// Library course sync: published library releases are merged into this
   /// academy's linked copies. A rollout gate, checked again when a job runs.
   LIBRARY_COURSE_SYNC
+  /// Exams (테스트): timed test lectures, attempts and results. A rollout gate.
+  EXAMS
+}
+
+enum LectureKind {
+  STANDARD
+  /// An exam: its materials are the problems, taken in one timed attempt.
+  TEST
+}
+
+enum TestType {
+  NONE
+  DIAGNOSTIC
+  FORMATIVE
+  SUMMATIVE
+}
+
+enum TestAttemptEndReason {
+  /// The student pressed 테스트 종료.
+  STUDENT
+  /// startedAt + the time limit passed.
+  TIME_UP
+  /// The class's period end passed.
+  PERIOD_CLOSED
+  /// A teacher ended it.
+  STAFF
 }
 
 /// Why one student earned points.
@@ -395,6 +421,7 @@ enum ExerciseProgressStatus {
 }
 
 model User {
+  testAttempts TestAttempt[]
   syncNotificationReads LibrarySyncNotificationRead[]
   libraryReleases        LibraryRelease[]
   resolvedSyncConflicts  LibrarySyncConflict[]
@@ -1442,6 +1469,8 @@ model Course {
 /// term — so the UUID is the identity and the UI shows status for context.
 model Class {
   manualSubmissions ManualSubmission[]
+  lectureTests      ClassLectureTest[]
+  testAttempts      TestAttempt[]
   helpRequests      StudentHelpRequest[]
 
   id                  String      @id @default(uuid()) @db.Uuid
@@ -1609,11 +1638,14 @@ model Lecture {
   position       Int
   /// Hidden lectures stay in the curriculum but disappear for students.
   isVisible      Boolean  @default(false) @map("is_visible")
+  /// TEST makes this lecture an exam; its `test` row holds the settings.
+  kind           LectureKind @default(STANDARD)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   courseModule CourseModule @relation(fields: [courseModuleId], references: [id], onDelete: Cascade)
   materials    Material[]
+  test         LectureTest?
 
   @@unique([courseModuleId, position])
   @@index([courseModuleId])
@@ -1827,6 +1859,10 @@ model ExerciseCollaborationDocument {
 /// One graded attempt at an exercise.
 model Submission {
   requestId String? @map("request_id") @db.Uuid
+  /// Set when the submission was made inside an exam attempt. Such rows never
+  /// move practice progress or award points, and students see no verdict.
+  testAttemptId String? @map("test_attempt_id") @db.Uuid
+  testAttempt   TestAttempt? @relation(fields: [testAttemptId], references: [id], onDelete: Restrict)
   reviewVersion Int @default(0) @map("review_version")
   manualAssessmentSnapshot Json? @map("manual_assessment_snapshot")
   manualReviewResult Json? @map("manual_review_result")
@@ -2569,6 +2605,9 @@ model ManualSubmission {
   includeInScore           Boolean                   @map("include_in_score")
   requestKey               String                    @map("request_key") @db.Uuid
   reviewVersion            Int                       @default(0) @map("review_version")
+  /// Set when made inside an exam attempt; see `Submission.testAttemptId`.
+  testAttemptId            String?                   @map("test_attempt_id") @db.Uuid
+  testAttempt              TestAttempt?              @relation(fields: [testAttemptId], references: [id], onDelete: Restrict)
   createdAt                DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
   material                 Material                  @relation(fields: [materialId], references: [id], onDelete: Restrict)
   user                     User                      @relation(fields: [userId], references: [id], onDelete: Restrict)
@@ -3332,4 +3371,82 @@ model LibrarySyncResolutionReceipt {
 
   @@id([copyCourseId, requestKey])
   @@map("library_sync_resolution_receipts")
+}
+
+/// The exam definition of a TEST lecture, shared by every class learning the course.
+model LectureTest {
+  lectureId        String   @id @map("lecture_id") @db.Uuid
+  /// 테스트 안내 shown before starting and in 평가 안내. Empty = the six default rules.
+  guide            String   @default("")
+  /// One-line subtitle under the title.
+  summary          String   @default("")
+  testType         TestType @default(NONE) @map("test_type")
+  /// Null = no time limit. 1–600 minutes.
+  timeLimitMinutes Int?     @map("time_limit_minutes")
+  usePreparation   Boolean  @default(true) @map("use_preparation")
+  reviewAfterEnd   Boolean  @default(false) @map("review_after_end")
+  allowSelfRetake  Boolean  @default(false) @map("allow_self_retake")
+  /// {materialId: pointsHundredths}. Snapshotted into each attempt at start.
+  points           Json     @default("{}")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  lecture  Lecture            @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  classes  ClassLectureTest[]
+  attempts TestAttempt[]
+
+  @@map("lecture_tests")
+}
+
+/// One class's sitting of one test: when it is open and when results show.
+model ClassLectureTest {
+  classId           String    @map("class_id") @db.Uuid
+  lectureId         String    @map("lecture_id") @db.Uuid
+  /// Both null = 상시 (always open).
+  opensAt           DateTime? @map("opens_at") @db.Timestamptz(6)
+  closesAt          DateTime? @map("closes_at") @db.Timestamptz(6)
+  /// Null = results hidden. Past = released. Future = scheduled release.
+  resultsReleasedAt DateTime? @map("results_released_at") @db.Timestamptz(6)
+  updatedByUserId   String    @map("updated_by_user_id") @db.Uuid
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  class Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  test  LectureTest @relation(fields: [lectureId], references: [lectureId], onDelete: Cascade)
+
+  @@id([classId, lectureId])
+  @@index([lectureId])
+  @@map("class_lecture_tests")
+}
+
+/// One student's sitting of a test. Append-only apart from closing it.
+model TestAttempt {
+  id              String                @id @default(uuid()) @db.Uuid
+  lectureId       String                @map("lecture_id") @db.Uuid
+  classId         String                @map("class_id") @db.Uuid
+  userId          String                @map("user_id") @db.Uuid
+  attemptNo       Int                   @map("attempt_no")
+  consentedAt     DateTime              @map("consented_at") @db.Timestamptz(6)
+  /// Client clock minus server clock at start, in ms, for support only.
+  clockDriftMs    Int?                  @map("clock_drift_ms")
+  startedAt       DateTime              @default(now()) @map("started_at") @db.Timestamptz(6)
+  /// Null = no deadline (no time limit and no period end).
+  deadlineAt      DateTime?             @map("deadline_at") @db.Timestamptz(6)
+  endedAt         DateTime?             @map("ended_at") @db.Timestamptz(6)
+  endReason       TestAttemptEndReason? @map("end_reason")
+  endedByUserId   String?               @map("ended_by_user_id") @db.Uuid
+  /// [{materialId, pointsHundredths, position}] frozen at start.
+  itemsSnapshot   Json                  @map("items_snapshot")
+  /// A teacher-granted extra attempt, consumed by the next start.
+  retakeGrantedAt DateTime?             @map("retake_granted_at") @db.Timestamptz(6)
+
+  test              LectureTest        @relation(fields: [lectureId], references: [lectureId], onDelete: Restrict)
+  class             Class              @relation(fields: [classId], references: [id], onDelete: Restrict)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  submissions       Submission[]
+  manualSubmissions ManualSubmission[]
+
+  @@unique([classId, lectureId, userId, attemptNo])
+  @@index([classId, lectureId, endedAt])
+  @@index([userId, lectureId])
+  @@map("test_attempts")
 }

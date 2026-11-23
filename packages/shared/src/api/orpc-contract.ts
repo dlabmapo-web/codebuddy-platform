@@ -19,6 +19,7 @@ import { academyCoursesContract } from "./orpc/courses.contract.js";
 import { academyLibraryContract } from "./orpc/library.contract.js";
 import { academyLibrarySyncContract, platformLibrarySyncContract } from "./orpc/library-sync.contract.js";
 import { learnContract } from "./orpc/learn.contract.js";
+import { examContract } from "./orpc/exam.contract.js";
 import { lobbyContract } from "./orpc/lobby.contract.js";
 import {
   academyOperationsOverviewContract,
@@ -72,6 +73,7 @@ export const appContract = {
   academyLibrarySync: academyLibrarySyncContract,
   academyClasses: academyClassesContract,
   learn: learnContract,
+  exam: examContract,
   lobby: lobbyContract,
   monitoring: monitoringContract,
   notifications: notificationsContract,

@@ -163,5 +163,15 @@
   "LIBRARY_IMPORT_BUSY": "The library is busy. Retry this copy request.",
   "DLAB_LOGIN_REQUIRED": "Use the “Log in with DLAB” button for this account.",
   "EXERCISE_PRACTICE_ONLY": "This is ungraded practice. Run your code without submitting.",
-  "DLAB_MANAGED_FIELDS": "DLAB OS manages this account’s identity and role."
+  "DLAB_MANAGED_FIELDS": "DLAB OS manages this account’s identity and role.",
+  "EXAM_NOT_FOUND": "This test was not found.",
+  "EXAM_NOT_STARTED": "Start the test first.",
+  "EXAM_ENDED": "The test has ended. Answers can no longer be submitted.",
+  "EXAM_ITEM_NOT_IN_ATTEMPT": "This problem is not part of your test.",
+  "EXAM_PERIOD_NOT_OPEN": "The test is not open yet.",
+  "EXAM_PERIOD_CLOSED": "The test period has ended.",
+  "EXAM_LOCKED": "Published or already taken: points cannot change.",
+  "EXAM_RETAKE_NOT_ALLOWED": "You have already taken this test.",
+  "EXAM_FEATURE_OFF": "Tests are not enabled for this academy.",
+  "EXAM_INVALID_MATERIAL": "A test holds only multiple choice, short answer and code problems."
 }

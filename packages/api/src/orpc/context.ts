@@ -71,6 +71,8 @@ import type { TeacherOverviewService } from "../teach/teacher-overview.service.j
 import type { TeacherRosterService } from "../teach/teacher-roster.service.js";
 import type { TeacherStudentsService } from "../teach/teacher-students.service.js";
 import type { TeacherProgressService } from "../teach/teacher-progress.service.js";
+import type { ExamService } from "../exam/exam.service.js";
+import type { ExamStaffService } from "../exam/exam-staff.service.js";
 
 export type ORPCContext = { req: Request };
 export type ORPCImplementer = ReturnType<
@@ -150,6 +152,8 @@ export type ORPCDeps = {
   platformSupportService: PlatformSupportService;
   platformLifecycleService: PlatformLifecycleService;
   pointsService: PointsService;
+  examService: ExamService;
+  examStaffService: ExamStaffService;
 };
 
 export function requestAddress(req: Request): string {

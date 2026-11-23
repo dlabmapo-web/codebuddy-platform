@@ -169,7 +169,7 @@ const outlineInclude = {
       lectures: {
         orderBy: [{ position: "asc" }, { id: "asc" }],
         select: {
-          id: true, title: true, description: true, position: true, isVisible: true,
+          id: true, title: true, description: true, position: true, isVisible: true, kind: true,
           materials: {
             orderBy: [{ position: "asc" }, { id: "asc" }],
             select: {
@@ -2268,6 +2268,7 @@ function toCourseTree(course: CourseRecord) {
         description: lecture.description,
         position: lecture.position,
         isVisible: lecture.isVisible,
+        kind: lecture.kind,
         materials: lecture.materials.map((material) => ({
           id: material.id,
           type: material.type,

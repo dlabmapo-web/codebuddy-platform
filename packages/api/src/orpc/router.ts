@@ -102,6 +102,9 @@ import { TeacherStudentsService } from "../teach/teacher-students.service.js";
 import { createAcademyTeacherStudentsRouter } from "../teach/teacher-students.router.js";
 import { TeacherProgressService } from "../teach/teacher-progress.service.js";
 import { createTeacherProgressRouter } from "../teach/teacher-progress.router.js";
+import { ExamService } from "../exam/exam.service.js";
+import { ExamStaffService } from "../exam/exam-staff.service.js";
+import { createExamRouter } from "../exam/exam.router.js";
 import type { ORPCContext, ORPCDeps } from "./context.js";
 import { toORPCError } from "./error-mapping.js";
 
@@ -206,6 +209,8 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     platformLifecycleService: app.get(PlatformLifecycleService, {
       strict: false,
     }),
+    examService: app.get(ExamService, { strict: false }),
+    examStaffService: app.get(ExamStaffService, { strict: false }),
   });
   const handler = new RPCHandler(router, {
     interceptors: [
@@ -276,6 +281,7 @@ function createORPCRouter(deps: ORPCDeps) {
     ...platformOperationsRouters,
     ...platformSupportRouters,
     learn: createLearnRouter(os, deps),
+    exam: createExamRouter(os, deps),
     points: createPointsRouter(os, deps),
     monitoring: createMonitoringRouter(os, deps),
     teacherProgress: createTeacherProgressRouter(os, deps),

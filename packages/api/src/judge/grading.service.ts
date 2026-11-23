@@ -647,8 +647,13 @@ export class GradingService {
       const materialId = submission.materialId;
       if (!materialId) return;
       // Lock the authored revision until this commit; an edit during execution cannot move current progress.
-      const revisions = await tx.$queryRaw<Array<{ grading_revision: number }>>`SELECT grading_revision FROM programming_exercises WHERE material_id = ${materialId}::uuid FOR SHARE`;
+      // The same statement says whether this was an exam submission: those keep
+      // their verdict for the teacher but never move practice progress or points.
+      const revisions = await tx.$queryRaw<Array<{ grading_revision: number; in_exam: boolean }>>`SELECT grading_revision,
+        EXISTS (SELECT 1 FROM submissions s WHERE s.id = ${submissionId}::uuid AND s.test_attempt_id IS NOT NULL) AS in_exam
+        FROM programming_exercises WHERE material_id = ${materialId}::uuid FOR SHARE`;
       if (revisions[0]?.grading_revision !== submission.gradingRevision) return;
+      if (revisions[0]?.in_exam) return;
 
       const previous = await tx.studentExerciseProgress.findUnique({
         where: {

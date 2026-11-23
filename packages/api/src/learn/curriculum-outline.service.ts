@@ -106,6 +106,9 @@ export class CurriculumOutlineService {
     classId?: string,
     staffPractice = false,
   ): Promise<LearnCourseOutline> {
+    const testItemCounts = new Map(course.modules.flatMap((m) => m.lectures)
+      .filter((lecture) => lecture.kind === "TEST")
+      .map((lecture) => [lecture.id, lecture.materials.length]));
     const modules = nonemptyModules(course);
     const materialIds = navigableMaterialIds({ ...course, modules });
     // One `userId + materialIds` query for the whole course. A per-row lookup
@@ -131,6 +134,7 @@ export class CurriculumOutlineService {
           title: lecture.title,
           description: lecture.description,
           position: lecture.position,
+          ...(lecture.kind === "TEST" ? { test: { itemCount: testItemCounts.get(lecture.id) ?? 0 } } : {}),
           manualMaterials: lecture.materials.flatMap((material) => {
             if (!material.manualMaterial) return [];
             const attempt = statuses.get(material.id),
@@ -357,7 +361,11 @@ export function nonemptyModules(
   course: Pick<VisibleCourse, "modules">,
 ): VisibleCourse["modules"] {
   return course.modules.flatMap((courseModule) => {
-    const lectures = courseModule.lectures.filter((lecture) =>
+    // A test is one outline item: its problems open only inside an attempt,
+    // and they count toward neither navigation nor practice progress.
+    const lectures = courseModule.lectures.map((lecture) =>
+      lecture.kind === "TEST" ? { ...lecture, materials: [] } : lecture,
+    ).filter((lecture) => lecture.kind === "TEST" ||
       lecture.materials.some(
         (material) =>
           material.type === "EXPLANATION" ||

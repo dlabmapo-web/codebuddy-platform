@@ -386,6 +386,10 @@ export class LearnService {
     if (!material?.programmingExercise) {
       throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
     }
+    // A test problem opens only inside an exam attempt (the exam surface).
+    if (!preview && (material.lecture as { kind?: string }).kind === "TEST") {
+      throw new AppException("EXAM_NOT_STARTED", HttpStatus.FORBIDDEN);
+    }
     const { courseModule } = material.lecture;
     const course = await withCurriculum(this.prisma, courseModule.course, preview);
     return { ...material, lecture: { ...material.lecture, courseModule: { ...courseModule, course } } } as WorkspaceMaterial;

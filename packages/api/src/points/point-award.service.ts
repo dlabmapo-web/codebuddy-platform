@@ -305,6 +305,8 @@ export class PointAwardService {
     });
     if (
       !material?.manualMaterial?.includeInScore ||
+      // An exam problem never pays points: the test is graded, not practised.
+      material.lecture.kind === "TEST" ||
       !material.isVisible ||
       !material.lecture.isVisible ||
       !material.lecture.courseModule.isVisible ||

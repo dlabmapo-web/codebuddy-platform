@@ -13,7 +13,9 @@ import { ShortAnswerService } from "./short-answer.service.js";
 import { PointAwardService } from "../points/point-award.service.js";
 import type { Request } from "express";
 import { ManualAssetsService } from "./manual-assets.service.js";
+import { assertExamAdmission } from "../learn/submission.service.js";
 import {
+  HttpStatus,
   Injectable,
   Optional,
   NotFoundException,
@@ -417,6 +419,9 @@ export class ManualService {
       input,
       preview,
     );
+    // A test problem opens only inside an exam attempt (the exam surface).
+    if (!preview && row.lecture.kind === "TEST" && (actor.roles ?? [actor.role]).every((role) => role === "STUDENT"))
+      throw new AppException("EXAM_NOT_STARTED", HttpStatus.FORBIDDEN);
     const staffPractice = Boolean(this.practice?.allowed(actor));
     const privatePractice = staffPractice ? await this.practice!.read(input.academyId, actor.userId, row.id, preview, config.revision) : null;
     const roles = actor.roles ?? [actor.role];
@@ -761,9 +766,14 @@ export class ManualService {
     if (config.revision !== input.contentRevision) throw new ConflictException("Content changed; reload");
     return this.practice.submit(actor, input, config);
   }
-  async submit(identity: SupabaseIdentity, input: ManualSubmit) {
+  /**
+   * `exam.examAttemptId` is set only by `ExamService`, after it has checked the
+   * attempt is the caller's, open, and holds this problem.
+   */
+  async submit(identity: SupabaseIdentity, input: ManualSubmit, exam: { examAttemptId?: string } = {}) {
     if (input.preview) throw new ForbiddenException('Student submissions cannot use preview');
     const { actor, row, config } = await this.material(identity, input);
+    assertExamAdmission(row.lecture, exam.examAttemptId);
     await this.access.requirePermission(
       identity.authUserId,
       input.academyId,
@@ -928,6 +938,7 @@ export class ManualService {
             maximumHundredths: config.maximumHundredths,
             includeInScore: config.includeInScore,
             requestKey: input.requestKey,
+            testAttemptId: exam.examAttemptId ?? null,
           },
         });
         if (choiceDefinition)

@@ -43,7 +43,7 @@ export async function readCurricula(
         'createdAt', cm.created_at, 'updatedAt', cm.updated_at,
         'lectures', coalesce((SELECT json_agg(json_build_object(
             'id', l.id, 'courseModuleId', l.course_module_id, 'externalKey', l.external_key, 'title', l.title,
-            'description', l.description, 'position', l.position, 'isVisible', l.is_visible,
+            'description', l.description, 'position', l.position, 'isVisible', l.is_visible, 'kind', l.kind,
             'createdAt', l.created_at, 'updatedAt', l.updated_at,
             'materials', coalesce((SELECT json_agg(json_build_object(
                 'id', mt.id, 'lectureId', mt.lecture_id, 'type', mt.type, 'title', mt.title, 'position', mt.position,
@@ -102,7 +102,7 @@ function toModule(row: ModuleJson): Module {
     createdAt: new Date(row.createdAt), updatedAt: new Date(row.updatedAt),
     lectures: row.lectures.map((lecture) => ({
       id: lecture.id, courseModuleId: lecture.courseModuleId, externalKey: lecture.externalKey, title: lecture.title,
-      description: lecture.description, position: lecture.position, isVisible: lecture.isVisible,
+      description: lecture.description, position: lecture.position, isVisible: lecture.isVisible, kind: lecture.kind,
       createdAt: new Date(lecture.createdAt), updatedAt: new Date(lecture.updatedAt),
       materials: lecture.materials.map(toMaterial),
     })),

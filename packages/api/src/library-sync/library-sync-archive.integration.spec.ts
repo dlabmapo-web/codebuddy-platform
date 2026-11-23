@@ -172,7 +172,8 @@ describe.skipIf(!databaseUrl)(
       explanations = new ExplanationService(
         db,
         access,
-        {} as never,
+        // No outside pictures here: saving copies none (QA-006).
+        { copyRemoteImages: async (_academy: string, _course: string, html: string) => ({ html, copied: [], failed: [] }) } as never,
         audit,
         new CurriculumOutlineService(db),
         revocation,

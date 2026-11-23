@@ -47,5 +47,6 @@
     "empty_academy_body": "멤버 페이지에서 강사를 초대하세요.",
     "empty_title": "조건에 맞는 강사가 없습니다",
     "empty_body": "검색어를 바꾸거나 필터를 지워 보세요."
-  }
+  },
+  "delete_member": "{{name}} 삭제"
 }

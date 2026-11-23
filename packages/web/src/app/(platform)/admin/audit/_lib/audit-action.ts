@@ -179,6 +179,7 @@ export const auditActionLabels: Record<
   'academy.people.bulk.restore': 'action.academy.people.bulk.restore',
   'academy.people.bulk.role_change': 'action.academy.people.bulk.role_change',
   'academy.people.bulk.suspend': 'action.academy.people.bulk.suspend',
+  'academy.people.bulk.delete': 'action.academy.people.bulk.delete',
   'academy.people.imported': 'action.academy.people.imported',
   'academy.point_policy.reset': 'action.academy.point_policy.reset',
   'academy.point_policy.updated': 'action.academy.point_policy.updated',

@@ -106,6 +106,7 @@
     "choose_role": "Choose a role",
     "confirm_title": "Confirm this change",
     "confirm_affected": "{{count}} people will change.",
+    "confirm_affected_one": "1 person will change.",
     "confirm_blocked": "{{count}} cannot be changed and will be left alone.",
     "confirm_none": "Nobody in this selection can be changed.",
     "consequence": {
@@ -114,7 +115,9 @@
       "already_in_state": "{{count}} are already in that state",
       "last_manager_blocked": "{{count}} cannot change: an academy must keep one active manager",
       "ineligible": "{{count}} are not eligible for this change",
-      "monitoring_revoked": "{{count}} live monitoring sessions will end"
+      "monitoring_revoked": "{{count}} live monitoring sessions will end",
+      "accounts_deleted": "{{count}} accounts belong to no other academy and will be deleted",
+      "accounts_deleted_one": "1 account belongs to no other academy and will be deleted"
     },
     "sample": "For example: {{names}}",
     "confirm": "Confirm",
@@ -126,7 +129,13 @@
     "replayed": "This change had already been applied. Nothing ran a second time.",
     "result_download": "Download results as CSV",
     "close": "Close",
-    "os_restricted": "DLAB OS manages these roles and access. Clearing a Cove restriction does not clear an OS restriction."
+    "os_restricted": "DLAB OS manages these roles and access. Clearing a Cove restriction does not clear an OS restriction.",
+    "action_delete": "Delete",
+    "delete_title": "Delete these people?",
+    "delete_warning": "They are removed from this academy and every class right away. Anyone who belongs to no other academy has their account deleted too and can no longer sign in. Their past work stays in the records. This cannot be undone.",
+    "delete_ack": "I understand this cannot be undone.",
+    "delete_confirm": "Delete",
+    "deleting": "Deleting"
   },
   "delivery": {
     "title": "Invitations",

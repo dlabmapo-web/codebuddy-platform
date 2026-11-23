@@ -23,6 +23,8 @@ import { FacetedFilter } from '@/components/studio/faceted-filter';
 import { PageSizePicker } from '@/components/studio/page-size-picker';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useErrorText } from '@/i18n/client/use-error-text';
+
+import { DeleteMemberButton } from '../../people/_components/delete-member-button';
 import { routes } from '@/lib/routes';
 
 import {
@@ -66,6 +68,7 @@ export function StudentRoster({
   const errorText = useErrorText();
   const { query, change } = useStudentRosterState();
   const page = useStudentRosterQuery(academyId, query, initialData, initialKey);
+  const refetch = page.refetch;
 
   const commitSearch = React.useCallback(
     (search: string) => change({ search }),
@@ -230,20 +233,31 @@ export function StudentRoster({
         header: '',
         enableSorting: false,
         enableHiding: false,
-        size: 56,
+        size: 80,
         // §5.1 — the detail page, for every reader, including the Manager.
         // The editor is one click further on, behind the Edit link there. A
         // row action that opened the editor was a link a Team Lead could see
         // and not follow.
         cell: ({ row }) => (
-          <ProfileLinkCell
-            href={routes.academyStudent(academySlug, row.original.membershipId)}
-            label={t('view_profile', { name: row.original.displayName })}
-          />
+          <div className="flex items-center justify-end gap-1">
+            <ProfileLinkCell
+              href={routes.academyStudent(academySlug, row.original.membershipId)}
+              label={t('view_profile', { name: row.original.displayName })}
+            />
+            {/* Managers only: deleting a person is a members decision. */}
+            {canManageMembers ? (
+              <DeleteMemberButton
+                academyId={academyId}
+                membershipId={row.original.membershipId}
+                name={row.original.displayName}
+                onDeleted={() => void refetch()}
+              />
+            ) : null}
+          </div>
         ),
       },
     ],
-    [academySlug, canManageMembers, i18n.language, numbers, pointsEnabled, t, tManager],
+    [academyId, academySlug, canManageMembers, i18n.language, numbers, pointsEnabled, t, tManager, refetch],
   );
 
   if (page.isError && !data) {

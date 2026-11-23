@@ -60,7 +60,8 @@
           "enroll": "Members enrolled in bulk",
           "restore": "Members restored in bulk",
           "role_change": "Member roles changed in bulk",
-          "suspend": "Members suspended in bulk"
+          "suspend": "Members suspended in bulk",
+          "delete": "People deleted in bulk"
         }
       },
       "profile": {

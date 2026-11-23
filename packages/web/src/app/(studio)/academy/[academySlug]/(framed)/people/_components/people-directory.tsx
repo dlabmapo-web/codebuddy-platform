@@ -25,6 +25,7 @@ import {
   Ellipsis,
   FileSpreadsheet,
   ShieldOff,
+  Trash2,
   UserCheck,
   UserPen,
   UsersRound,
@@ -59,7 +60,7 @@ import {
   usePeopleDirectoryState,
   usePeopleMutations,
 } from '../_hooks/use-people-directory';
-import { BulkActions } from './bulk-actions';
+import { BulkActions, BulkConfirmDialog } from './bulk-actions';
 import { ImportWizard } from './import-wizard';
 
 /**
@@ -784,9 +785,20 @@ function RowActions({
 }) {
   const academySlug = useAcademySlug();
   const { t } = useTranslation('manager');
+  const [deleting, setDeleting] = React.useState(false);
 
   return (
     <div className="flex justify-end">
+      {deleting ? (
+        <BulkConfirmDialog
+          academyId={academyId}
+          classes={[]}
+          initialOptions={{ kind: 'DELETE' }}
+          onApplied={() => undefined}
+          onClose={() => setDeleting(false)}
+          selection={{ mode: 'ids', membershipIds: [membershipId] }}
+        />
+      ) : null}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -827,6 +839,20 @@ function RowActions({
               >
                 <UserCheck className="text-success" />
                 {t('people.action.restore')}
+              </DropdownMenuItem>
+            </>
+          ) : null}
+
+          {/* A D-LAB member belongs to the source system, which would bring them back. */}
+          {!managed && status !== 'LEFT' ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-danger focus:text-danger"
+                onSelect={() => setDeleting(true)}
+              >
+                <Trash2 className="text-danger" />
+                {t('people.action.delete')}
               </DropdownMenuItem>
             </>
           ) : null}

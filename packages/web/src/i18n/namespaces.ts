@@ -157,6 +157,8 @@ export const peopleOpsNamespaces = [
 export const peopleRosterNamespaces = [
   "manager",
   "people-rosters",
+  // The delete confirmation is the Members page's bulk dialog.
+  "people-ops",
   "errors",
 ] as const;
 

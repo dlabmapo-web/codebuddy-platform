@@ -16,6 +16,7 @@
     "academy.people.bulk.enroll": "일괄 반 등록",
     "academy.people.bulk.role_change": "일괄 역할 변경",
     "academy.people.bulk.suspend": "일괄 정지",
+    "academy.people.bulk.delete": "구성원 삭제",
     "academy.people.bulk.restore": "일괄 복구",
     "class.created": "반 생성",
     "class.updated": "반 수정",

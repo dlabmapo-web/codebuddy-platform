@@ -16,6 +16,7 @@
     "academy.people.bulk.enroll": "Enrolled members in bulk",
     "academy.people.bulk.role_change": "Changed roles in bulk",
     "academy.people.bulk.suspend": "Suspended members in bulk",
+    "academy.people.bulk.delete": "Deleted people",
     "academy.people.bulk.restore": "Restored members in bulk",
     "class.created": "Created a class",
     "class.updated": "Updated a class",

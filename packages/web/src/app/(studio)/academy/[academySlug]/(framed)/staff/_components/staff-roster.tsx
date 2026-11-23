@@ -23,6 +23,8 @@ import { FacetedFilter } from '@/components/studio/faceted-filter';
 import { PageSizePicker } from '@/components/studio/page-size-picker';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useErrorText } from '@/i18n/client/use-error-text';
+
+import { DeleteMemberButton } from '../../people/_components/delete-member-button';
 import { routes } from '@/lib/routes';
 
 import {
@@ -67,6 +69,7 @@ export function StaffRoster({
   const errorText = useErrorText();
   const { query, change } = useStaffRosterState();
   const page = useStaffRosterQuery(academyId, query, initialData, initialKey);
+  const refetch = page.refetch;
 
   const commitSearch = React.useCallback(
     (search: string) => change({ search }),
@@ -234,20 +237,31 @@ export function StaffRoster({
         header: '',
         enableSorting: false,
         enableHiding: false,
-        size: 56,
+        size: 80,
         // §5.1 — the detail page, for every reader. See the Students roster.
         cell: ({ row }) => (
-          <ProfileLinkCell
-            href={routes.academyStaffMember(
-              academySlug,
-              row.original.membershipId,
-            )}
-            label={t('view_profile', { name: row.original.displayName })}
-          />
+          <div className="flex items-center justify-end gap-1">
+            <ProfileLinkCell
+              href={routes.academyStaffMember(
+                academySlug,
+                row.original.membershipId,
+              )}
+              label={t('view_profile', { name: row.original.displayName })}
+            />
+            {/* Managers only: deleting a person is a members decision. */}
+            {canManageMembers ? (
+              <DeleteMemberButton
+                academyId={academyId}
+                membershipId={row.original.membershipId}
+                name={row.original.displayName}
+                onDeleted={() => void refetch()}
+              />
+            ) : null}
+          </div>
         ),
       },
     ],
-    [academySlug, canManageMembers, i18n.language, t, tManager],
+    [academyId, academySlug, canManageMembers, i18n.language, t, tManager, refetch],
   );
 
   if (page.isError && !data) {

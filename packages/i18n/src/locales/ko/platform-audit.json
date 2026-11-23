@@ -60,7 +60,8 @@
           "enroll": "구성원 일괄 배정",
           "restore": "구성원 일괄 복구",
           "role_change": "구성원 역할 일괄 변경",
-          "suspend": "구성원 일괄 정지"
+          "suspend": "구성원 일괄 정지",
+          "delete": "구성원 일괄 삭제"
         }
       },
       "profile": {

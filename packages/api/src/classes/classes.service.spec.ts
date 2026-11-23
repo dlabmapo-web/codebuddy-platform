@@ -1301,6 +1301,87 @@ describe("ClassesService assistant teachers", () => {
   });
 });
 
+describe("ClassesService teachers as one list", () => {
+  const revision = updatedAt.toISOString();
+  const teacherC = "70000000-0000-4000-8000-00000000000c";
+  const many = Array.from({ length: 6 }, (_, index) => `70000000-0000-4000-8000-0000000001${index}0`);
+
+  it("gates the teachers on class-teachers.manage", async () => {
+    const { service, access } = createService({ eligibleTeacherIds: [teacherB] });
+    await service.setTeachers(identity, { academyId, classId, teacherMembershipIds: [teacherB], expectedUpdatedAt: revision });
+    expect(access.requirePermission).toHaveBeenCalledWith(identity.authUserId, academyId, "class-teachers.manage");
+  });
+
+  it("seats the first teacher of an empty class and lists the rest, with no limit", async () => {
+    const { service, transaction } = createService({ eligibleTeacherIds: many });
+    await service.setTeachers(identity, { academyId, classId, teacherMembershipIds: many, expectedUpdatedAt: revision });
+    expect(transaction.class.updateMany).toHaveBeenCalledWith({
+      where: { id: classId, academyId, status: "ACTIVE", updatedAt: claiming },
+      data: { teacherMembershipId: many[0], updatedAt: expect.any(Date) },
+    });
+    expect(transaction.classAssistantTeacher.createMany).toHaveBeenCalledWith({
+      data: many.slice(1).map((membershipId) => ({ classId, membershipId })),
+      skipDuplicates: true,
+    });
+  });
+
+  it("keeps the teacher already answerable while they stay", async () => {
+    const { service, transaction } = createService({
+      record: classRecord({ teacher: teacherMembership(teacherA), assistants: [teacherMembership(teacherB)] }),
+      eligibleTeacherIds: [teacherA, teacherB, teacherC],
+    });
+    await service.setTeachers(identity, { academyId, classId, teacherMembershipIds: [teacherC, teacherA], expectedUpdatedAt: revision });
+    expect(transaction.class.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: { teacherMembershipId: teacherA, updatedAt: expect.any(Date) },
+    }));
+    expect(transaction.classAssistantTeacher.deleteMany).toHaveBeenCalledWith({ where: { classId, membershipId: { in: [teacherB] } } });
+    expect(transaction.classAssistantTeacher.createMany).toHaveBeenCalledWith({ data: [{ classId, membershipId: teacherC }], skipDuplicates: true });
+  });
+
+  it("moves another teacher into the answerable seat when its holder is removed", async () => {
+    const { service, transaction, revocation } = createService({
+      record: classRecord({ teacher: teacherMembership(teacherA), assistants: [teacherMembership(teacherB)] }),
+      eligibleTeacherIds: [teacherA, teacherB],
+    });
+    await service.setTeachers(identity, { academyId, classId, teacherMembershipIds: [teacherB], expectedUpdatedAt: revision });
+    expect(transaction.class.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: { teacherMembershipId: teacherB, updatedAt: expect.any(Date) },
+    }));
+    // teacherB leaves the assistant rows because it now holds the class's seat.
+    expect(transaction.classAssistantTeacher.deleteMany).toHaveBeenCalledWith({ where: { classId, membershipId: { in: [teacherB] } } });
+    expect(revocation.revokeScope).toHaveBeenCalledWith({ classId, teacherMembershipRef: teacherA }, "ASSIGNMENT_CHANGED");
+  });
+
+  it("does not touch or audit a set that changes nothing", async () => {
+    const { service, transaction, audit } = createService({
+      record: classRecord({ teacher: teacherMembership(teacherA), assistants: [teacherMembership(teacherB)] }),
+      eligibleTeacherIds: [teacherA, teacherB],
+    });
+    await service.setTeachers(identity, { academyId, classId, teacherMembershipIds: [teacherB, teacherA], expectedUpdatedAt: revision });
+    expect(transaction.class.updateMany).not.toHaveBeenCalled();
+    expect(audit.write).not.toHaveBeenCalled();
+  });
+
+  it("refuses one ineligible id without writing any of them", async () => {
+    const { service, transaction } = createService({ eligibleTeacherIds: [teacherB] });
+    await expect(service.setTeachers(identity, { academyId, classId, teacherMembershipIds: [teacherB, teacherC], expectedUpdatedAt: revision }))
+      .rejects.toMatchObject({ code: "CLASS_TEACHER_INELIGIBLE" });
+    expect(transaction.class.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("audits the whole list as membership ids", async () => {
+    const { service, audit } = createService({
+      record: classRecord({ teacher: teacherMembership(teacherA), assistants: [teacherMembership(teacherB)] }),
+      eligibleTeacherIds: [teacherA, teacherB],
+    });
+    await service.setTeachers(identity, { academyId, classId, teacherMembershipIds: [], expectedUpdatedAt: revision });
+    expect(vi.mocked(audit.write).mock.calls[0]?.[1]).toMatchObject({
+      action: "class.teachers.updated",
+      before: { teacherMembershipIds: [teacherA, teacherB] },
+    });
+  });
+});
+
 describe("ClassesService archive and audit", () => {
   it("stamps archivedAt and clears it on restore", async () => {
     const archive = createService();

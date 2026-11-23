@@ -91,15 +91,6 @@ export const assignedTeacherDetailSchema = assignedTeacherSummarySchema.extend({
 });
 export type AssignedTeacherDetail = z.infer<typeof assignedTeacherDetailSchema>;
 
-/**
- * How many teachers one class may carry: a homeroom teacher and two
- * assistants. A cap rather than an open list, because the number exists to
- * keep a class's teaching staff a thing a manager can hold in their head —
- * not because anything technical breaks at four.
- */
-export const CLASS_MAX_TEACHERS = 3;
-/** The same cap, counted as the dialog counts it: everyone but the homeroom. */
-export const CLASS_MAX_ASSISTANT_TEACHERS = CLASS_MAX_TEACHERS - 1;
 
 /**
  * One of a class's teachers, homeroom or assistant.
@@ -161,11 +152,10 @@ export const classSummarySchema = z.object({
    */
   assignedTeacher: assignedTeacherSummarySchema.nullable(),
   /**
-   * Everyone who teaches this class, homeroom first, then assistants by name.
-   * At most `CLASS_MAX_TEACHERS`, and empty only for an unassigned class with
-   * no assistants either.
+   * Everyone who teaches this class, by name, with no limit on how many.
+   * Empty only for a class with no teacher yet.
    */
-  teachers: z.array(classTeacherSummarySchema).max(CLASS_MAX_TEACHERS),
+  teachers: z.array(classTeacherSummarySchema),
   createdAt: z.iso.datetime(),
   /** Moves on course and roster changes too, not only on a name edit. */
   updatedAt: z.iso.datetime(),
@@ -217,7 +207,7 @@ export type ClassScheduleSlotInput = z.infer<
 export const classDetailSchema = classSummarySchema.extend({
   students: z.array(enrolledStudentSummarySchema),
   assignedTeacher: assignedTeacherDetailSchema.nullable(),
-  teachers: z.array(classTeacherDetailSchema).max(CLASS_MAX_TEACHERS),
+  teachers: z.array(classTeacherDetailSchema),
   /**
    * When the class meets. Empty is a valid timetable and means one specific
    * thing: this class never pays attendance points. Nothing else about it
@@ -308,12 +298,26 @@ export const setClassTeacherSchema = classIdInputSchema.extend({
  * asking "who became answerable for this class" needs to see.
  */
 export const setClassAssistantTeachersSchema = classIdInputSchema.extend({
-  teacherMembershipIds: z.array(z.uuid()).max(CLASS_MAX_ASSISTANT_TEACHERS),
+  teacherMembershipIds: z.array(z.uuid()),
   expectedUpdatedAt: z.iso.datetime(),
 });
 export type SetClassAssistantTeachersInput = z.infer<
   typeof setClassAssistantTeachersSchema
 >;
+
+/**
+ * Every teacher of a class, as one complete set. A class has teachers, not a
+ * homeroom teacher and assistants, and there is no limit on how many.
+ *
+ * Stored in the existing two places so monitoring, points and reports keep
+ * reading one answerable person: the teacher already in that seat keeps it
+ * while they stay, otherwise the first listed takes it.
+ */
+export const setClassTeachersSchema = classIdInputSchema.extend({
+  teacherMembershipIds: z.array(z.uuid()),
+  expectedUpdatedAt: z.iso.datetime(),
+});
+export type SetClassTeachersInput = z.infer<typeof setClassTeachersSchema>;
 
 /* ----------------------------------------------------------------- helpers */
 

@@ -994,6 +994,121 @@ export class ClassesService {
     return this.presentDetail(updated);
   }
 
+  /**
+   * Every teacher of the class, as one complete set, with no limit.
+   *
+   * A class has teachers, not a homeroom teacher and assistants. The two
+   * stores stay because monitoring, points and reports read one answerable
+   * person from the class row: whoever already holds it keeps it while they
+   * stay in the set, otherwise the first teacher listed takes it.
+   */
+  async setTeachers(
+    identity: SupabaseIdentity,
+    input: {
+      academyId: string;
+      classId: string;
+      teacherMembershipIds: string[];
+      expectedUpdatedAt: string;
+    },
+    context: ClassRequestContext = {},
+  ): Promise<ClassDetail> {
+    const actor = await this.requireTeacherManager(identity, input.academyId);
+    const desired = [...new Set(input.teacherMembershipIds)];
+
+    const { record: updated, removed } = await this.prisma.$transaction(
+      async (tx) => {
+        const current = await requireClass(tx, input.academyId, input.classId);
+        assertActive(current);
+        const homeroom = current.teacherMembershipId;
+        const assistants = current.assistantTeachers.map(
+          (assistant) => assistant.teacher.id,
+        );
+        const before = [...(homeroom ? [homeroom] : []), ...assistants];
+        const added = desired.filter((id) => !before.includes(id));
+        const removed = before.filter((id) => !desired.includes(id));
+        // Nothing to decide, so nothing to move the revision or to audit.
+        if (added.length === 0 && removed.length === 0) {
+          return { record: current, removed };
+        }
+
+        if (added.length > 0) {
+          // Every new membership is checked before anything is written, with
+          // one code for every failure so a caller cannot probe memberships.
+          const eligible = await tx.academyMembership.findMany({
+            where: { id: { in: added }, ...eligibleTeacherWhere(input.academyId) },
+            select: { id: true },
+          });
+          if (eligible.length !== added.length) {
+            throw new AppException(
+              "CLASS_TEACHER_INELIGIBLE",
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+        }
+
+        const nextHomeroom =
+          homeroom !== null && desired.includes(homeroom)
+            ? homeroom
+            : (desired[0] ?? null);
+        const nextAssistants = desired.filter((id) => id !== nextHomeroom);
+
+        const claimed = await tx.class.updateMany({
+          where: {
+            id: current.id,
+            academyId: input.academyId,
+            status: "ACTIVE",
+            updatedAt: atRevision(new Date(input.expectedUpdatedAt)),
+          },
+          data: { teacherMembershipId: nextHomeroom, updatedAt: new Date() },
+        });
+        if (claimed.count !== 1) {
+          throwClassWriteConflict(current, input.expectedUpdatedAt);
+        }
+
+        const dropped = assistants.filter((id) => !nextAssistants.includes(id));
+        if (dropped.length > 0) {
+          await tx.classAssistantTeacher.deleteMany({
+            where: { classId: current.id, membershipId: { in: dropped } },
+          });
+        }
+        const joined = nextAssistants.filter((id) => !assistants.includes(id));
+        if (joined.length > 0) {
+          await tx.classAssistantTeacher.createMany({
+            data: joined.map((membershipId) => ({ classId: current.id, membershipId })),
+            skipDuplicates: true,
+          });
+        }
+
+        const record = await requireClass(tx, input.academyId, input.classId);
+        await this.audit.write(tx, {
+          actorUserId: actor.userId,
+          academyId: input.academyId,
+          action: "class.teachers.updated",
+          targetType: "Class",
+          targetId: current.id,
+          requestId: context.requestId,
+          // Membership ids only: who teaches the class, nothing else.
+          before: { teacherMembershipIds: before },
+          after: {
+            teacherMembershipIds: [
+              ...(record.teacherMembershipId ? [record.teacherMembershipId] : []),
+              ...record.assistantTeachers.map((assistant) => assistant.teacher.id),
+            ],
+          },
+        });
+        return { record, removed };
+      },
+    );
+    // A teacher who just left the class stops monitoring it now.
+    for (const membershipId of removed) {
+      await this.revocation.revokeScope(
+        { classId: input.classId, teacherMembershipRef: membershipId },
+        "ASSIGNMENT_CHANGED",
+      );
+    }
+    return this.presentDetail(updated);
+  }
+
   private requireClassManager(identity: SupabaseIdentity, academyId: string) {
     return this.access.requirePermission(
       identity.authUserId,

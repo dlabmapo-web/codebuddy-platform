@@ -170,6 +170,8 @@
   "EXAM_ITEM_NOT_IN_ATTEMPT": "This problem is not part of your test.",
   "EXAM_PERIOD_NOT_OPEN": "The test is not open yet.",
   "EXAM_PERIOD_CLOSED": "The test period has ended.",
+  "EXAM_ENTRY_CLOSED": "The entry deadline has passed.",
+  "EXAM_EXIT_NOT_YET": "You cannot end the test yet.",
   "EXAM_LOCKED": "Published or already taken: points cannot change.",
   "EXAM_RETAKE_NOT_ALLOWED": "You have already taken this test.",
   "EXAM_FEATURE_OFF": "Tests are not enabled for this academy.",

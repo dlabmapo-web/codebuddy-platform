@@ -60,6 +60,23 @@ export function attemptIsOpen(input: { endedAt: Date | null; deadlineAt: Date | 
   return !input.deadlineAt || input.now < input.deadlineAt;
 }
 
+/** 입장 마감: nobody starts after the entry deadline. */
+export function entryOpen(input: { entryClosesAt: Date | null; now: Date }): boolean {
+  return !input.entryClosesAt || input.now < input.entryClosesAt;
+}
+
+/** 퇴실 시간: a student may end the test themselves only from this time. */
+export function exitAllowed(input: { exitOpensAt: Date | null; now: Date }): boolean {
+  return !input.exitOpensAt || input.now >= input.exitOpensAt;
+}
+
+/** The reference docs a code problem links to, by language and UI language. */
+export function languageReferenceUrl(language: string, locale: string): string {
+  if (language === "C") return "https://en.cppreference.com/w/c";
+  if (language === "CPP") return "https://en.cppreference.com/w/cpp";
+  return locale.startsWith("ko") ? "https://docs.python.org/ko/3/" : "https://docs.python.org/3/";
+}
+
 export function resultsVisible(input: { resultsReleasedAt: Date | null; now: Date }): boolean {
   return Boolean(input.resultsReleasedAt && input.resultsReleasedAt <= input.now);
 }
@@ -114,6 +131,10 @@ export const examSettingsSchema = z.object({
   allowSelfRetake: z.boolean(),
   /** Show the score as soon as the attempt ends, without waiting for a release. */
   showScoreOnFinish: z.boolean(),
+  /** Code problems link to the language reference during the test. */
+  languageReference: z.boolean(),
+  /** Review after the test shows explanations, once results are visible. */
+  showExplanations: z.boolean(),
 });
 export type ExamSettings = z.infer<typeof examSettingsSchema>;
 
@@ -121,6 +142,10 @@ export const examScheduleSchema = z.object({
   opensAt: isoDate.nullable(),
   closesAt: isoDate.nullable(),
   resultsReleasedAt: isoDate.nullable(),
+  /** 입장 마감: no new start after this. Null = until the period ends. */
+  entryClosesAt: isoDate.nullable(),
+  /** 퇴실 시간: the student cannot end the test before this. Null = any time. */
+  exitOpensAt: isoDate.nullable(),
 });
 export type ExamSchedule = z.infer<typeof examScheduleSchema>;
 
@@ -184,6 +209,10 @@ export const examAttemptShellSchema = z.object({
   open: z.boolean(),
   review: z.boolean(),
   resultsVisible: z.boolean(),
+  /** The student cannot end the test before this (퇴실 시간). */
+  exitOpensAt: isoDate.nullable(),
+  /** Code problems show a link to the language reference. */
+  languageReference: z.boolean(),
   items: z.array(examShellItemSchema),
   serverNow: isoDate,
 });
@@ -212,11 +241,14 @@ export const examItemContentSchema = z.discriminatedUnion("type", [
     options: z.array(z.object({ id: z.uuid(), content: z.string() })),
     contentRevision: z.number().int(),
     lastAnswer: z.array(z.uuid()).nullable(),
+    /** Only in review, once results are visible, when the test shows explanations. */
+    explanation: z.string().nullable(),
   }),
   z.object({
     type: z.literal("SHORT_ANSWER"), materialId: z.uuid(), title: z.string(), description: z.string(),
     placeholder: z.string(), contentRevision: z.number().int(),
     lastAnswer: z.string().nullable(),
+    explanation: z.string().nullable(),
   }),
 ]);
 export type ExamItemContent = z.infer<typeof examItemContentSchema>;
@@ -271,11 +303,15 @@ export const examResultsItemSchema = z.object({
   averageHundredths: z.number().nullable(),
   fullScoreRate: z.number().nullable(),
   averageSubmissions: z.number().nullable(),
+  /** Code problems only: runs per student who took the test. */
+  averageRuns: z.number().nullable(),
 });
 export const examResultsCellSchema = z.object({
   materialId: z.uuid(),
   submitted: z.boolean(),
   submissionCount: z.number().int(),
+  /** Code problems only; 0 for the others. */
+  runCount: z.number().int(),
   scoreHundredths: z.number().int().nullable(),
   /** Where a teacher opens it to read or grade. */
   submissionId: z.uuid().nullable(),
@@ -346,6 +382,7 @@ export const examStartInputSchema = examStudentTestInputSchema.extend({
 });
 export const examAttemptInputSchema = z.object({ ...academy, attemptId: z.uuid() });
 export const examItemInputSchema = examAttemptInputSchema.extend({ materialId: z.uuid() });
+export const examRecordRunInputSchema = examItemInputSchema;
 export const examSubmitInputSchema = examItemInputSchema.extend({ requestKey: z.uuid(), answer: examSubmitAnswerSchema });
 export const examStaffTestInputSchema = z.object({ ...academy, courseId: z.uuid(), lectureId: z.uuid() });
 export const examCreateTestInputSchema = z.object({ ...academy, courseId: z.uuid(), moduleId: z.uuid(), title: z.string().trim().min(1).max(200) });
@@ -359,10 +396,29 @@ export const examUpdateTestInputSchema = examStaffTestInputSchema.extend({
 });
 export const examClassInputSchema = z.object({ ...academy, classId: z.uuid() });
 export const examClassTestInputSchema = examClassInputSchema.extend({ lectureId: z.uuid() });
-export const examScheduleUpdateInputSchema = examClassTestInputSchema.extend({ schedule: examScheduleSchema })
+/** A time inside the period: not before it opens, not after it closes. */
+function withinPeriod(schedule: ExamSchedule, value: Date | null): boolean {
+  if (!value) return true;
+  if (schedule.opensAt && value < schedule.opensAt) return false;
+  return !schedule.closesAt || value <= schedule.closesAt;
+}
+export const examScheduleUpdateInputSchema = examClassTestInputSchema.extend({
+  schedule: examScheduleSchema.extend({
+    // Optional on input so an older client that never sends them keeps working.
+    entryClosesAt: isoDate.nullable().default(null),
+    exitOpensAt: isoDate.nullable().default(null),
+  }),
+})
   .refine((value) => !value.schedule.opensAt || !value.schedule.closesAt || value.schedule.opensAt < value.schedule.closesAt, {
     message: "The period must open before it closes", path: ["schedule", "closesAt"],
+  })
+  .refine((value) => withinPeriod(value.schedule, value.schedule.entryClosesAt), {
+    message: "The entry deadline must be inside the test period", path: ["schedule", "entryClosesAt"],
+  })
+  .refine((value) => withinPeriod(value.schedule, value.schedule.exitOpensAt), {
+    message: "The exit time must be inside the test period", path: ["schedule", "exitOpensAt"],
   });
+export const examCourseReportInputSchema = examStaffTestInputSchema;
 export const examStaffAttemptInputSchema = examClassTestInputSchema.extend({ userId: z.uuid() });
 
 /** The six default rules (§5.1), used when a test has no guide of its own. */

@@ -6,7 +6,9 @@ import {
   attemptTotal,
   computeDeadline,
   deadlineEndReason,
+  entryOpen,
   EXAM_SUBMIT_GRACE_MS,
+  exitAllowed,
   itemScore,
   multipleChoiceSchema,
   periodState,
@@ -91,7 +93,9 @@ export class ExamService {
     const released = row.settings.showScoreOnFinish || resultsVisible({ resultsReleasedAt: row.schedule.resultsReleasedAt, now });
     const latestOpen = latest ? attemptIsOpen({ ...latest, now }) : false;
     const latestEnded = Boolean(latest && !latestOpen);
-    const canRetake = latestEnded && period === "OPEN" && (row.settings.allowSelfRetake || Boolean(latest?.retakeGrantedAt));
+    // A retake is a new start, so the entry deadline closes it too.
+    const entry = entryOpen({ entryClosesAt: row.schedule.entryClosesAt, now });
+    const canRetake = latestEnded && period === "OPEN" && entry && (row.settings.allowSelfRetake || Boolean(latest?.retakeGrantedAt));
     let score: ExamStudentTest["score"] = null;
     if (released && latest && latestEnded) {
       const last = await readLastSubmissions(this.prisma, [latest.id]);
@@ -111,7 +115,7 @@ export class ExamService {
         id: latest.id, attemptNo: latest.attemptNo, startedAt: latest.startedAt, deadlineAt: latest.deadlineAt,
         endedAt: latest.endedAt ?? (latestOpen ? null : latest.deadlineAt), endReason: latest.endReason, open: latestOpen,
       } : null,
-      canStart: !latest && period === "OPEN" && items.length > 0,
+      canStart: !latest && period === "OPEN" && entry && items.length > 0,
       canRetake,
       resultsVisible: released,
       score,
@@ -133,6 +137,7 @@ export class ExamService {
     const period = periodState({ ...row.schedule, now });
     if (period === "BEFORE") throw new AppException("EXAM_PERIOD_NOT_OPEN", HttpStatus.FORBIDDEN);
     if (period === "AFTER") throw new AppException("EXAM_PERIOD_CLOSED", HttpStatus.FORBIDDEN);
+    if (!entryOpen({ entryClosesAt: row.schedule.entryClosesAt, now })) throw new AppException("EXAM_ENTRY_CLOSED", HttpStatus.FORBIDDEN);
     if (latest && !row.settings.allowSelfRetake && !latest.retakeGrantedAt)
       throw new AppException("EXAM_RETAKE_NOT_ALLOWED", HttpStatus.FORBIDDEN);
     const items = examItems(row.items, row.settings.points);
@@ -185,6 +190,9 @@ export class ExamService {
     const read = await this.requireOwnAttempt(input, userId);
     const open = attemptIsOpen({ ...read.attempt, now: read.serverNow });
     if (!open && !read.settings.reviewAfterEnd) throw new AppException("EXAM_ENDED", HttpStatus.FORBIDDEN);
+    // Explanations only in review, once this student may see results, and only when the test says so.
+    const explain = !open && read.settings.showExplanations && (read.settings.showScoreOnFinish
+      || resultsVisible({ resultsReleasedAt: read.schedule.resultsReleasedAt, now: read.serverNow }));
     if (!read.attempt.itemsSnapshot.some((item) => item.materialId === input.materialId))
       throw new AppException("EXAM_ITEM_NOT_IN_ATTEMPT", HttpStatus.NOT_FOUND);
     const [material, last] = await Promise.all([
@@ -222,7 +230,8 @@ export class ExamService {
     }
     const manual = material.manualMaterial;
     if (manual?.multipleChoice) {
-      const choice = publicChoice(multipleChoiceSchema.parse(manual.multipleChoice));
+      const full = multipleChoiceSchema.parse(manual.multipleChoice);
+      const choice = publicChoice(full);
       const options = [...choice.options];
       if (choice.shuffleOptions)
         for (let i = options.length - 1; i > 0; i--) {
@@ -233,13 +242,15 @@ export class ExamService {
       try { selected = lastAnswer ? (JSON.parse(lastAnswer) as string[]) : null; } catch { selected = null; }
       return { type: "MULTIPLE_CHOICE", materialId: material.id, title: material.title, question: choice.question,
         description: choice.problemDescription || manual.description, selectionMode: choice.selectionMode,
-        options, contentRevision: manual.revision, lastAnswer: selected };
+        options, contentRevision: manual.revision, lastAnswer: selected,
+        explanation: explain && full.explanationEnabled && full.explanation ? full.explanation : null };
     }
     if (manual) {
       const short = manual.shortAnswer ? shortAnswerSchema.parse(manual.shortAnswer) : null;
       return { type: "SHORT_ANSWER", materialId: material.id, title: material.title,
         description: [short?.question, manual.description].filter(Boolean).join("\n\n"),
-        placeholder: "", contentRevision: manual.revision, lastAnswer };
+        placeholder: "", contentRevision: manual.revision, lastAnswer,
+        explanation: explain && short?.explanationEnabled && short.explanation ? short.explanation : null };
     }
     throw new AppException("EXAM_INVALID_MATERIAL", HttpStatus.BAD_REQUEST);
   }
@@ -281,6 +292,22 @@ export class ExamService {
     return { submittedAt: new Date() };
   }
 
+  /**
+   * Counts one run of a code problem in the caller's open attempt. One guarded
+   * statement: a closed attempt, someone else's, or a problem outside the
+   * attempt simply counts nothing.
+   */
+  async recordRun(identity: SupabaseIdentity, input: { academyId: string; attemptId: string; materialId: string }): Promise<{ ok: true }> {
+    const { userId } = await this.access.requirePermission(identity.authUserId, input.academyId, "submissions.own.create");
+    const item = JSON.stringify([{ materialId: input.materialId }]);
+    await this.prisma.$executeRaw`
+      UPDATE test_attempts SET run_counts = jsonb_set(run_counts, ARRAY[${input.materialId}::text],
+        to_jsonb(COALESCE((run_counts->>${input.materialId}::text)::int, 0) + 1))
+      WHERE id = ${input.attemptId}::uuid AND user_id = ${userId}::uuid AND ended_at IS NULL
+        AND (deadline_at IS NULL OR deadline_at > now()) AND items_snapshot @> ${item}::jsonb`;
+    return { ok: true };
+  }
+
   async end(
     identity: SupabaseIdentity,
     input: { academyId: string; attemptId: string },
@@ -289,6 +316,9 @@ export class ExamService {
     const { userId } = await this.access.requirePermission(identity.authUserId, input.academyId, "curriculum.read");
     const read = await this.requireOwnAttempt(input, userId);
     let attempt = await this.closeIfExpired(read.attempt, read.schedule, read.serverNow);
+    // 퇴실 시간: the student may not leave before the exit time. Time running out still ends it.
+    if (!attempt.endedAt && !exitAllowed({ exitOpensAt: read.schedule.exitOpensAt, now: read.serverNow }))
+      throw new AppException("EXAM_EXIT_NOT_YET", HttpStatus.FORBIDDEN);
     if (!attempt.endedAt) {
       attempt = await this.prisma.$transaction(async (tx) => {
         const ended = await tx.testAttempt.updateMany({
@@ -355,6 +385,8 @@ export class ExamService {
       open,
       review: !open && settings.reviewAfterEnd,
       resultsVisible: released,
+      exitOpensAt: schedule.exitOpensAt,
+      languageReference: settings.languageReference,
       items: [...attempt.itemsSnapshot].sort((a, b) => a.position - b.position).map((snap) => {
         const material = byMaterial.get(snap.materialId);
         const submission = lastByMaterial.get(snap.materialId);
@@ -376,12 +408,13 @@ export class ExamService {
 }
 
 /** The guide stays; the points map is staff-only. */
-function publicSettings(settings: { guide: string; summary: string; testType: ExamStudentTest["settings"]["testType"]; timeLimitMinutes: number | null; usePreparation: boolean; reviewAfterEnd: boolean; allowSelfRetake: boolean; showScoreOnFinish: boolean }) {
+function publicSettings(settings: ExamStudentTest["settings"]) {
   return {
     guide: settings.guide, summary: settings.summary, testType: settings.testType,
     timeLimitMinutes: settings.timeLimitMinutes, usePreparation: settings.usePreparation,
     reviewAfterEnd: settings.reviewAfterEnd, allowSelfRetake: settings.allowSelfRetake,
-    showScoreOnFinish: settings.showScoreOnFinish,
+    showScoreOnFinish: settings.showScoreOnFinish, languageReference: settings.languageReference,
+    showExplanations: settings.showExplanations,
   };
 }
 

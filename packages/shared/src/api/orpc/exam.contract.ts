@@ -8,9 +8,11 @@ import {
   examClassTestInputSchema,
   examClassTestRowSchema,
   examConvertLectureInputSchema,
+  examCourseReportInputSchema,
   examCreateTestInputSchema,
   examItemContentSchema,
   examItemInputSchema,
+  examRecordRunInputSchema,
   examResultsSchema,
   examScheduleUpdateInputSchema,
   examStaffAttemptInputSchema,
@@ -35,11 +37,15 @@ export const examContract = {
   item: oc.input(examItemInputSchema).output(examItemContentSchema),
   submit: oc.input(examSubmitInputSchema).output(z.object({ submittedAt: z.coerce.date() })),
   end: oc.input(examAttemptInputSchema).output(examAttemptShellSchema),
+  /** Counts one run of a code problem, for the results' average runs. */
+  recordRun: oc.input(examRecordRunInputSchema).output(z.object({ ok: z.literal(true) })),
 
   staffTest: oc.input(examStaffTestInputSchema).output(examStaffTestSchema),
   createTest: oc.input(examCreateTestInputSchema).output(z.object({ lectureId: z.uuid() })),
   convertLecture: oc.input(examConvertLectureInputSchema).output(examStaffTestSchema),
   updateTest: oc.input(examUpdateTestInputSchema).output(examStaffTestSchema),
+  /** Every class's results for the test in one CSV (Elice's course report). */
+  exportCourseReport: oc.input(examCourseReportInputSchema).output(z.object({ filename: z.string(), csv: z.string() })),
 
   classTests: oc.input(examClassInputSchema).output(z.object({ tests: z.array(examClassTestRowSchema) })),
   results: oc.input(examClassTestInputSchema).output(examResultsSchema),

@@ -3389,6 +3389,10 @@ model LectureTest {
   /// Show each student's score as soon as their attempt ends; off waits for
   /// staff to release results for the class.
   showScoreOnFinish Boolean @default(false) @map("show_score_on_finish")
+  /// Code problems link to the language's reference docs during the test.
+  languageReference Boolean @default(false) @map("language_reference")
+  /// In review after the test, show each problem's explanation (results visible only).
+  showExplanations  Boolean @default(false) @map("show_explanations")
   /// {materialId: pointsHundredths}. Snapshotted into each attempt at start.
   points           Json     @default("{}")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -3410,6 +3414,10 @@ model ClassLectureTest {
   closesAt          DateTime? @map("closes_at") @db.Timestamptz(6)
   /// Null = results hidden. Past = released. Future = scheduled release.
   resultsReleasedAt DateTime? @map("results_released_at") @db.Timestamptz(6)
+  /// Nobody can start after this (입장 마감). Null = until the period ends.
+  entryClosesAt     DateTime? @map("entry_closes_at") @db.Timestamptz(6)
+  /// A student cannot end the test before this (퇴실 시간). Null = any time.
+  exitOpensAt       DateTime? @map("exit_opens_at") @db.Timestamptz(6)
   updatedByUserId   String    @map("updated_by_user_id") @db.Uuid
   updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -3441,6 +3449,8 @@ model TestAttempt {
   itemsSnapshot   Json                  @map("items_snapshot")
   /// A teacher-granted extra attempt, consumed by the next start.
   retakeGrantedAt DateTime?             @map("retake_granted_at") @db.Timestamptz(6)
+  /// {materialId: runs} of code problems, for the results' average runs.
+  runCounts       Json                  @default("{}") @map("run_counts")
 
   test              LectureTest        @relation(fields: [lectureId], references: [lectureId], onDelete: Restrict)
   class             Class              @relation(fields: [classId], references: [id], onDelete: Restrict)

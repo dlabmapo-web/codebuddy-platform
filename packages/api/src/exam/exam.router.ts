@@ -17,6 +17,8 @@ export function createExamRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) => student.item(context.identity, input)),
     submit: os.exam.submit.use(access.studentAuthenticated)
       .handler(({ context, input }) => student.submit(context.identity, input)),
+    recordRun: os.exam.recordRun.use(access.studentAuthenticated)
+      .handler(({ context, input }) => student.recordRun(context.identity, input)),
     end: os.exam.end.use(access.studentAuthenticated)
       .handler(({ context, input }) => student.end(context.identity, input, { requestId: requestId(context.req) })),
 
@@ -28,6 +30,8 @@ export function createExamRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) => staff.convertLecture(context.identity, input, { requestId: requestId(context.req) })),
     updateTest: os.exam.updateTest.use(access.authenticated)
       .handler(({ context, input }) => staff.updateTest(context.identity, input, { requestId: requestId(context.req) })),
+    exportCourseReport: os.exam.exportCourseReport.use(access.authenticated)
+      .handler(({ context, input }) => staff.exportCourseReport(context.identity, input)),
 
     classTests: os.exam.classTests.use(access.authenticated)
       .handler(({ context, input }) => staff.classTests(context.identity, input)),

@@ -170,6 +170,8 @@
   "EXAM_ITEM_NOT_IN_ATTEMPT": "이 테스트의 문제가 아닙니다.",
   "EXAM_PERIOD_NOT_OPEN": "아직 응시 기간이 아닙니다.",
   "EXAM_PERIOD_CLOSED": "응시 기간이 종료되었습니다.",
+  "EXAM_ENTRY_CLOSED": "입장이 마감되었습니다.",
+  "EXAM_EXIT_NOT_YET": "아직 종료할 수 없습니다.",
   "EXAM_LOCKED": "공개 중이거나 응시 기록이 있어 배점을 바꿀 수 없습니다.",
   "EXAM_RETAKE_NOT_ALLOWED": "이미 응시한 테스트입니다.",
   "EXAM_FEATURE_OFF": "테스트 기능이 꺼져 있습니다.",

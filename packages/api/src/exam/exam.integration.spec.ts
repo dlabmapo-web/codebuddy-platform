@@ -233,4 +233,100 @@ describe.skipIf(!databaseUrl)("exams against PostgreSQL", () => {
     expect(card).toMatchObject({ periodState: "BEFORE", canStart: false });
     await expect(exams.start(identity(late.auth), { ...base, consent: true, clockDriftMs: null })).rejects.toMatchObject({ code: "EXAM_PERIOD_NOT_OPEN" });
   });
+
+  /** A new student in a class, for the tests below that need a fresh attempt. */
+  async function enrol(name: string, inClass = classId) {
+    const student = { id: randomUUID(), auth: randomUUID(), membership: randomUUID() };
+    await client.user.create({ data: { id: student.id, authUserId: student.auth, status: "ACTIVE", displayName: name } });
+    await client.academyMembership.create({ data: { id: student.membership, academyId, userId: student.id, role: "STUDENT", status: "ACTIVE" } });
+    await client.classEnrollment.create({ data: { classId: inClass, membershipId: student.membership, enrolledByUserId: managerId } });
+    return student;
+  }
+  const open = { opensAt: null, closesAt: null, resultsReleasedAt: null };
+
+  it("closes entry after the entry deadline and holds a student in until the exit time", async () => {
+    const student = await enrol("Entrant");
+    await staff.updateSchedule(identity(managerAuth), { ...base, schedule: { ...open, entryClosesAt: new Date(Date.now() - 60_000) } });
+    expect(await exams.studentTest(identity(student.auth), base)).toMatchObject({ periodState: "OPEN", canStart: false });
+    await expect(exams.start(identity(student.auth), { ...base, consent: true, clockDriftMs: null })).rejects.toMatchObject({ code: "EXAM_ENTRY_CLOSED" });
+
+    const exitOpensAt = new Date(Date.now() + 3_600_000);
+    await staff.updateSchedule(identity(managerAuth), { ...base, schedule: { ...open, entryClosesAt: new Date(Date.now() + 3_600_000), exitOpensAt } });
+    const { attemptId } = await exams.start(identity(student.auth), { ...base, consent: true, clockDriftMs: null });
+    expect((await exams.attempt(identity(student.auth), { academyId, attemptId })).exitOpensAt).toEqual(exitOpensAt);
+    await expect(exams.end(identity(student.auth), { academyId, attemptId })).rejects.toMatchObject({ code: "EXAM_EXIT_NOT_YET" });
+
+    await staff.updateSchedule(identity(managerAuth), { ...base, schedule: { ...open, exitOpensAt: new Date(Date.now() - 1000) } });
+    expect((await exams.end(identity(student.auth), { academyId, attemptId })).open).toBe(false);
+  });
+
+  it("counts runs of code problems in one statement and averages them in the results", async () => {
+    await staff.updateSchedule(identity(managerAuth), { ...base, schedule: open });
+    const student = await enrol("Runner");
+    const { attemptId } = await exams.start(identity(student.auth), { ...base, consent: true, clockDriftMs: null });
+    const code = materials.find((m) => m.kind === "CODE")!;
+    statements = 0;
+    await exams.recordRun(identity(student.auth), { academyId, attemptId, materialId: code.id });
+    // Access, then the one guarded update.
+    expect(statements).toBeLessThanOrEqual(3);
+    await exams.recordRun(identity(student.auth), { academyId, attemptId, materialId: code.id });
+    await exams.recordRun(identity(student.auth), { academyId, attemptId, materialId: code.id });
+    // Another student's attempt and a problem outside the test count nothing.
+    await exams.recordRun(identity(students[0]!.auth), { academyId, attemptId, materialId: code.id });
+    await exams.recordRun(identity(student.auth), { academyId, attemptId, materialId: randomUUID() });
+    const stored = await client.testAttempt.findUniqueOrThrow({ where: { id: attemptId }, select: { runCounts: true } });
+    expect(stored.runCounts).toEqual({ [code.id]: 3 });
+
+    const results = await staff.results(identity(managerAuth), base);
+    const column = results.items.findIndex((item) => item.materialId === code.id);
+    expect(results.students.find((s) => s.userId === student.id)!.cells[column]!.runCount).toBe(3);
+    expect(results.items[column]!.averageRuns).toBeGreaterThan(0);
+    expect(results.items.find((item) => item.type !== "CODE")!.averageRuns).toBeNull();
+
+    // A closed attempt counts nothing more.
+    await exams.end(identity(student.auth), { academyId, attemptId });
+    await exams.recordRun(identity(student.auth), { academyId, attemptId, materialId: code.id });
+    expect((await client.testAttempt.findUniqueOrThrow({ where: { id: attemptId }, select: { runCounts: true } })).runCounts).toEqual({ [code.id]: 3 });
+  });
+
+  it("shows an explanation only in review, once results are visible, when the test shows them", async () => {
+    const mc = materials.find((m) => m.kind === "MC")!;
+    const row = await client.manualMaterial.findUniqueOrThrow({ where: { materialId: mc.id } });
+    await client.manualMaterial.update({ where: { materialId: mc.id }, data: {
+      multipleChoice: { ...(row.multipleChoice as object), explanationEnabled: true, explanation: "<p>type() returns the type.</p>" } } });
+    await staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId, settings: { reviewAfterEnd: true, showExplanations: true } });
+    const student = await enrol("Reviewer");
+    const { attemptId } = await exams.start(identity(student.auth), { ...base, consent: true, clockDriftMs: null });
+    const during = await exams.item(identity(student.auth), { academyId, attemptId, materialId: mc.id });
+    expect(during).toMatchObject({ type: "MULTIPLE_CHOICE", explanation: null });
+
+    await staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId, settings: { allowSelfRetake: false } });
+    await exams.end(identity(student.auth), { academyId, attemptId });
+    // Ended, but results are hidden: still no explanation.
+    expect(await exams.item(identity(student.auth), { academyId, attemptId, materialId: mc.id })).toMatchObject({ explanation: null });
+    await staff.updateSchedule(identity(managerAuth), { ...base, schedule: { ...open, resultsReleasedAt: new Date(Date.now() - 1000) } });
+    expect(await exams.item(identity(student.auth), { academyId, attemptId, materialId: mc.id }))
+      .toMatchObject({ explanation: "<p>type() returns the type.</p>" });
+    await staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId, settings: { showExplanations: false } });
+    expect(await exams.item(identity(student.auth), { academyId, attemptId, materialId: mc.id })).toMatchObject({ explanation: null });
+  });
+
+  it("exports one course report for every class in a fixed number of statements", async () => {
+    const otherClass = randomUUID();
+    await client.class.create({ data: { id: otherClass, academyId, name: "Class B", createdByUserId: managerId } });
+    await client.classCourse.create({ data: { classId: otherClass, courseId, assignedByUserId: managerId } });
+    const b = await enrol("B student", otherClass);
+    await exams.start(identity(b.auth), { academyId, classId: otherClass, lectureId, consent: true, clockDriftMs: null });
+    const enrolledA = await client.classEnrollment.count({ where: { classId } });
+
+    statements = 0;
+    const report = await staff.exportCourseReport(identity(managerAuth), { academyId, courseId, lectureId });
+    // Access, then the results of every class and the last submissions of every attempt.
+    expect(statements).toBeLessThanOrEqual(4);
+    const lines = report.csv.split("\r\n");
+    expect(lines[0]!.startsWith("﻿반,이름")).toBe(true);
+    expect(lines).toHaveLength(1 + enrolledA + 1);
+    expect(lines.filter((line) => line.startsWith("Class B,"))).toHaveLength(1);
+    expect(lines[0]).toContain("실행 횟수");
+  });
 });

@@ -35,6 +35,8 @@ export type ExamSettingsRow = {
   reviewAfterEnd: boolean;
   allowSelfRetake: boolean;
   showScoreOnFinish: boolean;
+  languageReference: boolean;
+  showExplanations: boolean;
   points: Record<string, number>;
 };
 
@@ -50,9 +52,17 @@ export type AttemptRow = {
   endReason: "STUDENT" | "TIME_UP" | "PERIOD_CLOSED" | "STAFF" | null;
   retakeGrantedAt: Date | null;
   itemsSnapshot: ExamItemSnapshot[];
+  /** {materialId: runs} of code problems. */
+  runCounts: Record<string, number>;
 };
 
-export type ScheduleRow = { opensAt: Date | null; closesAt: Date | null; resultsReleasedAt: Date | null };
+export type ScheduleRow = {
+  opensAt: Date | null;
+  closesAt: Date | null;
+  resultsReleasedAt: Date | null;
+  entryClosesAt: Date | null;
+  exitOpensAt: Date | null;
+};
 
 function date(value: unknown): Date | null {
   return value == null ? null : new Date(value as string);
@@ -71,6 +81,7 @@ export function toAttempt(raw: Record<string, unknown>): AttemptRow {
     endReason: (raw.end_reason as AttemptRow["endReason"]) ?? null,
     retakeGrantedAt: date(raw.retake_granted_at),
     itemsSnapshot: examItemsSnapshotSchema.parse(raw.items_snapshot),
+    runCounts: (raw.run_counts as Record<string, number> | null) ?? {},
   };
 }
 
@@ -79,6 +90,8 @@ export function toSchedule(raw: Record<string, unknown> | null): ScheduleRow {
     opensAt: date(raw?.opens_at),
     closesAt: date(raw?.closes_at),
     resultsReleasedAt: date(raw?.results_released_at),
+    entryClosesAt: date(raw?.entry_closes_at),
+    exitOpensAt: date(raw?.exit_opens_at),
   };
 }
 
@@ -92,6 +105,8 @@ export function toSettings(raw: Record<string, unknown>): ExamSettingsRow {
     reviewAfterEnd: raw.review_after_end as boolean,
     allowSelfRetake: raw.allow_self_retake as boolean,
     showScoreOnFinish: Boolean(raw.show_score_on_finish),
+    languageReference: Boolean(raw.language_reference),
+    showExplanations: Boolean(raw.show_explanations),
     points: (raw.points as Record<string, number>) ?? {},
   };
 }
@@ -289,8 +304,19 @@ export async function readStaffTest(db: Db, input: { academyId: string; courseId
 
 /** Everything the results page needs, in one statement. */
 export async function readResults(db: Db, input: { academyId: string; classId: string; lectureId: string }) {
-  const [row] = await db.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
-    SELECT l.id, l.title, cm.course_id, k.name AS class_name, to_jsonb(lt) AS test, to_jsonb(clt) AS schedule,
+  const [row] = await readResultsByClass(db, { academyId: input.academyId, lectureId: input.lectureId, classIds: [input.classId] });
+  return row ?? null;
+}
+
+/**
+ * The results of one test for several classes, one row per class, in one
+ * statement. `classIds: null` reads every active class that learns the course
+ * (the course report).
+ */
+export async function readResultsByClass(db: Db, input: { academyId: string; lectureId: string; classIds: readonly string[] | null }) {
+  const classFilter = input.classIds ? Prisma.sql`k.id = ANY(${[...input.classIds]}::uuid[])` : Prisma.sql`k.status = 'ACTIVE'`;
+  const rows = await db.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+    SELECT l.id, l.title, cm.course_id, k.id AS class_id, k.name AS class_name, to_jsonb(lt) AS test, to_jsonb(clt) AS schedule,
       ${itemsSql(Prisma.sql`l.id`)} AS items,
       COALESCE((SELECT jsonb_agg(jsonb_build_object('user_id', am.user_id, 'membership_id', am.id,
           'name', COALESCE(NULLIF(u.display_name, ''), u.username, u.email, ''), 'username', u.username) ORDER BY
@@ -307,16 +333,17 @@ export async function readResults(db: Db, input: { academyId: string; classId: s
     JOIN lecture_tests lt ON lt.lecture_id = l.id
     JOIN course_modules cm ON cm.id = l.course_module_id
     JOIN courses c ON c.id = cm.course_id
-    JOIN classes k ON k.id = ${input.classId}::uuid AND k.academy_id = c.academy_id
-    JOIN class_courses cc ON cc.class_id = k.id AND cc.course_id = c.id
+    JOIN class_courses cc ON cc.course_id = c.id
+    JOIN classes k ON k.id = cc.class_id AND k.academy_id = c.academy_id
     LEFT JOIN class_lecture_tests clt ON clt.class_id = k.id AND clt.lecture_id = l.id
-    WHERE l.id = ${input.lectureId}::uuid AND l.kind = 'TEST' AND c.academy_id = ${input.academyId}::uuid
+    WHERE l.id = ${input.lectureId}::uuid AND l.kind = 'TEST' AND c.academy_id = ${input.academyId}::uuid AND ${classFilter}
+    ORDER BY k.name, k.id
   `);
-  if (!row) return null;
-  return {
+  return rows.map((row) => ({
     lectureId: row.id as string,
     title: row.title as string,
     courseId: row.course_id as string,
+    classId: row.class_id as string,
     className: row.class_name as string,
     settings: toSettings(row.test as Record<string, unknown>),
     schedule: toSchedule(row.schedule as Record<string, unknown> | null),
@@ -329,8 +356,10 @@ export async function readResults(db: Db, input: { academyId: string; classId: s
     })),
     attempts: (row.attempts as Array<Record<string, unknown>>).map(toAttempt),
     serverNow: new Date(row.server_now as string),
-  };
+  }));
 }
+
+export type ResultsRow = Awaited<ReturnType<typeof readResultsByClass>>[number];
 
 /** The tests a class sits, across its courses, with attempt counts. One statement. */
 export async function readClassTests(db: Db, input: { academyId: string; classId: string }) {

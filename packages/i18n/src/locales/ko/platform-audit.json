@@ -110,7 +110,10 @@
       },
       "updated": "반 정보 수정",
       "archived": "반 보관",
-      "restored": "반 재개"
+      "restored": "반 재개",
+      "teachers": {
+        "updated": "반 강사 변경"
+      }
     },
     "content": {
       "course": {
@@ -180,6 +183,11 @@
         "resumed": "라이브러리 동기화 재개",
         "legacy_linked": "기존 강좌를 라이브러리 업데이트에 연결",
         "link_resolved": "라이브러리 자료 연결 검토"
+      },
+      "test": {
+        "created": "테스트 추가",
+        "converted": "강의를 테스트로 전환",
+        "updated": "테스트 수정"
       }
     },
     "platform": {
@@ -276,6 +284,19 @@
     "user": {
       "provision_failed": "OS 계정 동기화 실패",
       "provisioned": "OS 계정 동기화 완료"
+    },
+    "exam": {
+      "attempt": {
+        "started": "테스트 응시 시작",
+        "ended": "테스트 종료",
+        "ended_by_staff": "테스트 강제 종료"
+      },
+      "retake": {
+        "granted": "테스트 재응시 허용"
+      },
+      "schedule": {
+        "updated": "응시 기간·성적 공개 변경"
+      }
     }
   }
 }

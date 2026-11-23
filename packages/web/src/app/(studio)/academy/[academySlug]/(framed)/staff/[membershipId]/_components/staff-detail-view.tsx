@@ -8,7 +8,6 @@ import {
   Presentation,
   SquarePen,
   Users,
-  UsersRound,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -108,51 +107,33 @@ export function StaffDetailView({
         {teaching === 0 ? (
           <p className="text-[14px] text-sub">{t('staff.teaching_none')}</p>
         ) : (
-          <div className="space-y-5">
-            {(
-              [
-                ['homeroom', classes.homeroom],
-                ['assistant', classes.assistant],
-              ] as const
-            ).map(([kind, list]) =>
-              list.length === 0 ? null : (
-                <div key={kind}>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-sub">
-                    {t(`staff.${kind}`)}
-                  </p>
-                  <p className="mt-0.5 text-[12.5px] text-sub">
-                    {t(`staff.${kind}_hint`)}
-                  </p>
-                  <ul className="mt-2.5 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-                    {list.map((entry) => (
-                      <RecordRow
-                        accentId={entry.id}
-                        chips={entry.courses.map((course) => ({
-                          id: course.courseId,
-                          label: course.title,
-                        }))}
-                        facts={[
-                          {
-                            icon: Users,
-                            label: t('staff.class_students'),
-                            value: numbers.format(entry.studentCount),
-                          },
-                          {
-                            icon: BookOpen,
-                            label: t('staff.class_courses'),
-                            value: numbers.format(entry.courses.length),
-                          },
-                        ]}
-                        icon={kind === 'homeroom' ? Presentation : UsersRound}
-                        key={entry.id}
-                        name={entry.name}
-                      />
-                    ))}
-                  </ul>
-                </div>
-              ),
-            )}
-          </div>
+          // Every class they teach, as one list: a class's teachers are equal.
+          <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+            {[...classes.homeroom, ...classes.assistant].map((entry) => (
+              <RecordRow
+                accentId={entry.id}
+                chips={entry.courses.map((course) => ({
+                  id: course.courseId,
+                  label: course.title,
+                }))}
+                facts={[
+                  {
+                    icon: Users,
+                    label: t('staff.class_students'),
+                    value: numbers.format(entry.studentCount),
+                  },
+                  {
+                    icon: BookOpen,
+                    label: t('staff.class_courses'),
+                    value: numbers.format(entry.courses.length),
+                  },
+                ]}
+                icon={Presentation}
+                key={entry.id}
+                name={entry.name}
+              />
+            ))}
+          </ul>
         )}
       </DetailSection>
 

@@ -18,9 +18,8 @@ import { ClassStudentsPanel } from './class-students-panel';
 import { ClassTeacherPanel } from './class-teacher-panel';
 import { CourseAssignmentDialog } from './course-assignment-dialog';
 import { StudentEnrollmentDialog } from './student-enrollment-dialog';
-import { AssistantTeachersDialog } from './assistant-teachers-dialog';
-import { TeacherAssignmentDialog } from './teacher-assignment-dialog';
 import { TeacherRemovalDialog } from './teacher-removal-dialog';
+import { TeachersDialog } from './teachers-dialog';
 
 export function ClassDetailManager({
   academyId,
@@ -104,8 +103,7 @@ export function ClassDetailManager({
       {canEnroll ? <StudentEnrollmentDialog manager={manager} /> : null}
       {canAssignTeacher ? (
         <>
-          <TeacherAssignmentDialog manager={manager} />
-          <AssistantTeachersDialog manager={manager} />
+          <TeachersDialog manager={manager} />
           <TeacherRemovalDialog manager={manager} />
         </>
       ) : null}

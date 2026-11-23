@@ -4,7 +4,6 @@ import { useContentBasePath } from '@/components/studio/content-base-path-provid
 
 import type {
   AssignedCourseSummary,
-  AssignedTeacherSummary,
   ClassSummary,
 } from '@cove/shared';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -98,47 +97,26 @@ function CoursesCell({ courses }: { courses: AssignedCourseSummary[] }) {
  * assignment keeps the name and says plainly that it grants nothing.
  */
 /**
- * Who teaches this class, in one column's worth of space.
- *
- * The homeroom teacher is named and the assistants are counted rather than
- * listed: the list answers "is this class staffed, and by whom", and three
- * names in a table cell answers it worse than one name and a tally does.
+ * Who teaches this class, in one column's worth of space: the first teacher
+ * by name and how many more there are. Every teacher is on the same terms.
  */
-/** How many teachers assist this class, beside its homeroom teacher. */
-function assistantCount(record: ClassSummary): number {
-  return record.teachers.filter((teacher) => !teacher.isHomeroom).length;
-}
-
-function TeacherCell({
-  teacher,
-  assistantCount,
-}: {
-  teacher: AssignedTeacherSummary | null;
-  assistantCount: number;
-}) {
+function TeacherCell({ teachers }: { teachers: ClassSummary['teachers'] }) {
   const { t } = useLayoutTranslation('classes');
+  const teacher = teachers[0] ?? null;
   if (!teacher) {
-    return (
-      <span className="text-[13.5px] text-sub/60">
-        {assistantCount > 0
-          ? t('teacher_cell.assistants_only', { count: assistantCount })
-          : t('teacher_cell.none')}
-      </span>
-    );
+    return <span className="text-[13.5px] text-sub/60">{t('teacher_cell.none')}</span>;
   }
+  const more = teachers.length - 1;
 
   // The list carries no email, so the name falls back to the label directly.
   const name = teacher.displayName ?? t('detail.teacher_panel.no_name');
   const effective = teacherAssignmentState(teacher) === 'active';
+  const detail = more > 0 ? t('teacher_cell.more', { count: more }) : t('teacher_cell.role');
   return (
     <span
       aria-label={
         effective
-          ? `${t('teacher_cell.aria_assigned', { name })} · ${
-              assistantCount > 0
-                ? t('teacher_cell.with_assistants', { count: assistantCount })
-                : t('teacher_cell.role')
-            }`
+          ? `${t('teacher_cell.aria_assigned', { name })} · ${detail}`
           : t('teacher_cell.aria_unavailable', { name })
       }
       className="flex min-w-0 items-center gap-2"
@@ -153,13 +131,9 @@ function TeacherCell({
         {name.trim().charAt(0).toUpperCase()}
       </span>
       <span aria-hidden className="min-w-0">
-        <span className="block truncate text-[14px] font-semibold" title={name}>{name}</span>
+        <span className="block truncate text-[14px] font-semibold" title={teachers.map((row) => row.displayName ?? '').filter(Boolean).join(', ')}>{name}</span>
         {effective ? (
-          <span className="mt-0.5 block text-[12px] leading-4 text-sub">
-            {assistantCount > 0
-              ? t('teacher_cell.with_assistants', { count: assistantCount })
-              : t('teacher_cell.role')}
-          </span>
+          <span className="mt-0.5 block text-[12px] leading-4 text-sub">{detail}</span>
         ) : (
           <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-draft-soft px-1.5 py-0.5 text-[11.5px] font-bold text-draft">
             <span className="size-1.5 rounded-full bg-draft" />
@@ -196,7 +170,8 @@ export function ClassesTable({
         accessorFn: (record) => `${record.name} ${record.description}`,
         header: t('column.class'),
         cell: ({ row }) => {
-          const teacher = row.original.assignedTeacher;
+          const teacher = row.original.teachers[0] ?? null;
+          const more = row.original.teachers.length - 1;
           return (
             <div className="min-w-0">
               <Link
@@ -222,13 +197,7 @@ export function ClassesTable({
                         teacherAssignmentState(teacher) === 'active'
                           ? ''
                           : ` · ${t('teacher_cell.unavailable')}`
-                      }${
-                        assistantCount(row.original) > 0
-                          ? ` · ${t('teacher_cell.with_assistants', {
-                              count: assistantCount(row.original),
-                            })}`
-                          : ''
-                      }`
+                      }${more > 0 ? ` · ${t('teacher_cell.more', { count: more })}` : ''}`
                     : t('teacher_cell.aria_none')}
                 </p>
               ) : null}
@@ -276,13 +245,10 @@ export function ClassesTable({
         size: 176,
         // Sorting and search both run on the name, so an unassigned class
         // sorts with the other blanks rather than under a literal label.
-        accessorFn: (record) => record.assignedTeacher?.displayName ?? '',
+        accessorFn: (record) => record.teachers.map((teacher) => teacher.displayName ?? '').join(' '),
         header: t('column.teacher'),
         cell: ({ row }) => (
-          <TeacherCell
-            assistantCount={assistantCount(row.original)}
-            teacher={row.original.assignedTeacher}
-          />
+          <TeacherCell teachers={row.original.teachers} />
         ),
       },
       {

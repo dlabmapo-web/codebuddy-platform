@@ -4,7 +4,7 @@ import type {
   ClassTeacherDetail,
   EligibleTeacherSummary,
 } from '@cove/shared';
-import { assignmentGrantsAccess, CLASS_MAX_ASSISTANT_TEACHERS } from '@cove/shared';
+import { assignmentGrantsAccess } from '@cove/shared';
 
 /**
  * The decisions the teacher panel, list cell, and dialog all branch on, kept
@@ -67,40 +67,6 @@ export function canEditAssignment({
 }
 
 /**
- * Whether saving is allowed for the current dialog selection.
- *
- * Re-saving the teacher already assigned is refused here rather than sent as a
- * no-op: the API would accept it, but the button would have promised a change
- * it did not make.
- */
-export function canSubmitTeacherSelection({
-  selectedId,
-  currentId,
-  pending,
-}: {
-  selectedId: string | null;
-  currentId: string | null;
-  pending: boolean;
-}): boolean {
-  if (pending || selectedId === null) return false;
-  return selectedId !== currentId;
-}
-
-/**
- * Whether saving would displace somebody. Reopening the dialog on the current
- * teacher must not warn about replacing them with themselves.
- */
-export function isReplacement({
-  selectedId,
-  currentId,
-}: {
-  selectedId: string | null;
-  currentId: string | null;
-}): boolean {
-  return currentId !== null && selectedId !== null && selectedId !== currentId;
-}
-
-/**
  * The name to show for a teacher. Falls back to the email before the "no name"
  * label, because an address still identifies the person and the label does not.
  */
@@ -112,52 +78,21 @@ export function teacherDisplayName(
 }
 
 
-/* ------------------------------------------------------- assistant teachers */
+/* ----------------------------------------------------------------- teachers */
 
-/**
- * Who the assistants dialog may offer.
- *
- * The homeroom teacher is filtered out rather than shown and refused: they
- * already teach this class, and offering them would let a manager submit a
- * change the API exists to reject.
- */
-export function assistantCandidates<T extends { membershipId: string }>(
-  eligible: T[],
-  homeroomMembershipId: string | null,
-): T[] {
-  return eligible.filter(
-    (teacher) => teacher.membershipId !== homeroomMembershipId,
-  );
-}
-
-/** The assistants currently on the class, in the order the server sent them. */
-export function currentAssistantIds(
-  teachers: Pick<ClassTeacherDetail, 'membershipId' | 'isHomeroom'>[],
+/** Every teacher on the class, in the order the server sent them. */
+export function currentTeacherIds(
+  teachers: Pick<ClassTeacherDetail, 'membershipId'>[],
 ): string[] {
-  return teachers
-    .filter((teacher) => !teacher.isHomeroom)
-    .map((teacher) => teacher.membershipId);
+  return teachers.map((teacher) => teacher.membershipId);
 }
 
 /**
- * How many more assistants this class can take.
- *
- * Counted from the cap on assistants rather than from the total, so an
- * unassigned class does not silently offer the homeroom teacher's seat to an
- * assistant who could not then be promoted into it.
+ * Whether saving the teachers would change anything. There is no limit on how
+ * many; submitting the set already stored is refused here rather than sent as
+ * a no-op, because the button would have promised a change it did not make.
  */
-export function assistantSlotsLeft(assistantCount: number): number {
-  return Math.max(0, CLASS_MAX_ASSISTANT_TEACHERS - assistantCount);
-}
-
-/**
- * Whether saving the assistants would change anything.
- *
- * Submitting the set already stored is refused here rather than sent as a
- * no-op: the API would accept it, but the button would have promised a change
- * it did not make.
- */
-export function canSubmitAssistants({
+export function canSubmitTeachers({
   selectedIds,
   currentIds,
   pending,
@@ -167,7 +102,6 @@ export function canSubmitAssistants({
   pending: boolean;
 }): boolean {
   if (pending) return false;
-  if (selectedIds.length > CLASS_MAX_ASSISTANT_TEACHERS) return false;
   const current = new Set(currentIds);
   return (
     selectedIds.length !== currentIds.length ||

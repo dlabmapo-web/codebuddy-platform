@@ -41,7 +41,6 @@
       "employee_number": "사번",
       "joined": "합류일"
     },
-    "assistant_suffix": "(보조)",
     "no_class": "없음",
     "multi_role_note": "수업을 맡으면서 팀장이나 매니저를 겸하는 사람도 여기에 한 번만 나오며, 보유한 역할이 모두 표시됩니다.",
     "empty_academy_title": "아직 강사가 없습니다",

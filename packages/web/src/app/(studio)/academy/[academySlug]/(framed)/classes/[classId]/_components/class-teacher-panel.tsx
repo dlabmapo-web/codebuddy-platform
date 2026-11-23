@@ -1,14 +1,7 @@
 'use client';
 
 import type { ClassTeacherDetail } from '@cove/shared';
-import {
-  AlertTriangle,
-  GraduationCap,
-  Mail,
-  Plus,
-  UserMinus,
-  UserPlus,
-} from 'lucide-react';
+import { AlertTriangle, Mail, UserMinus, UserPlus } from 'lucide-react';
 
 import { Button } from '@/components/studio/button';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
@@ -16,9 +9,7 @@ import { useLayoutTranslation } from '@/i18n';
 
 import type { ClassDetailManagerState } from '../_hooks/use-class-detail-manager';
 import {
-  assistantSlotsLeft,
   canEditAssignment,
-  currentAssistantIds,
   teacherAssignmentState,
   teacherDisplayName,
   unavailableReason,
@@ -26,14 +17,8 @@ import {
 import { ClassPanel, ClassPanelEmpty } from './class-panel';
 
 /**
- * Who teaches this class: one homeroom teacher, and up to two assistants
- * beside them.
- *
- * The two are one list rather than two panels because they are the same fact —
- * a manager asking "who teaches Level 1" wants one answer. What separates them
- * is the badge and what removing them does: clearing the homeroom teacher
- * leaves the class running unassigned, while dropping an assistant leaves the
- * class staffed exactly as before.
+ * Who teaches this class: one list of teachers, all on the same terms, with no
+ * limit on how many. There is no homeroom or assistant distinction to show.
  *
  * A teacher can also read as unavailable, which is why each row reports the
  * membership rather than just a name: suspending somebody or moving them off
@@ -49,37 +34,18 @@ export function ClassTeacherPanel({
 }) {
   const { t } = useLayoutTranslation('classes');
   const { detail } = manager;
-  const homeroom = detail.assignedTeacher;
   const editable = canEditAssignment({ canAssign, status: detail.status });
-  const slotsLeft = assistantSlotsLeft(currentAssistantIds(detail.teachers).length);
 
   return (
     <ClassPanel
       action={
         editable ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Adding help is secondary to naming who is answerable, so it is
-                the outlined one of the two. */}
-            <Button
-              disabled={slotsLeft === 0}
-              onClick={manager.openAssistants}
-              size="sm"
-              variant="outline"
-            >
-              <UserPlus />
-              {t('detail.teacher_panel.manage_assistants')}
-            </Button>
-            {/* Brand blue, like "Assign courses" and "Add students": all three
-                panels have exactly one primary action, and they should look
-                like the same kind of thing. The teacher's own orange stays an
-                identity tint on the avatar and badge, never an action color. */}
-            <Button onClick={manager.openTeacher} size="sm">
-              {homeroom ? <GraduationCap /> : <Plus />}
-              {homeroom
-                ? t('detail.teacher_panel.replace')
-                : t('detail.teacher_panel.assign')}
-            </Button>
-          </div>
+          // Brand blue, like "Assign courses" and "Add students": each panel
+          // has exactly one primary action.
+          <Button onClick={manager.openTeachers} size="sm">
+            <UserPlus />
+            {t('detail.teacher_panel.add')}
+          </Button>
         ) : null
       }
       body={t('detail.teacher_panel.body')}
@@ -98,7 +64,6 @@ export function ClassTeacherPanel({
         <ul className="divide-y divide-border">
           {detail.teachers.map((teacher) => (
             <TeacherRow
-              canAssign={canAssign}
               editable={editable}
               key={teacher.membershipId}
               manager={manager}
@@ -111,17 +76,12 @@ export function ClassTeacherPanel({
   );
 }
 
-/**
- * One teacher. Identical for both kinds except the badge and which removal it
- * asks for — the same person in either seat teaches the class the same way.
- */
+/** One teacher. Every teacher of a class is shown and removed the same way. */
 function TeacherRow({
-  canAssign,
   editable,
   manager,
   teacher,
 }: {
-  canAssign: boolean;
   editable: boolean;
   manager: ClassDetailManagerState;
   teacher: ClassTeacherDetail;
@@ -148,19 +108,6 @@ function TeacherRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[15px] font-bold">{name}</span>
-          {/* Which seat, always — a class with three teachers is unreadable
-              without saying which one is answerable for it. */}
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[12px] font-bold ${
-              teacher.isHomeroom
-                ? 'bg-primary-light text-primary'
-                : 'bg-canvas text-sub'
-            }`}
-          >
-            {teacher.isHomeroom
-              ? t('detail.teacher_panel.homeroom')
-              : t('detail.teacher_panel.assistant')}
-          </span>
           {effective ? null : (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-draft-soft px-2 py-0.5 text-[12px] font-bold text-draft">
               <AlertTriangle className="size-3" />
@@ -184,9 +131,7 @@ function TeacherRow({
           }`}
         >
           {effective
-            ? teacher.isHomeroom
-              ? t('detail.teacher_panel.active')
-              : t('detail.teacher_panel.active_assistant')
+            ? t('detail.teacher_panel.active')
             : unavailableReason(teacher) === 'account'
               ? t('detail.teacher_panel.unavailable_account')
               : unavailableReason(teacher) === 'role'
@@ -194,11 +139,6 @@ function TeacherRow({
                 : t('detail.teacher_panel.unavailable_suspended')}
         </p>
 
-        {teacher.isHomeroom && manager.detail.status === 'ARCHIVED' && canAssign ? (
-          <p className="mt-2 text-[13px] leading-5 text-sub">
-            {t('detail.teacher_panel.archived_readonly')}
-          </p>
-        ) : null}
       </div>
 
       {editable ? (
@@ -208,11 +148,7 @@ function TeacherRow({
         <button
           className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-danger/20 bg-danger/5 px-3.5 text-[13.5px] font-bold text-danger transition-colors hover:bg-danger hover:border-danger hover:text-on-danger disabled:opacity-40"
           disabled={manager.removalPending}
-          onClick={() =>
-            teacher.isHomeroom
-              ? manager.askRemoveTeacher(teacher, name)
-              : manager.askRemoveAssistant(teacher, name)
-          }
+          onClick={() => manager.askRemoveTeacher(teacher, name)}
           type="button"
         >
           <UserMinus className="size-4" />

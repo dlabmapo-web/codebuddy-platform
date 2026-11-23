@@ -1,13 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  assistantCandidates,
-  assistantSlotsLeft,
   canEditAssignment,
-  canSubmitAssistants,
-  canSubmitTeacherSelection,
-  currentAssistantIds,
-  isReplacement,
+  canSubmitTeachers,
+  currentTeacherIds,
   teacherAssignmentState,
   teacherDisplayName,
   unavailableReason,
@@ -157,79 +153,6 @@ describe('canEditAssignment', () => {
   });
 });
 
-describe('canSubmitTeacherSelection', () => {
-  it('allows assigning to an unassigned class', () => {
-    expect(
-      canSubmitTeacherSelection({
-        selectedId: membershipA,
-        currentId: null,
-        pending: false,
-      }),
-    ).toBe(true);
-  });
-
-  it('allows replacing one teacher with another', () => {
-    expect(
-      canSubmitTeacherSelection({
-        selectedId: membershipB,
-        currentId: membershipA,
-        pending: false,
-      }),
-    ).toBe(true);
-  });
-
-  it('refuses to re-save the teacher already assigned', () => {
-    expect(
-      canSubmitTeacherSelection({
-        selectedId: membershipA,
-        currentId: membershipA,
-        pending: false,
-      }),
-    ).toBe(false);
-  });
-
-  it('refuses an empty selection, because removal is its own confirmation', () => {
-    expect(
-      canSubmitTeacherSelection({
-        selectedId: null,
-        currentId: membershipA,
-        pending: false,
-      }),
-    ).toBe(false);
-  });
-
-  it('blocks a second submit while the first is in flight', () => {
-    // Two sends of the same revision would turn the second into a conflict.
-    expect(
-      canSubmitTeacherSelection({
-        selectedId: membershipA,
-        currentId: null,
-        pending: true,
-      }),
-    ).toBe(false);
-  });
-});
-
-describe('isReplacement', () => {
-  it('warns only when somebody actually loses the class', () => {
-    expect(isReplacement({ selectedId: membershipB, currentId: membershipA })).toBe(
-      true,
-    );
-  });
-
-  it('stays quiet when the class had no teacher', () => {
-    expect(isReplacement({ selectedId: membershipA, currentId: null })).toBe(
-      false,
-    );
-  });
-
-  it('stays quiet when the current teacher is reselected', () => {
-    expect(isReplacement({ selectedId: membershipA, currentId: membershipA })).toBe(
-      false,
-    );
-  });
-});
-
 describe('teacherDisplayName', () => {
   it('prefers the display name', () => {
     expect(
@@ -258,99 +181,43 @@ describe('teacherDisplayName', () => {
 });
 
 
-describe('assistant teachers', () => {
-  const seat = (membershipId: string, isHomeroom: boolean) => ({
-    membershipId,
-    isHomeroom,
-  });
-
-  it('reads the assistants off the class teacher list', () => {
+describe('class teachers', () => {
+  it('reads every teacher off the class, with no homeroom or assistant split', () => {
     expect(
-      currentAssistantIds([
-        seat(membershipA, true),
-        seat(membershipB, false),
-        seat(membershipC, false),
+      currentTeacherIds([
+        { membershipId: membershipA },
+        { membershipId: membershipB },
+        { membershipId: membershipC },
       ]),
-    ).toEqual([membershipB, membershipC]);
-  });
-
-  it('reports no assistants for a class with only a homeroom teacher', () => {
-    expect(currentAssistantIds([seat(membershipA, true)])).toEqual([]);
-  });
-
-  /*
-   * Filtered out rather than shown and refused: offering the homeroom teacher
-   * would let a manager submit the one change the API exists to reject.
-   */
-  it('never offers the homeroom teacher as their own assistant', () => {
-    expect(
-      assistantCandidates(
-        [{ membershipId: membershipA }, { membershipId: membershipB }],
-        membershipA,
-      ),
-    ).toEqual([{ membershipId: membershipB }]);
-  });
-
-  it('offers everybody while the class is unassigned', () => {
-    expect(
-      assistantCandidates([{ membershipId: membershipA }], null),
-    ).toHaveLength(1);
-  });
-
-  it('counts the seats left from the assistant cap', () => {
-    expect(assistantSlotsLeft(0)).toBe(2);
-    expect(assistantSlotsLeft(2)).toBe(0);
-    // A class already over the cap reports no room rather than a negative.
-    expect(assistantSlotsLeft(3)).toBe(0);
+    ).toEqual([membershipA, membershipB, membershipC]);
   });
 
   it('refuses to submit the set already stored', () => {
     expect(
-      canSubmitAssistants({
-        selectedIds: [membershipB],
-        currentIds: [membershipB],
-        pending: false,
-      }),
+      canSubmitTeachers({ selectedIds: [membershipB], currentIds: [membershipB], pending: false }),
     ).toBe(false);
   });
 
-  it('submits a swap that keeps the same number of assistants', () => {
+  it('submits a swap that keeps the same number of teachers', () => {
     expect(
-      canSubmitAssistants({
-        selectedIds: [membershipC],
-        currentIds: [membershipB],
-        pending: false,
-      }),
+      canSubmitTeachers({ selectedIds: [membershipC], currentIds: [membershipB], pending: false }),
     ).toBe(true);
   });
 
-  it('submits an emptied set, which is how the last assistant goes', () => {
+  it('submits an emptied set, which is how the last teacher goes', () => {
     expect(
-      canSubmitAssistants({
-        selectedIds: [],
-        currentIds: [membershipB],
-        pending: false,
-      }),
+      canSubmitTeachers({ selectedIds: [], currentIds: [membershipB], pending: false }),
     ).toBe(true);
   });
 
-  it('refuses more assistants than the class may carry', () => {
-    expect(
-      canSubmitAssistants({
-        selectedIds: [membershipA, membershipB, membershipC],
-        currentIds: [],
-        pending: false,
-      }),
-    ).toBe(false);
+  it('takes any number of teachers', () => {
+    const many = Array.from({ length: 12 }, (_, i) => `60000000-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`);
+    expect(canSubmitTeachers({ selectedIds: many, currentIds: [], pending: false })).toBe(true);
   });
 
   it('refuses while a save is in flight, so one click cannot send twice', () => {
     expect(
-      canSubmitAssistants({
-        selectedIds: [membershipB],
-        currentIds: [],
-        pending: true,
-      }),
+      canSubmitTeachers({ selectedIds: [membershipB], currentIds: [], pending: true }),
     ).toBe(false);
   });
 });

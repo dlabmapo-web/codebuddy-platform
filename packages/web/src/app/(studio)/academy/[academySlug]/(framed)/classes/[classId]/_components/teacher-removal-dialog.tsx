@@ -13,12 +13,7 @@ import type { ClassDetailManagerState } from '../_hooks/use-class-detail-manager
  *
  * Separate from the course and student removals because the promise is
  * different: nothing is archived and no work is at stake. The class keeps its
- * courses, its roster, and its active status.
- *
- * The two kinds share the dialog and differ only in what is being promised.
- * Clearing the homeroom teacher leaves the class running unassigned — a
- * legitimate state, not a broken one — while dropping an assistant leaves it
- * staffed exactly as it was, minus one pair of hands.
+ * courses, its roster, its other teachers and its active status.
  */
 export function TeacherRemovalDialog({
   manager,
@@ -28,10 +23,7 @@ export function TeacherRemovalDialog({
   const { t } = useLayoutTranslation(['classes', 'common']);
   const errorText = useErrorText();
   const removing = manager.removing;
-  if (removing?.kind !== 'teacher' && removing?.kind !== 'assistant') {
-    return null;
-  }
-  const assistant = removing.kind === 'assistant';
+  if (removing?.kind !== 'teacher') return null;
 
   return (
     <Modal
@@ -41,13 +33,8 @@ export function TeacherRemovalDialog({
       open
     >
       <ModalContent
-        description={t(
-          assistant ? 'remove_assistant.body' : 'remove_teacher.body',
-          { name: removing.name },
-        )}
-        title={t(
-          assistant ? 'remove_assistant.heading' : 'remove_teacher.heading',
-        )}
+        description={t('remove_teacher.body', { name: removing.name })}
+        title={t('remove_teacher.heading')}
       >
         <div className="px-6 py-5">
           <div className="flex items-start gap-3.5">
@@ -62,17 +49,13 @@ export function TeacherRemovalDialog({
           <div className="mt-4 flex items-start gap-2.5 rounded-lg bg-success/5 px-3.5 py-3 text-[13.5px] leading-5 text-sub">
             <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" />
             <p>
-              {t(
-                assistant
-                  ? 'remove_assistant.reassurance'
-                  : 'detail.teacher_panel.body',
-              )}
+              {t('remove_teacher.reassurance')}
             </p>
           </div>
 
           {manager.removalError ? (
             <p className="mt-4 rounded-lg bg-danger/5 px-3.5 py-2.5 text-[14px] font-semibold text-danger">
-              {errorText(manager.removalError, t('teacher_dialog.failed'))}
+              {errorText(manager.removalError, t('teachers_dialog.failed'))}
             </p>
           ) : null}
         </div>
@@ -93,11 +76,7 @@ export function TeacherRemovalDialog({
           >
             {manager.removalPending
               ? t('remove_teacher.submitting')
-              : t(
-                  assistant
-                    ? 'remove_assistant.confirm'
-                    : 'remove_teacher.confirm',
-                )}
+              : t('remove_teacher.confirm')}
           </button>
         </div>
       </ModalContent>

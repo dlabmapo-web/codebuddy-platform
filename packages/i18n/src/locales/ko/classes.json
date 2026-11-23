@@ -25,7 +25,7 @@
     "status": "상태",
     "courses": "지정된 코스",
     "students": "학생",
-    "teacher": "담당 강사",
+    "teacher": "강사",
     "updated": "최근 변경",
     "actions": "작업"
   },
@@ -35,14 +35,13 @@
     "aria_other": "지정된 코스 {{count}}개: {{titles}}"
   },
   "teacher_cell": {
-    "none": "미지정",
-    "role": "담임 강사",
+    "none": "강사 없음",
+    "role": "강사",
     "unavailable": "권한 없음",
-    "aria_assigned": "담당 강사: {{name}}",
+    "aria_assigned": "강사: {{name}}",
     "aria_unavailable": "{{name}} 강사가 지정되어 있지만 권한이 없습니다",
-    "aria_none": "담당 강사 미지정",
-    "with_assistants_other": "담임 강사 · 보조 {{count}}명",
-    "assistants_only_other": "담임 강사 미지정 · 보조 {{count}}명"
+    "aria_none": "강사 없음",
+    "more_other": "외 강사 {{count}}명"
   },
   "create": {
     "heading": "반 이름 정하기",
@@ -78,11 +77,9 @@
       "students_none": "아직 등록한 학생이 없음",
       "students_all_learning_other": "모두 학습 중",
       "students_some_inactive_other": "{{count}}자리는 권한을 주지 않음",
-      "teacher": "담당 강사",
-      "teacher_unassigned": "미지정",
-      "teacher_none": "아직 담당자가 없음",
-      "teacher_active": "이 반을 담당 중",
-      "teacher_unavailable": "지정되었지만 권한 없음",
+      "teacher": "강사",
+      "teacher_none": "아직 강사가 없음",
+      "teacher_unavailable": "권한이 없는 강사가 있음",
       "last_change": "최근 변경",
       "last_change_note": "정보·코스·학생 변경 전체"
     },
@@ -140,11 +137,9 @@
     },
     "teacher_panel": {
       "heading": "강사",
-      "body": "담임 강사 한 명이 이 반을 책임지며, 보조 강사를 최대 두 명까지 둘 수 있습니다. 보조 강사도 같은 권한으로 수업합니다.",
-      "assign": "강사 지정",
-      "replace": "강사 변경",
-      "remove": "지정 해제",
-      "empty": "아직 배정된 강사가 없습니다. 이 반을 책임질 담임 강사를 배정하세요.",
+      "body": "여기 있는 모든 강사가 같은 권한으로 이 반을 가르칩니다. 필요한 만큼 추가할 수 있습니다.",
+      "remove": "제외",
+      "empty": "아직 강사가 없습니다. 이 반을 가르칠 강사를 추가하세요.",
       "empty_readonly": "아직 담당 강사가 없습니다.",
       "archived_readonly": "이 반은 보관 상태입니다. 담당 강사를 바꾸려면 먼저 복원하세요.",
       "no_name": "이름 없음",
@@ -155,10 +150,7 @@
       "unavailable_account": "비활성 사용자 계정이라 이 지정은 권한을 주지 않습니다. 변경하거나 해제하세요.",
       "unavailable_suspended": "정지된 멤버십이라 이 지정은 권한을 주지 않습니다. 변경하거나 해제하세요.",
       "unavailable_role": "더 이상 강사가 아니라서 이 지정은 권한을 주지 않습니다. 변경하거나 해제하세요.",
-      "manage_assistants": "보조 강사",
-      "homeroom": "담임",
-      "assistant": "보조",
-      "active_assistant": "활성 멤버십, 보조"
+      "add": "강사 추가"
     },
     "students_panel": {
       "heading": "학생",
@@ -211,46 +203,11 @@
     "submitting": "추가하는 중…",
     "failed": "학생을 추가하지 못했습니다. 반을 새로 불러온 뒤 다시 시도하세요."
   },
-  "teacher_dialog": {
-    "heading_assign": "강사 지정",
-    "heading_replace": "강사 변경",
-    "body": "이 학원의 활성 강사만 표시됩니다. 한 강사가 여러 반을 담당할 수 있습니다.",
-    "trigger_label": "강사 선택",
-    "search": "이름 또는 이메일로 검색",
-    "empty": "검색 결과가 없습니다.",
-    "none_eligible": "이 학원에는 아직 활성 강사가 없습니다. 강사를 초대하거나 구성원의 역할을 강사로 바꾸세요.",
-    "load_failed": "강사 목록을 불러오지 못했습니다. 연결을 확인하고 다시 시도하세요.",
-    "unselected": "아직 선택한 강사가 없습니다.",
-    "replace_warning": "저장하는 즉시 {{name}} 강사는 이 반의 모니터링 권한을 잃습니다.",
-    "submit_assign": "강사 지정",
-    "submit_replace": "강사 변경",
-    "submitting": "저장 중…",
-    "failed": "담당 강사를 저장하지 못했습니다. 반을 새로 불러온 뒤 다시 시도하세요."
-  },
-  "assistants_dialog": {
-    "heading": "보조 강사 관리",
-    "body": "보조 강사는 담임 강사와 같은 권한으로 이 반을 가르칩니다. 최대 {{count}}명이며, 담임 강사는 포함되지 않습니다.",
-    "trigger_label": "보조 강사 선택",
-    "search": "이름 또는 이메일로 검색",
-    "empty": "검색과 일치하는 강사가 없습니다.",
-    "none_eligible": "이 학원에는 보조를 맡을 다른 활성 강사가 없습니다. 강사를 초대하거나 구성원의 역할을 강사로 변경하세요.",
-    "selected": "{{max}}명 중 {{count}}명 선택됨.",
-    "over_cap": "보조 강사는 최대 {{count}}명까지 선택할 수 있습니다.",
-    "submit": "보조 강사 저장",
-    "submitting": "저장 중…",
-    "failed": "보조 강사를 저장하지 못했습니다. 반을 새로고침한 뒤 다시 시도하세요."
-  },
   "remove_teacher": {
-    "heading": "담당 강사를 해제할까요?",
-    "body": "{{name}} 강사는 이 반의 모니터링 권한을 바로 잃습니다. 반은 코스와 학생을 그대로 유지한 채 운영되며, 다른 강사를 지정할 때까지 담당자 없이 남습니다.",
-    "confirm": "지정 해제",
-    "submitting": "해제하는 중…"
-  },
-  "remove_assistant": {
-    "heading": "이 보조 강사를 제외할까요?",
-    "body": "{{name}}은(는) 이 반에 대한 접근 권한을 즉시 잃습니다. 반의 담임 강사, 과정, 학생은 그대로 유지됩니다.",
-    "reassurance": "반의 강사 배정은 그대로 유지됩니다. 이 보조 강사의 접근 권한만 종료됩니다.",
-    "confirm": "보조 강사 제외",
+    "heading": "이 강사를 제외할까요?",
+    "body": "{{name}} 강사는 모니터링을 포함해 이 반에 대한 접근 권한을 즉시 잃습니다. 반의 코스, 학생, 다른 강사는 그대로 유지됩니다.",
+    "reassurance": "반은 그대로 운영됩니다. 이 강사의 접근 권한만 종료됩니다.",
+    "confirm": "강사 제외",
     "submitting": "제외하는 중…"
   },
   "remove_course": {
@@ -275,5 +232,18 @@
     "submitting": "보관하는 중…",
     "failed": "반을 보관하지 못했습니다. 잠시 후 다시 시도하세요."
   },
-  "load_failed": "최신 반 목록을 불러오지 못했습니다. 마지막으로 불러온 내용입니다."
+  "load_failed": "최신 반 목록을 불러오지 못했습니다. 마지막으로 불러온 내용입니다.",
+  "teachers_dialog": {
+    "heading": "이 반의 강사",
+    "body": "이 반을 가르칠 강사를 모두 선택하세요. 이 학원의 활성 강사만 표시되며, 인원 제한은 없습니다.",
+    "trigger_label": "강사 선택",
+    "search": "이름 또는 이메일로 검색",
+    "empty": "검색과 일치하는 강사가 없습니다.",
+    "none_eligible": "이 학원에는 아직 활성 강사가 없습니다. 강사를 초대하거나 구성원의 역할을 강사로 바꾸세요.",
+    "load_failed": "강사 목록을 불러오지 못했습니다. 연결을 확인하고 다시 시도하세요.",
+    "selected": "{{count}}명 선택됨.",
+    "submit": "강사 저장",
+    "submitting": "저장 중…",
+    "failed": "강사를 저장하지 못했습니다. 반을 새로고침한 뒤 다시 시도하세요."
+  }
 }

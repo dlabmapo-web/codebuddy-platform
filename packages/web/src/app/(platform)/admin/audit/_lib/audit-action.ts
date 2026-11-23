@@ -186,6 +186,7 @@ export const auditActionLabels: Record<
   'academy.profile.update': 'action.academy.profile.update',
   'class.archived': 'action.class.archived',
   'class.assistants.updated': 'action.class.assistants.updated',
+  'class.teachers.updated': 'action.class.teachers.updated',
   'class.courses.updated': 'action.class.courses.updated',
   'class.created': 'action.class.created',
   'class.deleted': 'action.class.deleted',

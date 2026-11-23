@@ -26,7 +26,7 @@
     "status": "Status",
     "courses": "Assigned courses",
     "students": "Students",
-    "teacher": "Assigned teacher",
+    "teacher": "Teachers",
     "updated": "Last change",
     "actions": "Actions"
   },
@@ -37,16 +37,14 @@
     "aria_other": "{{count}} assigned courses: {{titles}}"
   },
   "teacher_cell": {
-    "none": "Not assigned",
-    "role": "Homeroom teacher",
+    "none": "No teacher",
+    "role": "Teacher",
     "unavailable": "Unavailable",
-    "aria_assigned": "Assigned teacher: {{name}}",
+    "aria_assigned": "Teacher: {{name}}",
     "aria_unavailable": "{{name}} is assigned but the assignment grants no access",
-    "aria_none": "No teacher assigned",
-    "with_assistants_one": "Homeroom teacher · {{count}} assistant",
-    "with_assistants_other": "Homeroom teacher · {{count}} assistants",
-    "assistants_only_one": "No homeroom teacher · {{count}} assistant",
-    "assistants_only_other": "No homeroom teacher · {{count}} assistants"
+    "aria_none": "No teacher",
+    "more_one": "+{{count}} more teacher",
+    "more_other": "+{{count}} more teachers"
   },
   "create": {
     "heading": "Name the class",
@@ -86,11 +84,9 @@
       "students_all_learning_other": "All learning now",
       "students_some_inactive_one": "1 seat grants no access",
       "students_some_inactive_other": "{{count}} seats grant no access",
-      "teacher": "Teacher",
-      "teacher_unassigned": "Not assigned",
-      "teacher_none": "Nobody is responsible yet",
-      "teacher_active": "Responsible for this class",
-      "teacher_unavailable": "Assigned, but grants no access",
+      "teacher": "Teachers",
+      "teacher_none": "No teacher yet",
+      "teacher_unavailable": "A teacher here has no access",
       "last_change": "Last change",
       "last_change_note": "Any edit, course, or roster change"
     },
@@ -148,11 +144,9 @@
     },
     "teacher_panel": {
       "heading": "Teachers",
-      "body": "One homeroom teacher is answerable for this class, with up to two assistants beside them. Assistants teach it on the same terms.",
-      "assign": "Assign teacher",
-      "replace": "Replace teacher",
-      "remove": "Remove assignment",
-      "empty": "No teacher is assigned yet. Assign the homeroom teacher answerable for this class.",
+      "body": "Every teacher listed here teaches this class on the same terms. Add as many as you need.",
+      "remove": "Remove",
+      "empty": "No teacher yet. Add the teachers who teach this class.",
       "empty_readonly": "No teacher is assigned yet.",
       "archived_readonly": "This class is archived. Restore it before changing who teaches it.",
       "no_name": "Name not set",
@@ -163,10 +157,7 @@
       "unavailable_account": "This user account is inactive, so the assignment grants no access. Replace it or remove it.",
       "unavailable_suspended": "This membership is suspended, so the assignment grants no access. Replace it or remove it.",
       "unavailable_role": "This member is no longer a teacher, so the assignment grants no access. Replace it or remove it.",
-      "manage_assistants": "Assistants",
-      "homeroom": "Homeroom",
-      "assistant": "Assistant",
-      "active_assistant": "Active membership, assisting"
+      "add": "Add teachers"
     },
     "students_panel": {
       "heading": "Students",
@@ -221,46 +212,11 @@
     "submitting": "Adding…",
     "failed": "Could not add the students. Reload the class and try again."
   },
-  "teacher_dialog": {
-    "heading_assign": "Assign a teacher",
-    "heading_replace": "Replace the teacher",
-    "body": "Only active teachers of this academy appear here. One teacher can be responsible for many classes.",
-    "trigger_label": "Select a teacher",
-    "search": "Search by name or email",
-    "empty": "No teacher matches that search.",
-    "none_eligible": "This academy has no active teachers yet. Invite one, or change a member's role to Teacher.",
-    "load_failed": "Teachers could not be loaded. Check your connection and try again.",
-    "unselected": "No teacher selected yet.",
-    "replace_warning": "{{name}} loses class-monitoring access to this class as soon as you save.",
-    "submit_assign": "Assign teacher",
-    "submit_replace": "Replace teacher",
-    "submitting": "Saving…",
-    "failed": "Could not save the teacher. Reload the class and try again."
-  },
-  "assistants_dialog": {
-    "heading": "Manage assistant teachers",
-    "body": "Assistants teach this class on the same terms as its homeroom teacher. Up to {{count}} of them, and the homeroom teacher is not one.",
-    "trigger_label": "Select assistants",
-    "search": "Search by name or email",
-    "empty": "No teacher matches that search.",
-    "none_eligible": "This academy has no other active teachers to assist. Invite one, or change a member's role to Teacher.",
-    "selected": "{{count}} of {{max}} selected.",
-    "over_cap": "Pick at most {{count}} assistants.",
-    "submit": "Save assistants",
-    "submitting": "Saving…",
-    "failed": "Could not save the assistants. Reload the class and try again."
-  },
   "remove_teacher": {
     "heading": "Remove this teacher?",
-    "body": "{{name}} loses class-monitoring access to this class right away. The class stays active with its courses and students, and runs unassigned until you pick someone else.",
-    "confirm": "Remove assignment",
-    "submitting": "Removing…"
-  },
-  "remove_assistant": {
-    "heading": "Remove this assistant?",
-    "body": "{{name}} loses access to this class right away. The class keeps its homeroom teacher, its courses, and its students.",
-    "reassurance": "The class stays staffed. Only this assistant's access ends.",
-    "confirm": "Remove assistant",
+    "body": "{{name}} loses access to this class right away, including class monitoring. The class keeps its courses, students and other teachers.",
+    "reassurance": "The class stays active. Only this teacher's access ends.",
+    "confirm": "Remove teacher",
     "submitting": "Removing…"
   },
   "remove_course": {
@@ -285,5 +241,18 @@
     "submitting": "Archiving…",
     "failed": "Could not archive the class. Try again in a moment."
   },
-  "load_failed": "Could not load the latest classes. This is the last version that loaded."
+  "load_failed": "Could not load the latest classes. This is the last version that loaded.",
+  "teachers_dialog": {
+    "heading": "Teachers of this class",
+    "body": "Pick every teacher who teaches this class. Only active teachers of this academy appear here, and there is no limit.",
+    "trigger_label": "Select teachers",
+    "search": "Search by name or email",
+    "empty": "No teacher matches that search.",
+    "none_eligible": "This academy has no active teachers yet. Invite one, or change a member's role to Teacher.",
+    "load_failed": "Teachers could not be loaded. Check your connection and try again.",
+    "selected": "{{count}} selected.",
+    "submit": "Save teachers",
+    "submitting": "Saving…",
+    "failed": "Could not save the teachers. Reload the class and try again."
+  }
 }

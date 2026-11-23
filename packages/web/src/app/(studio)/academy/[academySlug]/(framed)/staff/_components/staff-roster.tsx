@@ -160,13 +160,8 @@ export function StaffRoster({
         meta: { hideable: true },
         cell: ({ row }) => (
           <ClassChips
-            classes={[
-              ...row.original.homeroomClasses,
-              ...row.original.assistantClasses.map((entry) => ({
-                ...entry,
-                suffix: t('teachers.assistant_suffix'),
-              })),
-            ]}
+            // Every class they teach, on the same terms: no assistant label.
+            classes={[...row.original.homeroomClasses, ...row.original.assistantClasses]}
             emptyLabel={t('teachers.no_class')}
           />
         ),

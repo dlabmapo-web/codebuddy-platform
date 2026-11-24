@@ -386,6 +386,9 @@ export function ContentTable({
         id: 'name',
         header: t('table.class'),
         enableHiding: false,
+        // Wide enough for a whole class name: the name is how operators tell
+        // one class from another, and a truncated one hides the difference.
+        size: 300,
         cell: ({ row }) => (
           <TitleCell
             subtitle={row.original.description}
@@ -433,7 +436,7 @@ export function ContentTable({
         t('table.students'),
         (row) => row.studentCount,
         'none',
-        80,
+        104,
         true,
       ),
       updatedColumn<PlatformClass>(88),
@@ -442,10 +445,11 @@ export function ContentTable({
         header: '',
         enableHiding: false,
         enableSorting: false,
-        size: 96,
+        size: 56,
         cell: ({ row }) => (
           <ContentRowActions
             deleteLabel={platform('content_panel.delete_class')}
+            openInMenu
             href={contentDetailHref.class(row.original, path)}
             label={row.original.name}
             onRename={() =>

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Copy, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ArrowRight, Copy, ExternalLink, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/studio/overlays';
+import { ClassDeleteImpactNotice } from '@/components/studio/class-delete-impact-notice';
 import { Modal, ModalContent } from '@/components/studio/primitives';
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
@@ -44,10 +45,14 @@ import { orpc } from '@/lib/orpc';
  * their academy. It is optional, because the academy detail page offers the
  * same menu without a dialog to open.
  *
- * Refusals are shown, never predicted. The server declines to delete a course
- * or class with student work behind it; that answer arrives in the dialog. An
- * item disabled by a rule the browser guessed at is wrong the moment another
- * tab changes the state it guessed from.
+ * `openInMenu` moves Open into the menu as its first item (the classes table):
+ * there the row is read for its wide name column, and one "⋯" per row is the
+ * quieter end of it.
+ *
+ * Refusals are shown, never predicted: what the server declines arrives in the
+ * dialog. An item disabled by a rule the browser guessed at is wrong the moment
+ * another tab changes the state it guessed from. A class may be deleted with
+ * student work in it; its dialog says what goes first.
  */
 export type ContentDeleteTarget =
   | { kind: 'course'; id: string; label: string }
@@ -60,9 +65,12 @@ export function ContentRowActions({
   onRename,
   copyAction,
   href,
+  openInMenu = false,
   statusAction,
 }: {
   deleteLabel: string;
+  /** Open as the menu's first item instead of an arrow beside it. */
+  openInMenu?: boolean;
   label: string;
   onDelete: () => void;
   /** Omitted where the surface has no rename dialog to open. */
@@ -84,14 +92,14 @@ export function ContentRowActions({
       className="flex items-center justify-end gap-0.5"
       onClick={(event) => event.stopPropagation()}
     >
-      <Link
+      {openInMenu ? null : <Link
         aria-label={content('table.open')}
         className="group grid size-8 place-items-center rounded-md text-sub transition-colors hover:bg-brand-soft hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         href={href}
         title={content('table.open')}
       >
         <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-      </Link>
+      </Link>}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -105,6 +113,14 @@ export function ContentRowActions({
         <DropdownMenuContent align="end" className="w-[13rem] text-[14.5px]">
           <DropdownMenuLabel className="truncate text-[12.5px]">{label}</DropdownMenuLabel>
           <DropdownMenuSeparator />
+          {openInMenu ? (
+            <DropdownMenuItem asChild>
+              <Link href={href}>
+                <ExternalLink className="text-sub" />
+                {content('table.open')}
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
           {onRename ? (
             <DropdownMenuItem onSelect={onRename}>
               <Pencil className="text-sub" />
@@ -143,8 +159,8 @@ export function ContentRowActions({
  * Each asks for its name typed back, as academy deletion does — the destructive
  * acts in this product should ask the same thing of the person doing them.
  *
- * The server refuses either outright once a student has submitted, which is the
- * guarantee that matters and the one this form cannot make.
+ * A course with student work is refused by the server. A class may go with it;
+ * the dialog shows what is kept and what is deleted before the name is typed.
  */
 export function ContentDeleteDialog({
   academyId,
@@ -230,6 +246,9 @@ export function ContentDeleteDialog({
             />
             {error ? (
               <p className="mt-1 text-[13px] text-danger" role="alert">{errorText(error)}</p>
+            ) : null}
+            {target?.kind === 'class' && academyId ? (
+              <ClassDeleteImpactNotice academyId={academyId} classId={target.id} open />
             ) : null}
           </div>
           <div className="flex justify-end gap-2 border-t border-border px-6 py-4">

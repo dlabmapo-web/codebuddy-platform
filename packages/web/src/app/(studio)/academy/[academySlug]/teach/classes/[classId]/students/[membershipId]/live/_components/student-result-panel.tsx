@@ -17,6 +17,7 @@ import {
   resultPresentation,
 } from '@/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_lib/scoring';
 import type { LiveSubmissionResult } from '../_hooks/use-live-submission-result';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /**
  * The student's latest verdict, as the student sees it.
@@ -42,7 +43,7 @@ export function StudentResultPanel({
   const { t: tl } = useLayoutTranslation('learn');
   const locale = useLocale();
   const time = React.useMemo(
-    () => new Intl.DateTimeFormat(locale, { timeStyle: 'medium' }),
+    () => new Intl.DateTimeFormat(locale, { timeZone: displayTimeZone, timeStyle: 'medium' }),
     [locale],
   );
   const { view, result, summary } = submission;

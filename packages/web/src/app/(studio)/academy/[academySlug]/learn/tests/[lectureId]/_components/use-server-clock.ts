@@ -3,6 +3,7 @@
 import * as React from 'react';
 
 import { orpc } from '@/lib/orpc';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /**
  * The server's clock as seen from here: one round trip, the server instant
@@ -44,7 +45,7 @@ export function useServerClock({ initialServerNow }: { initialServerNow?: Date |
     return () => window.clearInterval(timer);
   }, []);
 
-  const time = (ms: number) => new Date(ms).toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const time = (ms: number) => new Date(ms).toLocaleTimeString('ko-KR', { timeZone: displayTimeZone, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
   return {
     syncing,
     resync: () => void resync(),

@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 
 import { studentAnalyticsPath, type OverviewQuery } from '../../_lib/overview-url';
 import { Avatar, Duration, EmptyState, Panel } from './overview-primitives';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /**
  * The two five-row previews, and the one rule they share.
@@ -379,7 +380,7 @@ function LastSeen({ at, locale }: { at: string | null; locale: string }) {
   if (!at) return <span>{t('never')}</span>;
   return (
     <time dateTime={at}>
-      {new Intl.DateTimeFormat(locale, {
+      {new Intl.DateTimeFormat(locale, { timeZone: displayTimeZone,
         month: 'short',
         day: 'numeric',
       }).format(new Date(at))}

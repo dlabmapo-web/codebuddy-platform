@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useLocale } from '@/i18n';
 import { cn } from '@/lib/utils';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /**
  * The teacher's accent, and the same violet v1 used for the teacher's cursor.
@@ -177,7 +178,7 @@ export function FeedbackPanel({
                     <time
                       className="ml-auto shrink-0 text-[11px] text-sub"
                       dateTime={note.updatedAt}
-                      title={new Date(note.updatedAt).toLocaleString(locale)}
+                      title={new Date(note.updatedAt).toLocaleString(locale, { timeZone: displayTimeZone })}
                     >
                       {formatStamp(note.updatedAt)}
                     </time>
@@ -201,7 +202,7 @@ export function FeedbackPanel({
  */
 function useStampFormatter(locale: string) {
   return React.useMemo(() => {
-    const format = new Intl.DateTimeFormat(locale, {
+    const format = new Intl.DateTimeFormat(locale, { timeZone: displayTimeZone,
       month: 'numeric',
       day: 'numeric',
       hour: '2-digit',

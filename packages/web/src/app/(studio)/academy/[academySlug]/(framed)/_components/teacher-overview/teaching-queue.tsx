@@ -24,6 +24,7 @@ import {
   type OverviewQuery,
 } from '../../_lib/overview-url';
 import { Avatar, Duration, EmptyState, Panel } from './overview-primitives';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /**
  * The overview's signature surface: who to check first, and what says so.
@@ -255,7 +256,7 @@ function LastSeen({ at }: { at: string | null }) {
   }
   return (
     <time className="font-mono font-semibold tabular-nums text-ink" dateTime={at}>
-      {new Intl.DateTimeFormat(i18n.language, {
+      {new Intl.DateTimeFormat(i18n.language, { timeZone: displayTimeZone,
         month: 'short',
         day: 'numeric',
       }).format(new Date(at))}

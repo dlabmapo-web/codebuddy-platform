@@ -1,6 +1,7 @@
 'use client';
 
 import { Sparkles, X } from 'lucide-react';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 export type AiFeedbackItem = { id: string; content: string; created_at: string };
 
@@ -52,7 +53,7 @@ export function AiFeedbackPanel({
               </div>
               <span style={{ fontSize: '12px', fontWeight: 600, color: ACCENT }}>AI 튜터</span>
               <span style={{ fontSize: '11px', color: '#BCC0C7', marginLeft: 'auto' }}>
-                {new Date(fb.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {new Date(fb.created_at).toLocaleString('ko-KR', { timeZone: displayTimeZone, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
             <p style={{ fontSize: '13px', color: '#16181D', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{fb.content}</p>

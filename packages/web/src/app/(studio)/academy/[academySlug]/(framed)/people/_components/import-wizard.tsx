@@ -36,6 +36,7 @@ import {
   templateCsv,
   uploadWorkbook,
 } from '../_lib/upload-workbook';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /**
  * Member import, as three screens in one dialog.
@@ -402,7 +403,7 @@ function ReviewStep({
           <Tally tone="danger" value={preview.error} label={t('import.count_error')} />
           <span className="ml-auto text-[11.5px] text-sub">
             {t('import.expires', {
-              time: new Intl.DateTimeFormat(i18n.language, {
+              time: new Intl.DateTimeFormat(i18n.language, { timeZone: displayTimeZone,
                 hour: '2-digit',
                 minute: '2-digit',
               }).format(new Date(preview.expiresAt)),

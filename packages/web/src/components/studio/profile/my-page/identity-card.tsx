@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 
 import { accentStyle, roleAccent } from '@/components/studio/profile/accent';
 import { ImagePicker } from './image-picker';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /**
  * The page opens on the thing it is actually about: this person, in this
@@ -122,7 +123,7 @@ export function IdentityCard({
               {academy.context.joinedAt ? (
                 <span className="text-[13px] text-sub">
                   {t('identity.joined', {
-                    date: new Intl.DateTimeFormat(locale, {
+                    date: new Intl.DateTimeFormat(locale, { timeZone: displayTimeZone,
                       year: 'numeric',
                       month: 'short',
                     }).format(new Date(academy.context.joinedAt)),

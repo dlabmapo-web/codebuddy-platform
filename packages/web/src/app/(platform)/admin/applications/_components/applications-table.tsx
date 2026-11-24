@@ -32,6 +32,7 @@ import {
 } from '../../_hooks/use-platform-applications';
 import { waitedFor } from '../_lib/waited-for';
 import { ApplicationsSummary } from './applications-summary';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /**
  * Everyone waiting to be let into an academy, in the table the console uses
@@ -188,7 +189,7 @@ export function ApplicationsTable({
                   ? 'font-bold text-danger'
                   : 'text-sub',
               )}
-              title={new Date(row.original.createdAt).toLocaleString(locale)}
+              title={new Date(row.original.createdAt).toLocaleString(locale, { timeZone: displayTimeZone })}
             >
               {t(`age.${age.unit}`, { count: age.value })}
             </span>

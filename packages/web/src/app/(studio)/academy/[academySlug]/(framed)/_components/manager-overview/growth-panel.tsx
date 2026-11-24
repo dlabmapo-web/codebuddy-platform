@@ -17,6 +17,7 @@ import { formatLocalDate } from '../../_lib/overview-view';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 
 import { EmptyState, Panel, toneStyles } from '../overview-ui/panel';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /**
  * Arrivals, by the academy's own calendar days.
@@ -215,7 +216,7 @@ export function GrowthPanel({
                         {join.displayName}
                       </span>
                       <span className="block font-mono text-[10.5px] tabular-nums text-sub">
-                        {new Intl.DateTimeFormat(i18n.language, {
+                        {new Intl.DateTimeFormat(i18n.language, { timeZone: displayTimeZone,
                           month: 'short',
                           day: 'numeric',
                         }).format(new Date(join.joinedAt))}

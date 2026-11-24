@@ -60,6 +60,7 @@ import {
   useTeacherStudentsQuery,
 } from '../_hooks/use-teacher-students';
 import { optionsForParent, type StudentsQuery } from '../_lib/students-url';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /**
  * Student analytics: one table, and the controls that decide what is in it.
@@ -524,7 +525,7 @@ function LastActive({ at }: { at: string | null }) {
   if (!at) return <span className="text-sub">{t('never')}</span>;
   return (
     <time className="whitespace-nowrap font-mono text-[12.5px] tabular-nums" dateTime={at}>
-      {new Intl.DateTimeFormat(i18n.language, {
+      {new Intl.DateTimeFormat(i18n.language, { timeZone: displayTimeZone,
         month: 'short',
         day: 'numeric',
       }).format(new Date(at))}

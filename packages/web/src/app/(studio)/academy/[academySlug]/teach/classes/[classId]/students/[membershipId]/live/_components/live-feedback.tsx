@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/studio/button';
 import { useLocale } from '@/i18n';
 import type { MonitoringAckResult } from '@/lib/monitoring/types';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /**
  * The teacher's note on this exercise, docked under the workspace.
@@ -60,7 +61,7 @@ export function FeedbackDock({
   const [failed, setFailed] = React.useState(false);
 
   const time = React.useMemo(
-    () => new Intl.DateTimeFormat(locale, { timeStyle: 'short' }),
+    () => new Intl.DateTimeFormat(locale, { timeZone: displayTimeZone, timeStyle: 'short' }),
     [locale],
   );
 

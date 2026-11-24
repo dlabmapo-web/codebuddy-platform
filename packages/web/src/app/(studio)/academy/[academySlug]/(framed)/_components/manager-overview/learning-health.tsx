@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 
 import { durationDisplay, meterWidth } from '../../_lib/overview-view';
 import { EmptyState, Panel } from '../overview-ui/panel';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /**
  * How the academy is learning, and which class is doing it best right now.
@@ -321,7 +322,7 @@ function ClassComparisonTable({
           if (!value) return <Missing />;
           return (
             <span className="whitespace-nowrap font-mono text-[11.5px] tabular-nums text-sub">
-              {new Intl.DateTimeFormat(i18n.language, {
+              {new Intl.DateTimeFormat(i18n.language, { timeZone: displayTimeZone,
                 month: 'short',
                 day: 'numeric',
               }).format(new Date(value))}

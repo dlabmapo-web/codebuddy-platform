@@ -29,16 +29,17 @@ export type AcademyFeatureName = z.infer<typeof academyFeatureNameSchema>;
 /**
  * Features still being rolled out, which a new academy does *not* start with.
  *
- * Everything else is on for a new academy (see above). A rollout gate is the
- * opposite on purpose: it is switched on academy by academy once the feature
- * has shown it holds up there — server sample checks share the judge with
- * official grading, so turning them on everywhere at once is exactly the
- * capacity risk the gate exists to avoid.
+ * Empty since v2.0.73: tests (exams) and server-checked samples are on for
+ * every academy by default, like the rest, and migration 20261124100000
+ * turned them on for the academies that already existed. Kept so a future
+ * feature can start here again, switched on academy by academy.
+ *
+ * Server-checked samples send to the judge only the Python problems the browser
+ * cannot judge itself (`comparesSampleLocally`): weighted grading and ignored
+ * input prompts. Python samples run there one at a time, and the slot reserved
+ * for submissions keeps official grading safe.
  */
-export const academyRolloutFeatures: ReadonlySet<AcademyFeatureName> = new Set([
-  "SERVER_SAMPLE_CHECKS",
-  "EXAMS",
-]);
+export const academyRolloutFeatures: ReadonlySet<AcademyFeatureName> = new Set<AcademyFeatureName>([]);
 
 /**
  * The named class board is computed from the point ledger, so it cannot stand

@@ -180,7 +180,7 @@
       "total": "총점:",
       "total_hint": "이 테스트에 포함된 문제의 배점 총합이 표시됩니다.",
       "not_100": "100점 아님",
-      "locked": "공개 중이거나 응시 기록이 있어 배점을 바꿀 수 없습니다.",
+      "locked": "학생이 응시를 시작해 배점을 바꿀 수 없습니다.",
       "empty": "코스 빌더에서 이 수업에 객관식, 주관식, 코드 문제를 추가해 주세요.",
       "invalid": "테스트에 사용할 수 없음",
       "open_editor": "편집기 열기",
@@ -259,6 +259,7 @@
       "SHORT_ANSWER": "주관식"
     },
     "open_test_settings": "테스트 설정",
+    "problem_count": "{{count}}문제",
     "release_auto": "이 테스트는 학생이 마치는 즉시 점수를 자동으로 보여 줍니다.",
     "avg_runs": "평균 실행 횟수",
     "cell_submissions": "제출 {{count}}회",

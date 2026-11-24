@@ -168,6 +168,8 @@
       "case_expected": "기댓값",
       "case_actual": "실행 결과",
       "score": "점수",
+      "test_points": "테스트 점수",
+      "test_not_counted": "미반영: 이후 제출이 채점됩니다",
       "tests": "테스트",
       "runtime": "실행 시간",
       "solve_time": "풀이 시간",

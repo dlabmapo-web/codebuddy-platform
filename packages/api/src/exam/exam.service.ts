@@ -203,6 +203,7 @@ export class ExamService {
           programmingExercise: {
             select: {
               description: true, inputFormat: true, outputFormat: true, constraints: true, starterCode: true, language: true, quiz: true,
+              gradingMode: true, inputPromptPolicy: true,
               testCases: { orderBy: { position: "asc" }, select: { input: true, expectedOutput: true, visibility: true } },
             },
           },
@@ -226,7 +227,8 @@ export class ExamService {
         samples: exercise.testCases.filter((testCase) => testCase.visibility === "SAMPLE")
           .map((testCase) => ({ input: testCase.input, output: testCase.expectedOutput })),
         hiddenCount: exercise.testCases.filter((testCase) => testCase.visibility !== "SAMPLE").length,
-        language: exercise.language, starterCode: exercise.starterCode, lastAnswer };
+        language: exercise.language, starterCode: exercise.starterCode,
+        gradingMode: exercise.gradingMode, inputPromptPolicy: exercise.inputPromptPolicy, lastAnswer };
     }
     const manual = material.manualMaterial;
     if (manual?.multipleChoice) {

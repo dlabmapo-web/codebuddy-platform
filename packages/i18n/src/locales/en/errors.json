@@ -172,7 +172,8 @@
   "EXAM_PERIOD_CLOSED": "The test period has ended.",
   "EXAM_ENTRY_CLOSED": "The entry deadline has passed.",
   "EXAM_EXIT_NOT_YET": "You cannot end the test yet.",
-  "EXAM_LOCKED": "Published or already taken: points cannot change.",
+  "EXAM_LOCKED": "Students have started this test: points cannot change.",
+  "EXAM_NO_POINTS": "Give the problems points before publishing the test.",
   "EXAM_RETAKE_NOT_ALLOWED": "You have already taken this test.",
   "EXAM_FEATURE_OFF": "Tests are not enabled for this academy.",
   "EXAM_INVALID_MATERIAL": "A test holds only multiple choice, short answer and code problems."

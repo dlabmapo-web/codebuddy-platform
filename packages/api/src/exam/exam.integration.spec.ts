@@ -11,6 +11,7 @@ import type { PrismaService } from "../database/prisma.service.js";
 import { PrismaClient } from "../generated/prisma/client.js";
 import { ExamStaffService } from "./exam-staff.service.js";
 import { ExamService } from "./exam.service.js";
+import { TeacherProgressRepository } from "../teach/teacher-progress.repository.js";
 
 /**
  * Exams against a disposable PostgreSQL (COVE_INTEGRATION_DATABASE_URL), never
@@ -81,16 +82,23 @@ describe.skipIf(!databaseUrl)("exams against PostgreSQL", () => {
 
   afterAll(async () => { await client?.$disconnect(); });
 
-  it("lets staff set points and publish, then locks the points", async () => {
+  it("refuses publishing without points, then keeps points editable until an attempt", async () => {
     const before = await staff.staffTest(identity(managerAuth), { academyId, courseId, lectureId });
     expect(before.locked).toBe(false);
+    await expect(staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId, isVisible: true }))
+      .rejects.toMatchObject({ code: "EXAM_NO_POINTS" });
     const points = Object.fromEntries(materials.map((m, i) => [m.id, (i < 5 ? 6 : 7) * 100]));
     const updated = await staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId, points });
     expect(updated.totalPointsHundredths).toBe(5 * 600 + 10 * 700);
     const published = await staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId, isVisible: true });
-    expect(published.locked).toBe(true);
+    expect(published.locked).toBe(false);
     expect(published.items.every((item) => item.isVisible)).toBe(true);
-    await expect(staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId, points })).rejects.toMatchObject({ code: "EXAM_LOCKED" });
+    // Published but untaken: points still change, though never to a total of zero.
+    const zero = Object.fromEntries(materials.map((m) => [m.id, 0]));
+    await expect(staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId, points: zero }))
+      .rejects.toMatchObject({ code: "EXAM_NO_POINTS" });
+    const repointed = await staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId, points });
+    expect(repointed.totalPointsHundredths).toBe(5 * 600 + 10 * 700);
   });
 
   it("shows the test card in one test statement and starts one attempt", async () => {
@@ -110,6 +118,11 @@ describe.skipIf(!databaseUrl)("exams against PostgreSQL", () => {
     expect(shell.items).toHaveLength(15);
     expect(shell.deadlineAt!.getTime() - shell.startedAt.getTime()).toBe(50 * 60_000);
     expect(shell.items.every((item) => !item.submitted && item.scoreHundredths === null)).toBe(true);
+    // A student has started: the points are frozen now.
+    const taken = await staff.staffTest(identity(managerAuth), { academyId, courseId, lectureId });
+    expect(taken.locked).toBe(true);
+    await expect(staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId,
+      points: { [taken.items[0]!.materialId]: 100 } })).rejects.toMatchObject({ code: "EXAM_LOCKED" });
   });
 
   it("refuses another student's attempt and a problem outside the attempt", async () => {
@@ -178,6 +191,20 @@ describe.skipIf(!databaseUrl)("exams against PostgreSQL", () => {
     // Access and class checks, then the grid read and one last-submission read,
     // whatever the number of students or problems.
     expect(resultStatements).toBeLessThanOrEqual(6);
+
+    // The teacher's submission page reads the same points: the counted (last)
+    // submission earns the item's points; the earlier one is not counted.
+    const reviewer = new TeacherProgressRepository(client as unknown as PrismaService);
+    const attemptId = attempts.get(students[5]!.id)!;
+    const [earlier, later] = programmingRows.filter((row) => row.testAttemptId === attemptId && row.materialId === code[0]!.id)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    const worth = results.items.find((item) => item.materialId === code[0]!.id)!.pointsHundredths;
+    statements = 0;
+    const counted = await reviewer.testPointsForSubmission({ testAttemptId: attemptId, materialId: code[0]!.id, submissionId: later!.id });
+    expect(statements).toBe(2);
+    expect(counted).toMatchObject({ pointsHundredths: worth, counted: { submissionId: later!.id, fraction: 1 } });
+    expect(await reviewer.testPointsForSubmission({ testAttemptId: attemptId, materialId: code[0]!.id, submissionId: earlier!.id }))
+      .toMatchObject({ pointsHundredths: worth, counted: null });
 
     // Grading a short answer moves it from pending to scored.
     const short = await client.manualSubmission.findFirstOrThrow({ where: { userId: students[5]!.id, testAttemptId: attempts.get(students[5]!.id)!, shortAnswerAssessment: { isNot: null } } });

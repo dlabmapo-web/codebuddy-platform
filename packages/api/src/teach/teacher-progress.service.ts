@@ -1,5 +1,5 @@
 import { programmingAssessment } from "../learn/programming-assessment.js";
-import { quizFeedback } from "@cove/shared";
+import { itemScore, quizFeedback } from "@cove/shared";
 import { programExit } from "../judge/program-exit.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
@@ -627,9 +627,17 @@ export class TeacherProgressService {
         HttpStatus.NOT_FOUND,
       );
     }
-    const statement = await this.repository.findStatement(
-      submission.sourceMaterialId,
-    );
+    // A test submission also reports its test points, read alongside.
+    const [statement, testPoints] = await Promise.all([
+      this.repository.findStatement(submission.sourceMaterialId),
+      submission.testAttemptId
+        ? this.repository.testPointsForSubmission({
+            testAttemptId: submission.testAttemptId,
+            materialId: submission.sourceMaterialId,
+            submissionId: submission.id,
+          })
+        : null,
+    ]);
 
     const sampleByPosition = new Map(
       submission.gradingCases.map((item) => [item.position, item]),
@@ -691,6 +699,13 @@ export class TeacherProgressService {
       compileDiagnostics: submission.compileDiagnostics,
       hiddenPassed: hidden.filter((item) => isOutputCorrect(item.outcome)).length,
       hiddenTotal: hidden.length,
+      test: testPoints
+        ? {
+            pointsHundredths: testPoints.pointsHundredths,
+            scoreHundredths: testPoints.counted ? itemScore(testPoints.counted.fraction, testPoints.pointsHundredths) : null,
+            counted: testPoints.counted !== null,
+          }
+        : null,
     };
   }
 

@@ -24,7 +24,7 @@ import { PageSizePicker } from '@/components/studio/page-size-picker';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useErrorText } from '@/i18n/client/use-error-text';
 
-import { DeleteMemberButton } from '../../people/_components/delete-member-button';
+import { MemberRowMenu } from '../../people/_components/member-row-menu';
 import { routes } from '@/lib/routes';
 
 import {
@@ -33,7 +33,6 @@ import {
   UsernameCell,
 } from '../../_components/people-cells';
 import {
-  ProfileLinkCell,
   RosterFailure,
   RosterFooter,
 } from '../../_components/roster-parts';
@@ -236,27 +235,20 @@ export function StudentRoster({
         header: '',
         enableSorting: false,
         enableHiding: false,
-        size: 80,
+        size: 56,
         // §5.1 — the detail page, for every reader, including the Manager.
         // The editor is one click further on, behind the Edit link there. A
         // row action that opened the editor was a link a Team Lead could see
         // and not follow.
         cell: ({ row }) => (
-          <div className="flex items-center justify-end gap-1">
-            <ProfileLinkCell
-              href={routes.academyStudent(academySlug, row.original.membershipId)}
-              label={t('view_profile', { name: row.original.displayName })}
-            />
-            {/* Managers only: deleting a person is a members decision. */}
-            {canManageMembers && row.original.userId !== viewerUserId ? (
-              <DeleteMemberButton
-                academyId={academyId}
-                membershipId={row.original.membershipId}
-                name={row.original.displayName}
-                onDeleted={() => void refetch()}
-              />
-            ) : null}
-          </div>
+          <MemberRowMenu
+            academyId={academyId}
+            canDelete={canManageMembers && row.original.userId !== viewerUserId}
+            membershipId={row.original.membershipId}
+            name={row.original.displayName}
+            onDeleted={() => void refetch()}
+            profileHref={routes.academyStudent(academySlug, row.original.membershipId)}
+          />
         ),
       },
     ],

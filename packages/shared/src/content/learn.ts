@@ -290,9 +290,9 @@ export const learnExerciseSchema = z.object({
    */
   gradingRevision: z.number().int().positive().default(1),
   /**
-   * Whether this academy judges public samples of enhanced problems on the
-   * server. Off, a sample run shows its output and leaves the verdict to
-   * Submit, as before.
+   * Whether this problem's public samples run on the server: always for C and
+   * C++, and where the academy has it on, for Python the browser cannot judge
+   * (`comparesSampleLocally`). Off, they run in the browser.
    */
   serverSampleChecks: z.boolean().default(false),
   sampleTestCases: z.array(learnSampleTestCaseSchema),
@@ -909,4 +909,18 @@ export function workspaceMaterialSequence(context: WorkspaceNavigatorContext | n
     ...(lecture.documents ?? []).filter((item) => item.pdf.placement !== "SUPPLEMENTARY").map((item) => ({ materialId: item.materialId, title: item.title, position: item.position, type: "PDF_DOCUMENT", status: item.status })),
     ...(lecture.manualMaterials ?? []).map((item) => ({ materialId: item.materialId, title: item.title, position: item.position, type: item.type })),
   ].sort((left, right) => left.position - right.position)));
+}
+
+/**
+ * Whether the browser can decide a Python sample's verdict exactly as the
+ * server will; the API sends only the other samples to the judge.
+ *
+ * Only legacy comparison is: the browser's `normalizeSampleOutput` is the
+ * judge's legacy normalizer. Weighted grading compares in CPython — Python's
+ * `splitlines`, `re.search`, substring rules — and a JavaScript imitation
+ * would pass samples that fail on Submit, or the reverse. Better to say
+ * nothing than to say something the grade will contradict.
+ */
+export function comparesSampleLocally(gradingMode: string | undefined, inputPromptPolicy = "INCLUDE"): boolean {
+  return inputPromptPolicy === "INCLUDE" && (gradingMode ?? "LEGACY_STDIO") === "LEGACY_STDIO";
 }

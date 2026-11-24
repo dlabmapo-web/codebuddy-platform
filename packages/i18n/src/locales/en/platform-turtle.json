@@ -1,0 +1,45 @@
+{
+  "title": "Public Turtle",
+  "subtitle": "Which academies use public Turtle, when, and how much.",
+  "active_now": "Active now",
+  "active_now_hint": "seen in the last 5 minutes",
+  "devices": "Devices",
+  "devices_hint": "different browsers, not people",
+  "entries": "Entries",
+  "entries_hint": "times a code was entered",
+  "runs": "Runs",
+  "runs_hint": "times code was run",
+  "period": {
+    "label": "Period",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "7d": "7 days",
+    "30d": "30 days",
+    "90d": "90 days",
+    "from": "From",
+    "to": "To"
+  },
+  "show_all": "Show all academies",
+  "updated": "Updated {{time}}",
+  "refresh_failed": "Could not refresh. Showing earlier figures.",
+  "chart": {
+    "title_hour": "Use by hour",
+    "title_day": "Use by day",
+    "time": "Time",
+    "table": "Show the figures",
+    "empty": "No public Turtle use in this period."
+  },
+  "table": {
+    "academy": "Academy",
+    "last_used": "Last used",
+    "never": "Not in 180 days",
+    "unknown": "Unknown academy",
+    "search": "Search an academy",
+    "empty": "No academies found."
+  },
+  "note": "Public Turtle has no sign-in, so it counts browsers. A shared computer counts as one device, and one student using two browsers counts as two. Times are Seoul time. Figures can be 15 seconds late and are kept for 180 days.",
+  "unavailable": {
+    "title": "Public Turtle use is unavailable",
+    "body": "The platform could not be reached. Try again shortly."
+  }
+}

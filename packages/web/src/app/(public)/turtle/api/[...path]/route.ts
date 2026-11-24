@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { trialAllowedPath, trialBody, trialBrowserBody, trialCookieName, trialNonceName, trialOriginAllowed } from '@/lib/turtle-trial/boundary';
+import { trialAllowedPath, trialBody, trialBrowserBody, trialCookieName, trialDevice, trialDeviceName, trialDeviceSeconds, trialNonceName, trialOriginAllowed } from '@/lib/turtle-trial/boundary';
 
 export const runtime = 'nodejs';
 const headers = { 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' };
@@ -20,6 +20,9 @@ async function handler(request: Request, context: Context) {
   const guestCookie = trialCookieName(production, fixture), nonceCookie = trialNonceName(production, fixture);
   const token = jar.get(guestCookie)?.value ?? '';
   const nonce = jar.get(nonceCookie)?.value ?? '';
+  const entering = path === 'access' && request.method === 'POST';
+  const deviceCookie = trialDeviceName(production, fixture);
+  const device = entering ? trialDevice(jar.get(deviceCookie)?.value) : '';
   // Opening the public page without a grant is an ordinary signed-out state.
   if (path === 'bootstrap' && !token) return new NextResponse(null, { status: 204, headers });
   try {
@@ -32,6 +35,7 @@ async function handler(request: Request, context: Context) {
     const upstreamHeaders = {
       'Content-Type': 'application/json', 'X-Cove-Bff-Secret': secret,
       'X-Cove-Turtle-Session': token, 'X-Cove-Turtle-Nonce': nonce, 'X-Cove-Client-IP': ip,
+      ...(entering ? { 'X-Cove-Turtle-Device': device } : {}),
     };
     const upstream = await fetch(new URL('/api/turtle-trial/' + path, base), {
       method: path === 'challenge' ? 'POST' : request.method, headers: upstreamHeaders,
@@ -57,12 +61,13 @@ async function handler(request: Request, context: Context) {
       response.cookies.set(nonceCookie, data.nonce, { ...cookieOptions(), maxAge: 600 });
       return response;
     }
-    if (path === 'access' && request.method === 'POST') {
+    if (entering) {
       if (token) await fetch(new URL('/api/turtle-trial/access', base), {
         method: 'DELETE', headers: upstreamHeaders, signal: AbortSignal.timeout(5000),
       }).catch(() => {});
       const response = NextResponse.json({ expiresAt: data.expiresAt }, { headers });
       response.cookies.set(guestCookie, data.token, { ...cookieOptions(), maxAge: 7200 });
+      response.cookies.set(deviceCookie, device, { ...cookieOptions(), maxAge: trialDeviceSeconds });
       return response;
     }
     const response = NextResponse.json(data, { headers });

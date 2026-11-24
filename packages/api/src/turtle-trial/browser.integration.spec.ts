@@ -9,6 +9,7 @@ import { TrialBrowserRuns } from './browser-runs.js';
 import { TrialBrowserService } from './browser.service.js';
 import { TrialRuntime } from './trial-runtime.js';
 import { trialDigest, trialPrefix } from './trial-security.js';
+import type { TurtleUsageRecorder } from './usage-recorder.js';
 
 const url = process.env.TURTLE_BROWSER_TEST_REDIS_URL;
 const local = url && new URL(url).hostname === '127.0.0.1' && new URL(url).port === '6398' && new URL(url).pathname === '/1';
@@ -41,6 +42,18 @@ describe.skipIf(!local)('browser admission with dedicated local Redis', () => {
     expect(run.state).toBe('ACTIVE'); expect(run).not.toHaveProperty('token'); expect(run).not.toHaveProperty('displayUrl');
     expect(remote.ready).not.toHaveBeenCalled(); expect(remote.request).not.toHaveBeenCalled(); expect(remote.lookup).not.toHaveBeenCalled();
     expect(turtleBrowserStartSchema.safeParse({ ...input(), source: 'private code' }).success).toBe(false);
+  });
+  it('counts an accepted run once, its renewals as sightings, and keeps the device with the grant', async () => {
+    const record = vi.fn();
+    const counted = new TrialBrowserRuns(store, policy, { record } as unknown as TurtleUsageRecorder);
+    const issued = await store.issue('browser-test-v1', '', policy.issue(), 'd'.repeat(32));
+    const g = async () => (await store.grant(issued.token, 'browser-test-v1'))!;
+    await store.version('browser-test-v1');
+    const request = input(), run = await counted.start(await g(), request);
+    await counted.start(await g(), request).catch(() => {});
+    await counted.renew(await g(), run.id);
+    expect(record.mock.calls.map(([, kind]) => kind)).toEqual(['run', 'seen']);
+    expect(record.mock.calls[0]![0].device).toBe('d'.repeat(32));
   });
   it('recovers a lost reply idempotently across instances and rejects changed source', async () => {
     const g = await enter(), request = input(); const first = await service.start(g.token, request);

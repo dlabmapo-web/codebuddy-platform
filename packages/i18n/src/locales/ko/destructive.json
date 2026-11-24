@@ -11,7 +11,14 @@
   "class": {
     "delete": "반 삭제",
     "delete_title": "{{name}}을(를) 삭제할까요?",
-    "delete_body": "반과 학생 명단, 시간표가 삭제됩니다. 학생 제출물이 있으면 거부되며, 그때는 보관을 사용하세요.",
+    "delete_body": "반과 학생 명단, 시간표, 코스 연결이 삭제됩니다. 기록을 남기려면 보관을 사용하세요.",
+    "impact": {
+      "heading_other": "이 반의 학생 {{count}}명의 학습 기록",
+      "test_attempts_other": "테스트 응시 {{count}}건이 답안·점수와 함께 삭제됩니다.",
+      "answers_other": "객관식·단답형 답안 {{count}}건이 점수·피드백과 함께 삭제됩니다.",
+      "kept_other": "코드 제출 {{count}}건은 반 정보 없이 학생 기록에 남습니다.",
+      "check_failed": "학생 학습 기록을 확인하지 못했습니다. 삭제하면 이 반의 답안과 테스트 응시는 함께 삭제됩니다."
+    },
     "delete_confirm_label": "확인하려면 {{name}} 을(를) 입력하세요",
     "delete_confirm": "영구 삭제",
     "delete_working": "삭제하는 중…",

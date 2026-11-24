@@ -24,6 +24,7 @@ import {
   VideoViewingStatusBadge,
   VideoWatchedBar,
 } from "./video-viewing-progress";
+import { displayTimeZone } from '@cove/i18n/settings';
 
 export function VideoClassViewingReport({
   academyId,
@@ -68,7 +69,7 @@ export function VideoClassViewingReport({
     query.isError &&
     [401, 403, 404].includes((query.error as { status?: number }).status ?? 0);
   const formatDate = (value: string) =>
-    new Intl.DateTimeFormat(i18n.language, {
+    new Intl.DateTimeFormat(i18n.language, { timeZone: displayTimeZone,
       dateStyle: "medium",
       timeStyle: "short",
     }).format(new Date(value));

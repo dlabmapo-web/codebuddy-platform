@@ -652,6 +652,7 @@ model Academy {
   dlabCampus DlabCampus?
 
   helpRequests StudentHelpRequest[]
+  turtleUsageHours TurtleUsageHour[]
 
   id             String        @id @default(uuid()) @db.Uuid
   organizationId String        @map("organization_id") @db.Uuid
@@ -754,6 +755,23 @@ model Academy {
 ///
 /// A missing row means off: enabling a feature is always a deliberate write,
 /// so a new academy never starts inside a staged rollout.
+/// Public Turtle use by one anonymous device in one hour. The hash is keyed per
+/// academy, so it names no person and matches nothing in another academy.
+model TurtleUsageHour {
+  academyId  String   @map("academy_id") @db.Uuid
+  hour       DateTime @db.Timestamptz(6)
+  deviceHash String   @map("device_hash") @db.Char(32)
+  entries    Int      @default(0)
+  runs       Int      @default(0)
+  lastSeenAt DateTime @map("last_seen_at") @db.Timestamptz(6)
+
+  academy Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+
+  @@id([academyId, hour, deviceHash])
+  @@index([hour])
+  @@map("turtle_usage_hours")
+}
+
 model AcademyFeatureFlag {
   academyId String         @map("academy_id") @db.Uuid
   feature   AcademyFeature

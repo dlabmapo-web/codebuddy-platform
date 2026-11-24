@@ -128,6 +128,8 @@ export const eligibleTeacherSummarySchema = z.object({
   userId: z.uuid(),
   displayName: z.string().nullable(),
   email: z.email().nullable(),
+  /** The sign-in ID, so a manager can find a teacher by it. */
+  username: z.string().nullable().optional(),
   ...memberAvatarUrlsShape,
 });
 export type EligibleTeacherSummary = z.infer<
@@ -359,10 +361,11 @@ export function assignmentGrantsAccess(
 /**
  * Deleting a class outright.
  *
- * Archiving is the ordinary end of a class and keeps its history; this is for
- * one created by mistake. Refused once any student has submitted through it,
- * because that work is the students' and a class is not the right thing to
- * destroy it with.
+ * Archiving is the ordinary end of a class and keeps its history; this
+ * removes it. Allowed with students' work in it, after the dialog has said
+ * what goes (`classDeleteImpactSchema`): code submissions, solve time and
+ * points stay on the students' records without the class; answers and test
+ * attempts, which cannot exist outside a class, are deleted with it.
  */
 export const deleteClassSchema = z
   .object({
@@ -373,3 +376,15 @@ export const deleteClassSchema = z
   })
   .strict();
 export type DeleteClassInput = z.infer<typeof deleteClassSchema>;
+
+/** What deleting a class does to students' work, shown before confirming. */
+export const classDeleteImpactSchema = z.object({
+  /** Code submissions: kept on the students' records, without the class. */
+  keptSubmissions: z.number().int().nonnegative(),
+  /** Quiz and short-answer answers and test attempts: deleted with the class. */
+  deletedAnswers: z.number().int().nonnegative(),
+  deletedTestAttempts: z.number().int().nonnegative(),
+  /** Students with any work in the class. */
+  students: z.number().int().nonnegative(),
+});
+export type ClassDeleteImpact = z.infer<typeof classDeleteImpactSchema>;

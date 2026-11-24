@@ -55,6 +55,25 @@ describe.skipIf(!local)('academy Turtle codes with real Redis', () => {
     expect(await pins.state(a)).toEqual({ available: true, current: first.current });
     await expect(pins.reveal(a, randomUUID())).rejects.toThrow('PIN_CHANGED');
   });
+  it('counts an entry for its own academy under a device hash no other academy shares', async () => {
+    const record = vi.fn();
+    const counted = new TrialService(config, store, runtime as never, pins, prisma as never, undefined, undefined, { record } as never);
+    const cookie = 'c'.repeat(32);
+    const enter = async (pin: string, device?: string) => counted.access(pin, (await counted.challenge('local')).nonce, 'local', device);
+    const first = (await pins.generate(a, null)).pin, second = (await pins.generate(b, null)).pin;
+    const { token } = await enter(first, cookie);
+    await enter(first, cookie); await enter(second, cookie); await enter(first, 'not a device');
+    await expect(enter('999999', cookie)).rejects.toThrow('INVALID_PIN');
+    const seen = record.mock.calls.map(([grant, kind]) => ({ ...grant, kind }));
+    expect(seen.map(entry => [entry.academyId, entry.kind])).toEqual([[a, 'entry'], [a, 'entry'], [b, 'entry'], [a, 'entry']]);
+    expect(seen[0].device).toMatch(/^[a-f0-9]{32}$/);
+    expect(seen[0].device).not.toBe(cookie);
+    expect(seen[1].device).toBe(seen[0].device);
+    expect(seen[2].device).not.toBe(seen[0].device);
+    expect(seen[3].device).toBe('');
+    expect((await counted.grant(token)).device).toBe(seen[0].device);
+    expect((await counted.grant(token)).hash).toBe(seen[0].hash);
+  });
   it('rejects stale/concurrent generation and keeps retired digits reserved for two hours', async () => {
     const original = await pins.generate(a, null);
     const results = await Promise.allSettled([pins.generate(a, original.current.version), other.generate(a, original.current.version)]);

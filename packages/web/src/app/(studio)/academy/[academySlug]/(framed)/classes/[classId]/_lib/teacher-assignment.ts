@@ -111,10 +111,10 @@ export function canSubmitTeachers({
 
 /** Search text for a teacher row, matching on either half of their identity. */
 export function teacherSearchLabel(
-  teacher: Pick<EligibleTeacherSummary, 'displayName' | 'email'>,
+  teacher: Pick<EligibleTeacherSummary, 'displayName' | 'email' | 'username'>,
   fallback: string,
 ): string {
   return (
-    [teacher.displayName, teacher.email].filter(Boolean).join(' · ') || fallback
+    [teacher.displayName, teacher.email, teacher.username].filter(Boolean).join(' · ') || fallback
   );
 }

@@ -32,6 +32,7 @@ import { ResultPanel } from './result-panel';
 import { StaffSolutionDialog } from './staff-workspace-dialogs';
 import { StaffTutoringDrawer, type TutoringStudent } from './staff-tutoring-drawer';
 import { StaffStudentPane, type TutoringTransitionGuard } from './staff-student-pane';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /** Personal practice stays mounted and isolated while explicit tutoring owns a separate student session. */
 export function StaffWorkspace({ academyId, bootstrap, userId }: {
@@ -181,7 +182,7 @@ export function StaffWorkspace({ academyId, bootstrap, userId }: {
     {preview ? <p role="status" className="border-b border-warning/25 bg-warning/5 px-4 py-2 text-xs font-semibold text-warning">{t('preview')}</p> : null}
     {historyOpen ? <section className="max-h-44 shrink-0 overflow-auto border-b border-border bg-card px-4 py-3" aria-label={t('history')}>
       <h2 className="mb-2 text-xs font-bold">{t('history')}</h2>
-      {!submission.history.length ? <p className="text-xs text-sub">{t('history_empty')}</p> : submission.history.map((attempt) => <button key={attempt.submissionId} type="button" disabled={busy} onClick={() => { void submission.select(attempt.submissionId); setTab('result'); }} className="mr-2 mb-2 rounded-lg border border-border px-3 py-2 text-xs hover:border-brand disabled:opacity-50">{new Date(attempt.createdAt).toLocaleString()} · {attempt.score ?? '—'}</button>)}
+      {!submission.history.length ? <p className="text-xs text-sub">{t('history_empty')}</p> : submission.history.map((attempt) => <button key={attempt.submissionId} type="button" disabled={busy} onClick={() => { void submission.select(attempt.submissionId); setTab('result'); }} className="mr-2 mb-2 rounded-lg border border-border px-3 py-2 text-xs hover:border-brand disabled:opacity-50">{new Date(attempt.createdAt).toLocaleString(undefined, { timeZone: displayTimeZone })} · {attempt.score ?? '—'}</button>)}
     </section> : null}
     <div className="flex shrink-0 border-b border-border bg-card p-1 md:hidden">{(['problem', 'code'] as const).map((value) => <button type="button" key={value} onClick={() => setMobile(value)} className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold ${mobile === value ? 'bg-brand-soft text-brand' : 'text-sub'}`}>{t(value)}</button>)}</div>
     <div className="flex min-h-0 flex-1 overflow-hidden">

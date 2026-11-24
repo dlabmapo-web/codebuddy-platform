@@ -180,7 +180,7 @@
       "total": "Total:",
       "total_hint": "The sum of the points of the problems in this test.",
       "not_100": "Not 100",
-      "locked": "The test is published or has attempts, so points cannot change.",
+      "locked": "Students have started this test, so points cannot change.",
       "empty": "Add multiple choice, short answer or code problems to this lecture in the course builder.",
       "invalid": "Not allowed in a test",
       "open_editor": "Open editor",
@@ -259,6 +259,8 @@
       "SHORT_ANSWER": "Short answer"
     },
     "open_test_settings": "Test settings",
+    "problem_count": "{{count}} problems",
+    "problem_count_one": "{{count}} problem",
     "release_auto": "This test shows each student's score automatically when they finish.",
     "avg_runs": "Avg. runs",
     "cell_submissions": "{{count}} submissions",

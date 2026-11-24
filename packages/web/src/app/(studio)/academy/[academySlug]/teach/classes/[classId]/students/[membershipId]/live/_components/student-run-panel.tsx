@@ -6,6 +6,7 @@ import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useLocale } from '@/i18n';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 const lifecycleStyles = {
   STARTED: { icon: LoaderCircle, tone: 'text-[#9CDCFE]', spin: true },
@@ -35,7 +36,7 @@ export function StudentRunPanel({
   const { t } = useTranslation('monitoring');
   const locale = useLocale();
   const time = React.useMemo(
-    () => new Intl.DateTimeFormat(locale, { timeStyle: 'medium' }),
+    () => new Intl.DateTimeFormat(locale, { timeZone: displayTimeZone, timeStyle: 'medium' }),
     [locale],
   );
 

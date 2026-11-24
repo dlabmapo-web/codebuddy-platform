@@ -246,7 +246,7 @@
     "heading": "Teachers of this class",
     "body": "Pick every teacher who teaches this class. Only active teachers of this academy appear here, and there is no limit.",
     "trigger_label": "Select teachers",
-    "search": "Search by name or email",
+    "search": "Search by name, ID or email",
     "empty": "No teacher matches that search.",
     "none_eligible": "This academy has no active teachers yet. Invite one, or change a member's role to Teacher.",
     "load_failed": "Teachers could not be loaded. Check your connection and try again.",

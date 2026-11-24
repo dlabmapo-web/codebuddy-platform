@@ -171,6 +171,8 @@
       "case_expected": "Expected",
       "case_actual": "Received",
       "score": "Score",
+      "test_points": "Test points",
+      "test_not_counted": "Not counted: a later submission is graded",
       "tests": "Tests",
       "runtime": "Runtime",
       "solve_time": "Solve time",

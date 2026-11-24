@@ -458,6 +458,16 @@ export const teacherSubmissionReviewSchema = z
     compileDiagnostics: z.string().nullable().optional(),
     hiddenPassed: countSchema,
     hiddenTotal: countSchema,
+    /**
+     * Made inside a test: the points this problem is worth in it and what this
+     * submission earned there, as the test's results count them. Only the last
+     * submission per problem counts; an earlier one says so (`counted: false`).
+     */
+    test: z.object({
+      pointsHundredths: z.number().int(),
+      scoreHundredths: z.number().int().nullable(),
+      counted: z.boolean(),
+    }).nullable().optional(),
   })
   .strict();
 export type TeacherSubmissionReview = z.infer<

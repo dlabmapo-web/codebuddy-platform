@@ -41,6 +41,7 @@ import { WorkspaceResizeHandle } from './workspace-resize-handle';
 import styles from './manual-workspace.module.css';
 import type { CSSProperties } from 'react';
 import { executionTranslationKey } from './execution-state';
+import { displayTimeZone } from '@cove/i18n/settings';
 export function ManualWorkspace({
   academyId,
   materialId,
@@ -456,7 +457,7 @@ export function ManualWorkspace({
   const submissionPanels = <>{attempt ? (
             <section ref={resultPanel} className="mx-5 mb-5 rounded-lg border border-border bg-canvas/50 p-4 sm:mx-6">
               <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold text-sub"><History aria-hidden className="size-4" />{mt("last_submission")}</h2>
-              <p className="mt-1 text-xs text-sub">{new Date(attempt.createdAt).toLocaleString()}</p>
+              <p className="mt-1 text-xs text-sub">{new Date(attempt.createdAt).toLocaleString(undefined, { timeZone: displayTimeZone })}</p>
               <div className="mt-3"><AssessmentStatus label={resultLabel(attempt)} completed={effective?.completed} /></div>
               {attempt.shortAnswerAssessment?.status === "ERROR" ? (
                 <button
@@ -491,7 +492,7 @@ export function ManualWorkspace({
                     key={old.id}
                   >
                     <p>
-                      {new Date(old.createdAt).toLocaleString()} ·{" "}
+                      {new Date(old.createdAt).toLocaleString(undefined, { timeZone: displayTimeZone })} ·{" "}
                       {resultLabel(old)}
                     </p>
                     <details>

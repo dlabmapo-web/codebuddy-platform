@@ -24,6 +24,7 @@ import { useErrorText } from '@/i18n/client/use-error-text';
 import { toApiError } from '@/lib/api-errors';
 import { orpc } from '@/lib/orpc';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
+import { useSampleRunner } from '@/lib/workspace/use-sample-runner';
 import { useStudentPresence } from '@/lib/monitoring/student-presence';
 import { useStudentMonitoring } from '@/lib/monitoring/use-student-monitoring';
 import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
@@ -240,6 +241,7 @@ function CodeItem(props: Props & { content: Extract<ExamItemContent, { type: 'CO
   const language = (['PYTHON', 'C', 'CPP'].includes(content.language) ? content.language : 'PYTHON') as ExerciseLanguage;
   const python = language === 'PYTHON';
   const runner = usePythonRunner({ browserRuntime: python });
+  const { runSample: checkSample } = useSampleRunner(runner);
   const { t: tm } = useTranslation('monitoring');
   const codeRef = React.useRef(code);
   React.useEffect(() => { codeRef.current = code; }, [code]);
@@ -285,10 +287,18 @@ function CodeItem(props: Props & { content: Extract<ExamItemContent, { type: 'CO
     if (readOnly) return;
     void orpc.exam.recordRun({ academyId: props.academyId, attemptId: props.attemptId, materialId: content.materialId }).catch(() => undefined);
   };
+  // The normal workspace's sample check: the run, then ✓ or ✕ against the
+  // expected output, judged in the browser only where Submit grades the same way.
   const runSample = (index: number) => {
+    const sample = sampleTestCases[index];
+    if (!sample) return;
     setActiveSample(index);
     countRun();
-    void runner.run(code, { stdin: content.samples[index]?.input ?? '' }).finally(() => setActiveSample(null));
+    void checkSample(code, sample, index, {
+      sampleCount: sampleTestCases.length,
+      gradingMode: content.gradingMode,
+      inputPromptPolicy: content.inputPromptPolicy,
+    }).finally(() => setActiveSample(null));
   };
   return (
     <div className="flex h-full min-h-0 min-w-0 overflow-hidden" ref={paneRef}>

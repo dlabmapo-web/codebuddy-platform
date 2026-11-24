@@ -1,5 +1,5 @@
 'use client';
-import { isFileBundle } from '@cove/shared';
+import { isFileBundle, formatPoints } from '@cove/shared';
 import { MultiFileEditor } from '@/components/editor/multi-file-editor';
 import { ProgrammingGradingPanel } from '@/components/programming-review/grading-panel';
 import { monacoLanguageFor } from '@/lib/workspace/exercise-language';
@@ -102,7 +102,20 @@ export function SubmissionReview({
         </div>
 
         <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-border pt-3 sm:grid-cols-5">
-          <Fact label={t('progress.review.score')} value={String(review.score)} />
+          {/* In a test the score that matters is the test's points, as its
+              results count them; the problem's own 0–100 would disagree. */}
+          {review.test ? (
+            <Fact
+              label={t('progress.review.test_points')}
+              value={
+                review.test.counted && review.test.scoreHundredths !== null
+                  ? `${formatPoints(review.test.scoreHundredths)} / ${formatPoints(review.test.pointsHundredths)}`
+                  : t('progress.review.test_not_counted')
+              }
+            />
+          ) : (
+            <Fact label={t('progress.review.score')} value={String(review.score)} />
+          )}
           <Fact
             label={t('progress.review.tests')}
             value={`${review.passedCount}/${review.totalCount}`}

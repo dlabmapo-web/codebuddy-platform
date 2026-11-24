@@ -115,7 +115,9 @@ export class DlabReconcilerService {
     ids: readonly string[],
     snapshots?: DirectorySnapshot[],
     renamedUserIds: readonly string[] = [],
+    options: { revive?: boolean } = {},
   ) {
+    const revivedIds: string[] = [];
     const rows = snapshots ?? (await readDlabDirectory(tx, ids));
     await sourceWrite(tx);
     const directory =
@@ -189,6 +191,23 @@ export class DlabReconcilerService {
           throw new DlabError("membership_conflict", 409);
         const id = before?.id ?? randomUUID();
         retained.add(id);
+        // Deleted from the academy by its manager (LEFT is set nowhere else).
+        // A directory sync leaves them out; only the binding keeps up with the
+        // revision, so the identity is not reprocessed forever. Signing in from
+        // D-LAB OS again (`revive`) brings them back like a new member.
+        const revived = options.revive === true && before?.status === "LEFT";
+        if (revived) revivedIds.push(id);
+        else if (before?.status === "LEFT") {
+          if (before.binding!.appliedRevision !== identity.revision)
+            bindings.push({
+              externalUserId: identity.externalUserId,
+              externalCampusId: campus.externalCampusId,
+              membershipId: id,
+              appliedRevision: identity.revision,
+              sourceAccessStatus: before.binding!.sourceAccessStatus,
+            });
+          continue;
+        }
         const sourceAllowed = directoryCampusAllowed(
           this.config,
           identity,
@@ -197,7 +216,7 @@ export class DlabReconcilerService {
         const status =
           sourceAllowed &&
           user.status === "ACTIVE" &&
-          !before?.binding?.localSuspendedAt
+          (revived || !before?.binding?.localSuspendedAt)
             ? "ACTIVE"
             : "SUSPENDED";
         const extras = sourceAllowed
@@ -338,6 +357,11 @@ export class DlabReconcilerService {
       FROM jsonb_to_recordset(${JSON.stringify(bindings)}::jsonb) AS x("externalUserId" text,"externalCampusId" text,"membershipId" text,"appliedRevision" int,"sourceAccessStatus" text)
       ON CONFLICT (external_user_id,external_campus_id) DO UPDATE SET applied_revision=EXCLUDED.applied_revision,source_access_status=EXCLUDED.source_access_status
     `);
+    // The delete recorded a local suspension; a returning member starts clean.
+    if (revivedIds.length)
+      await tx.$executeRaw`
+      UPDATE dlab_membership_bindings SET local_suspended_at = NULL
+      WHERE membership_id = ANY(${revivedIds}::uuid[])`;
     if (profiles.length)
       await tx.$executeRaw(Prisma.sql`
       INSERT INTO student_academy_profiles (membership_id,academy_id,school_grade,coding_interests,created_at,updated_at)

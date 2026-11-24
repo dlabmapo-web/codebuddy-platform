@@ -62,7 +62,8 @@ export function TestRowBadge({ builder, lecture }: { builder: CourseBuilderState
   return (
     <>
       <BadgeCheck aria-label={t('badge')} className="size-4 shrink-0 text-brand" />
-      {surface === 'academy' ? (
+      {/* Authors only: a teacher reading the course cannot open the settings page. */}
+      {surface === 'academy' && builder.editable ? (
         <Link href={routes.academyContentTest(slug, builder.target.courseId, lecture.id)}
           className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md border border-border px-2.5 text-[12.5px] font-semibold text-ink hover:border-brand hover:text-brand">
           <Settings2 aria-hidden className="size-3.5" /> {t('authoring.open')}

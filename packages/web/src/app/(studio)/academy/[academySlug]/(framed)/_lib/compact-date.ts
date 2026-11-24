@@ -1,3 +1,4 @@
+import { displayTimeZone } from '@cove/i18n/settings';
 /**
  * A date short enough to fit a fixed column.
  *
@@ -7,7 +8,7 @@
  * into a horizontal scrollbar.
  */
 export function compactDate(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
+  return new Intl.DateTimeFormat(locale, { timeZone: displayTimeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

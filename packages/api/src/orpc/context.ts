@@ -56,6 +56,7 @@ import type { AcademyLibraryService } from "../content/library/academy-library.s
 import type { LibraryReleaseService } from "../library-sync/library-release.service.js";
 import type { AcademyLibrarySyncService } from "../library-sync/academy-sync.service.js";
 import type { PlatformInvitationsService } from "../platform/platform-invitations.service.js";
+import type { PlatformTurtleService } from "../platform/platform-turtle.service.js";
 import type { PlatformRankingService } from "../platform/platform-ranking.service.js";
 import type { PlatformSettingsService } from "../platform/platform-settings.service.js";
 import type { RegradeService } from "../platform/regrade.service.js";
@@ -140,6 +141,7 @@ export type ORPCDeps = {
   academyLibrarySyncService: AcademyLibrarySyncService;
   platformInvitationsService: PlatformInvitationsService;
   platformRankingService: PlatformRankingService;
+  platformTurtleService: PlatformTurtleService;
   platformSettingsService: PlatformSettingsService;
   regradeService: RegradeService;
   /**

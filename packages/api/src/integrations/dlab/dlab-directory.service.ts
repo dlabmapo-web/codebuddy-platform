@@ -76,6 +76,13 @@ export class DlabDirectoryService {
     requestId: string | undefined,
     assertOwned: () => Promise<void>,
     onFinalize?: (tx: Prisma.TransactionClient) => Promise<void>,
+    /**
+     * The person is signing in from D-LAB OS now. Someone a manager deleted
+     * comes back: the account is reactivated and so is each membership the
+     * delete closed. A directory sync never does this, or deleting would last
+     * only until the next OS update.
+     */
+    options: { revive?: boolean } = {},
   ): Promise<DirectoryResult> {
     try {
       const [before] = await readDlabDirectory(this.prisma, [
@@ -96,8 +103,11 @@ export class DlabDirectoryService {
         throw new DlabError("identity_conflict", 409);
       const authUserId = saved.reservedUserId;
       const email = buildPlaceholderEmail(saved.reservedUserId);
-      // A locally deleted tombstone cannot regain provider credentials via sync.
-      if (before.user?.status !== "DELETED") {
+      // A locally deleted tombstone regains provider credentials only by
+      // signing in from OS, never via sync.
+      const revivesAccount =
+        options.revive === true && before.user?.status === "DELETED";
+      if (before.user?.status !== "DELETED" || revivesAccount) {
         await assertOwned();
         try {
           await providerDeadline(
@@ -138,7 +148,10 @@ export class DlabDirectoryService {
             status: "ACTIVE",
             platformRole: "USER",
           },
-          update: { displayName: saved.name },
+          update: {
+            displayName: saved.name,
+            ...(revivesAccount ? { status: "ACTIVE" as const } : {}),
+          },
         });
         if (user.authUserId !== authUserId && user.status !== "DELETED")
           throw new DlabError("identity_conflict", 409);
@@ -168,6 +181,7 @@ export class DlabDirectoryService {
           [saved.externalUserId],
           [snapshot],
           renamed ? [userId] : [],
+          { revive: options.revive === true },
         );
         const memberships = await tx.$queryRaw<
           Array<{ id: string; status: string; source: string }>

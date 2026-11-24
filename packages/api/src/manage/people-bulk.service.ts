@@ -303,10 +303,11 @@ export class PeopleBulkService {
         this.logger.warn(`auth user delete after bulk failed: ${error instanceof Error ? error.message : "unknown"}`);
       }
     }
-    // One statement for every account whose sign-in went.
+    // One statement for every account whose sign-in went. A D-LAB account keeps
+    // its auth id: the OS owns it, and the sync matches the person by it.
     if (signInsDeleted.length > 0) {
       await this.prisma.user.updateMany({
-        where: { authUserId: { in: signInsDeleted }, status: "DELETED" },
+        where: { authUserId: { in: signInsDeleted }, status: "DELETED", dlabIdentity: { is: null } },
         data: { authUserId: null },
       });
     }
@@ -632,17 +633,21 @@ export class PeopleBulkService {
             AND (a.membership_id = ANY(${ids}::uuid[]) OR a.membership_id = c.teacher_membership_id)`;
         // The account itself, when nothing else holds it. Kept as a row so past
         // work still names a person; status DELETED refuses every sign-in, and
-        // the email and username are released for reuse.
+        // the email and username are released for reuse. A D-LAB account keeps
+        // both: they are placeholders the OS owns, and the database refuses any
+        // change to them outside the D-LAB sync.
         const accounts = input.eligible.filter((member) => member.accountDeletable).map((member) => member.userId);
         if (accounts.length > 0) {
           const users = await transaction.user.findMany({
             where: { id: { in: accounts }, platformRole: "USER" },
             select: { id: true, authUserId: true },
           });
-          await transaction.user.updateMany({
-            where: { id: { in: users.map((user) => user.id) } },
-            data: { status: "DELETED", email: null, username: null },
-          });
+          const userIds = users.map((user) => user.id);
+          await transaction.$executeRaw`
+            UPDATE users u SET status = 'DELETED'::"UserStatus", updated_at = now(),
+              email = CASE WHEN EXISTS (SELECT 1 FROM dlab_identities d WHERE d.user_id = u.id) THEN u.email END,
+              username = CASE WHEN EXISTS (SELECT 1 FROM dlab_identities d WHERE d.user_id = u.id) THEN u.username END
+            WHERE u.id = ANY(${userIds}::uuid[])`;
           deletedAuthUserIds = users.flatMap((user) => (user.authUserId ? [user.authUserId] : []));
         }
         break;

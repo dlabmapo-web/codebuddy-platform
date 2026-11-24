@@ -136,6 +136,14 @@ export class ExamStaffService {
     }
     if (input.isVisible && current.items.some((item) => !item.type))
       throw new AppException("EXAM_INVALID_MATERIAL", HttpStatus.BAD_REQUEST);
+    // A published test is worth something: publishing, or re-pointing a
+    // published test, refuses a total of zero.
+    const publishedAfter = input.isVisible ?? current.isVisible;
+    if (publishedAfter && (input.isVisible === true || input.points)) {
+      const next: Record<string, number> = { ...pointsOf(current), ...input.points };
+      const total = current.items.filter((item) => item.type).reduce((sum, item) => sum + (next[item.materialId] ?? 0), 0);
+      if (total <= 0) throw new AppException("EXAM_NO_POINTS", HttpStatus.BAD_REQUEST);
+    }
     await this.prisma.$transaction(async (tx) => {
       await lockCourse(tx, input.courseId);
       const settings = input.settings ?? {};
@@ -194,7 +202,9 @@ export class ExamStaffService {
       settings: settingsOf(row.settings),
       items,
       totalPointsHundredths: items.filter((item) => item.type).reduce((sum, item) => sum + item.pointsHundredths, 0),
-      locked: row.isVisible || row.attemptCount > 0,
+      // Attempts snapshot their points when they start, so points are free to
+      // change until the first one, published or not.
+      locked: row.attemptCount > 0,
       attemptCount: row.attemptCount,
       classes: row.classes,
     };

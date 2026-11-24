@@ -16,6 +16,7 @@ import { useAcademySlug } from "@/components/studio/academy-route-provider";
 import { CodeEditor } from "@/app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/code-editor";
 import { GuiViewer } from "./gui-viewer";
 import { executionTranslationKey } from './execution-state';
+import { displayTimeZone } from '@cove/i18n/settings';
 export function ManualReviewWorkspace({
   academyId,
   classId,
@@ -300,7 +301,7 @@ export function ManualReviewWorkspace({
         </AssessmentDrawer>
         <dl className="ml-auto flex flex-wrap gap-5 text-xs sm:gap-8">
           <div><dt className="mb-1 flex items-center gap-1.5 text-sub"><History aria-hidden className="size-3.5" />{mt('ui.attempt_count')}</dt><dd className="font-semibold tabular-nums">{learner?.attempts.length ?? 0}</dd></div>
-          <div><dt className="mb-1 flex items-center gap-1.5 text-sub"><Clock3 aria-hidden className="size-3.5" />{mt('last_submission')}</dt><dd className="font-semibold">{newestAttempt ? new Date(newestAttempt.createdAt).toLocaleString() : '—'}</dd></div>
+          <div><dt className="mb-1 flex items-center gap-1.5 text-sub"><Clock3 aria-hidden className="size-3.5" />{mt('last_submission')}</dt><dd className="font-semibold">{newestAttempt ? new Date(newestAttempt.createdAt).toLocaleString(undefined, { timeZone: displayTimeZone }) : '—'}</dd></div>
           <div><dt className="mb-1 flex items-center gap-1.5 text-sub"><Trophy aria-hidden className="size-3.5 text-warning" />{mt('ui.latest_score')}</dt><dd className="font-semibold tabular-nums text-brand">{newestResult ? `${newestResult.scoreHundredths / 100} / ${newestAttempt!.maximumHundredths / 100}` : '—'}</dd></div>
         </dl>
       </div>
@@ -349,7 +350,7 @@ export function ManualReviewWorkspace({
                 >
                   {learner!.attempts.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {new Date(a.createdAt).toLocaleString()} ·{" "}
+                      {new Date(a.createdAt).toLocaleString(undefined, { timeZone: displayTimeZone })} ·{" "}
                       {a.reviews.length
                         ? mt("reviewed")
                         : effectiveManualResult(a)

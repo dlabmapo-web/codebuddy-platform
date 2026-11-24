@@ -288,7 +288,9 @@ export function FeatureBoard({
   );
 
   return (
-    <div className="grid gap-4">
+    // One shrinkable column: with the default `auto` track the table's full
+    // width (a column per feature) stretched the page past the viewport.
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
       <FeatureTally rows={rows} />
 
       {mutation.isError ? (

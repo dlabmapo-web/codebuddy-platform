@@ -426,6 +426,34 @@ describe("getSubmissionReview", () => {
     expect(teacherSubmissionReviewSchema.safeParse(review).success).toBe(true);
   });
 
+  it("reports a test submission's test points, and says when a later one counts instead", async () => {
+    const attemptId = "b0000000-0000-4000-8000-000000000001";
+    const testPointsForSubmission = vi.fn(async () => ({
+      pointsHundredths: 6_000,
+      counted: { submissionId: submission.id, fraction: 0.5 },
+    }));
+    const { service } = createService({
+      findSubmissionForReview: vi.fn(async () => ({ ...submission, testAttemptId: attemptId })),
+      testPointsForSubmission,
+    });
+    const input = { academyId, classId, membershipId: alice.membershipId, submissionId: submission.id };
+    const review = await service.getSubmissionReview(identity, input);
+    expect(testPointsForSubmission).toHaveBeenCalledWith({ testAttemptId: attemptId, materialId: required, submissionId: submission.id });
+    expect(review.test).toEqual({ pointsHundredths: 6_000, scoreHundredths: 3_000, counted: true });
+    expect(teacherSubmissionReviewSchema.safeParse(review).success).toBe(true);
+
+    testPointsForSubmission.mockResolvedValueOnce({ pointsHundredths: 6_000, counted: null } as never);
+    expect((await service.getSubmissionReview(identity, input)).test).toEqual({ pointsHundredths: 6_000, scoreHundredths: null, counted: false });
+  });
+
+  it("reads no test points for an ordinary submission", async () => {
+    const testPointsForSubmission = vi.fn();
+    const { service } = createService({ findSubmissionForReview: vi.fn(async () => submission), testPointsForSubmission });
+    const review = await service.getSubmissionReview(identity, { academyId, classId, membershipId: alice.membershipId, submissionId: submission.id });
+    expect(review.test).toBeNull();
+    expect(testPointsForSubmission).not.toHaveBeenCalled();
+  });
+
   it("shows a public case's program ending but never a hidden one's (C/C++)", async () => {
     const crashed = {
       ...submission,

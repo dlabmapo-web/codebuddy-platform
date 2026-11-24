@@ -22,6 +22,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 
 import { DataTable } from '@/components/studio/data-table';
 import { Tooltip, TooltipProvider } from '@/components/studio/primitives';
+import { ClassDeleteImpactNotice } from '@/components/studio/class-delete-impact-notice';
 import { DeleteConfirmDialog } from '@/components/studio/delete-confirm-dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
@@ -375,6 +376,7 @@ export function ClassesTable({
         cancelLabel={destructive('class.cancel')}
         confirmLabel={destructive('class.delete_confirm')}
         fieldLabel={destructive('class.delete_confirm_label', { name: toDelete?.name ?? '' })}
+        notice={toDelete ? <ClassDeleteImpactNotice academyId={toDelete.academyId} classId={toDelete.id} open /> : null}
         workingLabel={destructive('class.delete_working')}
         confirmValue={toDelete?.name ?? ''}
         onClose={() => setToDelete(null)}

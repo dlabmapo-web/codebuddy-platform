@@ -14,6 +14,7 @@ import { TrialPins } from './trial-pins.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { TrialBrowserPolicy } from './browser-policy.js';
 import { TrialBrowserRuns } from './browser-runs.js';
+import { TurtleUsageRecorder } from './usage-recorder.js';
 
 // Sized for every academy starting a 50-student class in the same minute
 // (35 academies, 1,750 students) with about three times that as headroom.
@@ -30,7 +31,8 @@ export class TrialService {
     @Optional() @Inject(TrialPins) private readonly pins?: TrialPins,
     @Optional() @Inject(PrismaService) private readonly prisma?: PrismaService,
     @Optional() @Inject(TrialBrowserPolicy) private readonly browserPolicy?: TrialBrowserPolicy,
-    @Optional() @Inject(TrialBrowserRuns) private readonly browserRuns?: TrialBrowserRuns) {}
+    @Optional() @Inject(TrialBrowserRuns) private readonly browserRuns?: TrialBrowserRuns,
+    @Optional() @Inject(TurtleUsageRecorder) private readonly usage?: TurtleUsageRecorder) {}
   enabled() { if (!this.config.get('TURTLE_TRIAL_ENABLED')) throw new ServiceUnavailableException('TRIAL_UNAVAILABLE'); }
   private version() { return this.config.get<string>('TURTLE_TRIAL_PIN_VERSION')!; }
   private owner(g: TrialGrant) { return 'trial:' + g.hash; }
@@ -41,7 +43,7 @@ export class TrialService {
     return { nonce: value + '.' + trialDigest(value, this.config.get<string>('BFF_SHARED_SECRET')!) };
   }
   private ipHash(ip: string) { return trialDigest(ip, this.config.get<string>('TURTLE_TRIAL_PIN_PEPPER')!); }
-  async access(pin: unknown, nonce: string, ip: string) {
+  async access(pin: unknown, nonce: string, ip: string, device?: string) {
     this.enabled();
     const [random, timestamp, signature] = nonce.split('.');
     if (!random || !timestamp || !signature || !/^[a-f0-9]{32}$/.test(random) ||
@@ -57,20 +59,25 @@ export class TrialService {
       ['access:ip:' + this.ipHash(ip), trialEntryLimits.entriesPerIp, 600000], ['access:all', trialEntryLimits.entriesPerMinute, 60000],
       [...wrong, 0],
     ]);
-    try { return await this.admit(pin); }
+    try { return await this.admit(pin, device); }
     catch (error) {
       if (error instanceof UnauthorizedException && error.message === 'INVALID_PIN') await this.store.limit([wrong]);
       throw error;
     }
   }
-  private async admit(pin: unknown) {
+  private async admit(pin: unknown, device?: string) {
     const normalized = typeof pin === 'string' ? pin.trim() : '';
     const managed = await this.pins?.resolve(normalized);
     if (managed) {
       await this.academy(managed.academyId, true);
       const browser = this.browserPolicy?.issue(managed.academyId);
       if (!browser) await this.runtime.ready();
-      return this.store.issue(managed.version, managed.academyId, browser);
+      // Keyed with the academy, so one browser is a different device in each.
+      const deviceHash = device && /^[a-f0-9]{32}$/.test(device)
+        ? trialDigest('device:' + managed.academyId + ':' + device, this.config.get<string>('TURTLE_TRIAL_PIN_PEPPER')!).slice(0, 32) : '';
+      const issued = await this.store.issue(managed.version, managed.academyId, browser, deviceHash);
+      this.usage?.record({ academyId: managed.academyId, device: deviceHash, hash: trialHash(issued.token) }, 'entry');
+      return issued;
     }
     if (this.config.get('TURTLE_TRIAL_LEGACY_PIN_ENABLED') !== true) throw new UnauthorizedException('INVALID_PIN');
     if (!/^[0-9]{6}$/.test(normalized) || !trialEqual(
@@ -188,6 +195,7 @@ export class TrialService {
       catch (error) { await this.runtime.request('/sessions/' + s.id, 'DELETE').catch(() => {}); throw error; }
       try { await this.grant(token); }
       catch (error) { await this.runtime.request('/sessions/' + s.id, 'DELETE').catch(() => {}); throw error; }
+      if (reservation === 'NEW') this.usage?.record(g, 'run');
       return s;
     } finally {
       await unlock().catch(() => {});

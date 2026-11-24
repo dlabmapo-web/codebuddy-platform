@@ -2,6 +2,12 @@ import { turtleBodyBytes, turtleBrowserStartSchema } from '@cove/shared';
 
 export const trialCookieName = (production: boolean, fixture = false) => production ? '__Host-cove-turtle' : fixture ? 'cove-turtle-browser-fixture' : 'cove-turtle-dev';
 export const trialNonceName = (production: boolean, fixture = false) => production ? '__Host-cove-turtle-nonce' : fixture ? 'cove-turtle-browser-fixture-nonce' : 'cove-turtle-nonce-dev';
+/** Counts browsers for usage totals; names nobody and grants nothing. */
+export const trialDeviceName = (production: boolean, fixture = false) => production ? '__Host-cove-turtle-device' : fixture ? 'cove-turtle-browser-fixture-device' : 'cove-turtle-device-dev';
+export const trialDeviceSeconds = 180 * 86400;
+export function trialDevice(value: string | undefined): string {
+  return value && /^[a-f0-9]{32}$/.test(value) ? value : crypto.randomUUID().replaceAll('-', '');
+}
 export function trialAllowedPath(path: string, method: string): boolean {
   return (path === 'challenge' && method === 'GET') ||
     (path === 'access' && ['POST', 'DELETE'].includes(method)) ||

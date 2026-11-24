@@ -8,7 +8,8 @@
     "all_courses": "All courses",
     "load_failed_title": "Could not load this course",
     "load_failed_body": "This is not a permissions problem. Something went wrong on the server — try again, and check the server logs if it persists.",
-    "summary": "{{modules}} modules · {{lectures}} lectures",
+    "module_count_one": "{{count}} module",
+    "module_count_other": "{{count}} modules",
     "structural_error": "Could not save that change. Try again.",
     "import_excel": "Import from Excel",
     "show_all_content": "Show all content",
@@ -131,6 +132,7 @@
       "difficulty": "Pick a difficulty.",
       "description": "Write the problem description.",
       "test": "Add at least one complete test case.",
+      "test_incomplete": "Every test case needs an expected output. Fill it in, or remove the empty case.",
       "solution": "Add the correct answer code."
     },
     "location": "Problem location",
@@ -246,9 +248,9 @@
     "move_failed": "Couldn’t move it."
   },
   "pdf": {
-    "add": "Add PDF",
+    "add": "Add PDF or slides",
     "edit": "PDF material",
-    "description": "Upload one PDF and choose where students can find it. New materials are visible to students.",
+    "description": "Upload one PDF or PowerPoint file and choose where students can find it. Slides are saved as a PDF. New materials are visible to students.",
     "title": "Title",
     "placement": "Show in",
     "placements": {
@@ -257,10 +259,10 @@
       "BOTH": "Main lesson and resources"
     },
     "choose": "Choose a PDF or PPT file, or drop it here",
-    "replace": "Replace PDF (optional)",
+    "replace": "Replace file (optional)",
     "file": "PDF or PPT file",
     "limit": "PDF, PPT or PPTX · maximum 95 MB",
-    "save": "Save PDF",
+    "save": "Save",
     "cancel": "Cancel",
     "open": "Open PDF",
     "back": "Back",

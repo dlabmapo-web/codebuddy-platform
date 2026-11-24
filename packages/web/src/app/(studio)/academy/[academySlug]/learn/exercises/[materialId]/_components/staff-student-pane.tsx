@@ -21,6 +21,7 @@ import { FeedbackDock } from '@/app/(studio)/academy/[academySlug]/teach/classes
 import { RemotePointer } from '@/components/monitoring/remote-pointer';
 import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import type { TutoringStudent } from './staff-tutoring-drawer';
+import { displayTimeZone } from '@cove/i18n/settings';
 const MonacoEditor = dynamic(() => import('@/lib/monaco/editor'), { ssr: false });
 export type TutoringTransitionGuard = { current: (() => Promise<boolean>) | null };
 type Props = { academyId: string; materialId: string; userId: string; starterCode: string; student: TutoringStudent; beforeChangeRef: TutoringTransitionGuard; close: () => Promise<boolean> };
@@ -75,7 +76,7 @@ function StudentSession({ academyId, materialId, userId, student, context, start
       <button type="button" onClick={() => void close()} aria-label={t('tutoring_own_code')} className="rounded-lg p-2 text-sub hover:bg-canvas sm:order-last"><X className="size-4" /></button>
       <Link href={historyHref} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-brand" onClick={event=>{if(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();void(async()=>{if(await(beforeChangeRef.current?.()??Promise.resolve(true)))router.push(historyHref);})();}}>{th('history.title')}</Link>
       <div className="col-span-3 flex min-w-0 flex-wrap items-center gap-3 sm:contents">
-        <div className="text-xs text-sub sm:text-right"><p>{t('tutoring_last_submission')}</p><p className="mt-1 font-semibold text-ink">{latest ? new Date(latest.createdAt).toLocaleString() : t(history.isError ? 'tutoring_status_unknown' : 'tutoring_not_submitted')}</p></div>
+        <div className="text-xs text-sub sm:text-right"><p>{t('tutoring_last_submission')}</p><p className="mt-1 font-semibold text-ink">{latest ? new Date(latest.createdAt).toLocaleString(undefined, { timeZone: displayTimeZone }) : t(history.isError ? 'tutoring_status_unknown' : 'tutoring_not_submitted')}</p></div>
         <div className="border-l border-border pl-3 text-right text-xs text-sub"><p>{t('tutoring_score')}</p><p className="mt-1 font-bold text-ink">{latest ? `${latest.score}/100` : '—'}</p></div>
         <button type="button" onClick={() => setFeedbackOpen(!feedbackOpen)} aria-expanded={feedbackOpen} className="inline-flex items-center gap-1.5 rounded-lg border border-brand/20 bg-brand-soft px-3 py-2 text-xs font-bold text-brand"><MessageSquare aria-hidden className="size-3.5" />{t('tutoring_feedback')}</button>
       </div>

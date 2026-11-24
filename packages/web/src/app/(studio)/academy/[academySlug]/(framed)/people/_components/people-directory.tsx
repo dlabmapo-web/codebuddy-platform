@@ -24,6 +24,7 @@ import {
   ChevronDown,
   Ellipsis,
   FileSpreadsheet,
+  Link2,
   ShieldOff,
   Trash2,
   UserCheck,
@@ -269,7 +270,7 @@ export function PeopleDirectory({
         id: 'role',
         accessorFn: (row) => row.role,
         header: t('people.column.role'),
-        size: 140,
+        size: 180,
         cell: ({ row }) => (
           <RoleCell
             managed={row.original.managedBy === 'dlab'}
@@ -684,7 +685,22 @@ function RoleCell({
   // A role only changes while the membership is active. Rendering the plain
   // badge — not a disabled button — is the honest form: there is nothing here
   // to press, so nothing offers to be pressed.
-  if (managed) return <span title={t('people.action.managed_by_os')}>{badge}<span className="ml-1 text-xs text-sub">{t('people.action.managed_label')}</span></span>;
+  // A D-LAB OS member: the role beside a small source chip, on one line. The
+  // chip says where the role comes from; the tooltip says why it cannot change.
+  if (managed)
+    return (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+        {badge}
+        <span
+          aria-label={t('people.action.managed_by_os')}
+          className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-1.5 py-0.5 text-[11px] font-semibold leading-none text-sub"
+          title={t('people.action.managed_by_os')}
+        >
+          <Link2 aria-hidden className="size-3" />
+          {t('people.action.managed_label')}
+        </span>
+      </span>
+    );
   if (status !== 'ACTIVE') return badge;
 
   return (
@@ -843,8 +859,8 @@ function RowActions({
             </>
           ) : null}
 
-          {/* A D-LAB member belongs to the source system, which would bring them back. */}
-          {!managed && status !== 'LEFT' ? (
+          {/* D-LAB members too: a deleted membership stays deleted through sync. */}
+          {status !== 'LEFT' ? (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem

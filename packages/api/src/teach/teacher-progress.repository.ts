@@ -7,6 +7,7 @@ import {
 } from "@cove/shared";
 
 import { PrismaService } from "../database/prisma.service.js";
+import { readLastSubmissions } from "../exam/exam-read.js";
 import { Prisma, type SubmissionStatus } from "../generated/prisma/client.js";
 import {
   authorizedOverviewWorkPredicate,
@@ -437,6 +438,25 @@ export class TeacherProgressRepository {
    * resolved student and exercise: the caller has proved both belong to the
    * class before any of this is selected.
    */
+  /**
+   * What a test submission is worth in its test, as the test's results count
+   * it: the points frozen at the attempt's start, and the last submission per
+   * problem. Two statements, read together, and only for test submissions.
+   */
+  async testPointsForSubmission(input: { testAttemptId: string; materialId: string; submissionId: string }) {
+    const [attempt, last] = await Promise.all([
+      this.prisma.testAttempt.findUnique({ where: { id: input.testAttemptId }, select: { itemsSnapshot: true } }),
+      readLastSubmissions(this.prisma, [input.testAttemptId]),
+    ]);
+    if (!attempt) return null;
+    const items = Array.isArray(attempt.itemsSnapshot)
+      ? (attempt.itemsSnapshot as Array<{ materialId?: string; pointsHundredths?: number }>)
+      : [];
+    const pointsHundredths = items.find((item) => item.materialId === input.materialId)?.pointsHundredths ?? 0;
+    const counted = last.find((row) => row.materialId === input.materialId);
+    return { pointsHundredths, counted: counted?.submissionId === input.submissionId ? counted : null };
+  }
+
   async findSubmissionForReview(input: {
     userId: string;
     materialIds: string[];
@@ -458,6 +478,7 @@ export class TeacherProgressRepository {
         sourceMaterialId: true,
         status: true,
         submissionPolicy: true, manualAssessmentSnapshot: true, manualReviewResult: true,
+        testAttemptId: true,
         score: true,
         earnedWeight: true,
         possibleWeight: true,

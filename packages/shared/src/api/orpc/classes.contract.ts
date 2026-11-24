@@ -16,6 +16,7 @@ import {
   setClassTeachersSchema,
   setClassCoursesSchema,
   deleteClassSchema,
+  classDeleteImpactSchema,
   setClassStatusSchema,
   setClassScheduleSchema,
   setClassTeacherSchema,
@@ -41,6 +42,7 @@ export const academyClassesContract = {
    * created by mistake, and it is refused once anybody has submitted through it.
    */
   delete: oc.input(deleteClassSchema).output(z.object({ classId: z.uuid() })),
+  deleteImpact: oc.input(classIdInputSchema).output(classDeleteImpactSchema),
   setCourses: oc.input(setClassCoursesSchema).output(classDetailSchema),
   /**
    * When the class meets. §8.1 — the whole timetable at once, for Managers and Team Leads,

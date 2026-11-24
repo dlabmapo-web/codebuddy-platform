@@ -36,6 +36,7 @@
   "automatic_help": "Submit code and receive a score from your test cases.",
   "retained_grading": "Future submissions are off. Saved test cases and previous results are kept so you can enable grading later.",
   "solutions_hints": "Reference solutions and hints (optional)",
+  "solutions_hints_required": "Correct answer code (required) and hints",
   "advanced_grading": "Advanced grading settings",
   "advanced_case": "More test settings",
   "points_summary": "Test points: {{total}} · Maximum score: {{maximum}}",

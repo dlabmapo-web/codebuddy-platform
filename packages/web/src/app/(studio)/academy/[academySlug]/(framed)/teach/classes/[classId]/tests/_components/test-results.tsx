@@ -64,7 +64,7 @@ export function TestResults({ academyId, initial, canManageContent }: { academyI
   return (
     <div className="space-y-6 px-4 pb-16 sm:px-6">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[13px] text-sub">{formatDuration(t, results.settings.timeLimitMinutes)} · {t('problem_count_value', { count: results.items.length })} · {t('points_value', { points: formatPoints(results.totalPointsHundredths) })}</span>
+        <span className="text-[13px] text-sub">{formatDuration(t, results.settings.timeLimitMinutes)} · {t('results.problem_count', { count: results.items.length })} · {t('points_value', { points: formatPoints(results.totalPointsHundredths) })}</span>
         <span className="flex-1" />
         {canManageContent ? (
           <Link href={routes.academyContentTest(slug, results.courseId, results.lectureId)} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-[13px] font-semibold hover:bg-surface">

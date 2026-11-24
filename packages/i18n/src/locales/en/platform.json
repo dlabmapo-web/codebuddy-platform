@@ -190,7 +190,8 @@
     "library": "Library",
     "features": "Features",
     "point_policies": "Point policies",
-    "maintenance": "Maintenance"
+    "maintenance": "Maintenance",
+    "turtle": "Public Turtle"
   },
   "unavailable": {
     "title": "Academies are unavailable",
@@ -278,7 +279,7 @@
   "content_delete": {
     "title": "Delete {{name}}?",
     "course_body": "This removes the course and every module, lecture and problem in it. Refused if any student has submitted through it — hide it instead.",
-    "class_body": "This removes the class, its roster and its schedule. Refused if any student has submitted through it — archive it instead.",
+    "class_body": "This removes the class with its roster, schedule and course links. To keep its history, archive it instead.",
     "confirm_label": "Type {{name}} to confirm"
   },
   "academy_field": {

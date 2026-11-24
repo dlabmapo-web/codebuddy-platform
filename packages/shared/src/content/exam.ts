@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { inputPromptPolicySchema, programmingExerciseGradingModeSchema } from "./course.js";
+
 /**
  * Exams (테스트). A TEST lecture whose materials are the problems, taken in one
  * timed attempt. Design: docs/superpowers/specs/2026-11-20-exam-tests-design.md.
@@ -227,6 +229,9 @@ export const examItemContentSchema = z.discriminatedUnion("type", [
     /** How many graded cases stay hidden, as the normal workspace says. */
     hiddenCount: z.number().int().min(0),
     language: z.string(), starterCode: z.string(),
+    /** How Submit grades it, so a sample run judges in the browser only what the server would. */
+    gradingMode: programmingExerciseGradingModeSchema.default("LEGACY_STDIO"),
+    inputPromptPolicy: inputPromptPolicySchema.default("INCLUDE"),
     /** The last code submitted in this attempt, to restore after leaving. */
     lastAnswer: z.string().nullable(),
   }),
@@ -280,7 +285,7 @@ export const examStaffTestSchema = z.object({
   settings: examSettingsSchema,
   items: z.array(examStaffItemSchema),
   totalPointsHundredths: z.number().int(),
-  /** Published, or any attempt exists: points and the problem list are frozen. */
+  /** Any attempt exists: points are frozen. Publishing alone does not freeze them. */
   locked: z.boolean(),
   attemptCount: z.number().int(),
   /** Every class that learns this course, with how far it got: results live per class. */

@@ -11,7 +11,18 @@
   "class": {
     "delete": "Delete class",
     "delete_title": "Delete {{name}}?",
-    "delete_body": "This removes the class, its roster and its schedule. Refused if any student has submitted through it — archive it instead.",
+    "delete_body": "This removes the class with its roster, schedule and course links. To keep its history, archive it instead.",
+    "impact": {
+      "heading_one": "Work by {{count}} student in this class",
+      "heading_other": "Work by {{count}} students in this class",
+      "test_attempts_one": "{{count}} test attempt is deleted, with its answers and score.",
+      "test_attempts_other": "{{count}} test attempts are deleted, with their answers and scores.",
+      "answers_one": "{{count}} quiz or short-answer answer is deleted, with its score and feedback.",
+      "answers_other": "{{count}} quiz and short-answer answers are deleted, with their scores and feedback.",
+      "kept_one": "{{count}} code submission stays on the student's record, without this class.",
+      "kept_other": "{{count}} code submissions stay on the students' records, without this class.",
+      "check_failed": "Could not check the students' work. Deleting still removes the answers and test attempts in this class."
+    },
     "delete_confirm_label": "Type {{name}} to confirm",
     "delete_confirm": "Delete permanently",
     "delete_working": "Deleting…",

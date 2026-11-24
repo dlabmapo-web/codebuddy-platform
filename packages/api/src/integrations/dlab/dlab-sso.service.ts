@@ -49,7 +49,8 @@ export class DlabSsoService {
       const campuses = await dlabTransaction(this.prisma, tx => desiredDlabCampuses(tx, this.config, saved));
       if (!campuses.length) throw new DlabError('campus_mapping_required', 403);
       const directory = this.directory ?? new DlabDirectoryService(this.config, this.prisma, this.state, this.source, this.auth, this.reconciler);
-      await directory.provision(saved, requestId, assertOwned);
+      // Signing in from OS brings back someone a manager deleted here.
+      await directory.provision(saved, requestId, assertOwned, undefined, { revive: true });
       const authUserId = saved.reservedUserId;
       const email = buildPlaceholderEmail(saved.reservedUserId);
       const eligible = await this.policy.eligible(authUserId);

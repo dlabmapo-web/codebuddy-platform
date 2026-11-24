@@ -24,7 +24,7 @@ import { PageSizePicker } from '@/components/studio/page-size-picker';
 import { ProfileAvatar } from '@/components/studio/profile-avatar';
 import { useErrorText } from '@/i18n/client/use-error-text';
 
-import { DeleteMemberButton } from '../../people/_components/delete-member-button';
+import { MemberRowMenu } from '../../people/_components/member-row-menu';
 import { routes } from '@/lib/routes';
 
 import {
@@ -34,7 +34,6 @@ import {
   UsernameCell,
 } from '../../_components/people-cells';
 import {
-  ProfileLinkCell,
   RosterFailure,
   RosterFooter,
 } from '../../_components/roster-parts';
@@ -58,8 +57,11 @@ export function StaffRoster({
   academyId,
   initialData,
   initialKey,
+  viewerUserId,
 }: {
   academyId: string;
+  /** The signed-in person: their own row offers no Delete, which the server refuses. */
+  viewerUserId?: string;
   initialData: StaffRosterPage | null;
   initialKey: string;
 }) {
@@ -237,31 +239,24 @@ export function StaffRoster({
         header: '',
         enableSorting: false,
         enableHiding: false,
-        size: 80,
+        size: 56,
         // §5.1 — the detail page, for every reader. See the Students roster.
         cell: ({ row }) => (
-          <div className="flex items-center justify-end gap-1">
-            <ProfileLinkCell
-              href={routes.academyStaffMember(
+          <MemberRowMenu
+            academyId={academyId}
+            canDelete={canManageMembers && row.original.userId !== viewerUserId}
+            membershipId={row.original.membershipId}
+            name={row.original.displayName}
+            onDeleted={() => void refetch()}
+            profileHref={routes.academyStaffMember(
                 academySlug,
                 row.original.membershipId,
               )}
-              label={t('view_profile', { name: row.original.displayName })}
-            />
-            {/* Managers only: deleting a person is a members decision. */}
-            {canManageMembers ? (
-              <DeleteMemberButton
-                academyId={academyId}
-                membershipId={row.original.membershipId}
-                name={row.original.displayName}
-                onDeleted={() => void refetch()}
-              />
-            ) : null}
-          </div>
+          />
         ),
       },
     ],
-    [academyId, academySlug, canManageMembers, i18n.language, t, tManager, refetch],
+    [academyId, academySlug, canManageMembers, viewerUserId, i18n.language, t, tManager, refetch],
   );
 
   if (page.isError && !data) {

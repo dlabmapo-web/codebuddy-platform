@@ -2,7 +2,7 @@ import { readSubmissionAdmission } from "./submission-admission-read.js";
 import { learnerProjectView } from "../content/exercise-project.js";
 import { manualProgrammingResult } from "./programming-assessment.js";
 import { resolveGradingProfile } from "../judge/grading-profile.js";
-import { isCompiledLanguage, rolesHavePermission, roleCanMonitor } from "@cove/shared";
+import { comparesSampleLocally, isCompiledLanguage, rolesHavePermission, roleCanMonitor } from "@cove/shared";
 import { StaffPracticeService } from "./staff-practice.service.js";
 import { referencePdfMetadata } from "../documents/pdf-reference.js";
 import { publicQuiz } from "@cove/shared";
@@ -404,6 +404,11 @@ export class LearnService {
     const exercise = material.programmingExercise;
     const { courseModule } = material.lecture;
     const course = courseModule.course;
+    // C and C++ have no browser runtime: their samples are always the server's.
+    // Plain Python never needs it: the browser judges those samples by Submit's
+    // own rule, which keeps Test clicks off the judge's few slots.
+    const compiled = isCompiledLanguage(exercise.language);
+    const needsFlag = !compiled && !comparesSampleLocally(exercise.gradingMode, exercise.inputPromptPolicy);
     const [draft, progress, sampleChecks] = await Promise.all([
       staffPractice ? Promise.resolve(null) : this.prisma.exerciseDraft.findUnique({
         where: { userId_materialId: { userId, materialId: material.id } },
@@ -413,8 +418,8 @@ export class LearnService {
         where: { userId_materialId: { userId, materialId: material.id } },
         select: { status: true, gradingRevision: true },
       }),
-      // The academy rollout flag applies to both supported grading modes.
-      this.prisma.academyFeatureFlag.findUnique({
+      // Read only where the academy's choice changes the answer.
+      !needsFlag ? Promise.resolve(null) : this.prisma.academyFeatureFlag.findUnique({
         where: {
           academyId_feature: {
             academyId: course.academyId,
@@ -469,8 +474,7 @@ export class LearnService {
         gradingMode: exercise.gradingMode,
         inputPromptPolicy: exercise.inputPromptPolicy,
         gradingRevision: exercise.gradingRevision,
-        // C and C++ have no browser runtime: their samples are always the server's.
-        serverSampleChecks: isCompiledLanguage(exercise.language) || (sampleChecks?.isEnabled ?? false),
+        serverSampleChecks: compiled || (sampleChecks?.isEnabled ?? false),
         sampleTestCases: ((exercise.submissionPolicy ?? "AUTOMATIC") !== "AUTOMATIC" ? [] : exercise.testCases)
           .filter((testCase) => testCase.visibility === "SAMPLE")
           .map((testCase) => ({

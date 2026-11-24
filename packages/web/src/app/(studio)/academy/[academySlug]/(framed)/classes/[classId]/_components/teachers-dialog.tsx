@@ -34,6 +34,7 @@ export function TeachersDialog({
     name: teacherSearchLabel(teacher, t('detail.teacher_panel.no_name')),
     displayName: teacher.displayName,
     email: teacher.email,
+    username: teacher.username ?? null,
     academyImageUrl: teacher.academyImageUrl,
     globalImageUrl: teacher.globalImageUrl,
     externalAvatarUrl: teacher.externalAvatarUrl,
@@ -106,7 +107,8 @@ export function TeachersDialog({
                           t('detail.teacher_panel.no_name')}
                       </span>
                       <span className="truncate text-[12px] text-sub">
-                        {teacher.email ?? t('detail.teacher_panel.no_email')}
+                        {[teacher.email, teacher.username ? `@${teacher.username}` : null].filter(Boolean).join(' · ') ||
+                          t('detail.teacher_panel.no_email')}
                       </span>
                     </span>
                   </span>

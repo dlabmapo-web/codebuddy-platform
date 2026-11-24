@@ -17,6 +17,7 @@ import { useErrorText } from '@/i18n/client/use-error-text';
 import { orpc } from '@/lib/orpc';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /**
  * A student's password, for the manager who is their only way back in.
@@ -179,7 +180,7 @@ function ScopedStudentPasswordPanel({ academyId, membershipId }: { academyId: st
           <p className="mt-2 text-[13px] leading-5 text-sub">
             {credential
               ? t('credentials.issued_meta', {
-                  date: new Date(credential.issuedAt).toLocaleDateString(),
+                  date: new Date(credential.issuedAt).toLocaleDateString(undefined, { timeZone: displayTimeZone }),
                   issuer: credential.issuedByName ?? t('credentials.unknown_issuer'),
                   count: credential.revealCount,
                 })

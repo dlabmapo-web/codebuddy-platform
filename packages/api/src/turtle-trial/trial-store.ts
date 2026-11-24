@@ -6,7 +6,7 @@ import { trialHash, trialPrefix } from './trial-security.js';
 import type { OnModuleDestroy } from '@nestjs/common';
 
 export type BrowserGrantFields = { browserProfile: string; browserRuntimeId: string; browserOrigin: string };
-export type TrialGrant = { hash: string; version: string; expiresAt: number; active: string; academyId?: string } & Partial<BrowserGrantFields>;
+export type TrialGrant = { hash: string; version: string; expiresAt: number; active: string; academyId?: string; device?: string } & Partial<BrowserGrantFields>;
 export type TrialRun = { requestKey: string; fingerprint: string; id?: string; settled?: string; reservedAt: string; engine?: string; leaseUntil?: string; deadline?: string; state?: string; profile?: string };
 // Each limit is [key, max, windowMs, increment]. Increment 0 only reads the
 // counter, so a class is not charged for attempts that were never wrong.
@@ -93,10 +93,10 @@ export class TrialStore implements OnModuleDestroy {
     await r.set(trialPrefix + 'version', expected, 'NX');
     return await r.get(trialPrefix + 'version') === expected;
   }
-  async issue(version: string, academyId = '', browser?: BrowserGrantFields) {
+  async issue(version: string, academyId = '', browser?: BrowserGrantFields, device = '') {
     const r = await this.client(); const token = randomBytes(32).toString('hex');
     const hash = trialHash(token); const expiresAt = Date.now() + 7200000;
-    await r.multi().hset(this.grantKey(hash), { version, academyId, expiresAt, active: '', used: 0, ...browser })
+    await r.multi().hset(this.grantKey(hash), { version, academyId, expiresAt, active: '', used: 0, device, ...browser })
       .expireat(this.grantKey(hash), Math.ceil(expiresAt / 1000) + 600).exec();
     return { token, expiresAt };
   }
@@ -109,7 +109,7 @@ export class TrialStore implements OnModuleDestroy {
       const raw = await r.get(trialPrefix + 'academy-pin:' + g.academyId);
       if (!raw || JSON.parse(raw).version !== g.version) return null;
     } else if (g.version !== version || !await this.version(version)) return null;
-    return { hash, version: g.version, academyId: g.academyId || undefined, expiresAt: Number(g.expiresAt), active: g.active ?? '', browserProfile: g.browserProfile, browserRuntimeId: g.browserRuntimeId, browserOrigin: g.browserOrigin };
+    return { hash, version: g.version, academyId: g.academyId || undefined, device: g.device || undefined, expiresAt: Number(g.expiresAt), active: g.active ?? '', browserProfile: g.browserProfile, browserRuntimeId: g.browserRuntimeId, browserOrigin: g.browserOrigin };
   }
   async run(g: TrialGrant, key: string): Promise<TrialRun | null> {
     const r = await this.client(); const data = await r.hgetall(this.runKey(g.hash, key));

@@ -325,7 +325,11 @@ export const librarySyncNamespaces = ["library-sync", "academy-library", "errors
  */
 export const operationsNamespaces = ["platform-operations", "errors"] as const;
 
+/** The console page for public Turtle use; no other route reads it. */
+export const platformTurtleNamespaces = ["platform-turtle"] as const;
+
 export type PageNamespace =
+  | (typeof platformTurtleNamespaces)[number]
   | (typeof librarySyncNamespaces)[number]
   | (typeof authNamespaces)[number]
   | (typeof monitoringNamespaces)[number]

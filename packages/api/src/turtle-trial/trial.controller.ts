@@ -23,10 +23,10 @@ export class TrialController {
     this.identify(secret); return this.service.challenge(ip ?? 'unknown');
   }
   @Post('access') access(@Body() body: unknown, @Headers('x-cove-bff-secret') secret?: string,
-    @Headers('x-cove-turtle-nonce') nonce?: string, @Headers('x-cove-client-ip') ip?: string) {
+    @Headers('x-cove-turtle-nonce') nonce?: string, @Headers('x-cove-client-ip') ip?: string, @Headers('x-cove-turtle-device') device?: string) {
     this.identify(secret); this.bounded(body);
     const parsed = z.object({ pin: z.unknown() }).strict().safeParse(body);
-    return this.service.access(parsed.success ? parsed.data.pin : undefined, nonce ?? '', ip ?? 'unknown');
+    return this.service.access(parsed.success ? parsed.data.pin : undefined, nonce ?? '', ip ?? 'unknown', device);
   }
   @Get('bootstrap') bootstrap(@Headers('x-cove-bff-secret') secret?: string, @Headers('x-cove-turtle-session') token?: string) {
     return this.service.bootstrap(this.identify(secret, token));

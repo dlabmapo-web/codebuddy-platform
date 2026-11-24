@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 
 import { durationDisplay } from '../../_lib/overview-view';
 import { toneStyles, type PanelTone } from '../overview-ui/panel';
+import { displayTimeZone } from '@cove/i18n/settings';
 
 /**
  * The student overview's own primitives: the ones that speak.
@@ -184,7 +185,7 @@ export function useRelativeDay() {
       if (days <= 0) return t('when.today');
       if (days === 1) return t('when.yesterday');
       if (days < 7) return t('when.days_ago', { count: days });
-      return new Intl.DateTimeFormat(i18n.language, {
+      return new Intl.DateTimeFormat(i18n.language, { timeZone: displayTimeZone,
         month: 'short',
         day: 'numeric',
       }).format(then);

@@ -1,10 +1,13 @@
 import { displayTimeZone } from '@cove/i18n/settings';
 import type { TFunction } from 'i18next';
 
-/** "26. 11. 20. 12:11", Elice's short form, in the academy's time zone. */
+/**
+ * "2026. 11. 20. 12:11", in the academy's time zone. Elice's dotted form with a
+ * full year: "26. 11. 20." reads as a day first.
+ */
 export function formatExamDate(value: Date | string): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: displayTimeZone, year: '2-digit', month: '2-digit', day: '2-digit',
+    timeZone: displayTimeZone, year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', hour12: false,
   }).formatToParts(new Date(value));
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';

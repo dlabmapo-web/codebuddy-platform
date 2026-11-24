@@ -75,6 +75,8 @@ import { createPlatformApplicationsRouters } from "../platform/platform-applicat
 import { createPlatformContentRouters } from "../platform/platform-content.router.js";
 import { createPlatformOperationsRouters } from "../platform/platform-operations.router.js";
 import { PlatformInvitationsService } from "../platform/platform-invitations.service.js";
+import { PlatformTurtleService } from "../platform/platform-turtle.service.js";
+import { createPlatformTurtleRouters } from "../platform/platform-turtle.router.js";
 import { PlatformRankingService } from "../platform/platform-ranking.service.js";
 import { PlatformSettingsService } from "../platform/platform-settings.service.js";
 import { RegradeService } from "../platform/regrade.service.js";
@@ -193,6 +195,7 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     platformInvitationsService: app.get(PlatformInvitationsService, {
       strict: false,
     }),
+    platformTurtleService: app.get(PlatformTurtleService, { strict: false }),
     platformRankingService: app.get(PlatformRankingService, {
       strict: false,
     }),
@@ -277,6 +280,7 @@ function createORPCRouter(deps: ORPCDeps) {
     ...librarySyncRouters,
     ...platformInvitationsRouters,
     ...platformRankingRouters,
+    ...createPlatformTurtleRouters(os, deps),
     ...platformSettingsRouters,
     ...platformOperationsRouters,
     ...platformSupportRouters,

@@ -1,9 +1,10 @@
-import { HttpException, Inject, Injectable } from '@nestjs/common';
+import { HttpException, Inject, Injectable, Optional } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { TurtleBrowserRun, TurtleBrowserStart } from '@cove/shared';
 import { TrialStore, type TrialGrant } from './trial-store.js';
 import { TrialBrowserPolicy } from './browser-policy.js';
 import { trialHash, trialPrefix } from './trial-security.js';
+import { TurtleUsageRecorder } from './usage-recorder.js';
 
 // Lease renewal and settlement are atomic, including Stop/renew races. Client
 // timing and reported output never determine admission refunds or authority.
@@ -34,7 +35,8 @@ return 1`;
 
 @Injectable()
 export class TrialBrowserRuns {
-  constructor(@Inject(TrialStore) private readonly store: TrialStore, @Inject(TrialBrowserPolicy) private readonly policy: TrialBrowserPolicy) {}
+  constructor(@Inject(TrialStore) private readonly store: TrialStore, @Inject(TrialBrowserPolicy) private readonly policy: TrialBrowserPolicy,
+    @Optional() @Inject(TurtleUsageRecorder) private readonly usage?: TurtleUsageRecorder) {}
   async end(g: TrialGrant, key: string, expired = false) {
     const redis = await this.store.client();
     await redis.eval(finish, 2, this.store.grantKey(g.hash), this.store.runKey(g.hash, key), key, Date.now(), expired ? 'EXPIRED' : 'STOPPED');
@@ -58,9 +60,10 @@ export class TrialBrowserRuns {
       if (record?.engine === 'browser') await this.recover(g, g.active);
     }
     const now = Date.now();
-    await this.store.reserve(g, input.requestKey, trialHash(JSON.stringify(input)), { id: randomUUID(), profile: JSON.stringify(profile), deadline: Math.min(g.expiresAt, now + 120000), leaseUntil: Math.min(g.expiresAt, now + 30000) });
+    const reservation = await this.store.reserve(g, input.requestKey, trialHash(JSON.stringify(input)), { id: randomUUID(), profile: JSON.stringify(profile), deadline: Math.min(g.expiresAt, now + 120000), leaseUntil: Math.min(g.expiresAt, now + 30000) });
     const run = await this.recover(g, input.requestKey);
     if (!run || run.state !== 'ACTIVE') throw new HttpException('RUN_ENDED', 409);
+    if (reservation === 'NEW') this.usage?.record(g, 'run');
     return run;
   }
   async owned(g: TrialGrant, id: string) {
@@ -74,6 +77,7 @@ export class TrialBrowserRuns {
     const renewed = await redis.eval(renew, 3, this.store.grantKey(g.hash), this.store.runKey(g.hash, key), trialPrefix + 'browser:draining', key, Date.now());
     const run = await this.recover(g, key);
     if (!renewed || !run || run.state !== 'ACTIVE') throw new HttpException('RUN_ENDED', 409);
+    this.usage?.record(g, 'seen');
     return run;
   }
 }

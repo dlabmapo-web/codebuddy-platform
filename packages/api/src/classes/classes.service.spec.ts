@@ -1480,31 +1480,28 @@ describe("ClassesService archive and audit", () => {
   });
 
   /**
-   * The policy this test used to hold was "a class is archived, never
-   * deleted". That changed deliberately: a class created by mistake had no way
-   * out, and archiving one is a claim about its history rather than a way to
-   * unmake it.
-   *
-   * What replaced the old assertion is the guarantee that actually protects
-   * anybody — a class carrying student work cannot be deleted at all. The
-   * archive path is untouched and remains the ordinary end of a class.
+   * A class may now be deleted with students' work in it (QA, v2.0.72): the
+   * dialog first shows what goes (`deleteImpact`), and the delete keeps code
+   * submissions, solve time and points detached while removing what cannot
+   * stand without the class — covered end to end in exam.integration.spec.
+   * What still protects anybody here: one delete, guarded by the typed name.
    */
-  it("exposes exactly one delete, and it refuses a class with student work", async () => {
+  it("exposes one delete and its impact preview, and the delete wants the exact name", async () => {
     expect(
       Object.getOwnPropertyNames(ClassesService.prototype).filter((name) =>
         name.toLowerCase().includes("delete")
       ),
-    ).toEqual(["deleteClass"]);
+    ).toEqual(["deleteImpact", "deleteClass"]);
 
     const { service, prisma } = createService();
-    vi.mocked(prisma.submission.count).mockResolvedValue(3 as never);
+    vi.mocked(prisma.class.findFirst).mockResolvedValue({ id: classId, name: "Level 1 Evening", status: "ACTIVE" } as never);
 
     await expect(
       service.deleteClass(identity, {
         academyId,
         classId,
-        confirmName: "Level 1 Evening",
+        confirmName: "Level 1",
       }),
-    ).rejects.toMatchObject({ code: "CONTENT_HAS_SUBMISSIONS" });
+    ).rejects.toMatchObject({ code: "CLASS_VALIDATION_FAILED" });
   });
 });

@@ -11,6 +11,7 @@ import type { PrismaService } from "../database/prisma.service.js";
 import { PrismaClient } from "../generated/prisma/client.js";
 import { ExamStaffService } from "./exam-staff.service.js";
 import { ExamService } from "./exam.service.js";
+import { ClassesService } from "../classes/classes.service.js";
 import { TeacherProgressRepository } from "../teach/teacher-progress.repository.js";
 
 /**
@@ -355,5 +356,40 @@ describe.skipIf(!databaseUrl)("exams against PostgreSQL", () => {
     expect(lines).toHaveLength(1 + enrolledA + 1);
     expect(lines.filter((line) => line.startsWith("Class B,"))).toHaveLength(1);
     expect(lines[0]).toContain("실행 횟수");
+  });
+
+  it("deletes a class with students' work: practice kept and detached, test work removed", async () => {
+    const access = new AcademyAccessService(prisma, new SupportGrantResolver(prisma));
+    const revocation = { revokeClass: vi.fn().mockResolvedValue(undefined) };
+    const classes = new ClassesService(prisma, access, new AuditService(), revocation as never, { signMany: vi.fn().mockResolvedValue([]) } as never);
+    const code = materials.find((m) => m.kind === "CODE")!;
+    const student = students[0]!;
+    // One ordinary practice submission in the class, outside any test.
+    const practice = await client.submission.create({ data: {
+      userId: student.id, materialId: code.id, sourceMaterialId: code.id, courseId, classId, gradingRevision: 1,
+      language: "PYTHON", timeLimitMs: 1000, memoryLimitMb: 128, code: "print(3)", totalCount: 1, engineVersion: "fixture",
+      status: "PASSED", score: 100, problemTitle: "p", courseTitle: "c", moduleTitle: "m", lectureTitle: "l",
+      modulePosition: 1, lecturePosition: 1, problemPosition: 1,
+    } });
+    const attempts = await client.testAttempt.count({ where: { classId } });
+    const answers = await client.manualSubmission.count({ where: { classId } });
+    expect(attempts).toBeGreaterThan(0);
+    expect(answers).toBeGreaterThan(0);
+
+    const impact = await classes.deleteImpact(identity(managerAuth), { academyId, classId });
+    expect(impact).toMatchObject({ keptSubmissions: 1, deletedAnswers: answers, deletedTestAttempts: attempts });
+    expect(impact.students).toBeGreaterThan(0);
+
+    const name = (await client.class.findUniqueOrThrow({ where: { id: classId } })).name;
+    await classes.deleteClass(identity(managerAuth), { academyId, classId, confirmName: name });
+
+    expect(await client.class.count({ where: { id: classId } })).toBe(0);
+    expect(await client.testAttempt.count({ where: { classId } })).toBe(0);
+    expect(await client.manualSubmission.count({ where: { classId } })).toBe(0);
+    // Test submissions went with their attempts; the practice one stays, detached.
+    expect(await client.submission.findUniqueOrThrow({ where: { id: practice.id } })).toMatchObject({ classId: null, score: 100 });
+    expect(await client.submission.count({ where: { classId } })).toBe(0);
+    expect(revocation.revokeClass).toHaveBeenCalledWith(classId, "CLASS_ARCHIVED");
+    expect(await client.auditLog.count({ where: { academyId, action: "class.deleted", targetId: classId } })).toBe(1);
   });
 });

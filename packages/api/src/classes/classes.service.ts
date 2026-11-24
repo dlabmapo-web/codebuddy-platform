@@ -8,6 +8,7 @@ import type {
   AcademyAuditAction,
   AcademyRole,
   AssignedTeacherSummary,
+  ClassDeleteImpact,
   ClassDetail,
   ClassStatus,
   ClassSummary,
@@ -260,12 +261,47 @@ export class ClassesService {
   }
 
   /**
-   * Destroy a class.
+   * What deleting this class does to students' work, for the dialog to say
+   * before anyone confirms. One statement after the permission check.
+   */
+  async deleteImpact(
+    identity: SupabaseIdentity,
+    input: { academyId: string; classId: string },
+  ): Promise<ClassDeleteImpact> {
+    await this.requireClassManager(identity, input.academyId);
+    const [row] = await this.prisma.$queryRaw<
+      Array<{ kept: number; answers: number; attempts: number; students: number }>
+    >`
+      SELECT
+        (SELECT count(*) FROM submissions s WHERE s.class_id = c.id AND s.test_attempt_id IS NULL)::int AS kept,
+        (SELECT count(*) FROM manual_submissions m WHERE m.class_id = c.id)::int AS answers,
+        (SELECT count(*) FROM test_attempts t WHERE t.class_id = c.id)::int AS attempts,
+        (SELECT count(*) FROM (
+          SELECT user_id FROM submissions WHERE class_id = c.id
+          UNION SELECT user_id FROM manual_submissions WHERE class_id = c.id
+          UNION SELECT user_id FROM test_attempts WHERE class_id = c.id
+        ) people)::int AS students
+      FROM classes c
+      WHERE c.id = ${input.classId}::uuid AND c.academy_id = ${input.academyId}::uuid`;
+    if (!row) throw new AppException("CLASS_NOT_FOUND", HttpStatus.NOT_FOUND);
+    return {
+      keptSubmissions: row.kept,
+      deletedAnswers: row.answers,
+      deletedTestAttempts: row.attempts,
+      students: row.students,
+    };
+  }
+
+  /**
+   * Destroy a class, students' work included, after the dialog has shown
+   * what goes (`deleteImpact`).
    *
-   * Archiving is the ordinary end of a class and keeps everything it taught;
-   * this is for one created by mistake. Refused once anybody has submitted
-   * through it — that work belongs to the students, and a class is not the
-   * right thing to destroy it with.
+   * Archiving is the ordinary end of a class and keeps everything it taught.
+   * Deleting keeps what can stand without the class: code submissions (their
+   * progress and best scores), solve time and points are detached by their
+   * foreign keys (ON DELETE SET NULL). What cannot exist outside a class goes
+   * with it: quiz and short-answer answers, test attempts and the submissions
+   * made in them, help requests, feedback and monitoring visits.
    *
    * The name is typed back, matching how a course and an academy are deleted,
    * so the three destructive acts in the product ask the same thing of the
@@ -289,30 +325,28 @@ export class ClassesService {
       throw new AppException("CLASS_VALIDATION_FAILED", HttpStatus.BAD_REQUEST);
     }
 
-    const submissions = await this.prisma.submission.count({
-      where: { classId: record.id },
-    });
-    if (submissions > 0) {
-      throw new AppException("CONTENT_HAS_SUBMISSIONS", HttpStatus.CONFLICT);
-    }
-
     await this.prisma.$transaction(async (tx) => {
-      // Ordered for the relations the schema refuses to cascade. The
-      // submission count above proves the one that matters is empty.
+      // Children before parents, for the relations the schema refuses to
+      // cascade. Test submissions belong to their attempt, not to the
+      // student's practice record, so they go with it.
+      await tx.$executeRaw`
+        DELETE FROM programming_submission_reviews r USING submissions s, test_attempts t
+        WHERE r.submission_id = s.id AND s.test_attempt_id = t.id AND t.class_id = ${record.id}::uuid`;
+      await tx.$executeRaw`
+        DELETE FROM submissions s USING test_attempts t
+        WHERE s.test_attempt_id = t.id AND t.class_id = ${record.id}::uuid`;
+      await tx.$executeRaw`
+        DELETE FROM manual_reviews r USING manual_submissions m
+        WHERE r.submission_id = m.id AND m.class_id = ${record.id}::uuid`;
+      await tx.manualSubmission.deleteMany({ where: { classId: record.id } });
+      await tx.testAttempt.deleteMany({ where: { classId: record.id } });
+      await tx.studentHelpRequest.deleteMany({ where: { classId: record.id } });
       await tx.teacherFeedback.deleteMany({ where: { classId: record.id } });
       await tx.teacherMonitoringVisit.deleteMany({
         where: { classId: record.id },
       });
-      await tx.studentClassCourseLearningDay.deleteMany({
-        where: { classId: record.id },
-      });
-      await tx.pointAward.deleteMany({ where: { classId: record.id } });
-      await tx.exerciseSolveSession.deleteMany({
-        where: { classId: record.id },
-      });
-      await tx.classScheduleSlot.deleteMany({ where: { classId: record.id } });
-      await tx.classEnrollment.deleteMany({ where: { classId: record.id } });
-      await tx.classCourse.deleteMany({ where: { classId: record.id } });
+      // Rosters, schedule, course and test links, learning days cascade;
+      // code submissions, solve sessions and points are detached.
       await tx.class.delete({ where: { id: record.id } });
 
       await this.audit.write(tx, {
@@ -325,6 +359,7 @@ export class ClassesService {
         before: { name: record.name, status: record.status },
       });
     });
+    await this.revocation.revokeClass(record.id, "CLASS_ARCHIVED");
 
     return { classId: record.id };
   }

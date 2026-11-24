@@ -464,6 +464,20 @@ html[data-cove-scroll-boundary], html[data-cove-scroll-boundary] > body {
   overflow-x: clip;
 }
 
+/* A modal menu or dialog locks scrolling with `body { overflow: hidden }`
+ * (react-remove-scroll). With `overflow-x: clip` on html that no longer
+ * reaches the viewport: body becomes its own scroll box, the sticky header
+ * sticks to the top of body — scrolled out of view — and a menu anchored to
+ * it (the avatar menu) opens off-screen while the page will not scroll.
+ * Lock the viewport instead and leave body unscrollable but not a box. */
+html[data-cove-scroll-boundary]:has(> body[data-scroll-locked]) {
+  overflow: hidden;
+}
+html[data-cove-scroll-boundary] > body[data-scroll-locked] {
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+}
+
 body {
   font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 15px;

@@ -333,7 +333,8 @@ export function useExerciseNavigation({
   const refreshProgress = React.useCallback(() => {
     void queryClient.invalidateQueries({
       queryKey: ['learn', academyId, 'navigator', classId, courseId],
-    });
+      // A verdict has just asked for the whole course: join that read.
+    }, { cancelRefetch: false });
   }, [academyId, classId, courseId, queryClient]);
 
   /* -------------------------------------------------------------- prefetch */

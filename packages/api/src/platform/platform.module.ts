@@ -15,6 +15,7 @@ import { PlatformContentService } from "./platform-content.service.js";
 import { PlatformInvitationsService } from "./platform-invitations.service.js";
 import { PlatformLibraryService } from "./platform-library.service.js";
 import { PlatformParticipationRepository } from "./platform-participation.repository.js";
+import { PlatformTurtleService } from "./platform-turtle.service.js";
 import { PlatformRankingService } from "./platform-ranking.service.js";
 import { PlatformSettingsService } from "./platform-settings.service.js";
 import { RegradeService } from "./regrade.service.js";
@@ -67,6 +68,7 @@ import { PlatformLifecycleService } from "./platform-lifecycle.service.js";
     PlatformLibraryService,
     PlatformLibraryImportService,
     PlatformRankingService,
+    PlatformTurtleService,
     PlatformSettingsService,
     RegradeService,
   ],
@@ -82,6 +84,7 @@ import { PlatformLifecycleService } from "./platform-lifecycle.service.js";
     PlatformLibraryService,
     PlatformLibraryImportService,
     PlatformRankingService,
+    PlatformTurtleService,
     PlatformSettingsService,
     RegradeService,
   ],

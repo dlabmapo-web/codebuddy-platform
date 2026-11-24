@@ -190,7 +190,8 @@
     "library": "라이브러리",
     "features": "기능",
     "point_policies": "포인트 정책",
-    "maintenance": "유지 보수"
+    "maintenance": "유지 보수",
+    "turtle": "공개 터틀"
   },
   "unavailable": {
     "title": "아카데미를 불러올 수 없습니다",

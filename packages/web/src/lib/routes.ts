@@ -82,6 +82,7 @@ export const routes = {
    * file already draws between `adminSettings` and `adminAcademySettings`.
    */
   adminOperations: '/admin/operations',
+  adminTurtle: '/admin/turtle',
   adminAcademyNew: '/admin/academies/new',
   adminAcademy: (academySlug: string) =>
     `/admin/academies/${segment(academySlug)}`,

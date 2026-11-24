@@ -12,6 +12,7 @@ import {
   Shield,
   SlidersHorizontal,
   Trophy,
+  Turtle,
   Users,
   Wrench,
 } from 'lucide-react';
@@ -188,6 +189,7 @@ export function PlatformSidebar() {
           label: t('nav.maintenance'),
           icon: Wrench,
         },
+        { href: routes.adminTurtle, label: t('nav.turtle'), icon: Turtle },
       ],
     },
     {

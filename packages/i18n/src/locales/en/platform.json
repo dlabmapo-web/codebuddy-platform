@@ -190,7 +190,8 @@
     "library": "Library",
     "features": "Features",
     "point_policies": "Point policies",
-    "maintenance": "Maintenance"
+    "maintenance": "Maintenance",
+    "turtle": "Public Turtle"
   },
   "unavailable": {
     "title": "Academies are unavailable",

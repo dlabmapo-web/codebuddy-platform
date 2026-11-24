@@ -50,6 +50,7 @@ import type platformContent from '@cove/i18n/locales/en/platform-content.json';
 import type platformLibrary from '@cove/i18n/locales/en/platform-library.json';
 import type academyLibrary from '@cove/i18n/locales/en/academy-library.json';
 import type platformInvitations from '@cove/i18n/locales/en/platform-invitations.json';
+import type platformTurtle from '@cove/i18n/locales/en/platform-turtle.json';
 import type platformRanking from '@cove/i18n/locales/en/platform-ranking.json';
 import type platformUsers from '@cove/i18n/locales/en/platform-users.json';
 import type platformSupport from '@cove/i18n/locales/en/platform-support.json';
@@ -119,6 +120,7 @@ declare module 'i18next' {
       exam: typeof exam;
       'platform-invitations': typeof platformInvitations;
       'platform-ranking': typeof platformRanking;
+      'platform-turtle': typeof platformTurtle;
       'platform-users': typeof platformUsers;
       'platform-support': typeof platformSupport;
       points: typeof points;

@@ -38,6 +38,8 @@
     "not_found_title": "Page not found",
     "not_found_body": "The requested page does not exist or cannot be accessed.",
     "not_found_home": "Go to Cove Studio",
+    "page_unavailable_title": "This page isn't available",
+    "page_unavailable_body": "It may have been removed, or your role in this academy can't open it. Use the menu to find the pages you can open.",
     "academy_not_found_title": "This academy is not available",
     "academy_not_found_body": "It may have been renamed, or your membership here may have ended. Check the link, or ask an academy manager."
   },

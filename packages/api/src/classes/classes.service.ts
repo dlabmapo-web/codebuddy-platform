@@ -753,6 +753,7 @@ export class ClassesService {
             id: true,
             displayName: true,
             email: true,
+            username: true,
             ...memberAvatarSelect.user.select,
           },
         },
@@ -770,6 +771,7 @@ export class ClassesService {
         userId: membership.user.id,
         displayName: membership.user.displayName,
         email: displayableEmail(membership.user.email),
+        username: membership.user.username,
         ...(avatars.get(membership.id) ?? noMemberAvatar),
       })),
     };

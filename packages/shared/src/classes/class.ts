@@ -128,6 +128,8 @@ export const eligibleTeacherSummarySchema = z.object({
   userId: z.uuid(),
   displayName: z.string().nullable(),
   email: z.email().nullable(),
+  /** The sign-in ID, so a manager can find a teacher by it. */
+  username: z.string().nullable().optional(),
   ...memberAvatarUrlsShape,
 });
 export type EligibleTeacherSummary = z.infer<

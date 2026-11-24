@@ -8,8 +8,7 @@ import {
   type MemberDetailInput,
   type StaffDetail,
   type StudentDetail,
-  type StudentStanding,
-} from "@cove/shared";
+  type StudentStanding, displayableEmail } from "@cove/shared";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { holdsRoleWhere } from "../authorization/membership-roles.js";
@@ -578,7 +577,7 @@ export class MemberDetailService {
       ...(canManageMembers
         ? {
             contact: {
-              email: membership.user.email,
+              email: displayableEmail(membership.user.email),
               contactPhone: memberProfile?.contactPhone ?? null,
               employeeNumber: staffProfile?.employeeNumber ?? null,
             },

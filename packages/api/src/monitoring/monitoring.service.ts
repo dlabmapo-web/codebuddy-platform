@@ -319,7 +319,7 @@ export class MonitoringService {
         membershipId: student.studentMembershipId,
         userId: profile.id,
         displayName: profile.displayName,
-        email: profile.email,
+        email: displayableEmail(profile.email),
       },
       class: { classId: classRecord.id, name: classRecord.name },
       exercise: input.materialId

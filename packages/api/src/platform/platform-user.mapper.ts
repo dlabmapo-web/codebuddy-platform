@@ -1,3 +1,4 @@
+import { displayableEmail } from "@cove/shared";
 import type {
   AcademyRole,
   InvitationDeliveryState,
@@ -71,7 +72,8 @@ export function toUserSummary(
     userId: record.id,
     displayName: record.displayName,
     username: record.username,
-    email: record.email,
+    // A generated placeholder (D-LAB OS and email-less accounts) never shows.
+    email: displayableEmail(record.email),
     avatarUrl: record.avatarUrl,
     status: record.status,
     platformRole: record.platformRole,

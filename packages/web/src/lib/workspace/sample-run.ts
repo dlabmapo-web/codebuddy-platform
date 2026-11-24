@@ -74,18 +74,7 @@ export type SampleVerdict =
    */
   | { kind: 'unchecked' };
 
-/**
- * Whether a sample's verdict can be decided here exactly as the server will.
- *
- * Only legacy comparison is: `normalizeSampleOutput` is byte-for-byte the
- * judge's legacy normalizer. Weighted grading compares in CPython — Python's
- * `splitlines`, `re.search`, substring rules — and a JavaScript imitation
- * would pass samples that fail on Submit, or the reverse. Better to say
- * nothing than to say something the grade will contradict.
- */
-export function comparesSampleLocally(gradingMode: string | undefined, inputPromptPolicy = 'INCLUDE'): boolean {
-  return inputPromptPolicy === 'INCLUDE' && (gradingMode ?? 'LEGACY_STDIO') === 'LEGACY_STDIO';
-}
+export { comparesSampleLocally } from '@cove/shared';
 
 /**
  * A run that crashed or was stopped has no output worth comparing — reporting

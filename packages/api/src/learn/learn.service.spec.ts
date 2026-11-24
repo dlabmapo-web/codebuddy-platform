@@ -349,8 +349,34 @@ describe("LearnService visible curriculum", () => {
     );
   });
 
-  it.each([false, true])("advertises server samples for legacy exercises when enabled=%s", async (enabled) => {
+  it("keeps plain Python samples in the browser without reading the flag", async () => {
     const { service, prisma } = createService();
+    vi.mocked(prisma.academyFeatureFlag.findUnique).mockResolvedValue({ isEnabled: true } as never);
+    const result = await service.getExerciseWorkspace(identity, { academyId, classId, materialId });
+    expect(result.exercise.serverSampleChecks).toBe(false);
+    expect(prisma.academyFeatureFlag.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("always sends compiled samples to the server", async () => {
+    const { service, prisma } = createService();
+    const material = (await prisma.material.findFirst()) as unknown as { programmingExercise: object };
+    vi.mocked(prisma.material.findFirst).mockResolvedValue({
+      ...material, programmingExercise: { ...material.programmingExercise, language: "C" },
+    } as never);
+    const result = await service.getExerciseWorkspace(identity, { academyId, classId, materialId });
+    expect(result.exercise.serverSampleChecks).toBe(true);
+    expect(prisma.academyFeatureFlag.findUnique).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ gradingMode: "ELICE_STDIO" }, false], [{ gradingMode: "ELICE_STDIO" }, true],
+    [{ inputPromptPolicy: "IGNORE" }, false], [{ inputPromptPolicy: "IGNORE" }, true],
+  ])("follows the academy's choice for samples the browser cannot judge: %o, enabled=%s", async (grading, enabled) => {
+    const { service, prisma } = createService();
+    const material = (await prisma.material.findFirst()) as unknown as { programmingExercise: object };
+    vi.mocked(prisma.material.findFirst).mockResolvedValue({
+      ...material, programmingExercise: { ...material.programmingExercise, ...grading },
+    } as never);
     vi.mocked(prisma.academyFeatureFlag.findUnique).mockResolvedValue({ isEnabled: enabled } as never);
     const result = await service.getExerciseWorkspace(identity, { academyId, classId, materialId });
     expect(result.exercise.serverSampleChecks).toBe(enabled);

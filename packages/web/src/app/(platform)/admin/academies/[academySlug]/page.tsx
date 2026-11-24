@@ -10,6 +10,8 @@ import {
 import { BackLink } from '@/components/studio/back-link';
 import { backTo } from '@/lib/back-to';
 
+import { destructiveNamespaces } from '@/i18n/namespaces';
+
 import { PlatformShell } from '../../_components/platform-shell';
 import { AcademyDetail } from './_components/academy-detail';
 
@@ -53,6 +55,7 @@ export default async function PlatformAcademyPage({
       back={<BackLink href={backTo.platformAcademy()} label={t('shell.back')} />}
       bleed
       description={`/${academy.slug}`}
+      namespaces={destructiveNamespaces}
       title={academy.name}
     >
       <AcademyDetail

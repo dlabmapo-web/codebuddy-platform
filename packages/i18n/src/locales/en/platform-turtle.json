@@ -32,7 +32,7 @@
   "table": {
     "academy": "Academy",
     "last_used": "Last used",
-    "never": "Not in 180 days",
+    "never": "No use recorded",
     "unknown": "Unknown academy",
     "search": "Search an academy",
     "empty": "No academies found."

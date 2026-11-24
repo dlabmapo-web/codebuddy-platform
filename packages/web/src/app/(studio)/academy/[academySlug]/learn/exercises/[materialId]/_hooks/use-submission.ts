@@ -88,6 +88,7 @@ export function useSubmission({
   const requestRef = React.useRef<{code: string; materialId: string; classId: string; id: string} | null>(null);
   const sourceRef = React.useRef<EventSource | null>(null);
   const fallbackRef = React.useRef<SubmissionFallback | null>(null);
+  const announcedRef = React.useRef('');
 
   const teardown = React.useCallback(() => {
     sourceRef.current?.close();
@@ -110,6 +111,11 @@ export function useSubmission({
           (previous.manualAssessment?.reviewVersion ?? 0) > (fetched.manualAssessment?.reviewVersion ?? 0) ? previous : fetched);
         setSubmitting(false);
         teardown();
+        // The stream and the fallback can both deliver one verdict; its
+        // progress is refreshed once. A teacher's later review is a new one.
+        const verdict = `${fetched.submissionId}:${fetched.status}:${fetched.manualAssessment?.reviewVersion ?? 0}`;
+        if (announcedRef.current === verdict) return true;
+        announcedRef.current = verdict;
         // The verdict moves progress, so the outline and catalog are stale.
         void queryClient.invalidateQueries({ queryKey: ['learn', academyId] });
         void queryClient.invalidateQueries({ queryKey: ['latest-submission', userId, academyId, materialId] });

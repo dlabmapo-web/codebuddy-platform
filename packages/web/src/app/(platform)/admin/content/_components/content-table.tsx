@@ -386,9 +386,9 @@ export function ContentTable({
         id: 'name',
         header: t('table.class'),
         enableHiding: false,
-        // Wide enough for a whole class name: the name is how operators tell
-        // one class from another, and a truncated one hides the difference.
-        size: 300,
+        // The one unsized column, so it takes what the others leave: the name
+        // is how operators tell one class from another, and the widths beside
+        // it stay small enough that the row menu needs no sideways scroll.
         cell: ({ row }) => (
           <TitleCell
             subtitle={row.original.description}
@@ -414,7 +414,7 @@ export function ContentTable({
         id: 'courses',
         header: t('table.assigned_courses'),
         enableSorting: false,
-        size: 176,
+        size: 156,
         meta: { hideable: true },
         cell: ({ row }) => <CoursesCell courses={row.original.courses} />,
       },
@@ -422,7 +422,7 @@ export function ContentTable({
         id: 'teacher',
         header: t('table.teacher'),
         enableSorting: false,
-        size: 164,
+        size: 136,
         meta: { hideable: true },
         cell: ({ row }) => (
           <TeacherCell
@@ -436,7 +436,7 @@ export function ContentTable({
         t('table.students'),
         (row) => row.studentCount,
         'none',
-        104,
+        116,
         true,
       ),
       updatedColumn<PlatformClass>(88),

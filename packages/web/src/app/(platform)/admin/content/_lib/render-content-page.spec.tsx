@@ -15,4 +15,6 @@ it.each(['courses', 'classes'] as const)('renders %s rows without requesting or 
   expect(table.props.initialData).toEqual({ items: [] });
   expect(table.props.initialSummary).toBeNull();
   expect(summary).not.toHaveBeenCalled();
+  // The class delete dialog reads its impact from here; without it, raw keys show.
+  expect(page.props.namespaces).toContain('destructive');
 });

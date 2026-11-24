@@ -285,7 +285,7 @@ export const examStaffTestSchema = z.object({
   settings: examSettingsSchema,
   items: z.array(examStaffItemSchema),
   totalPointsHundredths: z.number().int(),
-  /** Any attempt exists: points are frozen. Publishing alone does not freeze them. */
+  /** Any attempt exists: changing points re-scores it, so it needs `rescoreAttempts`. */
   locked: z.boolean(),
   attemptCount: z.number().int(),
   /** Every class that learns this course, with how far it got: results live per class. */
@@ -398,6 +398,8 @@ export const examUpdateTestInputSchema = examStaffTestInputSchema.extend({
   isVisible: z.boolean().optional(),
   settings: examSettingsSchema.partial().optional(),
   points: z.record(z.uuid(), z.number().int().min(0).max(EXAM_POINTS_MAX_HUNDREDTHS)).optional(),
+  /** Says the author knows students have attempts, whose scores change with the points. */
+  rescoreAttempts: z.boolean().optional(),
 });
 export const examClassInputSchema = z.object({ ...academy, classId: z.uuid() });
 export const examClassTestInputSchema = examClassInputSchema.extend({ lectureId: z.uuid() });

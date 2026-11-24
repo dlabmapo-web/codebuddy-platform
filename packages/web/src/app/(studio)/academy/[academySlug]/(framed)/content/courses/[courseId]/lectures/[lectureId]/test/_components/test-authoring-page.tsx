@@ -141,7 +141,7 @@ export function TestAuthoringPage({ academyId, initial }: { academyId: string; i
         {tab === 'guide' ? <GuideTab test={test} busy={busy} onSave={(guide) => update({ settings: { guide } })} />
           : tab === 'settings' ? <SettingsTab test={test} busy={busy} onSave={(settings) => update({ settings })} />
             : <ProblemsTab key={test.items.map((item) => `${item.materialId}:${item.pointsHundredths}`).join(',')} test={test} busy={busy} academySlug={slug}
-              onSave={(points) => update({ points })} onReorder={reorder} />}
+              onSave={(points) => update({ points, ...(test.locked ? { rescoreAttempts: true } : {}) })} onReorder={reorder} />}
       </section>
 
       {editing ? (
@@ -308,6 +308,7 @@ function ProblemsTab({ test, busy, academySlug, onSave, onReorder }: {
   onReorder: (orderedMaterialIds: string[]) => Promise<void>;
 }) {
   const { t } = useTranslation('exam');
+  const [confirming, setConfirming] = React.useState(false);
   const initial = React.useMemo(() => Object.fromEntries(test.items.map((item) => [item.materialId, formatPoints(item.pointsHundredths)])), [test.items]);
   const [values, setValues] = React.useState<Record<string, string>>(initial);
   const parsed = Object.fromEntries(Object.entries(values).map(([id, value]) => [id, Math.round(Number(value) * 100)]));
@@ -330,7 +331,7 @@ function ProblemsTab({ test, busy, academySlug, onSave, onReorder }: {
       </div>
       {test.locked ? (
         <p className="mt-3 flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-[12.5px] font-semibold text-sub">
-          <TriangleAlert aria-hidden className="size-4 text-warning" /> {t('authoring.problems.locked')}
+          <TriangleAlert aria-hidden className="size-4 text-warning" /> {t('authoring.problems.rescore_hint')}
         </p>
       ) : null}
       <ul className="mt-3 divide-y divide-border border-y border-border">
@@ -357,7 +358,7 @@ function ProblemsTab({ test, busy, academySlug, onSave, onReorder }: {
               <Link href={editorHref} className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink hover:text-brand">{item.title}</Link>
               {!item.type ? <span className="text-[12px] font-semibold text-danger">{t('authoring.problems.invalid')}</span> : (
                 <label className="flex items-center gap-2">
-                  <input type="number" min={0} step={0.5} value={values[item.materialId] ?? ''} disabled={test.locked}
+                  <input type="number" min={0} step={0.5} value={values[item.materialId] ?? ''} disabled={busy}
                     aria-label={`${item.title} ${t('authoring.problems.points')}`}
                     onChange={(event) => setValues((current) => ({ ...current, [item.materialId]: event.target.value }))}
                     className="h-10 w-20 rounded-lg border border-border bg-surface px-2 text-right text-[14px] outline-none focus:border-brand disabled:text-sub" />
@@ -374,9 +375,20 @@ function ProblemsTab({ test, busy, academySlug, onSave, onReorder }: {
         <span className="ml-auto text-[16px] font-bold text-brand">{t('points_value', { points: formatPoints(total) })}</span>
         {total !== 10_000 ? <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[11px] font-bold text-warning">{t('authoring.problems.not_100')}</span> : null}
       </div>
-      {test.locked ? null : (
-        <div className="pt-6"><SaveButton busy={busy} disabled={!changed || !valid} onClick={() => void onSave(parsed)} /></div>
-      )}
+      <div className="pt-6">
+        <SaveButton busy={busy} disabled={!changed || !valid} onClick={() => (test.locked ? setConfirming(true) : void onSave(parsed))} />
+      </div>
+      {confirming ? (
+        <Dialog title={t('authoring.problems.rescore_title')} onClose={() => setConfirming(false)} footer={(
+          <>
+            <button type="button" onClick={() => setConfirming(false)} className="ml-auto h-11 rounded-lg border border-border px-5 text-[14px] font-semibold text-sub hover:text-ink">{t('authoring.cancel')}</button>
+            <button type="button" disabled={busy} onClick={() => { setConfirming(false); void onSave(parsed); }}
+              className="h-11 rounded-lg bg-brand px-5 text-[14px] font-bold text-on-brand disabled:opacity-50">{t('authoring.problems.rescore_confirm')}</button>
+          </>
+        )}>
+          <p className="text-[14px] leading-6 text-sub">{t('authoring.problems.rescore_body', { count: test.attemptCount })}</p>
+        </Dialog>
+      ) : null}
     </div>
   );
 }

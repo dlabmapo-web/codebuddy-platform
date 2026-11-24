@@ -32,7 +32,7 @@
   "table": {
     "academy": "학원",
     "last_used": "마지막 사용",
-    "never": "180일간 없음",
+    "never": "사용 기록 없음",
     "unknown": "알 수 없는 학원",
     "search": "학원 검색",
     "empty": "학원이 없습니다."

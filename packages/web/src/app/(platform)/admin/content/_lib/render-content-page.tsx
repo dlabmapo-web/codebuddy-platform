@@ -15,7 +15,7 @@ import {
 } from '../../_lib/content-query';
 import type { ContentPage } from '../../_hooks/use-platform-content';
 import { ContentTable } from '../_components/content-table';
-import { contentNamespaces } from '@/i18n/namespaces';
+import { contentNamespaces, destructiveNamespaces } from '@/i18n/namespaces';
 
 /**
  * A curriculum page — Courses or Classes — across every academy.
@@ -69,7 +69,8 @@ export async function renderContentPage({
       bleed
       // Both content lenses reach the academy's visibility modal, whose copy
       // left the layout payload with the rest of the builder's.
-      namespaces={[...contentNamespaces, 'platform-library']}
+      // `destructive` is what a class delete says it would take with it.
+      namespaces={[...contentNamespaces, ...destructiveNamespaces, 'platform-library']}
       description={t(`platform-content:lens_description.${lens}`)}
       title={t(`platform-content:lens.${lens}`)}
     >

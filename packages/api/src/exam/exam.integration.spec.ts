@@ -119,11 +119,19 @@ describe.skipIf(!databaseUrl)("exams against PostgreSQL", () => {
     expect(shell.items).toHaveLength(15);
     expect(shell.deadlineAt!.getTime() - shell.startedAt.getTime()).toBe(50 * 60_000);
     expect(shell.items.every((item) => !item.submitted && item.scoreHundredths === null)).toBe(true);
-    // A student has started: the points are frozen now.
+    // A student has started: points change only knowingly, and reach the attempt.
     const taken = await staff.staffTest(identity(managerAuth), { academyId, courseId, lectureId });
     expect(taken.locked).toBe(true);
     await expect(staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId,
       points: { [taken.items[0]!.materialId]: 100 } })).rejects.toMatchObject({ code: "EXAM_LOCKED" });
+    const original = Object.fromEntries(taken.items.map((item) => [item.materialId, item.pointsHundredths]));
+    const rescored = await staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId,
+      points: { [taken.items[0]!.materialId]: 1600 }, rescoreAttempts: true });
+    expect(rescored.items[0]!.pointsHundredths).toBe(1600);
+    const after = await exams.attempt(identity(student.auth), { academyId, attemptId });
+    expect(after.items.map((item) => item.pointsHundredths)).toEqual(shell.items.map((item, i) => (i === 0 ? 1600 : item.pointsHundredths)));
+    expect(after.items.map((item) => item.materialId)).toEqual(shell.items.map((item) => item.materialId));
+    await staff.updateTest(identity(managerAuth), { academyId, courseId, lectureId, points: original, rescoreAttempts: true });
   });
 
   it("refuses another student's attempt and a problem outside the attempt", async () => {

@@ -58,8 +58,11 @@ export function StaffRoster({
   academyId,
   initialData,
   initialKey,
+  viewerUserId,
 }: {
   academyId: string;
+  /** The signed-in person: their own row offers no Delete, which the server refuses. */
+  viewerUserId?: string;
   initialData: StaffRosterPage | null;
   initialKey: string;
 }) {
@@ -249,7 +252,7 @@ export function StaffRoster({
               label={t('view_profile', { name: row.original.displayName })}
             />
             {/* Managers only: deleting a person is a members decision. */}
-            {canManageMembers ? (
+            {canManageMembers && row.original.userId !== viewerUserId ? (
               <DeleteMemberButton
                 academyId={academyId}
                 membershipId={row.original.membershipId}
@@ -261,7 +264,7 @@ export function StaffRoster({
         ),
       },
     ],
-    [academyId, academySlug, canManageMembers, i18n.language, t, tManager, refetch],
+    [academyId, academySlug, canManageMembers, viewerUserId, i18n.language, t, tManager, refetch],
   );
 
   if (page.isError && !data) {

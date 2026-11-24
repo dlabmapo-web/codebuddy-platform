@@ -14,7 +14,7 @@ import { getLocale } from '@/i18n/server/get-locale';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
 import { canReadAcademyMembers } from '@/lib/academy-access-state';
 import { requireAcademyRoute } from '@/lib/academy-route';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { createServerORPCClient, getAccount } from '@/lib/orpc-server';
 
 import { StudentRoster } from './_components/student-roster';
 
@@ -45,9 +45,13 @@ export default async function StudentsPage({
   ]);
 
   const query = parseStudentRosterQuery(await searchParams);
-  const page = await createServerORPCClient()
-    .academyPeople.students({ academyId, ...query })
-    .catch((): StudentRosterPage | null => null);
+  // The account is already read for this request's layout (React cache).
+  const [page, viewerUserId] = await Promise.all([
+    createServerORPCClient()
+      .academyPeople.students({ academyId, ...query })
+      .catch((): StudentRosterPage | null => null),
+    getAccount().then(({ user }) => user.id).catch(() => undefined),
+  ]);
 
   return (
     <StudioPage
@@ -61,6 +65,7 @@ export default async function StudentsPage({
       >
         <StudentRoster
           academyId={academyId}
+          viewerUserId={viewerUserId}
           initialData={page}
           initialKey={serializeStudentRosterQuery(query)}
         />

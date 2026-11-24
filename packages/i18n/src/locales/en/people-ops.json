@@ -111,10 +111,13 @@
     "confirm_none": "Nobody in this selection can be changed.",
     "consequence": {
       "teacher_assignments_stranded": "{{count}} teach classes that will be left without a teacher",
+      "teacher_assignments_stranded_one": "1 teaches classes that will be left without a teacher",
       "enrollments_dropped": "{{count}} will lose their place in every class",
       "already_in_state": "{{count}} are already in that state",
+      "already_in_state_one": "1 is already in that state",
       "last_manager_blocked": "{{count}} cannot change: an academy must keep one active manager",
       "ineligible": "{{count}} are not eligible for this change",
+      "ineligible_one": "1 is not eligible for this change",
       "monitoring_revoked": "{{count}} live monitoring sessions will end",
       "accounts_deleted": "{{count}} accounts belong to no other academy and will be deleted",
       "accounts_deleted_one": "1 account belongs to no other academy and will be deleted"

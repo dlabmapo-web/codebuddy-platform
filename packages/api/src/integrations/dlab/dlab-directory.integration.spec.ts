@@ -24,6 +24,12 @@ import { DlabDirectoryService } from "./dlab-directory.service.js";
 import { DlabCampusProvisioner } from "./dlab-campus-provisioner.js";
 import { dlabTransaction, sourceWrite } from "./dlab-transaction.js";
 import { readDlabDirectory } from "./dlab-directory-read.js";
+import { AuditService } from "../../academies/audit.service.js";
+import { RateLimitService } from "../../academies/rate-limit.service.js";
+import { AcademyAccessService } from "../../authorization/academy-access.service.js";
+import { SupportGrantResolver } from "../../authorization/support-grant.resolver.js";
+import { ManagerScopeService } from "../../manage/manager-scope.service.js";
+import { PeopleBulkService } from "../../manage/people-bulk.service.js";
 
 const database =
   process.env.COVE_INTEGRATION_DATABASE_URL ??
@@ -923,5 +929,107 @@ describe.skipIf(!database || !redisUrl)(
         JSON.stringify({ reconciliation: counts, provisioning }),
       );
     });
+    it("keeps a D-LAB member a manager deleted out of the academy through later syncs", async () => {
+      const f = await fixture(2);
+      const academyId = f.academyIds[0]!;
+      const student = randomUUID(), teacher = randomUUID();
+      const studentPayload = f.payload("student"), teacherPayload = f.payload("instructor");
+      const studentUser = (await f.directory.syncUser(student, studentPayload, randomUUID())).id;
+      const teacherUser = (await f.directory.syncUser(teacher, teacherPayload, randomUUID())).id;
+      const manager = { user: randomUUID(), auth: randomUUID() };
+      await db.user.create({ data: { id: manager.user, authUserId: manager.auth, status: "ACTIVE", displayName: "Manager",
+        email: `${manager.user}@example.test`, username: `m-${manager.user.slice(0, 8)}` } });
+      await db.academyMembership.create({ data: { academyId, userId: manager.user, role: "MANAGER", status: "ACTIVE" } });
+      const membership = (userId: string, id = academyId) =>
+        db.academyMembership.findFirstOrThrow({ where: { academyId: id, userId } });
+      const prisma = db as unknown as PrismaService;
+      const signIns = { deleteUser: vi.fn().mockResolvedValue(undefined) };
+      const bulk = new PeopleBulkService(prisma,
+        new ManagerScopeService(prisma, new AcademyAccessService(prisma, new SupportGrantResolver(prisma))),
+        new AuditService(), new RateLimitService(),
+        { revokeTeacher: vi.fn().mockResolvedValue(undefined), revokeStudent: vi.fn().mockResolvedValue(undefined) } as never,
+        signIns as never);
+      const selection = { mode: "ids" as const, membershipIds: [
+        (await membership(studentUser)).id, (await membership(teacherUser)).id] };
+      const actor = { authUserId: manager.auth } as never;
+      const preview = await bulk.preview(actor, { academyId, selection, options: { kind: "DELETE" } });
+      expect(preview.affected).toBe(2);
+      const result = await bulk.run(actor, { academyId, selection, options: { kind: "DELETE" },
+        idempotencyKey: randomUUID(), peopleRevision: preview.peopleRevision });
+      expect(result.succeeded).toBe(2);
+
+      // The student belonged nowhere else: account deleted, D-LAB identifiers kept.
+      const deleted = await db.user.findUniqueOrThrow({ where: { id: studentUser } });
+      expect(deleted.status).toBe("DELETED");
+      expect(deleted.username).toMatch(/^dlab_/);
+      expect(deleted.authUserId).not.toBeNull();
+      expect(signIns.deleteUser).toHaveBeenCalledTimes(1);
+      // The teacher keeps the other campus and the account.
+      expect(await db.user.findUniqueOrThrow({ where: { id: teacherUser } })).toMatchObject({ status: "ACTIVE" });
+
+      // D-LAB sends both people again; neither comes back to this academy.
+      const created = f.auth.createDlabUser.mock.calls.length;
+      await f.directory.syncUser(student, { ...studentPayload, name: "Renamed student", updated_at: "2026-11-14T01:00:00Z" }, randomUUID());
+      await f.directory.syncUser(teacher, { ...teacherPayload, name: "Renamed teacher", updated_at: "2026-11-14T01:00:00Z" }, randomUUID());
+      expect((await membership(studentUser)).status).toBe("LEFT");
+      expect((await membership(teacherUser)).status).toBe("LEFT");
+      expect((await membership(teacherUser, f.academyIds[1]!)).status).toBe("ACTIVE");
+      expect((await db.user.findUniqueOrThrow({ where: { id: studentUser } })).status).toBe("DELETED");
+      // No new sign-in for the deleted student; the teacher's is re-ensured as usual.
+      const forStudent = (calls: unknown[][]) => calls.filter(([id]) => id === deleted.authUserId).length;
+      expect(forStudent(f.auth.createDlabUser.mock.calls.slice(created))).toBe(0);
+
+      // Signing in from D-LAB OS brings both back, as fresh members of the academy.
+      for (const external of [student, teacher]) {
+        const saved = await db.dlabIdentity.findUniqueOrThrow({ where: { externalUserId: external } });
+        await f.directory.provision(saved, randomUUID(), async () => {}, undefined, { revive: true });
+      }
+      expect(await db.user.findUniqueOrThrow({ where: { id: studentUser } })).toMatchObject({ status: "ACTIVE" });
+      expect(forStudent(f.auth.createDlabUser.mock.calls.slice(created))).toBe(1);
+      for (const userId of [studentUser, teacherUser]) {
+        const back = await membership(userId);
+        expect(back.status).toBe("ACTIVE");
+        expect(await db.dlabMembershipBinding.findUniqueOrThrow({ where: { membershipId: back.id } }))
+          .toMatchObject({ localSuspendedAt: null });
+      }
+    });
+    it.each(["student", "tutor", "instructor", "so_staff", "edu_manager", "lab_head"])(
+      "deletes a single-campus D-LAB %s, keeps them out through sync, and restores them on sign-in",
+      async (role) => {
+        const f = await fixture(1);
+        const academyId = f.academyIds[0]!;
+        const external = randomUUID(), payload = f.payload(role);
+        const userId = (await f.directory.syncUser(external, payload, randomUUID())).id;
+        const manager = { user: randomUUID(), auth: randomUUID() };
+        await db.user.create({ data: { id: manager.user, authUserId: manager.auth, status: "ACTIVE", displayName: "Manager",
+          email: `${manager.user}@example.test`, username: `m-${manager.user.slice(0, 8)}` } });
+        await db.academyMembership.create({ data: { academyId, userId: manager.user, role: "MANAGER", status: "ACTIVE" } });
+        const prisma = db as unknown as PrismaService;
+        const bulk = new PeopleBulkService(prisma,
+          new ManagerScopeService(prisma, new AcademyAccessService(prisma, new SupportGrantResolver(prisma))),
+          new AuditService(), new RateLimitService(),
+          { revokeTeacher: vi.fn().mockResolvedValue(undefined), revokeStudent: vi.fn().mockResolvedValue(undefined) } as never,
+          { deleteUser: vi.fn().mockResolvedValue(undefined) } as never);
+        const member = () => db.academyMembership.findFirstOrThrow({ where: { academyId, userId }, include: { extraRoles: true } });
+        const selection = { mode: "ids" as const, membershipIds: [(await member()).id] };
+        const actor = { authUserId: manager.auth } as never;
+        const preview = await bulk.preview(actor, { academyId, selection, options: { kind: "DELETE" } });
+        expect(preview.affected).toBe(1);
+        await bulk.run(actor, { academyId, selection, options: { kind: "DELETE" },
+          idempotencyKey: randomUUID(), peopleRevision: preview.peopleRevision });
+        expect((await member()).status).toBe("LEFT");
+        expect((await db.user.findUniqueOrThrow({ where: { id: userId } })).status).toBe("DELETED");
+
+        await f.directory.syncUser(external, { ...payload, name: "Renamed", updated_at: "2026-11-14T01:00:00Z" }, randomUUID());
+        expect((await member()).status).toBe("LEFT");
+
+        const saved = await db.dlabIdentity.findUniqueOrThrow({ where: { externalUserId: external } });
+        await f.directory.provision(saved, randomUUID(), async () => {}, undefined, { revive: true });
+        const back = await member();
+        expect(back.status).toBe("ACTIVE");
+        expect([back.role, ...back.extraRoles.map((r) => r.role)].sort()).toEqual([...dlabAcademyRoles(role)].sort());
+        expect((await db.user.findUniqueOrThrow({ where: { id: userId } })).status).toBe("ACTIVE");
+      },
+    );
   },
 );

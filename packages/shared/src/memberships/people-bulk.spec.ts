@@ -162,11 +162,13 @@ describe("bulkEligibility", () => {
     }
   });
 
-  it("skips somebody who already left, and refuses a D-LAB managed member", () => {
+  it("skips somebody who already left, and deletes a D-LAB managed member", () => {
     expect(bulkEligibility({ role: "STUDENT", status: "LEFT" }, { kind: "DELETE" }))
       .toEqual({ eligible: false, code: "already_in_state" });
     expect(bulkEligibility({ role: "STUDENT", status: "ACTIVE", dlabManaged: true }, { kind: "DELETE" }))
-      .toEqual({ eligible: false, code: "managed_by_os" });
+      .toEqual({ eligible: true, code: "ok" });
+    expect(bulkEligibility({ role: "STUDENT", status: "SUSPENDED", dlabManaged: true, localSuspended: true }, { kind: "DELETE" }))
+      .toEqual({ eligible: true, code: "ok" });
   });
 
 });

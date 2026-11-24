@@ -286,8 +286,8 @@ export function bulkEligibility(
       }
       return { eligible: true, code: "ok" };
     case "DELETE":
-      // A D-LAB member is owned by the source system, which would bring them back.
-      if (member.dlabManaged) return { eligible: false, code: "managed_by_os" };
+      // D-LAB members included: the reconciler leaves a LEFT membership alone,
+      // so a later D-LAB update does not bring them back.
       if (member.status === "LEFT") return { eligible: false, code: "already_in_state" };
       return { eligible: true, code: "ok" };
   }

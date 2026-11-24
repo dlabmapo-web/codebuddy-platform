@@ -843,8 +843,8 @@ function RowActions({
             </>
           ) : null}
 
-          {/* A D-LAB member belongs to the source system, which would bring them back. */}
-          {!managed && status !== 'LEFT' ? (
+          {/* D-LAB members too: a deleted membership stays deleted through sync. */}
+          {status !== 'LEFT' ? (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem

@@ -14,7 +14,7 @@ import { QuizEditor } from './quiz-editor';
 import type { ExerciseAuthoringContext } from '@cove/shared';
 
 import { useExerciseAuthoring } from '../_hooks/use-exercise-authoring';
-import { withLanguage } from '../_lib/exercise-draft';
+import { exerciseCompleteness, withLanguage } from '../_lib/exercise-draft';
 import { SubmissionPolicyEditor } from './submission-policy-editor';
 import { AnswersEditor } from './answers-editor';
 import { BasicInformation } from './basic-information';
@@ -171,7 +171,8 @@ export function ExerciseWorkspace({
         />
 </div> : null}
         <details className="rounded-xl border border-border bg-card p-5">
-          <summary className="cursor-pointer text-sm font-semibold text-sub">{t('pdf-practice:solutions_hints')}</summary>
+          {/* The answer is required whenever Submit grades automatically; only hints are always optional. */}
+          <summary className="cursor-pointer text-sm font-semibold text-sub">{t(exerciseCompleteness(draft).find((row) => row.id === 'solution')?.optional ? 'pdf-practice:solutions_hints' : 'pdf-practice:solutions_hints_required')}</summary>
           <div className="mt-4 space-y-5">{assessmentEditors}</div>
         </details>
         </>}

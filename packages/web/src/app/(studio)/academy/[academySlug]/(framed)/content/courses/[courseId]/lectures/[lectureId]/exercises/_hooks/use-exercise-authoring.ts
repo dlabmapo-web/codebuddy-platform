@@ -157,9 +157,11 @@ export function useExerciseAuthoring({
     // `missing` no longer includes `test` — answers are optional — so the
     // comparison is widened here rather than widening `missing` itself, which
     // the typed translation keys above depend on staying narrow.
-    return (missing as readonly string[]).includes(field)
-      ? t(`exercise.error.${field}`)
-      : null;
+    if (!(missing as readonly string[]).includes(field)) return null;
+    // With cases present, the gap is an unfinished one (often a just-added blank
+    // case), not a missing first case.
+    if (field === 'test' && !draft.quiz && draft.testCases.length > 0) return t('exercise.error.test_incomplete');
+    return t(`exercise.error.${field}`);
   }
 
   function leave(destination = builderPath) {

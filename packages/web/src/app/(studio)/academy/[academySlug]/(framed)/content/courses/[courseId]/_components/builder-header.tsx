@@ -54,10 +54,9 @@ export function BuilderHeader({
       )}
       <div className="ml-auto flex items-center gap-3">
         <p className="text-[14px] font-semibold text-sub">
-          {t('builder.summary', {
-            modules: builder.tree.modules.length,
-            lectures: builder.lectureCount,
-          })}
+          {t('builder.module_count', { count: builder.tree.modules.length })}
+          {' · '}
+          {t('module.lecture_count', { count: builder.lectureCount })}
         </p>
         {/*
           §4.1 — offered only to a Team Lead, and only as a convenience: every

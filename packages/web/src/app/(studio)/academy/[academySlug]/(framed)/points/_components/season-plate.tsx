@@ -66,7 +66,9 @@ export function SeasonPlate({
         ? t('plate.gap_lead', {
             points: formatNumber(track.you - track.rival, locale),
           })
-        : t('plate.gap_alone');
+        : standing.position === 1
+          ? t('plate.gap_only')
+          : t('plate.gap_alone');
 
   return (
     <section className="relative overflow-hidden rounded-card border border-brand/20 bg-brand-soft shadow-[var(--shadow-card)]">

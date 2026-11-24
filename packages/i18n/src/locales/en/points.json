@@ -31,6 +31,7 @@
     "gap_chase": "{{points}}P to reach {{position}}",
     "gap_lead": "Holding 1st · {{points}}P ahead of 2nd",
     "gap_alone": "Solve a problem to join the ranking",
+    "gap_only": "1st · nobody else is ranked yet",
     "track_label": "Points to the next position",
     "solved": "{{count}} solved",
     "you": "You",

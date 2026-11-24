@@ -30,6 +30,7 @@
     "gap_chase": "{{position}}위까지 {{points}}P",
     "gap_lead": "1위 유지 중 · 2위와 {{points}}P 차이",
     "gap_alone": "문제를 풀면 순위가 시작돼요",
+    "gap_only": "1위 · 아직 다른 친구의 순위가 없어요",
     "track_label": "다음 순위까지 남은 포인트",
     "solved": "{{count}}문제",
     "you": "나",

@@ -123,14 +123,14 @@ export class ExamStaffService {
     identity: SupabaseIdentity,
     input: {
       academyId: string; courseId: string; lectureId: string; title?: string; isVisible?: boolean;
-      settings?: Partial<ExamSettings>; points?: Record<string, number>;
+      settings?: Partial<ExamSettings>; points?: Record<string, number>; rescoreAttempts?: boolean;
     },
     context: { requestId?: string } = {},
   ): Promise<ExamStaffTest> {
     const actor = await this.access.requirePermission(identity.authUserId, input.academyId, "curriculum.manage");
     const current = await this.readStaff(input);
     if (input.points) {
-      if (current.locked) throw new AppException("EXAM_LOCKED", HttpStatus.CONFLICT);
+      if (current.locked && !input.rescoreAttempts) throw new AppException("EXAM_LOCKED", HttpStatus.CONFLICT);
       const ids = new Set(current.items.map((item) => item.materialId));
       if (Object.keys(input.points).some((id) => !ids.has(id))) throw new AppException("CONTENT_PARENT_MISMATCH", HttpStatus.BAD_REQUEST);
     }
@@ -163,6 +163,17 @@ export class ExamStaffService {
           ...(input.points ? { points: { ...pointsOf(current), ...input.points } } : {}),
         },
       });
+      // Scores are read from each attempt's own snapshot, so new points reach
+      // students who already started, finished or not, all at once.
+      if (input.points && input.rescoreAttempts) {
+        const points = JSON.stringify(input.points);
+        await tx.$executeRaw`
+          UPDATE test_attempts a SET items_snapshot = (
+            SELECT jsonb_agg(CASE WHEN ${points}::jsonb ? (item->>'materialId')
+              THEN jsonb_set(item, '{pointsHundredths}', ${points}::jsonb -> (item->>'materialId')) ELSE item END ORDER BY ord)
+            FROM jsonb_array_elements(a.items_snapshot) WITH ORDINALITY AS e(item, ord))
+          WHERE a.lecture_id = ${input.lectureId}::uuid AND jsonb_array_length(a.items_snapshot) > 0`;
+      }
       if (input.title !== undefined || input.isVisible !== undefined) {
         await tx.lecture.update({
           where: { id: input.lectureId },
@@ -182,7 +193,7 @@ export class ExamStaffService {
           ...(input.title !== undefined ? { title: input.title } : {}),
           ...(input.isVisible !== undefined ? { isVisible: input.isVisible } : {}),
           ...(input.settings ? { settings: input.settings as Prisma.InputJsonValue } : {}),
-          ...(input.points ? { points: input.points } : {}),
+          ...(input.points ? { points: input.points, rescoredAttempts: input.rescoreAttempts ? current.attemptCount : 0 } : {}),
         },
       });
       await bumpContentRevision(tx, input.courseId);
@@ -202,8 +213,8 @@ export class ExamStaffService {
       settings: settingsOf(row.settings),
       items,
       totalPointsHundredths: items.filter((item) => item.type).reduce((sum, item) => sum + item.pointsHundredths, 0),
-      // Attempts snapshot their points when they start, so points are free to
-      // change until the first one, published or not.
+      // Attempts snapshot their points when they start. Points are free to change
+      // until the first one, and only with `rescoreAttempts` after it.
       locked: row.attemptCount > 0,
       attemptCount: row.attemptCount,
       classes: row.classes,

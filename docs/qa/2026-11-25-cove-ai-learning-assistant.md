@@ -1,0 +1,32 @@
+# Cove AI assistant pilot and release checks
+
+Use this checklist when implementing the [delivery plan](../superpowers/plans/2026-11-25-cove-ai-learning-assistant.md). These are proposed acceptance checks. Record actual results against the built feature. Use synthetic exercises and submissions for the initial evaluation.
+
+## Student-facing examples
+
+| Input or situation | Expected behavior |
+| --- | --- |
+| Empty hint bank on “Print Hello” | **Get a hint** works on the first day. The first hint directs attention to the example. The second distinct request gives a more specific next step. Opening the dialog alone consumes no hint. |
+| `print("hello")`, public equality case expects `Hello` | Explain the observed letter-case difference and give one next step. English example: “Your output starts with a lowercase `h`. What letter starts the example?” Korean example: “출력한 단어는 소문자 `h`로 시작해요. 예시의 첫 글자와 비교해 볼까요?” |
+| `print(Hello)`, with a confirmed public undefined-name diagnostic | Explain that Python tried to look up a name. With only a generic runtime verdict, suggest checking how text is written without claiming a confirmed diagnostic. Keep this separate from the letter-case note. |
+| Different correct approach, such as `word = "Hello"` followed by `print(word)` | The grader passes it. The assistant creates no failure occurrence and offers no correction. A soft-time warning on an otherwise passing program also creates no failure occurrence. |
+| Logic error in another problem | For “Print the larger of two different numbers”, a public test with inputs 2 and 5 got 2. Ask the student to trace which branch runs. Only describe a reversed comparison when their code supports it. Accept a valid `max` solution and a valid conditional. |
+| Several public failures, hidden-only failure, skipped case or timeout | Preserve every observed outcome. Choose one useful public next step. A timeout supports “the run reached its time limit”. It does not prove an infinite loop. For hidden-only evidence, offer a public experiment. |
+| Same symptom with truncated output, a regex comparator or two plausible causes | Skip the exact-output rule when its preconditions fail. Save the occurrence even if classification stays unknown. If truncation cannot be ruled out, abstain from a claim about the entire output. |
+
+## Reliability and isolation
+
+- **Coverage.** In the fixture, every eligible terminal failure has one occurrence after reconciliation, including failures with no assistant clicks. Use the committed submissions as the denominator. Exclude exams, manual receipts, repairs, cancellations, infrastructure faults and disabled-at-admission exercises.
+- **Recovery.** Kill the worker before capture, after occurrence insertion, and after model generation. Drop a wake-up, reorder two completions, replay a job and send concurrent duplicate requests. Once recovered, require all expected occurrences, one occurrence–pattern pair per match, one active note version per slot and one delivery per request ID. A generated reply that was never served is distinguishable from a delivered one.
+- **Authorization.** Try another user's submission, a different class/academy, a copied exercise, an exam, a hidden course, and replay after access is revoked or the exercise switch is turned off. Deny assistance without exposing the existence of another student's work. Previously delivered text stays private.
+- **Evidence.** Seed distinct markers in a hidden case, teacher solution, private fixture file and another learner's code. Inspect model requests, stored shared notes, logs and student replies for those markers. Also include an instruction embedded in the student's code comments and verify that it is treated as data.
+- **Versioning.** Edit only the statement while grading is in flight, edit a note during generation, re-import authored hints and retire an incorrect note. Reopen an old attempt. Its explanation must use the captured public context and applicable feedback version. A new request in a revised exercise must use its own bank.
+- **Fallback.** Disconnect the model and inject invalid responses. The student can still submit, receive a grade, use a saved note or read a fallback. No spinner waits indefinitely. When generation resumes, the backlog drains without recounting failures.
+- **Data lifecycle.** Delete a synthetic student through the supported cleanup path. Confirm private deliveries, occurrence links and any evaluation extracts follow that deletion. Check that any surviving reusable wording includes no student identifier, code or private output.
+
+## Decide when to expand the pilot
+
+1. Prepare at least 20 synthetic student situations, including the examples above. Run each in English and Korean. Record model and prompt versions, input evidence, expected observation, actual reply and response time. A teacher rates factual accuracy, readability and whether the next step is useful. Proposed pilot bar: at least 18 of 20 in **each** language pass all three criteria. Any leaked hidden/private data, false correction of a valid approach or changed official grade blocks expansion.
+2. Measure statement counts for opening the workspace and requesting help (hit and miss), first with one note and then with 100. Opening the page should add zero assistant-specific reads. The hit/miss counts must stay constant as the bank grows. Use Prisma query events against disposable Docker PostgreSQL with `COVE_INTEGRATION_DATABASE_URL`. Record the measured counts in the implementation commit. Follow the [existing query-count test](../../packages/api/src/content/navigation-performance.integration.spec.ts).
+3. Run identical concurrent grading workloads with the assistant disabled, serving saved notes, and generating new notes. Record p50/p95 reply time for hits and misses, grading p95, memory, queue lag and timeouts. Isolate the model from grader slots and cap its concurrency. A practical starting target is p95 below one second for a saved note and a visible fallback within ten seconds for a miss. These are proposed targets, not measurements.
+4. Enable one class, monitor capture coverage, note reuse, unclassified failures and the rate of next-attempt passes. Compare similar exercises and attempts. Treat these metrics as signals for investigation. If quality or grading degrades, disable generated replies, keep the existing grading path available, and reconcile eligible attempts when the worker recovers. Record the tested configuration and the decision before expanding.

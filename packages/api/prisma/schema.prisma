@@ -131,6 +131,9 @@ enum AcademyFeature {
   LIBRARY_COURSE_SYNC
   /// Exams (테스트): timed test lectures, attempts and results. A rollout gate.
   EXAMS
+  /// The Cove AI learning assistant. Operator-only and off by default: Cove
+  /// pays for every call, so an academy's own manager cannot switch it on.
+  AI_ASSISTANT
 }
 
 enum LectureKind {
@@ -430,6 +433,8 @@ model User {
   materialViews StudentMaterialView[]
   staffPracticeDrafts StaffPracticeDraft[]
   staffPracticeAttempts StaffPracticeAttempt[]
+  aiHelpReplies AiHelpReply[]
+  aiLibraryReports AiLibraryReport[]
   dlabIdentity DlabIdentity?
 
   libraryCourseImports LibraryCourseImport[]
@@ -653,6 +658,7 @@ model Academy {
 
   helpRequests StudentHelpRequest[]
   turtleUsageHours TurtleUsageHour[]
+  aiHelpReplies AiHelpReply[]
 
   id             String        @id @default(uuid()) @db.Uuid
   organizationId String        @map("organization_id") @db.Uuid
@@ -1487,6 +1493,7 @@ model Course {
 /// Names are intentionally not unique — an academy reuses "Level 1" every
 /// term — so the UUID is the identity and the UI shows status for context.
 model Class {
+  aiHelpReplies AiHelpReply[]
   manualSubmissions ManualSubmission[]
   lectureTests      ClassLectureTest[]
   testAttempts      TestAttempt[]
@@ -1776,6 +1783,7 @@ model ProgrammingExercise {
   material  Material           @relation(fields: [materialId], references: [id], onDelete: Cascade)
   testCases ExerciseTestCase[]
   hints     ExerciseHint[]
+  aiLibrary AiLibrary?
 
   @@index([externalKey])
   @@index([legacyProblemNo])
@@ -2002,6 +2010,7 @@ model Submission {
   regradeRun   PlatformOperationRun?   @relation(fields: [regradeRunId], references: [id], onDelete: SetNull)
   gradingCases SubmissionGradingCase[]
   cases        SubmissionCase[]
+  aiHelpReplies AiHelpReply[]
 
   @@index([userId, materialId, createdAt(sort: Desc)])
   @@index([status, createdAt])
@@ -2092,6 +2101,13 @@ model SubmissionCase {
   /// program chooses its ending, so it could encode hidden input in it.
   exitCode       Int?               @map("exit_code")
   exitSignal     String?            @map("exit_signal")
+  /// Python runtime errors of SAMPLE cases only, for the error coach. A hidden
+  /// case never has them: a program could raise its hidden input.
+  pythonErrorType    String? @map("python_error_type") @db.VarChar(100)
+  pythonErrorMessage String? @map("python_error_message") @db.VarChar(500)
+  pythonErrorLine    Int?    @map("python_error_line")
+  /// How a wrong output differs, as one word; hidden tests too, never their output. Server only.
+  outputDifference   String? @map("output_difference") @db.VarChar(20)
   /// Populated only for SAMPLE cases. A hidden case records an outcome and
   /// nothing else — otherwise a student could reconstruct hidden expectations
   /// by submitting probes.
@@ -3481,4 +3497,214 @@ model TestAttempt {
   @@index([classId, lectureId, endedAt])
   @@index([userId, lectureId])
   @@map("test_attempts")
+}
+
+enum AiHelpStatus {
+  /// Reserved before the model is called. Counts toward limits for a minute.
+  PENDING
+  DONE
+  FAILED
+}
+
+/// One personalized reply to a student about their own failed submission.
+/// The prompt and the code are not stored: both can be rebuilt from the submission.
+model AiHelpReply {
+  id              String       @id @default(uuid()) @db.Uuid
+  requestId       String       @map("request_id") @db.Uuid
+  userId          String       @map("user_id") @db.Uuid
+  academyId       String       @map("academy_id") @db.Uuid
+  classId         String?      @map("class_id") @db.Uuid
+  submissionId    String       @map("submission_id") @db.Uuid
+  /// The submission's frozen source material. Deliberately not a relation.
+  materialId      String       @map("material_id") @db.Uuid
+  gradingRevision Int          @map("grading_revision")
+  level           Int          @db.SmallInt
+  locale          String       @db.VarChar(2)
+  status          AiHelpStatus @default(PENDING)
+  reply           String?      @db.VarChar(2000)
+  /// The analysis sections, words only. Null on a reply written before analyses.
+  analysis        Json?
+  failureCode     String?      @map("failure_code") @db.VarChar(20)
+  libraryItemId   String?      @map("library_item_id") @db.Uuid
+  model           String?      @db.VarChar(80)
+  promptVersion   String       @map("prompt_version") @db.VarChar(20)
+  inputTokens     Int?         @map("input_tokens")
+  outputTokens    Int?         @map("output_tokens")
+  /// Millionths of a US dollar.
+  costMicros      Int?         @map("cost_micros")
+  latencyMs       Int?         @map("latency_ms")
+  reportedAt      DateTime?    @map("reported_at") @db.Timestamptz(6)
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt     DateTime?    @map("completed_at") @db.Timestamptz(6)
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  academy     Academy        @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  class       Class?         @relation(fields: [classId], references: [id], onDelete: SetNull)
+  submission  Submission     @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  libraryItem AiLibraryItem? @relation(fields: [libraryItemId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, requestId])
+  @@index([userId, createdAt])
+  @@index([userId, materialId, createdAt])
+  @@index([submissionId])
+  /// The weekly growth read and the common-mistakes view start from a problem.
+  @@index([materialId, createdAt])
+  @@map("ai_help_replies")
+}
+
+enum AiUsageKind {
+  HELP
+  LIBRARY
+}
+
+/// What the AI cost each month, so a monthly limit is one row to read.
+model AiUsageMonth {
+  /// First day of the month in Seoul.
+  month        DateTime    @db.Date
+  kind         AiUsageKind
+  requests     Int         @default(0)
+  inputTokens  BigInt      @default(0) @map("input_tokens")
+  outputTokens BigInt      @default(0) @map("output_tokens")
+  costMicros   BigInt      @default(0) @map("cost_micros")
+
+  @@id([month, kind])
+  @@map("ai_usage_months")
+}
+
+enum AiLibraryState {
+  WAITING
+  WRITING
+  CHECKING
+  REVIEWING
+  READY
+  FAILED
+}
+
+/// The AI-written hints and feedback of one exercise, and the job that makes them.
+model AiLibrary {
+  materialId      String         @id @map("material_id") @db.Uuid
+  contentDigest   String         @map("content_digest") @db.VarChar(64)
+  gradingRevision Int            @map("grading_revision")
+  state           AiLibraryState @default(WAITING)
+  attempts        Int            @default(0)
+  nextAttemptAt   DateTime       @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  /// Fencing token: a worker commits only while its lease id is current.
+  leaseId         String?        @map("lease_id") @db.Uuid
+  leaseUntil      DateTime?      @map("lease_until") @db.Timestamptz(6)
+  lastErrorCode   String?        @map("last_error_code") @db.VarChar(40)
+  /// [{approach, code}] that passed every test. Staff only, never a student's.
+  correctPrograms Json           @default("[]") @map("correct_programs")
+  model           String?        @db.VarChar(80)
+  promptVersion   String?        @map("prompt_version") @db.VarChar(20)
+  /// The exercise's `updated_at` when its content was last compared.
+  comparedAt      DateTime       @map("compared_at") @db.Timestamptz(6)
+  grownAt         DateTime?      @map("grown_at") @db.Timestamptz(6)
+  readyAt         DateTime?      @map("ready_at") @db.Timestamptz(6)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  exercise ProgrammingExercise @relation(fields: [materialId], references: [materialId], onDelete: Cascade)
+  items    AiLibraryItem[]
+  checks   AiLibraryCheck[]
+
+  @@index([state, nextAttemptAt])
+  @@index([contentDigest, state])
+  @@map("ai_libraries")
+}
+
+enum AiLibraryItemKind {
+  HINT
+  FEEDBACK
+}
+
+enum AiLibraryItemOrigin {
+  AI
+  COPY
+  GROWN
+  STAFF
+}
+
+enum AiLibraryItemState {
+  CHECKING
+  ACTIVE
+  HIDDEN
+  REJECTED
+}
+
+model AiLibraryItem {
+  id            String              @id @default(uuid()) @db.Uuid
+  materialId    String              @map("material_id") @db.Uuid
+  kind          AiLibraryItemKind
+  position      Int
+  /// The mistake's short name, for staff and the model.
+  label         String              @default("") @db.VarChar(120)
+  textKo        String              @map("text_ko") @db.VarChar(400)
+  textEn        String              @map("text_en") @db.VarChar(400)
+  /// FEEDBACK only. Staff only, never sent to a student.
+  wrongProgram  String?             @map("wrong_program") @db.Text
+  /// What the wrong program printed, by public case position.
+  publicOutputs Json?               @map("public_outputs")
+  /// Its wrong program's result on every test, in order: P passed, F failed, S skipped. Server only.
+  fingerprint   String?
+  origin        AiLibraryItemOrigin @default(AI)
+  state         AiLibraryItemState  @default(CHECKING)
+  rejectReason  String?             @map("reject_reason") @db.VarChar(300)
+  version       Int                 @default(1)
+  updatedBy     String?             @map("updated_by") @db.Uuid
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  library AiLibrary         @relation(fields: [materialId], references: [materialId], onDelete: Cascade)
+  reports AiLibraryReport[]
+  replies AiHelpReply[]
+  checks  AiLibraryCheck[]
+
+  @@index([materialId, state])
+  @@map("ai_library_items")
+}
+
+/// Two different students hide an item until staff look at it.
+model AiLibraryReport {
+  itemId    String   @map("item_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  item AiLibraryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, userId])
+  @@map("ai_library_reports")
+}
+
+enum AiLibraryCheckRole {
+  SOLUTION
+  CORRECT
+  WRONG
+}
+
+/// One program run in the grader to test a library. Never a submission.
+model AiLibraryCheck {
+  id             String             @id @default(uuid()) @db.Uuid
+  materialId     String             @map("material_id") @db.Uuid
+  itemId         String?            @map("item_id") @db.Uuid
+  role           AiLibraryCheckRole
+  label          String             @default("") @db.VarChar(120)
+  code           String             @db.Text
+  snapshot       Json
+  executionQueue String?            @map("execution_queue")
+  status         SubmissionStatus   @default(QUEUED)
+  /// Verdict and public outputs only, never a hidden case's.
+  publicOutputs  Json?              @map("public_outputs")
+  /// The program's result on every test, hidden ones too: P, F or S per test. Server only.
+  fingerprint    String?
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt      DateTime?          @map("started_at") @db.Timestamptz(6)
+  finishedAt     DateTime?          @map("finished_at") @db.Timestamptz(6)
+
+  library AiLibrary      @relation(fields: [materialId], references: [materialId], onDelete: Cascade)
+  item    AiLibraryItem? @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([materialId, status])
+  @@index([status, createdAt])
+  @@map("ai_library_checks")
 }

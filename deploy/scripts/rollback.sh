@@ -9,6 +9,8 @@ require_file "$previous"
 "$script_dir/check-language-floor.sh" "$previous"
 # Nor one that would compile a multi-file C/C++ program as a single main.c.
 "$script_dir/check-project-floor.sh" "$previous"
+# An older API cannot read the AI assistant switch; that switch goes off first.
+"$script_dir/clear-ai-gates.sh" "$previous"
 
 current_copy="$deploy_root/state/failed-deployment.env"
 install -m 600 "$deployment_env" "$current_copy"

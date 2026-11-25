@@ -103,6 +103,8 @@ jobs:
         run: python3 deploy/scripts/language-floor.test.py
       - name: Verify rollback refuses a target that cannot read multi-file C/C++ problems
         run: python3 deploy/scripts/project-floor.test.py
+      - name: Verify rollback switches the AI assistant off for an older API
+        run: python3 deploy/scripts/ai-gates.test.py
       - name: Verify browser pilot release configuration
         run: python3 deploy/scripts/turtle-browser-release.test.py
 

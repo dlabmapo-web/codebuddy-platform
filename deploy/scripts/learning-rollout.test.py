@@ -166,7 +166,7 @@ class LearningRolloutTests(unittest.TestCase):
         # Browser hooks have their own real-script ordering/Redis suites, and
         # the C/C++ rollback floor has language-floor.test.py. These fixtures
         # exercise the pre-existing API-before-web release contract.
-        for name in ("render-monitoring-config.sh", "preflight.sh", "wait-healthy.sh", "smoke.sh", "publish-turtle-browser.sh", "drain-turtle-browser.sh", "check-language-floor.sh", "check-project-floor.sh"):
+        for name in ("render-monitoring-config.sh", "preflight.sh", "wait-healthy.sh", "smoke.sh", "publish-turtle-browser.sh", "drain-turtle-browser.sh", "check-language-floor.sh", "check-project-floor.sh", "clear-ai-gates.sh"):
             script = self.root / "scripts" / name
             script.write_text("#!/bin/sh\nexit 0\n")
             script.chmod(0o700)

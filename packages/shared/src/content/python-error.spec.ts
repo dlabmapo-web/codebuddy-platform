@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyPythonError,
   classifySyntaxError,
+  parsePythonError,
   syntaxLessonCategories,
   pythonErrorFamilies,
   pythonErrorFamily,
@@ -141,5 +142,52 @@ describe("classifySyntaxError", () => {
       expect(typeof category).toBe("string");
     }
     expect(syntaxLessonCategories).toContain("generic-syntax");
+  });
+});
+
+describe("parsePythonError", () => {
+  const native = (frames: string, last: string) =>
+    `Traceback (most recent call last):\n  File "/opt/cove/bootstrap.py", line 77, in <module>\n    run_script(source)\n    ~~~~~~~~~~^^^^^^^^\n${frames}${last}\n`;
+
+  it("reads a native traceback", () => {
+    expect(parsePythonError(native('  File "main.py", line 1, in <module>\n', "NameError: name 'Hello' is not defined")))
+      .toEqual({ type: "NameError", message: "name 'Hello' is not defined", line: 1 });
+  });
+
+  it("reads a syntax error past its quoted source and caret", () => {
+    expect(parsePythonError(native('  File "main.py", line 2\n    print(1)\n    ^^^^^\n',
+      "IndentationError: expected an indented block after 'if' statement on line 1")))
+      .toEqual({ type: "IndentationError", message: "expected an indented block after 'if' statement on line 1", line: 2 });
+  });
+
+  it("uses the innermost line of the student's own file", () => {
+    expect(parsePythonError(native('  File "main.py", line 3, in <module>\n  File "main.py", line 2, in f\n', "IndexError: list index out of range"))?.line).toBe(2);
+    expect(parsePythonError(native('  File "main.py", line 2, in <module>\n  File "/usr/lib/python3.13/json/decoder.py", line 345, in decode\n    obj = x\n',
+      "json.decoder.JSONDecodeError: Expecting value: line 1 column 2 (char 1)")))
+      .toEqual({ type: "JSONDecodeError", message: "Expecting value: line 1 column 2 (char 1)", line: 2 });
+  });
+
+  it("takes the last exception of a chain, and the first line of its message", () => {
+    const first = 'Traceback (most recent call last):\n  File "main.py", line 2, in <module>\nZeroDivisionError: division by zero\n\nDuring handling of the above exception, another exception occurred:\n\n';
+    expect(parsePythonError(first + native('  File "main.py", line 4, in <module>\n', "ValueError: a\nb")))
+      .toEqual({ type: "ValueError", message: "a", line: 4 });
+  });
+
+  it("reads the Pyodide runner's single line, after anything the program printed", () => {
+    expect(parsePythonError("NameError: name 'x' is not defined")).toEqual({ type: "NameError", message: "name 'x' is not defined", line: null });
+    expect(parsePythonError("debug\nTypeError: bad operand")).toEqual({ type: "TypeError", message: "bad operand", line: null });
+  });
+
+  it.each(["", "\n", "just words", "SyntaxErr", "total: 5", "42"])("finds no exception in %j", (stderr) => {
+    expect(parsePythonError(stderr)).toBeNull();
+  });
+
+  it("caps what a program chose to say", () => {
+    expect(parsePythonError(`ValueError: ${"x".repeat(2_000)}`)?.message).toHaveLength(500);
+  });
+
+  it("accepts an exception with no message", () => {
+    expect(parsePythonError(native('  File "main.py", line 1, in <module>\n', "KeyboardInterrupt")))
+      .toEqual({ type: "KeyboardInterrupt", message: "", line: 1 });
   });
 });

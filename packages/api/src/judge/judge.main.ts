@@ -1,5 +1,6 @@
 import { bootstrapNativeWorker } from "./native-worker.js";
 import { RuntimeRecovery } from "./runtime-recovery.js";
+import { LibraryCheckRunner } from "./library-check.runner.js";
 import { PracticeRunner } from "./practice.runner.js";
 import "reflect-metadata";
 // The judge boots without Nest, so nothing else loads the env file for it.
@@ -114,6 +115,7 @@ async function bootstrap(): Promise<void> {
   const measured = <T>(kind: ExecutionKind, action: () => Promise<T>, jobId: string) => withExecutionKind(kind, () => grading.telemetry.time("service", action), jobId);
 
   const practice = new PracticeRunner(prisma, grading);
+  const libraryChecks = new LibraryCheckRunner(prisma, grading);
   const worker = queue.createWorker(
     (job) => {
       if (job.queuedAtMs !== undefined) telemetry.observe("queue", Math.max(0, Date.now() - job.queuedAtMs), "official");
@@ -130,7 +132,7 @@ async function bootstrap(): Promise<void> {
   const practiceWorker = queue.createPracticeWorker(
     (job, queuedAtMs) => {
       if (queuedAtMs !== undefined) telemetry.observe("queue", Math.max(0, Date.now() - queuedAtMs), "practice");
-      return measured("practice", () => capacity.runBackground(() => practice.run(job.attemptId)), job.attemptId);
+      return measured("practice", () => capacity.runBackground(() => job.kind === "library" ? libraryChecks.run(job.attemptId) : practice.run(job.attemptId)), job.attemptId);
     },
     environment.REGRADE_CONCURRENCY,
   );

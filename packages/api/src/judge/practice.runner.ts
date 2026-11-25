@@ -3,6 +3,7 @@ import type { PrismaService } from "../database/prisma.service.js";
 import type { GradingService, GradeSink } from "./grading.service.js";
 import { practiceSnapshotSchema } from "./practice-snapshot.js";
 import { programExit } from "./program-exit.js";
+import { readPythonError } from "./python-error-fields.js";
 
 /** Dispatches through the same evaluator, with a persistence sink that has no student writes. */
 export class PracticeRunner {
@@ -36,7 +37,7 @@ export class PracticeRunner {
             actualOutput: item.isSample ? item.actualOutput : null,
             weight: snapshot.gradingMode === "ELICE_STDIO" ? source?.weight ?? null : null,
             // Staff practising may read every case of the problem they author.
-            ...programExit(item) };
+            ...programExit(item), pythonError: item.isSample ? readPythonError(item) : null };
         }),
         compileFailed: Boolean(compileFailure),
         compileDiagnostics: compileFailure?.diagnostics ?? null,

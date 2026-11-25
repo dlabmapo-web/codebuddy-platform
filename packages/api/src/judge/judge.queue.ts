@@ -44,7 +44,12 @@ export function runtimeQueueName(kind: WorkKind, descriptor?: NativeAnyRuntimeDe
 export type SampleCheckJob = { checkId: string };
 
 export type GradingJob = { submissionId: string };
-export type PracticeJob = { attemptId: string };
+/**
+ * A run in the background lane that writes no student record. `library` names
+ * an AI library check rather than a staff attempt; an older worker finds no
+ * attempt by that id and does nothing, and the check is dispatched again.
+ */
+export type PracticeJob = { attemptId: string; kind?: "library" };
 
 /**
  * One repair, and the run and request it belongs to.
@@ -252,6 +257,20 @@ export class JudgeQueue implements OnModuleDestroy {
 
   async enqueuePractice(attemptId: string, descriptor?: NativeAnyRuntimeDescriptor | null): Promise<void> {
     await (descriptor ? this.forRuntime(descriptor) : this).practiceQueue.add("practice", { attemptId }, { jobId: attemptId });
+  }
+
+  async enqueueLibraryCheck(checkId: string, descriptor?: NativeAnyRuntimeDescriptor | null): Promise<void> {
+    await (descriptor ? this.forRuntime(descriptor) : this).practiceQueue.add("library-check", { attemptId: checkId, kind: "library" }, { jobId: checkId });
+  }
+
+  /** Dispatch again a check whose job was lost or whose worker did not know it. */
+  async redispatchLibraryCheck(checkId: string, descriptor?: NativeAnyRuntimeDescriptor | null): Promise<void> {
+    const queue = (descriptor ? this.forRuntime(descriptor) : this).practiceQueue;
+    const job = await queue.getJob(checkId);
+    const state = await job?.getState();
+    if (state === "waiting" || state === "active" || state === "delayed" || state === "prioritized") return;
+    await job?.remove().catch(() => undefined);
+    await this.enqueueLibraryCheck(checkId, descriptor);
   }
 
   /**

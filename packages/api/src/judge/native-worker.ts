@@ -13,6 +13,7 @@ import { NativeJobGate, nativeBackgroundCapable } from "./native-job-gate.js";
 import { loadNativeManifest, frozenNativeDescriptor, nativeReadinessKey, NATIVE_READINESS_HEARTBEAT } from "./native-admission.js";
 import { JudgeQueue, runtimeQueueName } from "./judge.queue.js";
 import { GradingService } from "./grading.service.js";
+import { LibraryCheckRunner } from "./library-check.runner.js";
 import { PracticeRunner } from "./practice.runner.js";
 import { RegradeRunner } from "./regrade.runner.js";
 import { SampleCheckRunner } from "./sample-check.runner.js";
@@ -172,9 +173,13 @@ export async function bootstrapNativeWorker(configuration: Record<string, unknow
       }, manifest.resources.cpuSlots));
       if (!background) continue;
       family.workers.push(q.createPracticeWorker(async job => {
-        const row = await prisma.staffPracticeAttempt.findUniqueOrThrow({ where: { id: job.attemptId }, select: { snapshot: true } });
+        const row = job.kind === "library"
+          ? await prisma.aiLibraryCheck.findUnique({ where: { id: job.attemptId }, select: { snapshot: true } })
+          : await prisma.staffPracticeAttempt.findUniqueOrThrow({ where: { id: job.attemptId }, select: { snapshot: true } });
+        // A library check goes with its exercise; nothing is left to run.
+        if (!row) return;
         const snapshot = practiceSnapshotSchema.parse(row.snapshot);
-        await execute(snapshot.memoryLimitMb, snapshot.executionRuntimeSnapshot, "background", g => withExecutionKind("practice", () => telemetry.time("service", () => new PracticeRunner(prisma, g).run(job.attemptId)), job.attemptId));
+        await execute(snapshot.memoryLimitMb, snapshot.executionRuntimeSnapshot, "background", g => withExecutionKind("practice", () => telemetry.time("service", () => job.kind === "library" ? new LibraryCheckRunner(prisma, g).run(job.attemptId) : new PracticeRunner(prisma, g).run(job.attemptId)), job.attemptId));
       }, 1));
       family.workers.push(q.createRegradeWorker(async job => {
         const row = await prisma.submission.findUniqueOrThrow({ where: { id: job.data.submissionId }, select: { memoryLimitMb: true, executionRuntimeSnapshot: true } });

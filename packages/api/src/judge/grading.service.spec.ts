@@ -230,6 +230,8 @@ describe("GradingService.grade", () => {
           // Still null: a hidden case reports its outcome and never what the
           // code produced, whether or not grading continued past it.
           actualOutput: null,
+          // Only how it differs, as one word, for the AI teacher's summary.
+          outputDifference: expect.stringMatching(/^[a-z_]+$/),
         }),
       ],
     });

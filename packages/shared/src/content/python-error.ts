@@ -235,3 +235,65 @@ export function classifySyntaxError(
   );
   return rule ? rule.category : "generic-syntax";
 }
+
+/* ------------------------------------------------- errors from a graded run */
+
+/** What a submitted public case keeps of the exception that ended it. */
+export type PythonErrorDetail = {
+  type: string;
+  message: string;
+  /** The line in the student's own file. Null when the runner did not say. */
+  line: number | null;
+};
+
+const PYTHON_ERROR_TYPE_MAX = 100;
+const PYTHON_ERROR_MESSAGE_MAX = 500;
+/** Both graders compile the student's code under this name. */
+const learnerFrame = /^ {2}File "main\.py", line (\d+)/;
+const anyFrame = /^ {2}File "/;
+
+/**
+ * The exception a graded program ended with, read from its stderr.
+ *
+ * Native CPython prints a whole traceback. The Pyodide runner prints one
+ * `Type: message` line, with no line number. A program can print anything it
+ * likes to stderr, so the answer is capped, and is text to show and never to
+ * follow.
+ */
+export function parsePythonError(stderr: string): PythonErrorDetail | null {
+  const marker = "Traceback (most recent call last):";
+  const start = stderr.lastIndexOf(marker);
+  const lines = (start === -1 ? stderr : stderr.slice(start + marker.length))
+    .split(/\r\n?|\n/);
+
+  let line: number | null = null;
+  let lastFrame = -1;
+  lines.forEach((text, index) => {
+    if (!anyFrame.test(text)) return;
+    lastFrame = index;
+    const own = learnerFrame.exec(text);
+    if (own) line = Number(own[1]);
+  });
+
+  // After the last frame come its quoted source and caret, all indented; the
+  // first line that is not is the exception itself.
+  // With no traceback the runner's own line is the last thing printed.
+  const last = start === -1
+    ? lines.filter((text) => text.trim() !== "").pop()
+    : lines.slice(lastFrame + 1).find((text) => text.trim() !== "" && !text.startsWith(" "));
+  if (last === undefined) return null;
+
+  const separator = last.indexOf(": ");
+  const qualified = (separator === -1 ? last : last.slice(0, separator)).trim().replace(/:$/, "");
+  const type = qualified.slice(qualified.lastIndexOf(".") + 1);
+  if (!/^[A-Za-z_]\w*$/.test(type)) return null;
+  // Without a traceback only an exception's own name is believable: a program
+  // that prints a word to stderr has not raised it.
+  if (start === -1 && !/(?:Error|Exception|Interrupt|Exit|Iteration|Warning)$/.test(type)) return null;
+
+  return {
+    type: type.slice(0, PYTHON_ERROR_TYPE_MAX),
+    message: (separator === -1 ? "" : last.slice(separator + 2)).trim().slice(0, PYTHON_ERROR_MESSAGE_MAX),
+    line,
+  };
+}

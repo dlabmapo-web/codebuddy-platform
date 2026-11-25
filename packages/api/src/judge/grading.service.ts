@@ -9,6 +9,8 @@ import { PrismaService } from "../database/prisma.service.js";
 import { PointAwardService } from "../points/point-award.service.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import type { OutputComparator } from "./comparator-pool.js";
+import { casePythonError, noPythonError, type PythonErrorFields } from "./python-error-fields.js";
+import { differenceOf } from "./output-difference.js";
 import type { CompileResult, ExecutionEngine, ExecutionResult } from "./execution-engine.js";
 import { evaluateEnhancedCase, GRADING_OVERHEAD_MS } from "./case-evaluator.js";
 import {
@@ -77,7 +79,9 @@ export type CaseRow = {
   /** A compiled program's runtime error: how it ended. Null otherwise. */
   exitCode: number | null;
   exitSignal: string | null;
-};
+  /** How a wrong output differs, as one word. Kept for hidden tests too, never their output. */
+  outputDifference: string | null;
+} & PythonErrorFields;
 
 /** The exit fields of a case: only a compiled program's runtime error has them. */
 export function caseExit(
@@ -327,6 +331,8 @@ export class GradingService {
           executionState: "EXECUTED",
           exitCode: null,
           exitSignal: null,
+          outputDifference: outcome === "WRONG_OUTPUT" ? differenceOf(testCase.expectedOutput, run.stdout, null) : null,
+          ...casePythonError({ isSample, language: submission.language, outcome, stderr: run.stderr }),
         });
 
         await report({
@@ -451,7 +457,9 @@ export class GradingService {
             softPenalty: testCase.softPenalty,
           }),
           executionState: "EXECUTED",
+          outputDifference: outcome === "WRONG_OUTPUT" ? differenceOf(testCase.expectedOutput, run.stdout, testCase.comparator) : null,
           ...caseExit(outcome, run.termination),
+          ...casePythonError({ isSample, language: submission.language, outcome, stderr: run.stderr }),
         });
 
         await report({
@@ -779,5 +787,7 @@ function skipped(position: number, isSample: boolean): CaseRow {
     executionState: "NOT_RUN",
     exitCode: null,
     exitSignal: null,
+    outputDifference: null,
+    ...noPythonError,
   };
 }

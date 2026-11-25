@@ -1,3 +1,7 @@
+import { AiHelpService } from "../ai-assistant/ai-help.service.js";
+import { AiUsageService } from "../ai-assistant/ai-usage.service.js";
+import { createAiAssistantRouter } from "../ai-assistant/ai-assistant.router.js";
+import { AiLibraryService } from "../ai-assistant/library/library.service.js";
 import { LegacyLibraryLinkService } from "../library-sync/legacy-link.service.js";
 import { ClassroomService } from "../classes/classroom.service.js";
 import { ProgrammingReviewService } from "../learn/programming-review.service.js";
@@ -212,6 +216,9 @@ export function registerORPCRoutes(app: NestExpressApplication): void {
     platformLifecycleService: app.get(PlatformLifecycleService, {
       strict: false,
     }),
+    aiHelpService: app.get(AiHelpService, { strict: false }),
+    aiLibraryService: app.get(AiLibraryService, { strict: false }),
+    aiUsageService: app.get(AiUsageService, { strict: false }),
     examService: app.get(ExamService, { strict: false }),
     examStaffService: app.get(ExamStaffService, { strict: false }),
   });
@@ -285,6 +292,7 @@ function createORPCRouter(deps: ORPCDeps) {
     ...platformOperationsRouters,
     ...platformSupportRouters,
     learn: createLearnRouter(os, deps),
+    aiAssistant: createAiAssistantRouter(os, deps),
     exam: createExamRouter(os, deps),
     points: createPointsRouter(os, deps),
     monitoring: createMonitoringRouter(os, deps),

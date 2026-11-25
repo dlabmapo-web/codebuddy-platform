@@ -1,3 +1,4 @@
+import { AiAssistantModule } from "./ai-assistant/ai-assistant.module.js";
 import { ExplanationsModule } from "./explanations/explanations.module.js";
 import { DlabModule } from "./integrations/dlab/dlab.module.js";
 import { TurtleTrialModule } from './turtle-trial/trial.module.js';
@@ -47,6 +48,7 @@ import { TeachModule } from "./teach/teach.module.js";
     TurtleTrialModule,
     DraftsModule,
     AcademiesModule,
+    AiAssistantModule,
     AuthModule,
     AuthorizationModule,
     ClassesModule,

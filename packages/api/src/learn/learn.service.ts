@@ -7,6 +7,7 @@ import { StaffPracticeService } from "./staff-practice.service.js";
 import { referencePdfMetadata } from "../documents/pdf-reference.js";
 import { publicQuiz } from "@cove/shared";
 import { HttpStatus, Injectable, Optional } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 import {
   SOLVE_SESSION_MAX_SECONDS,
@@ -41,6 +42,7 @@ import {
   nonemptyModules,
   visibleCurriculumInclude,
 } from "./curriculum-outline.service.js";
+import type { ApiEnvironment } from "../config/env.schema.js";
 import { withCurricula, withCurriculum } from "./curriculum-read.js";
 import { reachableMaterialWhere } from "./curriculum-visibility.js";
 import { lessonImageIds } from "../content/lesson-images.js";
@@ -88,6 +90,7 @@ type WorkspaceMaterial = Omit<
       include: typeof workspaceMaterialInclude;
     }>["programmingExercise"]
   >;
+  ai?: { featureOn: boolean };
 };
 
 @Injectable()
@@ -101,7 +104,13 @@ export class LearnService {
     private readonly classContext: LearningClassContextService,
     @Optional() private readonly practice?: StaffPracticeService,
     @Optional() private readonly lessonImages?: ManualAssetsService,
+    @Optional() private readonly config?: ConfigService<ApiEnvironment, true>,
   ) {}
+
+  /** The assistant's master switch. Off without a configuration, as in most tests. */
+  private aiEnabled(): boolean {
+    return this.config?.get("AI_ASSISTANT_ENABLED", { infer: true }) === true;
+  }
 
   async listCourses(
     identity: SupabaseIdentity,
@@ -382,7 +391,7 @@ export class LearnService {
       },
       select: {id: true},
     });
-    const material = reachable ? await readSubmissionAdmission(this.prisma, input.materialId, input.academyId, {workspace: true, preview}) : null;
+    const material = reachable ? await readSubmissionAdmission(this.prisma, input.materialId, input.academyId, {workspace: true, preview, ai: this.aiEnabled()}) : null;
     if (!material?.programmingExercise) {
       throw new AppException("EXERCISE_NOT_AVAILABLE", HttpStatus.NOT_FOUND);
     }
@@ -483,10 +492,10 @@ export class LearnService {
             expectedOutput: testCase.expectedOutput,
             comparator: testCase.comparator,
           })),
-        hints: exercise.hints.map((hint) => ({
-          position: hint.position,
-          content: hint.content,
-        })),
+        aiAssistant: !staffPractice && material.ai?.featureOn === true && exercise.aiFeedbackEnabled &&
+          (exercise.submissionPolicy ?? "AUTOMATIC") === "AUTOMATIC" && exercise.language === "PYTHON" && exercise.quiz == null && exercise.sourceProject == null,
+        // Only what a teacher wrote: AI hints teach the AI teacher, not the student.
+        hints: exercise.hints.map((hint) => ({ position: hint.position, content: hint.content })),
         hiddenTestCaseCount: ((exercise.submissionPolicy ?? "AUTOMATIC") !== "AUTOMATIC" ? [] : exercise.testCases).filter(
           (testCase) => testCase.visibility === "HIDDEN",
         ).length,

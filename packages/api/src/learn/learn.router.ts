@@ -29,6 +29,12 @@ export function createLearnRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) =>
         deps.studentOverviewService.get(context.identity, input)
       ),
+    getAiHelp: os.learn.getAiHelp.use(access.studentAuthenticated)
+      .handler(({ context, input }) => deps.aiHelpService.get(context.identity, input)),
+    requestAiHelp: os.learn.requestAiHelp.use(access.studentAuthenticated)
+      .handler(({ context, input }) => deps.aiHelpService.request(context.identity, input)),
+    reportAiHelp: os.learn.reportAiHelp.use(access.studentAuthenticated)
+      .handler(({ context, input }) => deps.aiHelpService.report(context.identity, input)),
     listCourses: os.learn.listCourses
       .use(access.studentAuthenticated)
       .handler(({ context, input }) =>

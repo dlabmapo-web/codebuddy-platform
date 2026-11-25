@@ -2,6 +2,14 @@ import { practiceSubmitSchema, practiceHistorySchema } from "../../content/learn
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 import { materialTypeSchema } from '../../content/course.js';
+import {
+  aiHelpResponseSchema,
+  aiHelpViewSchema,
+  aiReportedSchema,
+  getAiHelpInputSchema,
+  reportAiHelpInputSchema,
+  requestAiHelpInputSchema,
+} from '../../content/ai-help.js';
 import { latestSubmissionInputSchema, latestSubmissionSchema } from '../../content/latest-submission.js';
 
 import {
@@ -162,6 +170,13 @@ export const learnContract = {
   /** A staff member's own C/C++ practice: the same checks, with no class. */
   startPracticeSampleCheck: oc.input(startPracticeSampleCheckSchema).output(sampleCheckViewSchema),
   startPracticeRunCheck: oc.input(startPracticeRunCheckSchema).output(sampleCheckViewSchema),
+  /**
+   * The AI assistant on the student's own failed submission. `getAiHelp` makes
+   * no paid call; `requestAiHelp` makes at most one per `requestId`.
+   */
+  getAiHelp: oc.input(getAiHelpInputSchema).output(aiHelpViewSchema),
+  requestAiHelp: oc.input(requestAiHelpInputSchema).output(aiHelpResponseSchema),
+  reportAiHelp: oc.input(reportAiHelpInputSchema).output(aiReportedSchema),
   getSampleCheck: oc.input(getSampleCheckInputSchema).output(sampleCheckViewSchema),
   cancelSampleCheck: oc.input(sampleCheckInputSchema).output(sampleCheckViewSchema),
 };

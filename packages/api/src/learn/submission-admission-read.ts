@@ -1,4 +1,4 @@
-import type { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '../generated/prisma/client.js';
 import type { referencePdfMetadata } from '../documents/pdf-reference.js';
 
 /** Nested JSON selected by the workspace query, including the mapper's title. */
@@ -10,7 +10,10 @@ type ReferenceProjection = Record<string, unknown> & {
 type AdmissionMaterial = Prisma.MaterialGetPayload<{include: {
   programmingExercise: {include: {testCases: true}},
   lecture: {include: {courseModule: {include: {course: true}}}}
-}}>;
+}}> & {
+  /** Workspace reads only: the academy's AI switch. */
+  ai?: { featureOn: boolean };
+};
 function columns<T>(value: Record<string, unknown>): T {
   return Object.fromEntries(Object.entries(value).map(([key, value]) => {
     const name = key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
@@ -18,10 +21,15 @@ function columns<T>(value: Record<string, unknown>): T {
   })) as T;
 }
 /** Admission metadata and automatic-only cases in one statement, without a deep include. */
-export async function readSubmissionAdmission(db: Prisma.TransactionClient, materialId: string, academyId: string, options: {workspace?: boolean; preview?: boolean} = {}): Promise<AdmissionMaterial | null> {
+export async function readSubmissionAdmission(db: Prisma.TransactionClient, materialId: string, academyId: string, options: {workspace?: boolean; preview?: boolean; ai?: boolean} = {}): Promise<AdmissionMaterial | null> {
+  // Part of this statement rather than another one: opening a problem costs no more.
+  const ai = options.workspace && options.ai
+    ? Prisma.sql`jsonb_build_object('featureOn',
+        EXISTS (SELECT 1 FROM academy_feature_flags f WHERE f.academy_id = c.academy_id AND f.feature = 'AI_ASSISTANT' AND f.is_enabled))`
+    : Prisma.sql`NULL::jsonb`;
   const [row] = await db.$queryRaw<Array<{ material: Record<string, unknown>; exercise: Record<string, unknown> | null;
-    tests: Record<string, unknown>[]; hints: Record<string, unknown>[]; reference: ReferenceProjection | null; lecture: Record<string, unknown>; module: Record<string, unknown>; course: Record<string, unknown> }>>`
-    SELECT to_jsonb(m) AS material, CASE WHEN pe.material_id IS NULL THEN NULL WHEN ${Boolean(options.workspace)}::boolean THEN to_jsonb(pe) - 'solution_code' ELSE jsonb_build_object(
+    tests: Record<string, unknown>[]; hints: Record<string, unknown>[]; reference: ReferenceProjection | null; ai: AdmissionMaterial['ai'] | null; lecture: Record<string, unknown>; module: Record<string, unknown>; course: Record<string, unknown> }>>(Prisma.sql`
+    SELECT to_jsonb(m) AS material, ${ai} AS ai, CASE WHEN pe.material_id IS NULL THEN NULL WHEN ${Boolean(options.workspace)}::boolean THEN to_jsonb(pe) - 'solution_code' ELSE jsonb_build_object(
         'materialId',pe.material_id,'quiz',pe.quiz,'language',pe.language,
         'gradingRevision',pe.grading_revision,'submissionPolicy',pe.submission_policy,
         'timeLimitMs',pe.time_limit_ms,'memoryLimitMb',pe.memory_limit_mb,
@@ -53,9 +61,9 @@ export async function readSubmissionAdmission(db: Prisma.TransactionClient, mate
     LEFT JOIN programming_exercises pe ON pe.material_id=m.id
     WHERE m.id=${materialId}::uuid AND c.academy_id=${academyId}::uuid
       AND (${Boolean(options.preview)}::boolean OR (m.is_visible AND l.is_visible AND cm.is_visible AND c.is_visible))
-  `;
+  `);
   if (!row) return null;
-  return { ...columns<AdmissionMaterial>(row.material),
+  return { ...columns<AdmissionMaterial>(row.material), ...(row.ai ? { ai: row.ai } : {}),
     programmingExercise: row.exercise ? { ...columns<NonNullable<AdmissionMaterial['programmingExercise']>>(row.exercise),
       ...(options.workspace ? {hints: row.hints.map(h => columns(h)), referencePdf: row.reference ? {
         ...columns<Record<string,unknown>>(row.reference), asset: columns<Record<string,unknown>>(row.reference.asset), material: row.reference.material,

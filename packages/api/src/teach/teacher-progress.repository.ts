@@ -509,6 +509,9 @@ export class TeacherProgressRepository {
             actualOutput: true,
             exitCode: true,
             exitSignal: true,
+            pythonErrorType: true,
+            pythonErrorMessage: true,
+            pythonErrorLine: true,
           },
         },
         // Sample cases only. A hidden grading case is never selected, so the
@@ -518,6 +521,16 @@ export class TeacherProgressRepository {
           select: { position: true, input: true, expectedOutput: true },
         },
       },
+    });
+  }
+
+  /** The assistant's replies on one attempt. The caller has read that attempt in scope. */
+  async findAiReplies(input: { userId: string; submissionId: string }) {
+    return this.prisma.aiHelpReply.findMany({
+      where: { userId: input.userId, submissionId: input.submissionId, status: "DONE" },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: 30,
+      select: { level: true, reply: true, analysis: true, locale: true, reportedAt: true, createdAt: true },
     });
   }
 

@@ -187,6 +187,38 @@ export const apiEnvironmentSchema = z.object({
   PYODIDE_VERSION: z.string().default("0.27.5"),
   SUBMISSION_RATE_LIMIT: z.coerce.number().int().min(1).max(120).default(10),
   /**
+   * The AI learning assistant. Everything here is optional: with the switch
+   * off or no key the API starts normally and AI help answers "off". The key
+   * belongs to this process alone — never the browser, a log or a fixture.
+   */
+  OPENAI_API_KEY: z.preprocess(v => v === "" ? undefined : v, z.string().min(20).optional()),
+  AI_ASSISTANT_ENABLED: z.preprocess(v => v === "true" || v === true, z.boolean()).default(false),
+  AI_ASSISTANT_MODEL: z.string().min(1).max(80).default("gpt-6-luna"),
+  AI_ASSISTANT_EFFORT: z.enum(["none", "low", "medium", "high"]).default("none"),
+  AI_ASSISTANT_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(30_000).default(8_000),
+  AI_ASSISTANT_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(100).max(4_000).default(400),
+  AI_ASSISTANT_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(8),
+  AI_ASSISTANT_PROBLEM_LIMIT: z.coerce.number().int().min(1).max(9).default(3),
+  AI_ASSISTANT_DAILY_LIMIT: z.coerce.number().int().min(1).max(100).default(10),
+  AI_ASSISTANT_MONTHLY_BUDGET_USD: z.coerce.number().min(0).max(1_000).default(5),
+  AI_ASSISTANT_INPUT_USD_PER_MTOK: z.coerce.number().min(0).max(100).default(0.1),
+  AI_ASSISTANT_OUTPUT_USD_PER_MTOK: z.coerce.number().min(0).max(1_000).default(0.5),
+  /** Writing libraries. Saved hints still show while it is off. */
+  AI_LIBRARY_ENABLED: z.preprocess(v => v === "true" || v === true, z.boolean()).default(false),
+  AI_LIBRARY_MODEL: z.string().min(1).max(80).default("gpt-6-luna"),
+  AI_LIBRARY_EFFORT: z.enum(["none", "low", "medium", "high"]).default("low"),
+  AI_LIBRARY_MONTHLY_BUDGET_USD: z.coerce.number().min(0).max(1_000).default(10),
+  AI_LIBRARY_INPUT_USD_PER_MTOK: z.coerce.number().min(0).max(100).default(0.1),
+  AI_LIBRARY_OUTPUT_USD_PER_MTOK: z.coerce.number().min(0).max(1_000).default(0.5),
+  /** Seoul hours when libraries are written and tested, such as 22-7; 0-24 is always. */
+  AI_LIBRARY_HOURS: z.string().regex(/^(?:[01]?\d|2[0-4])-(?:[01]?\d|2[0-4])$/, "must look like 22-7").default("22-7"),
+  /** How long a problem must be left alone before its library is written. */
+  AI_LIBRARY_QUIET_MINUTES: z.coerce.number().int().min(0).max(1_440).default(10),
+  /** Include the teacher's solution when writing a library. Never during student help. */
+  AI_LIBRARY_SEND_SOLUTIONS: z.preprocess(v => v === undefined || v === "true" || v === true, z.boolean()).default(true),
+  /** How long students' AI replies are kept. */
+  AI_HELP_RETENTION_DAYS: z.coerce.number().int().min(1).max(3_650).default(180),
+  /**
    * Public sample checks: starting limits, not measured capacity. New checks
    * a student may start per minute (an idempotent retry costs nothing), and
    * checks an academy may have outstanding at once.

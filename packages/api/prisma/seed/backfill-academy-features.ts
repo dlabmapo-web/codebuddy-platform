@@ -13,7 +13,7 @@
 import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
-import { academyFeatureNames } from "@cove/shared";
+import { academyFeatureNames, academyRolloutFeatures } from "@cove/shared";
 
 import { PrismaClient } from "../../src/generated/prisma/client.js";
 
@@ -27,7 +27,8 @@ let created = 0;
 
 for (const academy of academies) {
   const result = await prisma.academyFeatureFlag.createMany({
-    data: academyFeatureNames.map((feature) => ({
+    // A rollout feature is switched on academy by academy, never in bulk.
+    data: academyFeatureNames.filter((feature) => !academyRolloutFeatures.has(feature)).map((feature) => ({
       academyId: academy.id,
       feature,
       isEnabled: true,

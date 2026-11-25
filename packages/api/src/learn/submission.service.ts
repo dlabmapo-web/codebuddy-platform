@@ -3,6 +3,7 @@ import { readSubmissionAdmission } from "./submission-admission-read.js";
 import { nativeRuntimeVersion } from "@cove/grading-runtime";
 import type { NativeAnyRuntimeDescriptor } from "@cove/shared";
 import { programExit } from "../judge/program-exit.js";
+import { readPythonError } from "../judge/python-error-fields.js";
 import { NativeAdmission, frozenNativeDescriptor } from "../judge/native-admission.js";
 import { snapshotTransaction } from "../judge/snapshot-transaction.js";
 import { runtimeQueueName } from "../judge/judge.queue.js";
@@ -52,7 +53,7 @@ type OwnedSubmission = Prisma.SubmissionGetPayload<{
  * copy in a new endpoint is how a remembered submission id turns into a way
  * to read somebody else's code.
  */
-function ownedSubmissionWhere(input: {
+export function ownedSubmissionWhere(input: {
   academyId: string;
   userId: string;
   scope: LearningScope;
@@ -428,6 +429,8 @@ export class SubmissionService {
           // A program chooses its own ending (`return getchar();`), so a
           // hidden case's would disclose hidden input: public cases only.
           ...(item.isSample ? programExit(item) : { exitCode: null, exitSignal: null }),
+          pythonError: item.isSample ? readPythonError(item) : null,
+          comparator: sample?.comparator ?? null,
         };
       }),
       compileFailed: submission.compileFailed,

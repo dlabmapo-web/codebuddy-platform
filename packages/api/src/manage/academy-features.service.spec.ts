@@ -25,13 +25,15 @@ function createService(rows: { feature: string; isEnabled: boolean }[] = []) {
     academyFeatureFlag: { findMany: vi.fn().mockResolvedValue(rows) },
     $transaction: vi.fn().mockImplementation((fn) => fn(transaction)),
   };
+  const platform = vi.fn().mockRejectedValue(new Error("PLATFORM_ACCESS_DENIED"));
   const service = new AcademyFeaturesService(
     prisma as never,
     { requirePermission: vi.fn().mockResolvedValue({ userId: "u1" }) } as never,
     { requireManager: vi.fn().mockResolvedValue({ userId: "u1" }) } as never,
     { write: vi.fn().mockResolvedValue({}) } as never,
+    { requirePermission: platform } as never,
   );
-  return { service, upserts };
+  return { service, upserts, platform };
 }
 
 describe("AcademyFeaturesService", () => {
@@ -94,5 +96,18 @@ describe("AcademyFeaturesService", () => {
     expect(upserts).toEqual([
       { feature: "TEACHER_LIVE_MONITORING", isEnabled: false },
     ]);
+  });
+
+  it("lets only a platform operator switch a feature Cove pays for", async () => {
+    const { service, upserts, platform } = createService();
+    const change = { academyId, feature: "AI_ASSISTANT" as const, isEnabled: true };
+
+    await expect(service.setEnabled(identity, change)).rejects.toThrow("PLATFORM_ACCESS_DENIED");
+    expect(upserts).toEqual([]);
+
+    platform.mockResolvedValue({ userId: "u1" });
+    await service.setEnabled(identity, change);
+    expect(upserts).toEqual([{ feature: "AI_ASSISTANT", isEnabled: true }]);
+    expect(platform).toHaveBeenCalledWith("auth-1", "platform.features.manage");
   });
 });

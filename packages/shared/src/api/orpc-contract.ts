@@ -3,6 +3,7 @@ import {
   academyTeacherOverviewContract,
   academyTeacherStudentsContract,
 } from "./orpc/academy-teacher-overview.contract.js";
+import { aiAssistantContract } from "./orpc/ai-assistant.contract.js";
 import { authContract } from "./orpc/auth.contract.js";
 import { academyTurtleContract } from './orpc/academy-turtle.contract.js';
 import {
@@ -74,6 +75,7 @@ export const appContract = {
   academyLibrarySync: academyLibrarySyncContract,
   academyClasses: academyClassesContract,
   learn: learnContract,
+  aiAssistant: aiAssistantContract,
   exam: examContract,
   lobby: lobbyContract,
   monitoring: monitoringContract,

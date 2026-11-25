@@ -1,5 +1,6 @@
 import { programmingAssessment } from "../learn/programming-assessment.js";
-import { itemScore, quizFeedback } from "@cove/shared";
+import { aiAnalysisSchema, itemScore, quizFeedback } from "@cove/shared";
+import { readPythonError } from "../judge/python-error-fields.js";
 import { programExit } from "../judge/program-exit.js";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import {
@@ -628,8 +629,10 @@ export class TeacherProgressService {
       );
     }
     // A test submission also reports its test points, read alongside.
-    const [statement, testPoints] = await Promise.all([
+    const [statement, aiReplies, testPoints] = await Promise.all([
       this.repository.findStatement(submission.sourceMaterialId),
+      // What the assistant told the student about this attempt.
+      this.repository.findAiReplies({ userId: student.userId, submissionId: submission.id }),
       submission.testAttemptId
         ? this.repository.testPointsForSubmission({
             testAttemptId: submission.testAttemptId,
@@ -693,10 +696,19 @@ export class TeacherProgressService {
           actualOutput: item.isSample ? item.actualOutput : null,
           // The same rule for a program's ending: it can encode hidden input.
           ...(item.isSample ? programExit(item) : { exitCode: null, exitSignal: null }),
+          pythonError: item.isSample ? readPythonError(item) : null,
         };
       }),
       compileFailed: submission.compileFailed,
       compileDiagnostics: submission.compileDiagnostics,
+      aiReplies: aiReplies.map((row) => ({
+        level: row.level,
+        text: row.reply ?? "",
+        analysis: aiAnalysisSchema.safeParse(row.analysis).data ?? null,
+        locale: row.locale === "en" ? "en" as const : "ko" as const,
+        reported: row.reportedAt !== null,
+        createdAt: row.createdAt.toISOString(),
+      })),
       hiddenPassed: hidden.filter((item) => isOutputCorrect(item.outcome)).length,
       hiddenTotal: hidden.length,
       test: testPoints

@@ -295,6 +295,11 @@ export const learnExerciseSchema = z.object({
    * (`comparesSampleLocally`). Off, they run in the browser.
    */
   serverSampleChecks: z.boolean().default(false),
+  /**
+   * Whether the AI assistant may explain this learner's failed submissions.
+   * A convenience for what to draw: every request decides it again.
+   */
+  aiAssistant: z.boolean().default(false),
   sampleTestCases: z.array(learnSampleTestCaseSchema),
   hints: z.array(learnHintSchema),
   /** A count. The cases themselves never cross this boundary. */

@@ -2,8 +2,9 @@ import { programmingAssessmentSchema } from "./programming-review.js";
 import { quizFeedbackSchema } from "./quiz.js";
 import { z } from "zod";
 
+import { teacherAiReplySchema } from "./ai-help.js";
 import { exerciseDifficultySchema } from "./course.js";
-import { caseOutcomeSchema, programExitSignalSchema } from "./submission.js";
+import { caseOutcomeSchema, programExitSignalSchema, pythonErrorDetailSchema } from "./submission.js";
 import { sortDirectionSchema } from "./answer-records.js";
 
 /**
@@ -415,6 +416,8 @@ export const teacherReviewCaseSchema = z
     /** C/C++ runtime errors, sample cases only, as the student sees them. */
     exitCode: z.number().int().min(0).max(255).nullable().optional(),
     exitSignal: programExitSignalSchema.nullable().optional(),
+    /** Python runtime errors, sample cases only, as the student sees them. */
+    pythonError: pythonErrorDetailSchema.nullable().optional(),
   })
   .strict();
 export type TeacherReviewCase = z.infer<typeof teacherReviewCaseSchema>;
@@ -453,6 +456,8 @@ export const teacherSubmissionReviewSchema = z
     /** Current statement for context, or null when it is no longer available. */
     statement: z.string().nullable(),
     cases: z.array(teacherReviewCaseSchema),
+    /** What the AI assistant told the student about this attempt. */
+    aiReplies: z.array(teacherAiReplySchema).optional(),
     /** C/C++: the attempt did not compile, and GCC's messages. */
     compileFailed: z.boolean().optional(),
     compileDiagnostics: z.string().nullable().optional(),

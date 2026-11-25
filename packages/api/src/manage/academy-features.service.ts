@@ -2,12 +2,14 @@ import { Injectable } from "@nestjs/common";
 import {
   academyFeatureNames,
   academyFeatureRequires,
+  academyOperatorFeatures,
   type AcademyFeatureList,
   type AcademyFeatureName,
 } from "@cove/shared";
 
 import { AuditService } from "../academies/audit.service.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
+import { PlatformAccessService } from "../authorization/platform-access.service.js";
 import type { SupabaseIdentity } from "../auth/auth.types.js";
 import { PrismaService } from "../database/prisma.service.js";
 import { ManagerScopeService } from "./manager-scope.service.js";
@@ -26,6 +28,7 @@ export class AcademyFeaturesService {
     private readonly access: AcademyAccessService,
     private readonly scopes: ManagerScopeService,
     private readonly audit: AuditService,
+    private readonly platform: PlatformAccessService,
   ) {}
 
   async list(
@@ -48,6 +51,9 @@ export class AcademyFeaturesService {
       isEnabled: boolean;
     },
   ): Promise<AcademyFeatureList> {
+    // Cove pays for these, so holding the Manager role is not enough.
+    if (academyOperatorFeatures.has(input.feature))
+      await this.platform.requirePermission(identity.authUserId, "platform.features.manage");
     const actor = await this.scopes.requireManager(
       identity,
       input.academyId,

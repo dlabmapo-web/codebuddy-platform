@@ -826,6 +826,8 @@ export class MonitoringService {
             expectedOutput: testCase.expectedOutput,
             comparator: testCase.comparator,
           })),
+        // A teacher asks the assistant nothing on a student's behalf.
+        aiAssistant: false,
         hints: exercise.hints.map((hint) => ({
           position: hint.position,
           content: hint.content,

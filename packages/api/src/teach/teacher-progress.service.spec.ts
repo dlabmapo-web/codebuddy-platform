@@ -105,6 +105,7 @@ function createService(repository: RepositoryStub = {}) {
     listAttempts: vi.fn(async () => []),
     findSubmissionForReview: vi.fn(async () => null),
     findStatement: vi.fn(async () => null),
+    findAiReplies: vi.fn(async () => []),
     ...repository,
   } as unknown as TeacherProgressRepository;
 
@@ -423,6 +424,22 @@ describe("getSubmissionReview", () => {
     expect(review).toMatchObject({ hiddenPassed: 0, hiddenTotal: 1 });
     // The live view matches a review to the exercise on screen by this.
     expect(review.materialId).toBe(required);
+    expect(teacherSubmissionReviewSchema.safeParse(review).success).toBe(true);
+  });
+
+  it("shows a public case's Python error, never a hidden one's, and what the assistant said", async () => {
+    const error = { pythonErrorType: "NameError", pythonErrorMessage: "name 'x' is not defined", pythonErrorLine: 2 };
+    const findAiReplies = vi.fn(async () => [
+      { level: 1, reply: "Where is x made?", locale: "en", reportedAt: new Date(), createdAt: new Date("2026-11-25T01:00:00Z") },
+    ]);
+    const { service } = createService({
+      findSubmissionForReview: vi.fn(async () => ({ ...submission, cases: submission.cases.map((item) => ({ ...item, outcome: "RUNTIME_ERROR", ...error })) })),
+      findAiReplies,
+    });
+    const review = await service.getSubmissionReview(identity, { academyId, classId, membershipId: alice.membershipId, submissionId: submission.id });
+    expect(review.cases.map((item) => item.pythonError)).toEqual([{ type: "NameError", message: "name 'x' is not defined", line: 2 }, null]);
+    expect(findAiReplies).toHaveBeenCalledWith({ userId: alice.userId, submissionId: submission.id });
+    expect(review.aiReplies).toEqual([{ level: 1, text: "Where is x made?", locale: "en", reported: true, createdAt: "2026-11-25T01:00:00.000Z" }]);
     expect(teacherSubmissionReviewSchema.safeParse(review).success).toBe(true);
   });
 

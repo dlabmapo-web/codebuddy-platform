@@ -1,3 +1,6 @@
+import type { AiHelpService } from "../ai-assistant/ai-help.service.js";
+import type { AiUsageService } from "../ai-assistant/ai-usage.service.js";
+import type { AiLibraryService } from "../ai-assistant/library/library.service.js";
 import type { LegacyLibraryLinkService } from "../library-sync/legacy-link.service.js";
 import type { ClassroomService } from "../classes/classroom.service.js";
 import type { ProgrammingReviewService } from "../learn/programming-review.service.js";
@@ -154,6 +157,9 @@ export type ORPCDeps = {
   platformSupportService: PlatformSupportService;
   platformLifecycleService: PlatformLifecycleService;
   pointsService: PointsService;
+  aiHelpService: AiHelpService;
+  aiLibraryService: AiLibraryService;
+  aiUsageService: AiUsageService;
   examService: ExamService;
   examStaffService: ExamStaffService;
 };

@@ -21,6 +21,7 @@ export const academyFeatureNames = [
   "STUDENT_CLASS_LEADERBOARD",
   "SERVER_SAMPLE_CHECKS",
   "EXAMS",
+  "AI_ASSISTANT",
 ] as const;
 
 export const academyFeatureNameSchema = z.enum(academyFeatureNames);
@@ -29,17 +30,25 @@ export type AcademyFeatureName = z.infer<typeof academyFeatureNameSchema>;
 /**
  * Features still being rolled out, which a new academy does *not* start with.
  *
- * Empty since v2.0.73: tests (exams) and server-checked samples are on for
- * every academy by default, like the rest, and migration 20261124100000
- * turned them on for the academies that already existed. Kept so a future
- * feature can start here again, switched on academy by academy.
+ * Tests (exams) and server-checked samples left this set in v2.0.73: they are
+ * on for every academy by default, like the rest, and migration 20261124100000
+ * turned them on for the academies that already existed. The AI assistant
+ * starts here, switched on academy by academy.
  *
  * Server-checked samples send to the judge only the Python problems the browser
  * cannot judge itself (`comparesSampleLocally`): weighted grading and ignored
  * input prompts. Python samples run there one at a time, and the slot reserved
  * for submissions keeps official grading safe.
  */
-export const academyRolloutFeatures: ReadonlySet<AcademyFeatureName> = new Set<AcademyFeatureName>([]);
+export const academyRolloutFeatures: ReadonlySet<AcademyFeatureName> = new Set<AcademyFeatureName>(["AI_ASSISTANT"]);
+
+/**
+ * Features only a platform operator may switch.
+ *
+ * Cove pays for every AI call, so an academy's own manager neither sees nor
+ * changes this one; the console's feature board does.
+ */
+export const academyOperatorFeatures: ReadonlySet<AcademyFeatureName> = new Set<AcademyFeatureName>(["AI_ASSISTANT"]);
 
 /**
  * The named class board is computed from the point ledger, so it cannot stand

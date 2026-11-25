@@ -1,5 +1,6 @@
 import { quizFeedbackSchema } from "./quiz.js";
 import { z } from "zod";
+import { caseComparatorSchema } from "./course.js";
 import { programmingAssessmentSchema } from "./programming-review.js";
 
 /**
@@ -86,6 +87,13 @@ export const programExitSignals = [
 export const programExitSignalSchema = z.enum(programExitSignals);
 export type ProgramExitSignal = z.infer<typeof programExitSignalSchema>;
 
+/** A Python exception that ended a public case. See `parsePythonError`. */
+export const pythonErrorDetailSchema = z.object({
+  type: z.string().min(1).max(100),
+  message: z.string().max(500),
+  line: z.number().int().positive().nullable(),
+});
+
 export const submissionCaseSchema = z.object({
   position: z.number().int().positive(),
   isSample: z.boolean(),
@@ -109,6 +117,13 @@ export const submissionCaseSchema = z.object({
    */
   exitCode: z.number().int().min(0).max(255).nullable().optional(),
   exitSignal: programExitSignalSchema.nullable().optional(),
+  /**
+   * The Python exception that ended a public case, for the error coach. Never
+   * present on a hidden case: a program could raise its hidden input.
+   */
+  pythonError: pythonErrorDetailSchema.nullable().optional(),
+  /** How a public case's output was compared. Public cases only. */
+  comparator: caseComparatorSchema.nullable().optional(),
 });
 export type SubmissionCaseResult = z.infer<typeof submissionCaseSchema>;
 

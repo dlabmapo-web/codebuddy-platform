@@ -30,6 +30,7 @@ const darkSurfaces = new Set(
     // The teacher's copy of the student's result, on the same dark output pane.
     'app/(studio)/academy/[academySlug]/teach/classes/[classId]/students/[membershipId]/live/_components/student-result-panel.tsx',
     'app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/error-coach-panel.tsx',
+    'app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/learner-help.tsx',
     'app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/result-hero.tsx',
     'app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/result-metrics.tsx',
     'app/(studio)/academy/[academySlug]/learn/exercises/[materialId]/_components/result-panel.tsx',

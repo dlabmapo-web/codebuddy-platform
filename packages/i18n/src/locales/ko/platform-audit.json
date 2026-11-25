@@ -240,6 +240,14 @@
         "completed": "재채점 완료됨"
       }
     },
+    "ai": {
+      "library": {
+        "regenerated": "AI 라이브러리 다시 쓰기 요청"
+      },
+      "library_item": {
+        "updated": "AI 힌트 또는 피드백 수정"
+      }
+    },
     "monitoring": {
       "exercise_solution": {
         "viewed": "모범 답안 열람"

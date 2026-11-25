@@ -1,0 +1,89 @@
+{
+  "title": "About your result",
+  "case": "Test {{number}}",
+  "rule": {
+    "no_output": {
+      "what": "Your program finished without printing anything.",
+      "next": "Where in your code should the answer be printed?"
+    },
+    "letter_case": {
+      "what": "Your output has the right letters, but a capital or small letter is different.",
+      "next": "Which letter is different from the example?"
+    },
+    "spacing": {
+      "what": "Your output is almost the same. Only the spaces are different.",
+      "next": "Where does the example have a space, and where does it not?"
+    },
+    "line_breaks": {
+      "what": "You printed the right values, but the lines are broken in different places.",
+      "next": "Which values are on the same line in the example?"
+    },
+    "number_format": {
+      "what": "Your number has the right value, but it is written in a different way.",
+      "next": "Does the example have a decimal point?"
+    },
+    "punctuation": {
+      "what": "Your words are right, but a mark such as a comma or an exclamation mark is different.",
+      "next": "Which marks does the example have?"
+    },
+    "missing_lines": {
+      "what": "The lines you printed are right, but some lines at the end are missing.",
+      "next": "When does your program stop printing?"
+    },
+    "extra_lines": {
+      "what": "The first lines are right, but your program printed more lines than expected.",
+      "next": "Which line should be the last one?"
+    },
+    "extra_text": {
+      "what": "The right answer is there, but your program printed something else with it.",
+      "next": "What is printed besides the answer in the example?"
+    }
+  },
+  "ai": {
+    "label": "AI teacher",
+    "invite": "Want the AI teacher to look at your code?",
+    "analyze": "Analyze my code",
+    "reading": "The AI teacher is reading your code and every test…",
+    "simpler_heading": "More simply",
+    "section": {
+      "result": "Result",
+      "where": "Where",
+      "why": "Why",
+      "think": "Think",
+      "try_it": "Try it",
+      "also_check": "Also check"
+    },
+    "line": "Line {{number}}",
+    "show_line": "Show in editor",
+    "simpler": "Explain more simply",
+    "simplifying": "Explaining more simply…",
+    "left_one": "{{count}} analysis left for this problem today",
+    "left_other": "{{count}} analyses left for this problem today",
+    "note": "Written by AI. It can be wrong.",
+    "report": "Report",
+    "reported": "Reported. Thank you.",
+    "report_failed": "Could not report. Try again.",
+    "failed": "Could not get an analysis. Check your connection and try again.",
+    "retry": "Try again",
+    "state": {
+      "LIMIT_PROBLEM": "You have used today's AI analyses for this problem. Try your idea, or ask your teacher.",
+      "LIMIT_DAY": "You have used today's AI analyses. They come back tomorrow.",
+      "EXAM_OPEN": "AI analysis is off while you have a test open.",
+      "STALE": "This problem changed after you submitted. Submit again to get an analysis.",
+      "OFF": "AI analysis is not available right now."
+    },
+    "fallback": {
+      "trace_public": "Follow your code by hand with the first failed example. What should it print?",
+      "try_small": "Try a small input you can work out by hand. What should your program print?",
+      "time_limit": "Your program ran too long. Which value should change so the loop can stop?",
+      "busy": "The AI teacher is busy. Please try again in a moment."
+    }
+  },
+  "teacher": {
+    "title": "AI teacher on this attempt",
+    "body": "What the AI teacher told the student. It can be wrong.",
+    "reported": "Reported by the student",
+    "analysis": "Analysis",
+    "simpler": "Explained more simply"
+  }
+}

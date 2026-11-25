@@ -1,7 +1,7 @@
 'use client';
 
 import type { AcademyFeatureList, AcademyFeatureName } from '@cove/shared';
-import { academyFeatureNames, academyFeatureRequires } from '@cove/shared';
+import { academyFeatureNames, academyFeatureRequires, academyOperatorFeatures } from '@cove/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CornerDownRight } from 'lucide-react';
 
@@ -71,7 +71,7 @@ export function FeatureSettings({
         </p>
       ) : null}
 
-      {academyFeatureNames.map((feature) => {
+      {academyFeatureNames.filter((feature) => !academyOperatorFeatures.has(feature)).map((feature) => {
         const isEnabled = enabled.get(feature) ?? false;
         const requires = academyFeatureRequires[feature];
         const busy = mutation.isPending && mutation.variables?.feature === feature;

@@ -37,6 +37,7 @@ export function useSubmission({
   classId,
   materialId,
   initialResult = null,
+  initialCode = null,
   initialLatest,
   solveSessionId,
   reopenSolveSession,
@@ -52,6 +53,8 @@ export function useSubmission({
    * student chose to review, exactly as it read when they submitted it.
    */
   initialResult?: SubmissionResult | null;
+  /** The code that historical attempt was made with, when it is known. */
+  initialCode?: string | null;
   initialLatest?: import("@cove/shared").LatestSubmission | null;
   /** The sitting this attempt belongs to; the server owns its elapsed time. */
   solveSessionId?: string | null;
@@ -62,6 +65,8 @@ export function useSubmission({
   const latest = useLatestSubmission({ academyId, materialId, classId, mode: 'student' }, userId, true, initialLatest);
   const [submitting, setSubmitting] = React.useState(false);
   const [submissionId, setSubmissionId] = React.useState<string | null>(null);
+  /** The code each accepted attempt was made with, so a verdict is never explained against later edits. */
+  const [accepted, setAccepted] = React.useState<{ submissionId: string; code: string } | null>(null);
   const [totalCount, setTotalCount] = React.useState(0);
   const [reported, setReported] = React.useState<ReportedCase[]>([]);
   const [result, setResult] = React.useState<SubmissionResult | null>(
@@ -200,6 +205,7 @@ export function useSubmission({
         return;
       }
       requestRef.current = null;
+      setAccepted({ submissionId: accepted.submissionId, code });
       void queryClient.invalidateQueries({ queryKey: ['latest-submission', userId, academyId, materialId] });
       setSubmissionId(accepted.submissionId);
       setTotalCount(accepted.totalCount);
@@ -277,6 +283,11 @@ export function useSubmission({
     submitting,
     submissionId,
     result,
+    /** The code the shown verdict is about. Null when it is not known. */
+    submittedCode: !result ? null
+      : accepted?.submissionId === result.submissionId ? accepted.code
+      : initialResult?.submissionId === result.submissionId ? initialCode
+      : null,
     error,
     cells,
     reset: () => {

@@ -9,6 +9,11 @@ import { createClient } from '@/lib/supabase/client';
 import type { Socket } from 'socket.io-client';
 
 export const helpQueryKey = (academyId: string, classId: string) => ['help-requests', academyId, classId] as const;
+/** One student's own request in a class, as every place that shows it reads it. */
+export const myHelpRequestKey = (academyId: string, classId: string, userId: string) =>
+  [...helpQueryKey(academyId, classId), 'self', userId] as const;
+/** Asks the mounted request control to send; see `RequestHelp`. */
+export const askTeacherEvent = 'cove:ask-teacher';
 export function helpAccessDenied(error: unknown): boolean {
   const code = (error as { code?: string } | null)?.code;
   return !!code && ['MONITORING_DISABLED', 'MONITORING_ACCESS_DENIED', 'PERMISSION_DENIED', 'ACADEMY_MEMBERSHIP_SUSPENDED', 'ACADEMY_NOT_FOUND', 'USER_SUSPENDED'].includes(code);

@@ -50,6 +50,7 @@ function snapshot(materialId: string): MonitoringExercisePreview {
       inputPromptPolicy: 'INCLUDE',
       gradingRevision: 1,
       serverSampleChecks: false,
+      aiAssistant: false,
       sampleTestCases: [],
       hints: [],
       hiddenTestCaseCount: 0,

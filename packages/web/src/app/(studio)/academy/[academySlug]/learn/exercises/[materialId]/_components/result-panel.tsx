@@ -1,14 +1,18 @@
 'use client';
+import type { SubmissionResult } from '@cove/shared';
+
 import { ProgrammingAssessmentResult } from '@/components/programming-review/assessment-result';
 import { QuizFeedback } from '@/components/workspace/quiz-feedback';
 
+import type * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useErrorText } from '@/i18n/client/use-error-text';
 import { useLayoutTranslation } from '@/i18n';
 
 import type { SubmissionState } from '../_hooks/use-submission';
-import { hiddenResultCount, resultPresentation, showsScore } from '../_lib/scoring';
+import { firstPythonError, hiddenResultCount, resultPresentation, showsScore } from '../_lib/scoring';
+import { ErrorCoachPanel } from './error-coach-panel';
 import { ResultHero } from './result-hero';
 import { ResultMetrics } from './result-metrics';
 import { TestResultList } from './test-result-list';
@@ -16,15 +20,27 @@ import { TestResultList } from './test-result-list';
 export function ResultPanel({
   submission,
   compiled = false,
+  currentCode = null,
+  onFocusLine,
+  renderHelp,
 }: {
   submission: SubmissionState;
   /** C/C++: shows a compile error and explains runtime errors. */
   compiled?: boolean;
+  /** What the editor holds now: the coach points at a line only while it is still the one submitted. */
+  currentCode?: string | null;
+  onFocusLine?: (line: number, column: number) => void;
+  /**
+   * A learner's help for a failed attempt. Staff practice passes none. It gets
+   * the graded code, and a way to the editor line only while the editor still
+   * holds that code.
+   */
+  renderHelp?: (result: SubmissionResult, graded: { code: string | null; onFocusLine?: (line: number, column: number) => void }) => React.ReactNode;
 }) {
   const { t } = useLayoutTranslation('learn');
   const { t: tc } = useTranslation('sample-check');
   const errorText = useErrorText();
-  const { result, cells, submitting, error } = submission;
+  const { result, cells, submitting, error, submittedCode } = submission;
 
   if (!submitting && !result && !error) {
     return (
@@ -41,9 +57,24 @@ export function ResultPanel({
   const suppressesResults =
     presentation === 'judge_error' || presentation === 'transport_error';
 
+  const pythonError = suppressesResults ? null : firstPythonError(result);
+  // The coach quotes the student's line, so it reads the code that was graded.
+  const quotable = submittedCode !== null && submittedCode === currentCode;
+
   return (
     <div className="space-y-4 px-4 py-4 sm:px-5">
       <ResultHero presentation={presentation} />
+
+      {pythonError ? (
+        <div className="-mx-4 sm:-mx-5">
+          <ErrorCoachPanel
+            code={submittedCode ?? ''}
+            error={{ ...pythonError, offset: null, display: '' }}
+            onFocusLine={quotable ? onFocusLine : undefined}
+          />
+        </div>
+      ) : null}
+      {result && presentation !== 'accepted' && !suppressesResults && !submitting ? renderHelp?.(result, { code: submittedCode, onFocusLine: quotable ? onFocusLine : undefined }) : null}
 
       {!suppressesResults && (submitting || (result && showsScore(result))) ? (
         <ResultMetrics

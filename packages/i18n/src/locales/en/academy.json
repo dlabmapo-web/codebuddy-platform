@@ -42,6 +42,10 @@
       "EXAMS": {
         "title": "Tests (exams)",
         "body": "Timed tests made of multiple choice, short answer and code problems, with per-class periods and results."
+      },
+      "AI_ASSISTANT": {
+        "title": "AI learning assistant",
+        "body": "AI hints and personalized feedback. Cove pays for each request, so only Cove operators can switch it on."
       }
     }
   },

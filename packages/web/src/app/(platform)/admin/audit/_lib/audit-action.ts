@@ -251,6 +251,8 @@ export const auditActionLabels: Record<
   'content.pdf.deleted': 'action.content.pdf.deleted',
   'content.pdf.moved': 'action.content.pdf.moved',
   'content.pdf.visibility': 'action.content.pdf.visibility',
+  'ai.library.regenerated': 'action.ai.library.regenerated',
+  'ai.library_item.updated': 'action.ai.library_item.updated',
   'content.programming_exercise.created':
     'action.content.programming_exercise.created',
   'content.programming_exercise.deleted':

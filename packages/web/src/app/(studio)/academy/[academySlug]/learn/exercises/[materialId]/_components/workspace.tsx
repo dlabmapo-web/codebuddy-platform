@@ -50,6 +50,7 @@ import {
 } from '../_lib/python-error-lines';
 import { EditorPane, type OutputTab } from './editor-pane';
 import { FeedbackPanel } from './feedback-panel';
+import { LearnerHelp } from './learner-help';
 import { MonitoringIndicator } from './monitoring-indicator';
 import { RequestHelp } from '@/components/monitoring/request-help';
 import { WorkspaceHeader } from './workspace-header';
@@ -176,6 +177,7 @@ function ProgrammingWorkspace({
     // bootstrap still describes the exercise the page was loaded on, and its
     // settled result would be cached as the new exercise's (QA-001b).
     initialResult: selected?.result ?? workspace.latestResult ?? null,
+    initialCode: selected?.code ?? null,
     initialLatest: workspace.latestSubmission,
     solveSessionId: solveSession.solveSessionId,
     reopenSolveSession: solveSession.reopen,
@@ -787,6 +789,10 @@ function ProgrammingWorkspace({
               sampleTestCases={exercise.sampleTestCases}
               submission={submission}
               tab={outputTab}
+              renderHelp={(result, graded) => (
+                <LearnerHelp key={result.submissionId} academyId={academyId} aiAssistant={exercise.aiAssistant} classId={classId} userId={userId} result={result}
+                  code={graded.code} onFocusLine={graded.onFocusLine} />
+              )}
             />
           </section>
         </div>

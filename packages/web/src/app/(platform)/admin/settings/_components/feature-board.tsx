@@ -8,7 +8,7 @@ import type {
 import { academyFeatureNames, academyFeatureRequires } from '@cove/shared';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClipboardCheck, BadgeCheck, Coins, Eye, Trophy, Users } from 'lucide-react';
+import { ClipboardCheck, BadgeCheck, Coins, Eye, Sparkles, Trophy, Users } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -101,6 +101,14 @@ const featureStyles: Record<
     chip: 'bg-teal-soft text-teal',
     meter: 'bg-teal',
     icon: BadgeCheck,
+  },
+  // Operator-only: Cove pays for every AI call.
+  AI_ASSISTANT: {
+    tone: 'peer',
+    dot: 'bg-peer',
+    chip: 'bg-peer-soft text-peer',
+    meter: 'bg-peer',
+    icon: Sparkles,
   },
 };
 

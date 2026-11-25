@@ -76,7 +76,7 @@
       "difficulty": "Difficulty",
       "language": "Language",
       "ai_feedback": "Enable AI feedback",
-      "ai_feedback_hint": "For now, this saves whether AI feedback is enabled for the problem.",
+      "ai_feedback_hint": "When the academy has the AI assistant, students get AI hints and personalized feedback on this problem.",
       "description": "Problem description",
       "constraints": "Conditions and constraints (optional)",
       "starter_code": "Initial code (editor default)",

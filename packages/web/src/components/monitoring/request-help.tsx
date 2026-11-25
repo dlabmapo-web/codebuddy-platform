@@ -9,7 +9,7 @@ import type { Socket } from 'socket.io-client';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import { orpc } from '@/lib/orpc';
 import { routes } from '@/lib/routes';
-import { helpAccessDenied, helpQueryKey, useHelpClock, useHelpOperation, useHelpRefresh } from '@/lib/monitoring/use-help-requests';
+import { askTeacherEvent, helpAccessDenied, myHelpRequestKey, useHelpClock, useHelpOperation, useHelpRefresh } from '@/lib/monitoring/use-help-requests';
 import { HelpWait } from './help-wait';
 
 export function RequestHelp({ academyId, classId, materialId, userId, socket, onNavigate }: {
@@ -19,7 +19,7 @@ export function RequestHelp({ academyId, classId, materialId, userId, socket, on
   const slug = useAcademySlug();
   const refresh = useHelpRefresh(academyId, classId, socket);
   const client = useQueryClient();
-  const queryKey = [...helpQueryKey(academyId, classId), 'self', userId];
+  const queryKey = myHelpRequestKey(academyId, classId, userId);
   const query = useQuery({ queryKey, queryFn: async ({ signal }) => {
     try { return { ...await orpc.monitoring.getMyActiveHelpRequest({ academyId, classId }, { signal }), denied: false }; }
     catch (error) { if (helpAccessDenied(error)) return { request: null, latestClosed: null, teacherAssigned: false, serverTime: new Date().toISOString(), denied: true }; throw error; }
@@ -42,10 +42,20 @@ export function RequestHelp({ academyId, classId, materialId, userId, socket, on
   const now = useHelpClock(query.data?.serverTime, query.dataUpdatedAt);
   const request = query.data?.request;
   const [initialClosed] = React.useState(() => query.data?.latestClosed?.id);
-  if (query.data?.denied || helpAccessDenied(query.error)) return null;
+  const denied = query.data?.denied || helpAccessDenied(query.error);
   const send = () => { const idempotencyKey = crypto.randomUUID(); void operation.run(() => orpc.monitoring.requestHelp({ academyId, classId, materialId, idempotencyKey })); };
   const cancel = () => { if (!request) return; const input = { academyId, requestId: request.id, expectedVersion: request.version, idempotencyKey: crypto.randomUUID() }; void operation.run(() => orpc.monitoring.cancelMyHelpRequest(input)); };
   const disabled = operation.busy || query.isPending || query.isError || !!operation.retry;
+  // The result panel's button asks through this control, so there is one
+  // request, one retry and one refresh however many places offer it.
+  const askRef = React.useRef<() => void>(() => {});
+  React.useEffect(() => { askRef.current = () => { if (!denied && !disabled && !request) send(); }; });
+  React.useEffect(() => {
+    const ask = () => askRef.current();
+    window.addEventListener(askTeacherEvent, ask);
+    return () => window.removeEventListener(askTeacherEvent, ask);
+  }, []);
+  if (denied) return null;
   return <div className="flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-border px-2 py-1" data-testid="student-help-request">
     {request ? <>
       <span role="status" className="text-xs font-semibold">{request.status === 'IN_PROGRESS' ? t('help.teacher_helping', { name: request.teacherName ?? t('help.teacher') }) : t('help.requested')}</span>

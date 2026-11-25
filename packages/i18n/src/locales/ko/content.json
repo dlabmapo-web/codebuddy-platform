@@ -73,7 +73,7 @@
       "difficulty": "난이도",
       "language": "언어",
       "ai_feedback": "AI 피드백 사용",
-      "ai_feedback_hint": "현재는 이 문제의 AI 피드백 사용 여부 설정만 저장됩니다.",
+      "ai_feedback_hint": "학원이 AI 학습 도우미를 사용하면 학생이 이 문제에서 AI 힌트와 맞춤 피드백을 받습니다.",
       "description": "문제 설명",
       "constraints": "조건 및 제약 사항 (선택)",
       "starter_code": "초기 코드 (에디터 기본값)",

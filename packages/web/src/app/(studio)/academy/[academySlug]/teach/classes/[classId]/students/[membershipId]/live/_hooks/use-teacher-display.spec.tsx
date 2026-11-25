@@ -18,7 +18,7 @@ const snapshot: MonitoringExercisePreview = {
   exercise: { materialId: 'b', title: 'Same title', difficulty: 'EASY', language: 'PYTHON',
     description: '', inputFormat: '', outputFormat: '', constraints: '', starterCode: '',
     timeLimitMs: 1000, memoryLimitMb: 256, gradingMode: 'LEGACY_STDIO', inputPromptPolicy: 'INCLUDE',
-    gradingRevision: 1, serverSampleChecks: false, sampleTestCases: [], hints: [], hiddenTestCaseCount: 0 },
+    gradingRevision: 1, serverSampleChecks: false, aiAssistant: false, sampleTestCases: [], hints: [], hiddenTestCaseCount: 0 },
 };
 
 it.each(['select', 'returnToLive', 'resumeWatched'] as const)('resumes the authorized live document through %s without reopening its watch', async action => {

@@ -8,7 +8,7 @@ import { QuizFeedback } from '@/components/workspace/quiz-feedback';
 import type { TeacherReviewCase, TeacherSubmissionReview } from '@cove/shared';
 import type { TFunction } from 'i18next';
 import { formatDateTime } from '@cove/i18n/format';
-import { Lock } from 'lucide-react';
+import { Lock, Sparkles } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
 
@@ -178,6 +178,7 @@ export function SubmissionReview({
 
         <div className="flex flex-col gap-4">
           {review.compileFailed ? <CompileFailure diagnostics={review.compileDiagnostics ?? null} /> : null}
+          {review.aiReplies?.length ? <AiReplies replies={review.aiReplies} /> : null}
           <section className="rounded-card border border-border bg-card">
             <h2 className="border-b border-border px-4 py-2.5 text-[13px] font-bold">
               {t('progress.review.cases_heading')}
@@ -268,11 +269,51 @@ function SampleCase({ item }: { item: TeacherReviewCase }) {
   );
 }
 
-/** C/C++: how a public case's program ended, worded as the student read it. */
+/** What the AI assistant told the student about this attempt, in order. */
+function AiReplies({ replies }: { replies: NonNullable<TeacherSubmissionReview['aiReplies']> }) {
+  const { t } = useTranslation('learning-help');
+  const locale = useLocale();
+  return (
+    <section className="rounded-card border border-border bg-card px-4 py-3.5" data-testid="review-ai-replies">
+      <h2 className="flex items-center gap-2 text-[14px] font-bold"><Sparkles aria-hidden className="size-4 text-brand" />{t('teacher.title')}</h2>
+      <p className="mt-0.5 text-[12.5px] text-sub">{t('teacher.body')}</p>
+      <ol className="mt-3 space-y-2">
+        {replies.map((reply, index) => (
+          <li className="rounded-lg border border-border px-3 py-2.5" key={index}>
+            <p className="flex flex-wrap items-center gap-2 text-[12px] text-sub">
+              <span className="font-bold">{t(reply.level === 2 ? 'teacher.simpler' : 'teacher.analysis')}</span>
+              <span>{formatDateTime(reply.createdAt, locale, true)}</span>
+              {reply.reported ? <span className="rounded-full bg-danger/10 px-2 py-0.5 font-semibold text-danger">{t('teacher.reported')}</span> : null}
+            </p>
+            {reply.analysis ? (
+              <dl className="mt-1.5 grid gap-x-3 gap-y-1.5 text-[13.5px] leading-6 sm:grid-cols-[6rem_1fr]" lang={reply.locale}>
+                {([
+                  ['result', reply.analysis.result],
+                  ['where', reply.analysis.line === null ? null : t('ai.line', { number: reply.analysis.line })],
+                  ['why', reply.analysis.why], ['think', reply.analysis.think],
+                  ['try_it', reply.analysis.tryIt], ['also_check', reply.analysis.alsoCheck],
+                ] as const).flatMap(([key, text]) => text ? [
+                  <dt className="text-[12px] font-semibold text-sub" key={`${key}-label`}>{t(`ai.section.${key}`)}</dt>,
+                  <dd className="whitespace-pre-wrap" key={key}>{text}</dd>,
+                ] : [])}
+              </dl>
+            ) : (
+              <p className="mt-1 whitespace-pre-wrap text-[14px] leading-6" lang={reply.locale}>{reply.text}</p>
+            )}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/** How a public case's program ended: Python's own words, or a C/C++ ending as the student read it. */
 function ProgramEnding({ item }: { item: TeacherReviewCase }) {
   const { t } = useTranslation('sample-check');
   if (item.outcome !== 'RUNTIME_ERROR') return null;
-  const text = item.exitSignal
+  const text = item.pythonError
+    ? `${item.pythonError.type}${item.pythonError.message ? `: ${item.pythonError.message}` : ''}${item.pythonError.line ? ` (main.py:${item.pythonError.line})` : ''}`
+    : item.exitSignal
     ? t(`workspace.exit.${item.exitSignal}`)
     : item.exitCode
       ? t('workspace.exit.code', { code: item.exitCode })

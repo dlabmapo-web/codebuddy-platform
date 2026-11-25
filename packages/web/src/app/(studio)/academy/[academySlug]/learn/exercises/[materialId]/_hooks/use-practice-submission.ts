@@ -15,6 +15,7 @@ export function usePracticeSubmission(academyId: string, materialId: string, pre
   const [error, setError] = React.useState<unknown>(null);
   const [selected, setSelected] = React.useState<SubmissionResult | null>(null);
   const [totalCount, setTotalCount] = React.useState(0);
+  const [accepted, setAccepted] = React.useState<{ submissionId: string; code: string } | null>(null);
   const acceptedAt = React.useRef(0);
   const request = React.useRef<{ code: string; id: string } | null>(null);
   const result = useQuery({
@@ -57,6 +58,7 @@ export function usePracticeSubmission(academyId: string, materialId: string, pre
     request.current = request.current?.code === code ? request.current : { code, id: crypto.randomUUID() };
     try {
       const accepted = await orpc.learn.submitPractice({ academyId, materialId, code, preview, gradingRevision, requestId: request.current.id });
+      setAccepted({ submissionId: accepted.submissionId, code });
       acceptedAt.current = Date.now();
       if (accepted.result) {
         client.setQueryData(['staff-practice', userId, academyId, 'result', accepted.submissionId], accepted.result);
@@ -73,6 +75,8 @@ export function usePracticeSubmission(academyId: string, materialId: string, pre
   }, [result.data]);
   return {
     submit, submissionId, result: value,
+    /** The code the shown verdict is about. Null when it is not known. */
+    submittedCode: value && accepted?.submissionId === value.submissionId ? accepted.code : null,
     refreshSummary: () => { void latest.refetch(); }, summaryRefreshing: latest.isFetching, latestSubmission: latest.data, summaryLoading: enabled && latest.isPending, summaryError: latest.isError,
     submitting: accepting || Boolean(submissionId && !result.error && (!result.data || !isTerminalStatus(result.data.status))),
     error: error ?? result.error,

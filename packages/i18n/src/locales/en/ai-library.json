@@ -1,0 +1,82 @@
+{
+  "title": "What the AI teacher knows about this problem",
+  "help": "AI writes hints and common mistakes for this problem, and Cove tests every mistake with real programs. The AI teacher uses them when it analyses a student's code; students never see them directly. You do not have to write anything; edit or hide an item to change what the AI teacher says.",
+  "open": "Show the AI library",
+  "off": "AI is not on for this problem. It needs the academy's AI assistant, the AI feedback checkbox above, and automatic Python grading.",
+  "failed": "The AI library could not be loaded.",
+  "retry": "Try again",
+  "state": {
+    "NONE": "Not written yet. Cove writes it at night, once editing has stopped.",
+    "WAITING": "Waiting to be written.",
+    "WRITING": "AI is writing it.",
+    "CHECKING": "Cove is running the test programs.",
+    "REVIEWING": "A second AI check is reading it.",
+    "READY": "Ready.",
+    "FAILED": "No library. Students still get the error coach, rules and personalized feedback."
+  },
+  "stale": "The problem changed, so students do not see these items until the new ones are ready.",
+  "error": {
+    "SOLUTION_FAILS": "Your own solution fails this problem's tests. Check the solution or the tests.",
+    "other": "Last problem: {{code}}"
+  },
+  "regenerate": "Write again",
+  "regenerating": "Asking…",
+  "regenerate_failed": "Could not ask for a new library. Try again.",
+  "hints": "Teacher's path (hints)",
+  "feedback": "Common mistakes",
+  "empty": "Nothing here yet.",
+  "ko": "Korean",
+  "en": "English",
+  "edit": "Edit",
+  "save": "Save",
+  "saving": "Saving…",
+  "cancel": "Cancel",
+  "hide": "Hide",
+  "restore": "Show again",
+  "conflict": "Someone else changed this item. It has been refreshed.",
+  "save_failed": "Could not save. Try again.",
+  "wrong_program": "Wrong program used to test it",
+  "correct_programs": "Correct programs that passed",
+  "item_state": {
+    "CHECKING": "Being tested",
+    "ACTIVE": "Shown",
+    "HIDDEN": "Hidden",
+    "REJECTED": "Dropped by the checks"
+  },
+  "origin": {
+    "AI": "AI",
+    "COPY": "AI (copied)",
+    "GROWN": "AI (grown)",
+    "STAFF": "Edited by staff"
+  },
+  "reports_one": "{{count}} report",
+  "reports_other": "{{count}} reports",
+  "dropped": "Dropped items ({{count}})",
+  "mistakes": {
+    "title": "Common mistakes, last 30 days",
+    "none": "No failed submissions yet.",
+    "python": "Python errors",
+    "library": "Matched by the AI library",
+    "unmatched": "AI answers that matched no known mistake: {{total}}",
+    "failures_one": "{{count}} failed submission",
+    "failures_other": "{{count}} failed submissions",
+    "students_one": "{{count}} student",
+    "students_other": "{{count}} students",
+    "times_one": "{{count}} time",
+    "times_other": "{{count}} times"
+  },
+  "reason": {
+    "SIZE": "Empty or too long",
+    "LINK": "Contains a link",
+    "LANGUAGE": "Wrong language",
+    "CODE": "Contains code",
+    "SOLUTION": "Gives away the answer",
+    "WRONG_PASSES": "Its wrong program passes the tests, so it is not a mistake",
+    "NOT_RUN": "Its wrong program could not be tested",
+    "NO_REVIEW": "The second check did not answer",
+    "TOO_FEW": "Too few good items to publish",
+    "EXTRA": "More mistakes than a library keeps",
+    "review": "Second check: {{reason}}",
+    "other": "Dropped ({{code}})"
+  }
+}

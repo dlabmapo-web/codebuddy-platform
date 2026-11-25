@@ -83,6 +83,7 @@ export const routes = {
    */
   adminOperations: '/admin/operations',
   adminTurtle: '/admin/turtle',
+  adminAi: '/admin/ai',
   adminAcademyNew: '/admin/academies/new',
   adminAcademy: (academySlug: string) =>
     `/admin/academies/${segment(academySlug)}`,

@@ -59,6 +59,7 @@ export function EditorPane({
   project = null,
   starterCode,
   compileDiagnostics = null,
+  renderHelp,
 }: {
   onRunAll: () => void;
   onStop: () => void;
@@ -97,6 +98,8 @@ export function EditorPane({
   starterCode?: string;
   /** GCC's latest messages, which a multi-file editor marks per file. */
   compileDiagnostics?: string | null;
+  /** A learner's help for a failed attempt; only the student's own workspace passes it. */
+  renderHelp?: React.ComponentProps<typeof ResultPanel>['renderHelp'];
 }) {
   const compiled = isCompiledLanguage(language);
   const { t } = useLayoutTranslation(['learn', 'common']);
@@ -246,7 +249,7 @@ export function EditorPane({
             />
             ) : null}
           </>) : (
-            <ResultPanel compiled={compiled} submission={submission} />
+            <ResultPanel compiled={compiled} currentCode={code} onFocusLine={onFocusLine} renderHelp={renderHelp} submission={submission} />
           )}
         </div>
       </div>

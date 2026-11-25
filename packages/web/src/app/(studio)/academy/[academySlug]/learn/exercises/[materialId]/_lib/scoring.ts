@@ -115,3 +115,11 @@ export const outcomeTone: Record<CaseOutcome, 'pass' | 'fail' | 'limit' | 'idle'
   MEMORY_LIMIT: 'limit',
   SKIPPED: 'idle',
 };
+
+/** The exception the coach explains: the first public case that raised one. */
+export function firstPythonError(
+  result: SubmissionResult | null,
+): NonNullable<SubmissionResult['cases'][number]['pythonError']> | null {
+  if (result?.status !== 'FAILED') return null;
+  return result.cases.find((item) => item.isSample && item.pythonError)?.pythonError ?? null;
+}

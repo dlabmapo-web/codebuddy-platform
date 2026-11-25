@@ -39,7 +39,7 @@ export const authNamespaces = ["auth"] as const;
  * Mounted by the `(framed)/content` layout, and by the two platform-console
  * surfaces that render the same builder against the shared library.
  */
-export const contentNamespaces = ["solutions", "pdf-practice", "quiz", "content", "grading", "common", "courses", "material-picker", "exercise-files", "exam"] as const;
+export const contentNamespaces = ["solutions", "pdf-practice", "quiz", "content", "grading", "common", "courses", "material-picker", "exercise-files", "exam", "ai-library"] as const;
 
 /**
  * The student exercise workspace.
@@ -58,6 +58,7 @@ export const exerciseNamespaces = [
   "sample-check",
   "monitoring",
   "python-errors",
+  "learning-help",
   "errors",
 ] as const;
 
@@ -69,6 +70,8 @@ export const exerciseNamespaces = [
  * the same list because a teacher moves between them through the class header.
  */
 export const teachNamespaces = [
+  // AI hints in a statement a teacher reads, and AI replies on an attempt.
+  "learning-help",
   "classroom",
   'learn',
   "practice", "solutions", "pdf-practice", "content",
@@ -328,7 +331,11 @@ export const operationsNamespaces = ["platform-operations", "errors"] as const;
 /** The console page for public Turtle use; no other route reads it. */
 export const platformTurtleNamespaces = ["platform-turtle"] as const;
 
+/** The console page for the AI assistant; no other route reads it. */
+export const platformAiNamespaces = ["platform-ai"] as const;
+
 export type PageNamespace =
+  | (typeof platformAiNamespaces)[number]
   | (typeof platformTurtleNamespaces)[number]
   | (typeof librarySyncNamespaces)[number]
   | (typeof authNamespaces)[number]

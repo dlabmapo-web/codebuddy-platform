@@ -10,6 +10,7 @@ import { ChoiceSelector } from '@/components/studio/choice-selector';
 import { useSearchParams } from 'next/navigation';
 import { ReferencePdfPicker } from '@/components/pdf/reference-pdf-picker';
 import { useTranslation } from 'react-i18next';
+import { AiLibraryPanel } from './ai-library-panel';
 import { QuizEditor } from './quiz-editor';
 import type { ExerciseAuthoringContext } from '@cove/shared';
 
@@ -175,6 +176,10 @@ export function ExerciseWorkspace({
           <summary className="cursor-pointer text-sm font-semibold text-sub">{t(exerciseCompleteness(draft).find((row) => row.id === 'solution')?.optional ? 'pdf-practice:solutions_hints' : 'pdf-practice:solutions_hints_required')}</summary>
           <div className="mt-4 space-y-5">{assessmentEditors}</div>
         </details>
+        {/* Its own section: nothing in it has to be filled in, so it stays out of the required box. */}
+        {authoring.savedMaterialId ? (
+          <AiLibraryPanel academyId={academyId} courseId={courseId} editable={editable} materialId={authoring.savedMaterialId} />
+        ) : null}
         </>}
         <ExerciseActions authoring={authoring} />
       </main>

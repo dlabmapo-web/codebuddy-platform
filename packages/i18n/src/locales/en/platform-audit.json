@@ -240,6 +240,14 @@
         "completed": "Re-grade finished"
       }
     },
+    "ai": {
+      "library": {
+        "regenerated": "AI library rewrite requested"
+      },
+      "library_item": {
+        "updated": "AI hint or feedback changed"
+      }
+    },
     "monitoring": {
       "exercise_solution": {
         "viewed": "Model solution viewed"

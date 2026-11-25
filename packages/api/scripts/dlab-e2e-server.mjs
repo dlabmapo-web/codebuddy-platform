@@ -34,6 +34,20 @@ Object.assign(process.env, {
   GUI_ENABLED: process.env.COVE_OBSERVATION_E2E === '1' ? 'true' : 'false', VIDEO_LESSONS_ENABLED: 'true', SHORT_ANSWER_ENABLED: 'true', MULTIPLE_CHOICE_ENABLED: 'true',
   ...(process.env.COVE_OBSERVATION_E2E === '1' ? { GUI_SERVICE_URL: 'http://127.0.0.1:4029', GUI_PUBLIC_WS_URL: 'ws://127.0.0.1:4029', GUI_SERVICE_SECRET: 'local-observation-runtime-secret-never-production' } : {}),
 });
+// The AI assistant runs unchanged; only OpenAI's address is answered here. A
+// person may send the local demo to the real model with their own key.
+const aiE2e = process.env.COVE_AI_ASSISTANT_E2E === '1';
+// Read here and nowhere else, so the key is in no environment the web or grader sees.
+const aiRealKey = aiE2e && process.env.COVE_AI_ASSISTANT_REAL_MODEL === '1'
+  ? (await readFile(new URL('../.env.local', import.meta.url), 'utf8')).match(/^OPENAI_API_KEY=["']?([^"'\s]+)/m)?.[1]
+  : undefined;
+if (aiE2e && process.env.COVE_AI_ASSISTANT_REAL_MODEL === '1' && !aiRealKey) throw new Error('No OPENAI_API_KEY in packages/api/.env.local');
+if (aiE2e) Object.assign(process.env, {
+  OPENAI_API_KEY: aiRealKey || 'local-e2e-model-key-never-production', AI_ASSISTANT_ENABLED: 'true', AI_LIBRARY_ENABLED: 'true',
+  AI_LIBRARY_HOURS: '0-24', AI_LIBRARY_QUIET_MINUTES: '0', AI_ASSISTANT_MONTHLY_BUDGET_USD: '1', AI_LIBRARY_MONTHLY_BUDGET_USD: '1',
+});
+// Nest reads `.env.local` too: an empty key here keeps a developer's out of other suites.
+else process.env.OPENAI_API_KEY = '';
 const db = new PrismaService(new ConfigService({ DATABASE_URL: dbUrl }));
 const redis = new Redis(process.env.COVE_DLAB_TEST_REDIS_URL);
 const authUsers = new Map(), hashes = new Map(), codes = new Map(), fixtures = new Map(), sessions = new Map(), refreshes = new Map();
@@ -61,6 +75,74 @@ function session(user, previous) {
 function authUser(input) {
   return { id: input.id ?? randomUUID(), aud: 'authenticated', role: 'authenticated', email: input.email, email_confirmed_at: new Date().toISOString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString(), app_metadata: { provider: 'email', providers: ['email'], ...input.app_metadata }, user_metadata: input.user_metadata ?? {}, identities: [] };
 }
+const aiProblem = {
+  description: '<p>Read a whole number N and print the sum of all whole numbers from 1 to N.</p>', inputFormat: 'One whole number N.', outputFormat: 'The sum.',
+  constraints: '1 to 100.', starterCode: '', solutionCode: 'n = int(input())\ntotal = 0\nfor i in range(1, n + 1):\n    total += i\nprint(total)',
+};
+/** Invented beginner problems for the playground with the real model. */
+const playgroundProblems = [
+  { title: 'Bigger number', description: '<p>Read two whole numbers, one per line, and print the bigger one.</p>', inputFormat: 'Two whole numbers, one per line.', outputFormat: 'The bigger number.', constraints: '-100 to 100.',
+    solutionCode: 'a = int(input())\nb = int(input())\nif a > b:\n    print(a)\nelse:\n    print(b)', tests: [['3\n8', '8', 'SAMPLE'], ['10\n2', '10', 'SAMPLE'], ['-5\n-9', '-5', 'HIDDEN'], ['7\n7', '7', 'HIDDEN']] },
+  { title: 'Count the vowels', description: '<p>Read a sentence and print how many vowels (a, e, i, o, u) it has. Capital letters count too.</p>', inputFormat: 'One sentence.', outputFormat: 'The number of vowels.', constraints: '1 to 50 characters.',
+    solutionCode: 's = input()\ncount = 0\nfor ch in s.lower():\n    if ch in "aeiou":\n        count += 1\nprint(count)',
+    tests: [['banana', '3', 'SAMPLE'], ['sky', '0', 'SAMPLE'], ['Apple Pie', '4', 'HIDDEN'], ['EDUCATION', '5', 'HIDDEN'], ['hello world', '3', 'HIDDEN'], ['AEIOU', '5', 'HIDDEN']] },
+  { title: 'Even or odd', description: '<p>Read a whole number. Print Even if it is even, and Odd if it is odd.</p>', inputFormat: 'One whole number.', outputFormat: 'Even or Odd.', constraints: '-1000 to 1000.',
+    solutionCode: 'n = int(input())\nif n % 2 == 0:\n    print("Even")\nelse:\n    print("Odd")', tests: [['4', 'Even', 'SAMPLE'], ['7', 'Odd', 'SAMPLE'], ['0', 'Even', 'HIDDEN'], ['-3', 'Odd', 'HIDDEN']] },
+  { title: 'Reverse a word', description: '<p>Read one word and print it backwards.</p>', inputFormat: 'One word.', outputFormat: 'The word backwards.', constraints: '1 to 20 letters.',
+    solutionCode: 'word = input()\nprint(word[::-1])', tests: [['cat', 'tac', 'SAMPLE'], ['level', 'level', 'SAMPLE'], ['python', 'nohtyp', 'HIDDEN'], ['ab', 'ba', 'HIDDEN']] },
+  { title: 'Star triangle', description: '<p>Read a whole number N and print N lines. Line 1 has one star, line 2 has two stars, and so on.</p>', inputFormat: 'One whole number N.', outputFormat: 'N lines of stars.', constraints: '1 to 10.',
+    solutionCode: 'n = int(input())\nfor i in range(1, n + 1):\n    print("*" * i)', tests: [['3', '*\n**\n***', 'SAMPLE'], ['1', '*', 'SAMPLE'], ['5', '*\n**\n***\n****\n*****', 'HIDDEN'], ['2', '*\n**', 'HIDDEN']] },
+];
+/** Stands in for the model. Its programs are run by Cove's real grader. */
+const aiModel = {
+  mode: 'ok', requests: [],
+  answer(request) {
+    const kind = request.text.format.name;
+    aiModel.requests.push({ kind, store: request.store, instructions: request.instructions, input: request.input });
+    if (aiModel.mode === 'fail') return Response.json({ error: { message: 'local failure' } }, { status: 503 });
+    const reply = kind === 'analysis' ? aiAnalysis(request) : kind === 'library' ? aiLibrary : kind === 'review'
+      ? { reviews: request.input.split(/\n\n(?=ITEM )/).slice(1).map(part => ({ id: part.match(/^ITEM (\w+)/)[1], ok: !part.includes('en: Planted'), reason: 'Not true for this program.' })) }
+      : { mistake: null };
+    return Response.json({ status: 'completed', model: request.model, output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(reply) }] }], usage: { input_tokens: 900, output_tokens: 90 } });
+  },
+};
+/** An analysis in the Analyze design's fields, the same words every time, so a test can find them. */
+function aiAnalysis({ instructions, input }) {
+  const korean = instructions.includes('선생님'), simpler = instructions.includes('did not understand') || instructions.includes('이해하지 못했습니다');
+  const item = input.match(/MATCHED MISTAKE[^\n]*:\n- (F\d+)/)?.[1] ?? null;
+  const line = 3;
+  if (aiModel.mode === 'code') return { item: null, result: 'Your loop stops early.', line, why: 'It stops before n.', think: 'Change it to `for i in range(1, n + 1):` and it works.', tryIt: null, alsoCheck: null };
+  if (simpler) return korean
+    ? { item, result: '마지막 수를 빼먹었어요.', line, why: '반복이 한 번 일찍 끝나요.', think: '어떤 수가 빠졌을까요?', tryIt: null, alsoCheck: null }
+    : { item, result: 'Your program forgot the last number.', line, why: 'The loop stops one step too early.', think: 'Which number is missing?', tryIt: null, alsoCheck: null };
+  return korean
+    ? { item, result: '예제는 통과했지만 숨겨진 테스트에서 너무 작은 수를 출력했어요.', line, why: '예제에 없는 수가 들어오면 프로그램이 합을 계산하지 않고 0을 출력해요.',
+        think: 'n까지 더하려면 반복이 어디에서 멈춰야 할까요?', tryIt: '3을 넣고 손으로 계산해 보세요.', alsoCheck: null }
+    : { item, result: 'You passed 0 of 4 tests: for input 5 your program printed 10, not 15.', line, why: '`for i in range(1, n):` stops before n, so the last number is never added.',
+        think: 'Where should the loop stop so that n is added too?', tryIt: 'Try 3 by hand: what should be printed?', alsoCheck: null };
+}
+const aiLibrary = {
+  hints: [
+    { ko: '어떤 수들을 더해야 하는지 먼저 적어 보세요.', en: 'First write down which numbers should be added.' },
+    { ko: '더한 값을 기억할 곳이 필요해요. 처음 값은 얼마일까요?', en: 'You need a place to keep the sum. What is its first value?' },
+    { ko: '수를 하나씩 차례로 더해 보세요.', en: 'Add the numbers one after another.' },
+    { ko: '마지막 수도 더했는지 확인해 보세요.', en: 'Check that the last number is added too.' },
+    { ko: '여기에 코드가 있어요: total += i', en: 'Here is code: total += i' },
+  ],
+  mistakes: [
+    { label: 'stops before N', wrongProgram: 'n = int(input())\ntotal = 0\nfor i in range(1, n):\n    total += i\nprint(total)', ko: '마지막 수가 빠졌어요. 반복이 어디에서 끝나나요?', en: 'The last number is left out. Where does the loop end?' },
+    { label: 'prints N', wrongProgram: 'n = int(input())\nprint(n)', ko: '입력한 수만 출력했어요. 다른 수들은 언제 더하나요?', en: 'Only the input number is printed. When are the other numbers added?' },
+    { label: 'multiplies', wrongProgram: 'n = int(input())\ntotal = 1\nfor i in range(1, n + 1):\n    total *= i\nprint(total)', ko: '더하지 않고 곱했어요. 문제는 무엇을 하라고 하나요?', en: 'The numbers are multiplied. What does the problem ask you to do?' },
+    { label: 'really correct', wrongProgram: 'n = int(input())\nprint(sum(range(1, n + 1)))', ko: '합이 맞지 않아요. 어디를 볼까요?', en: 'The sum is not right. Where should you look?' },
+    { label: 'starts at two', wrongProgram: 'n = int(input())\ntotal = 0\nfor i in range(2, n + 1):\n    total += i\nprint(total)', ko: '첫 번째 수가 빠졌어요. 어디에서 시작하나요?', en: 'The first number is left out. Where does the loop start?' },
+    { label: 'planted', wrongProgram: 'n = int(input())\nprint(n + 1)', ko: '반복이 너무 빨리 끝났어요. 어디에서 끝나나요?', en: 'Planted: the loop ends too early. Where does it end?' },
+  ],
+  correctPrograms: [
+    { approach: 'formula', code: 'n = int(input())\nprint(n * (n + 1) // 2)' },
+    { approach: 'while loop', code: 'n = int(input())\ntotal = 0\nwhile n > 0:\n    total += n\n    n -= 1\nprint(total)' },
+    { approach: 'built-in sum', code: 'n = int(input())\nprint(sum(range(n + 1)))' },
+  ],
+};
 const explanationAssets = new Map();
 let materialReadFault = null;
 const server = createServer(async (req, res) => {
@@ -314,6 +396,92 @@ const server = createServer(async (req, res) => {
       }
       return json(res, { imageMaterialIds, explanationMaterialId, secondProgrammingMaterialId, reviewStudentMembershipId, turtleMaterialId, pdfMaterialId, videoMaterialId, courseId: course.id, lectureId: lecture.id, materialId: material.id, writtenMaterialId: written.id, shortMaterialId: short.id, quizMaterialId: quiz.id, studentMembershipId: student.id, classes });
     }
+    // A ready academy for a person to click through, with password accounts.
+    if (aiE2e && path === '/testing/ai-playground' && req.method === 'POST') {
+      const org = await db.organization.create({ data: { name: 'AI playground', slug: 'ai-playground-' + randomUUID().slice(0, 8) } });
+      const academy = await db.academy.create({ data: { organizationId: org.id, name: 'AI Playground Academy', slug: 'ai-playground' } });
+      const people = {};
+      for (const [key, name, role, locale] of [
+        ['ai_manager', 'Manager Person', 'MANAGER', 'en'], ['ai_teacher', 'Teacher Person', 'TEACHER', 'en'],
+        ['ai_student', 'Student One', 'STUDENT', 'en'], ['ai_student2', '학생 둘', 'STUDENT', 'ko'], ['ai_admin', 'Operator Person', null, 'en'],
+      ]) {
+        const id = randomUUID(), email = key + '@playground.test';
+        authUsers.set(id, authUser({ id, email, user_metadata: { full_name: name } }));
+        await db.user.create({ data: { id, authUserId: id, email, username: key, displayName: name, status: 'ACTIVE', preferredLocale: locale, platformRole: role ? 'USER' : 'ADMIN' } });
+        const membership = role ? await db.academyMembership.create({ data: { academyId: academy.id, userId: id, role, status: 'ACTIVE', joinedAt: new Date() } }) : null;
+        people[key] = { id, membershipId: membership?.id };
+      }
+      const owner = people.ai_manager.id;
+      const course = await db.course.create({ data: { academyId: academy.id, title: 'Python with AI help', isVisible: true, createdByUserId: owner } });
+      const module = await db.courseModule.create({ data: { courseId: course.id, title: 'Loops', externalKey: randomUUID(), position: 1, isVisible: true } });
+      const lecture = await db.lecture.create({ data: { courseModuleId: module.id, title: 'Adding numbers', externalKey: randomUUID(), position: 1, isVisible: true } });
+      // The stand-in model knows only the first problem, so the others need the real one.
+      const sum = { title: 'Sum from 1 to N', ...aiProblem, tests: [['5', '15', 'SAMPLE'], ['3', '6', 'SAMPLE'], ['40', '820', 'HIDDEN'], ['1', '1', 'HIDDEN']] };
+      const problems = [];
+      for (const [index, { title, tests, ...problem }] of (aiRealKey ? [sum, ...playgroundProblems] : [sum]).entries()) {
+        const created = await db.material.create({ data: { lectureId: lecture.id, title, type: 'PROGRAMMING_EXERCISE', position: index + 1, isVisible: true,
+          programmingExercise: { create: { starterCode: '', ...problem, externalKey: randomUUID(), difficulty: 'EASY', aiFeedbackEnabled: true,
+            solutions: { create: { position: 0, title: 'Reference answer', code: problem.solutionCode } },
+            testCases: { create: tests.map(([input, expectedOutput, visibility], position) => ({ position: position + 1, input, expectedOutput, visibility })) } } } } });
+        problems.push({ title, materialId: created.id });
+      }
+      const material = { id: problems[0].materialId };
+      const classroom = await db.class.create({ data: { academyId: academy.id, name: 'AI playground class', description: 'Local AI assistant playground.', createdByUserId: owner, teacherMembershipId: people.ai_teacher.membershipId } });
+      await db.classCourse.create({ data: { classId: classroom.id, courseId: course.id, assignedByUserId: owner } });
+      await db.classEnrollment.createMany({ data: ['ai_student', 'ai_student2'].map((key) => ({ classId: classroom.id, membershipId: people[key].membershipId, enrolledByUserId: owner })) });
+      await db.academyFeatureFlag.createMany({ data: ['TEACHER_LIVE_MONITORING', 'AI_ASSISTANT'].map((feature) => ({ academyId: academy.id, feature, isEnabled: true })) });
+      return json(res, {
+        password: 'LocalLegacyTest123!', accounts: Object.keys(people), academySlug: academy.slug, courseId: course.id, lectureId: lecture.id,
+        classId: classroom.id, studentMembershipId: people.ai_student.membershipId, realModel: Boolean(aiRealKey),
+        problems: problems.map((item) => ({ ...item,
+          editor: `${studio}/academy/${academy.slug}/content/courses/${course.id}/lectures/${lecture.id}/exercises/${item.materialId}`,
+          problem: `${studio}/academy/${academy.slug}/learn/exercises/${item.materialId}?classId=${classroom.id}` })),
+        editor: `${studio}/academy/${academy.slug}/content/courses/${course.id}/lectures/${lecture.id}/exercises/${material.id}`,
+        problem: `${studio}/academy/${academy.slug}/learn/exercises/${material.id}?classId=${classroom.id}`,
+        classPage: `${studio}/academy/${academy.slug}/teach/classes/${classroom.id}`,
+        operator: `${studio}/admin/ai`,
+      });
+    }
+    if (aiE2e && path === '/testing/ai-libraries') {
+      return json(res, await db.aiLibrary.findMany({ select: { materialId: true, state: true, lastErrorCode: true } }));
+    }
+    if (aiE2e && path === '/testing/ai-last-answer') {
+      const reply = await db.aiHelpReply.findFirst({ where: { user: { username: url.searchParams.get('username') } }, orderBy: { createdAt: 'desc' },
+        select: { level: true, status: true, failureCode: true, libraryItem: { select: { label: true } } } });
+      return json(res, { level: reply?.level ?? null, status: reply?.status ?? null, failureCode: reply?.failureCode ?? null, mistake: reply?.libraryItem?.label ?? null,
+        output: aiModel.requests.filter((item) => item.kind === 'analysis').at(-1)?.output ?? null });
+    }
+    if (aiE2e && path === '/testing/ai-latest-submission') {
+      const found = await db.submission.findFirst({ where: { materialId: url.searchParams.get('materialId'), user: { username: url.searchParams.get('username') } }, orderBy: { createdAt: 'desc' }, select: { id: true } });
+      return json(res, { submissionId: found?.id ?? null });
+    }
+    if (aiE2e && path === '/testing/ai-model') {
+      if (req.method === 'POST') aiModel.mode = (await body(req)).mode ?? 'ok';
+      return json(res, { mode: aiModel.mode, requests: aiModel.requests });
+    }
+    if (aiE2e && /^\/fixtures\/[^/]+\/ai$/.test(path) && req.method === 'POST') {
+      const fixture = fixtures.get(path.split('/')[2]), input = await body(req);
+      if (!fixture) return json(res, { error: 'unknown_fixture' }, 404);
+      const feature = { academyId: fixture.academy.id, feature: 'AI_ASSISTANT' };
+      await db.academyFeatureFlag.upsert({ where: { academyId_feature: feature }, create: { ...feature, isEnabled: input.enabled }, update: { isEnabled: input.enabled } });
+      if (input.enrollFixtureId) {
+        const identity = await db.dlabIdentity.findUniqueOrThrow({ where: { externalUserId: input.enrollFixtureId } });
+        const member = await db.academyMembership.findUniqueOrThrow({ where: { academyId_userId: { academyId: fixture.academy.id, userId: identity.userId } } });
+        await db.classEnrollment.create({ data: { classId: input.classId, membershipId: member.id, enrolledByUserId: identity.userId } });
+      }
+      if (input.materialId) {
+        await db.exerciseTestCase.deleteMany({ where: { exerciseMaterialId: input.materialId } });
+        await db.programmingExerciseSolution.deleteMany({ where: { materialId: input.materialId } });
+        await db.programmingExercise.update({ where: { materialId: input.materialId }, data: {
+          ...aiProblem, aiFeedbackEnabled: true, gradingRevision: { increment: 1 },
+          solutions: { create: { position: 0, title: 'Reference answer', code: aiProblem.solutionCode } },
+          testCases: { create: [['5', '15', 'SAMPLE'], ['3', '6', 'SAMPLE'], ['40', '820', 'HIDDEN'], ['1', '1', 'HIDDEN']]
+            .map(([input, expectedOutput, visibility], index) => ({ position: index + 1, input, expectedOutput, visibility })) },
+        } });
+        await db.material.update({ where: { id: input.materialId }, data: { title: 'Sum from 1 to N' } });
+      }
+      return json(res, { ok: true });
+    }
     if (path.startsWith('/fixtures/') && req.method === 'PUT') {
       const id = path.split('/')[2], fixture = fixtures.get(id), input = await body(req);
       if (!fixture) return json(res, { error: 'unknown_fixture' }, 404);
@@ -394,6 +562,17 @@ const originalFetch = globalThis.fetch;
 globalThis.fetch = (input, init) => {
   const url = new URL(typeof input === 'string' ? input : input.url ?? input.toString());
   if (url.origin === 'https://os.dlabcampus.com' && url.pathname === '/v1/sso/token') return originalFetch(origin + '/os/token', init);
+  if (aiE2e && !aiRealKey && url.origin === 'https://api.openai.com') return aiModel.answer(JSON.parse(init.body));
+  // The real model, locally: keep what it answered, so a refused answer can be read here. Never in the application.
+  if (aiE2e && aiRealKey && url.origin === 'https://api.openai.com') return originalFetch(input, init).then(async (response) => {
+    try {
+      const body = await response.clone().json();
+      const output = (body.output ?? []).flatMap((item) => item.content ?? []).map((part) => part.text ?? '').join('');
+      aiModel.requests.push({ kind: JSON.parse(init.body).text.format.name, store: JSON.parse(init.body).store, output: output.slice(0, 4_000) });
+      aiModel.requests.splice(0, Math.max(0, aiModel.requests.length - 50));
+    } catch { /* a failed call has nothing to keep */ }
+    return response;
+  });
   if (url.origin === 'https://dlab-sso-provider.invalid') return originalFetch(origin + url.pathname + url.search, init);
   return originalFetch(input, init);
 };

@@ -97,3 +97,4 @@ packages/api/.history-e2e-*/
 # Isolated library synchronization browser acceptance
 packages/web/.next-library-sync/
 packages/api/.library-sync-e2e-*/
+packages/api/.ai-assistant-e2e-*/

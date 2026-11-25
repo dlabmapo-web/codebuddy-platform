@@ -1,0 +1,335 @@
+import { mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test';
+import { routes } from '../../packages/web/src/lib/routes';
+
+/**
+ * The learning assistant end to end on localhost: the real application and
+ * grader, with a local stand-in for the model. One story in order, because
+ * each step uses what the last one left.
+ */
+const studio = 'http://127.0.0.1:3309';
+const provider = 'http://127.0.0.1:4320';
+const rpcBase = 'http://127.0.0.1:4319/api/rpc/';
+const shots = resolve(__dirname, '../../test-results/ai-assistant-shots');
+
+const SHORT = 'n = int(input())\ntotal = 0\nfor i in range(1, n):\n    total += i\nprint(total)';
+const NAME_ERROR = 'n = int(input())\nfor i in range(1, n + 1):\n    total += i\nprint(total)';
+const EXTRA_TEXT = 'n = int(input())\nprint("Sum:", n * (n + 1) // 2)';
+const HIDDEN_ONLY = 'n = int(input())\nprint({5: 15, 3: 6}.get(n, 0))';
+const CORRECT = 'n = int(input())\nprint(n * (n + 1) // 2)';
+
+type Fixture = { id: string; academy: { id: string; slug: string }; username?: string };
+type Room = { courseId: string; lectureId: string; materialId: string; studentMembershipId: string; classes: { id: string }[] };
+type ModelLog = { requests: { kind: string; store: boolean; instructions: string; input: string }[] };
+
+test.describe.configure({ mode: 'serial' });
+let author: Fixture, learner: Fixture, other: Fixture, room: Room;
+let staff: Page, student: Page, tutorPage: Page;
+
+async function fixture(request: APIRequestContext, data: object): Promise<Fixture> {
+  const response = await request.post(`${provider}/fixtures`, { data });
+  expect(response.ok(), await response.text()).toBe(true);
+  return response.json();
+}
+async function setAi(request: APIRequestContext, data: object) {
+  const response = await request.post(`${provider}/fixtures/${author.id}/ai`, { data });
+  expect(response.ok(), await response.text()).toBe(true);
+}
+async function model(request: APIRequestContext): Promise<ModelLog> {
+  return (await request.get(`${provider}/testing/ai-model`)).json();
+}
+const setModel = (request: APIRequestContext, mode: string) => request.post(`${provider}/testing/ai-model`, { data: { mode } });
+async function enter(browser: Browser, who: Fixture, locale = 'en') {
+  const context = await browser.newContext({ baseURL: studio, viewport: { width: 1440, height: 1000 } });
+  await context.addCookies([{ name: 'i18next', value: locale, url: studio }]);
+  const page = await context.newPage();
+  const response = await page.request.get('/sso/start', { maxRedirects: 0, timeout: 180_000 });
+  const target = new URL(response.headers().location!);
+  target.searchParams.set('fixture', who.id);
+  await page.goto(`${provider}/os/authorize?${target.searchParams}`);
+  await expect(page).toHaveURL(/\/academy\//);
+  return page;
+}
+async function rpc(page: Page, method: string, input: object) {
+  const parts = (await page.context().cookies()).filter((cookie) => /auth-token(?:\.\d+)?$/.test(cookie.name)).sort((a, b) => a.name.localeCompare(b.name));
+  const token = JSON.parse(Buffer.from(parts.map((cookie) => cookie.value).join('').replace(/^base64-/, ''), 'base64url').toString()).access_token as string;
+  const response = await page.request.post(rpcBase + method, { headers: { Authorization: `Bearer ${token}` }, data: { json: input } });
+  return { status: response.status(), body: (await response.json()).json };
+}
+async function write(page: Page, code: string) {
+  await expect(page.locator('.monaco-editor').first()).toBeVisible({ timeout: 90_000 });
+  await expect.poll(() => page.evaluate((next) => {
+    const { monaco } = window as unknown as { monaco?: { editor: { getModels(): { setValue(value: string): void }[] } } };
+    const first = monaco?.editor.getModels()[0];
+    first?.setValue(next);
+    return Boolean(first);
+  }, code), { timeout: 60_000 }).toBe(true);
+}
+async function submit(page: Page, code: string) {
+  await write(page, code);
+  const started = page.waitForResponse((response) => /\/learn\/(?:submit|createSubmission)/i.test(response.url()) && response.request().method() === 'POST', { timeout: 60_000 }).catch(() => null);
+  await page.getByRole('button', { name: /^(Submit|제출)$/ }).first().click();
+  await started;
+}
+const shot = (page: Page, name: string) => page.screenshot({ path: resolve(shots, `${name}.png`) });
+const exercise = () => routes.academyLearnExercise(author.academy.slug, room.materialId, { classId: room.classes[0]!.id });
+
+test.beforeAll(async ({ browser, playwright }) => {
+  test.setTimeout(600_000);
+  await mkdir(shots, { recursive: true });
+  const request = await playwright.request.newContext();
+  author = await fixture(request, { role: 'lab_head', name: 'Owner Person' });
+  learner = await fixture(request, { role: 'student', name: 'Minji Learner', parentFixtureId: author.id });
+  other = await fixture(request, { role: 'student', name: 'Other Learner', parentFixtureId: author.id });
+  const tutor = await fixture(request, { role: 'tutor', name: 'Tutor Person', parentFixtureId: author.id });
+  staff = await enter(browser, author);
+  student = await enter(browser, learner);
+  tutorPage = await enter(browser, tutor);
+  const seeded = await request.post(`${provider}/fixtures/${author.id}/classroom`, { data: { studentFixtureId: learner.id, teacherFixtureId: tutor.id, emptyWork: true } });
+  expect(seeded.ok(), await seeded.text()).toBe(true);
+  room = await seeded.json();
+  await setModel(request, 'ok');
+  await request.dispose();
+});
+
+test('without the academy switch: the error coach works, and no AI', async ({ request }) => {
+  await setAi(request, { enabled: false, materialId: room.materialId });
+  await student.goto(exercise());
+  await submit(student, NAME_ERROR);
+  // The coach Cove already had, now after Submit: no AI, the student's own line.
+  await expect(student.getByTestId('error-coach')).toContainText('Python does not recognise this name', { timeout: 120_000 });
+  await expect(student.getByTestId('analyze')).toHaveCount(0);
+  await shot(student, '01-coach-after-submit');
+  // A rule, too, needs no AI, and shows at once.
+  await submit(student, EXTRA_TEXT);
+  await expect(student.getByTestId('rule-explanation')).toContainText('printed something else', { timeout: 120_000 });
+  await expect(student.getByTestId('analyze')).toHaveCount(0);
+  await shot(student, '02-rule-no-ai');
+  expect((await model(request)).requests).toEqual([]);
+});
+
+test('AI writes the library, and the real grader drops what is wrong', async ({ request }) => {
+  await setAi(request, { enabled: true });
+  await staff.goto(`${routes.academyCourse(author.academy.slug, room.courseId)}/lectures/${room.lectureId}/exercises/${room.materialId}`);
+  await staff.getByTestId('open-ai-library').click({ timeout: 120_000 });
+  const panel = staff.getByTestId('ai-library');
+  await expect(panel).toBeVisible();
+  // Nobody presses anything: the job finds the problem by itself.
+  await expect.poll(async () => (await rpc(staff, 'aiAssistant/getLibrary', {
+    academyId: author.academy.id, courseId: room.courseId, materialId: room.materialId,
+  })).body.state, { timeout: 420_000, intervals: [5_000] }).toBe('READY');
+  await staff.reload();
+  await staff.getByTestId('open-ai-library').click({ timeout: 60_000 });
+  await expect(panel.getByRole('status')).toContainText('Ready.');
+  const items = panel.getByTestId('ai-library-item');
+  // 5 hints minus the one with code; 6 mistakes minus a program that passes and a planted lie.
+  await expect(items).toHaveCount(8);
+  await expect(panel).toContainText('stops before N');
+  await panel.getByText(/^Dropped items \(3\)$/).click();
+  await expect(panel).toContainText('Its wrong program passes the tests');
+  await expect(panel).toContainText('Second check: Not true for this program.');
+  await expect(panel.getByText('really correct')).toHaveCount(0);
+  await shot(staff, '03-teacher-library');
+
+  const { requests } = await model(request);
+  expect(requests.map((item) => item.kind)).toEqual(['library', 'review']);
+  for (const item of requests) {
+    expect(item.store).toBe(false);
+    // Hidden tests never leave Cove.
+    expect(item.input).not.toContain('820');
+    expect(item.input).not.toMatch(/Minji|Owner Person/);
+  }
+  expect(requests[0]!.input).toContain('TEACHER SOLUTION');
+  expect(requests[1]!.input).not.toContain('TEACHER SOLUTION');
+});
+
+test('the hint bank teaches the AI teacher, and students never see it', async ({ request }) => {
+  const before = (await model(request)).requests.length;
+  await student.goto(exercise());
+  await expect(student.locator('.monaco-editor').first()).toBeVisible({ timeout: 90_000 });
+  // The teacher wrote no hints, and the AI's are not shown.
+  await expect(student.getByTestId('open-hints')).toHaveCount(0);
+  await expect(student.locator('body')).not.toContainText('First write down which numbers should be added.');
+  expect((await model(request)).requests.length).toBe(before);
+});
+
+test('the AI teacher analyses the code, explains more simply, then the teacher', async ({ request }) => {
+  const before = (await model(request)).requests.length;
+  await submit(student, SHORT);
+  await expect(student.getByTestId('ai-invite')).toContainText('Want the AI teacher to look at your code?', { timeout: 120_000 });
+  await shot(student, '04-analyze-offer');
+  await student.getByTestId('analyze').click();
+  const card = student.getByTestId('ai-analysis');
+  await expect(card).toContainText('You passed 0 of 4 tests: for input 5 your program printed 10, not 15.');
+  await expect(card).toContainText('stops before n, so the last number is never added.');
+  await expect(student.getByTestId('analysis-line')).toContainText('Line 3');
+  await expect(student.getByTestId('analysis-line')).toContainText('for i in range(1, n):');
+  await expect(student.getByText('2 analyses left for this problem today')).toBeVisible();
+  await shot(student, '05-analysis');
+
+  await student.getByTestId('explain-simpler').click();
+  await expect(student.getByTestId('ai-simpler')).toContainText('Your program forgot the last number.');
+  await expect(student.getByTestId('explain-simpler')).toHaveCount(0);
+  await shot(student, '06-simpler');
+
+  const asked = (await model(request)).requests.slice(before);
+  expect(asked.map((item) => item.kind)).toEqual(['analysis', 'analysis']);
+  const [analysed, simpler] = asked;
+  expect(analysed!.input).toContain('TESTS: passed 0 of 4. Examples: 0 of 2 passed. Hidden tests: 0 of 2 passed.');
+  expect(analysed!.input).toContain('HIDDEN TESTS (their data is secret): 2 failed: 2 printed a number that is too small.');
+  // The library knew this mistake by the tests it fails.
+  expect(analysed!.input).toMatch(/MATCHED MISTAKE[^\n]*:\n- F1 stops before N/);
+  expect(analysed!.input).toContain("TEACHER'S PATH (the intended way, step by step):\n1. First write down which numbers should be added.");
+  expect(simpler!.instructions).toContain('did not understand it');
+  for (const item of asked) {
+    expect(item.store).toBe(false);
+    expect(item.input).toContain('3| for i in range(1, n):');
+    // Never a hidden test, a solution, a name or an id.
+    expect(item.input + item.instructions).not.toMatch(/820|780|Minji|TEACHER SOLUTION|while n > 0/);
+    expect(item.input + item.instructions).not.toContain(room.materialId);
+    expect(item.input + item.instructions).not.toContain(learner.id);
+  }
+
+  await card.getByRole('button', { name: 'Report' }).click();
+  await expect(card).toContainText('Reported. Thank you.');
+  // The third analysis of the day on this problem is the last.
+  await submit(student, SHORT);
+  await student.getByTestId('analyze').click({ timeout: 120_000 });
+  await expect(student.getByTestId('ai-analysis')).toBeVisible();
+  await expect(student.getByTestId('ai-state')).toContainText("used today's AI analyses");
+  await expect(student.getByTestId('explain-simpler')).toHaveCount(0);
+  await submit(student, SHORT);
+  await student.getByTestId('analyze').click({ timeout: 120_000 });
+  await expect(student.getByTestId('ai-state')).toContainText("used today's AI analyses");
+  await expect(student.getByTestId('ai-analysis')).toHaveCount(0);
+  await student.getByTestId('ask-teacher').click();
+  await expect(student.getByTestId('student-help-request')).toContainText(/Requested|requested|waiting/i);
+  await shot(student, '07-limit-and-teacher');
+  expect((await model(request)).requests.length).toBe(before + 3);
+});
+
+test('only the student who submitted can read or ask; their teacher reads the analysis', async () => {
+  const history = await rpc(student, 'learn/listSubmissions', { academyId: author.academy.id, materialId: room.materialId });
+  const ids = (history.body.submissions as { submissionId: string }[]).map((item) => item.submissionId);
+  let id = '';
+  for (const candidate of ids) {
+    if ((await rpc(student, 'learn/getAiHelp', { academyId: author.academy.id, submissionId: candidate })).body.replies.length === 2) id = candidate;
+  }
+  expect(id).not.toBe('');
+  for (const page of [staff, tutorPage]) {
+    expect((await rpc(page, 'learn/getAiHelp', { academyId: author.academy.id, submissionId: id })).status).toBeGreaterThanOrEqual(400);
+    expect((await rpc(page, 'learn/requestAiHelp', { academyId: author.academy.id, submissionId: id, locale: 'en', requestId: crypto.randomUUID() })).status).toBeGreaterThanOrEqual(400);
+  }
+  // A student may read neither the library nor the operator's numbers.
+  expect((await rpc(student, 'aiAssistant/getLibrary', { academyId: author.academy.id, courseId: room.courseId, materialId: room.materialId })).status).toBeGreaterThanOrEqual(400);
+  expect((await rpc(student, 'aiAssistant/platformUsage', {})).status).toBeGreaterThanOrEqual(400);
+  expect((await rpc(staff, 'aiAssistant/platformUsage', {})).status).toBeGreaterThanOrEqual(400);
+
+  await tutorPage.goto(routes.academyTeachSubmission(author.academy.slug, room.classes[0]!.id, room.studentMembershipId, id));
+  const replies = tutorPage.getByTestId('review-ai-replies');
+  await expect(replies).toContainText('AI teacher on this attempt', { timeout: 120_000 });
+  await expect(replies).toContainText('You passed 0 of 4 tests');
+  await expect(replies).toContainText('Explained more simply');
+  await expect(replies).toContainText('Reported by the student');
+  await shot(tutorPage, '08-teacher-review');
+});
+
+test("a teacher's edit changes what the AI teacher is told; a hidden mistake is not used", async () => {
+  await staff.reload();
+  await staff.getByTestId('open-ai-library').click({ timeout: 90_000 });
+  const panel = staff.getByTestId('ai-library');
+  await expect(panel).toContainText('failed submissions · 1 student');
+  const mistake = panel.getByTestId('ai-library-item').filter({ hasText: 'stops before N' });
+  await mistake.getByRole('button', { name: 'Edit', exact: true }).click();
+  await mistake.getByRole('textbox', { name: 'Korean' }).fill('선생님 수정: n까지 더해야 해요. 반복은 어디까지 가나요?');
+  await mistake.getByRole('textbox', { name: 'English' }).fill('Teacher edit: n must be added too. Where does your loop go?');
+  await mistake.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(panel.getByTestId('ai-library-item').filter({ hasText: 'Teacher edit' })).toContainText('Edited by staff');
+  await panel.getByTestId('ai-library-item').filter({ hasText: 'starts at two' }).getByRole('button', { name: 'Hide', exact: true }).click();
+  await expect(panel.getByTestId('ai-library-item').filter({ hasText: 'starts at two' })).toContainText('Hidden');
+  await shot(staff, '09-teacher-edit');
+});
+
+test('Korean, a hidden-only failure, code in an answer, a broken model and a pass', async ({ browser, request }) => {
+  // Another student, in Korean, so their limits are their own.
+  const page = await enter(browser, other, 'ko');
+  await setAi(request, { enabled: true, enrollFixtureId: other.id, classId: room.classes[0]!.id });
+  await page.goto(exercise());
+  await submit(page, HIDDEN_ONLY);
+  let before = (await model(request)).requests.length;
+  await page.getByTestId('analyze').click({ timeout: 120_000 });
+  await expect(page.getByTestId('ai-analysis')).toContainText('숨겨진 테스트에서 너무 작은 수를 출력했어요.');
+  await expect(page.getByTestId('ai-invite')).toHaveCount(0);
+  const [hidden] = (await model(request)).requests.slice(before);
+  expect(hidden!.instructions).toContain('해요체');
+  expect(hidden!.input).toContain('Examples: 2 of 2 passed. Hidden tests: 0 of 2 passed.');
+  expect(hidden!.input).toContain('HIDDEN TESTS (their data is secret): 2 failed: 2 printed a number that is too small.');
+  expect(hidden!.input).not.toMatch(/820|"40"|FAILED EXAMPLES/);
+  await shot(page, '10-korean-hidden');
+
+  // The teacher's edit is what the AI teacher now reads; the hidden mistake is gone.
+  await setModel(request, 'code');
+  await submit(page, SHORT);
+  before = (await model(request)).requests.length;
+  await page.getByTestId('analyze').click({ timeout: 120_000 });
+  // An answer with new code in it is never shown.
+  await expect(page.getByTestId('ai-fallback')).toBeVisible();
+  const [edited] = (await model(request)).requests.slice(before);
+  expect(edited!.input).toMatch(/MATCHED MISTAKE[^\n]*:\n- F1 stops before N: 선생님 수정/);
+  expect(edited!.input).not.toContain('starts at two');
+  await expect(page.locator('body')).not.toContainText('range(1, n + 1)');
+
+  // A broken model: a fixed text, the teacher, and everything else still works.
+  await setModel(request, 'fail');
+  await submit(page, SHORT);
+  before = (await model(request)).requests.length;
+  await page.getByTestId('analyze').click({ timeout: 120_000 });
+  await expect(page.getByTestId('ai-fallback')).toBeVisible();
+  await expect(page.getByTestId('ask-teacher')).toBeVisible();
+  // One click is at most one call.
+  expect((await model(request)).requests.length).toBe(before + 1);
+  await shot(page, '11-model-down');
+  await setModel(request, 'ok');
+
+  await submit(page, CORRECT);
+  await expect(page.getByTestId('result-passed')).toContainText('4 / 4', { timeout: 120_000 });
+  await expect(page.getByTestId('learner-help')).toHaveCount(0);
+  await page.context().close();
+});
+
+test('switching the academy off removes AI and keeps the rest', async ({ request }) => {
+  await setAi(request, { enabled: false });
+  await student.goto(exercise());
+  await submit(student, EXTRA_TEXT);
+  await expect(student.getByTestId('rule-explanation')).toBeVisible({ timeout: 120_000 });
+  await expect(student.getByTestId('analyze')).toHaveCount(0);
+  await setAi(request, { enabled: true });
+});
+
+test('an operator sees counts and cost, and nobody’s words', async ({ browser, request }) => {
+  const admin = await fixture(request, { role: 'ADMIN', legacy: true });
+  const context = await browser.newContext({ baseURL: studio, viewport: { width: 1440, height: 1000 } });
+  await context.addCookies([{ name: 'i18next', value: 'en', url: studio }]);
+  const page = await context.newPage();
+  await page.goto('/login');
+  const password = page.getByLabel('Password', { exact: true });
+  await expect(async () => {
+    if (await password.getAttribute('type') !== 'text') await page.getByRole('button', { name: 'Show password', exact: true }).click();
+    await expect(password).toHaveAttribute('type', 'text');
+  }).toPass({ timeout: 30_000 });
+  await page.getByRole('textbox', { name: /ID|username/i }).fill(admin.username!);
+  await password.fill('LocalLegacyTest123!');
+  await page.getByRole('button', { name: /^(Log in|Sign in)$/i }).click();
+  await expect(page).toHaveURL(/\/admin/);
+  await page.goto('/admin/ai');
+  const main = page.getByRole('main');
+  await expect(main).toContainText('AI assistant', { timeout: 120_000 });
+  await expect(main).toContainText('Student help');
+  await expect(main).toContainText('SSO Browser Academy');
+  await expect(main).toContainText(/\$0\.00\d\d \/ \$1\.00/);
+  await expect(main).not.toContainText('Minji');
+  await expect(main).not.toContainText('left out the last number');
+  await shot(page, '12-operator');
+  await context.close();
+});

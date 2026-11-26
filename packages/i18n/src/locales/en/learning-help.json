@@ -77,13 +77,28 @@
       "try_small": "Try a small input you can work out by hand. What should your program print?",
       "time_limit": "Your program ran too long. Which value should change so the loop can stop?",
       "busy": "The AI teacher is busy. Please try again in a moment."
-    }
+    },
+    "button": "AI help",
+    "button_off": "AI help turns on when something is wrong.",
+    "button_own_input": "Use an example's input, or press Test run.",
+    "checking": "Cove is running your code on the examples…",
+    "examples_passed": "All examples pass. Press Submit to check the rest.",
+    "run_example": "This is Example {{number}}. Expected {{expected}}, you printed {{actual}}.",
+    "from": {
+      "RUN": "after Run",
+      "TEST_RUN": "after Test run",
+      "SUBMIT": "after Submit"
+    },
+    "invite_toolbar": "Need more help? Press ✨ AI help above the result."
   },
   "teacher": {
     "title": "AI teacher on this attempt",
     "body": "What the AI teacher told the student. It can be wrong.",
     "reported": "Reported by the student",
     "analysis": "Analysis",
-    "simpler": "Explained more simply"
+    "simpler": "Explained more simply",
+    "code_title": "AI help after Run and Test run on this problem",
+    "code_body": "Only the examples ran for these answers. Newest first.",
+    "checked_code": "The code it checked"
   }
 }

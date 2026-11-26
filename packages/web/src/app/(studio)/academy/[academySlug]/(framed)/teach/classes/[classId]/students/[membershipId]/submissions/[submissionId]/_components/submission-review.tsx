@@ -179,6 +179,7 @@ export function SubmissionReview({
         <div className="flex flex-col gap-4">
           {review.compileFailed ? <CompileFailure diagnostics={review.compileDiagnostics ?? null} /> : null}
           {review.aiReplies?.length ? <AiReplies replies={review.aiReplies} /> : null}
+          {review.aiCodeReplies?.length ? <AiReplies code replies={review.aiCodeReplies} /> : null}
           <section className="rounded-card border border-border bg-card">
             <h2 className="border-b border-border px-4 py-2.5 text-[13px] font-bold">
               {t('progress.review.cases_heading')}
@@ -269,19 +270,26 @@ function SampleCase({ item }: { item: TeacherReviewCase }) {
   );
 }
 
-/** What the AI assistant told the student about this attempt, in order. */
-function AiReplies({ replies }: { replies: NonNullable<TeacherSubmissionReview['aiReplies']> }) {
+type ReviewAiReply = NonNullable<TeacherSubmissionReview['aiReplies']>[number] & { source?: 'RUN' | 'TEST_RUN'; code?: string };
+
+/**
+ * What the AI assistant told the student about this attempt, in order; or,
+ * with `code`, what it told them after Run and Test run on this problem, each
+ * with the code the server checked (the campus courses design, §6).
+ */
+function AiReplies({ replies, code = false }: { replies: ReviewAiReply[]; code?: boolean }) {
   const { t } = useTranslation('learning-help');
   const locale = useLocale();
   return (
-    <section className="rounded-card border border-border bg-card px-4 py-3.5" data-testid="review-ai-replies">
-      <h2 className="flex items-center gap-2 text-[14px] font-bold"><Sparkles aria-hidden className="size-4 text-brand" />{t('teacher.title')}</h2>
-      <p className="mt-0.5 text-[12.5px] text-sub">{t('teacher.body')}</p>
+    <section className="rounded-card border border-border bg-card px-4 py-3.5" data-testid={code ? 'review-ai-code-replies' : 'review-ai-replies'}>
+      <h2 className="flex items-center gap-2 text-[14px] font-bold"><Sparkles aria-hidden className="size-4 text-brand" />{t(code ? 'teacher.code_title' : 'teacher.title')}</h2>
+      <p className="mt-0.5 text-[12.5px] text-sub">{t(code ? 'teacher.code_body' : 'teacher.body')}</p>
       <ol className="mt-3 space-y-2">
         {replies.map((reply, index) => (
           <li className="rounded-lg border border-border px-3 py-2.5" key={index}>
             <p className="flex flex-wrap items-center gap-2 text-[12px] text-sub">
               <span className="font-bold">{t(reply.level === 2 ? 'teacher.simpler' : 'teacher.analysis')}</span>
+              {reply.source ? <span className="rounded-full bg-brand/10 px-2 py-0.5 font-semibold text-brand">{t(`ai.from.${reply.source}`)}</span> : null}
               <span>{formatDateTime(reply.createdAt, locale, true)}</span>
               {reply.reported ? <span className="rounded-full bg-danger/10 px-2 py-0.5 font-semibold text-danger">{t('teacher.reported')}</span> : null}
             </p>
@@ -300,6 +308,12 @@ function AiReplies({ replies }: { replies: NonNullable<TeacherSubmissionReview['
             ) : (
               <p className="mt-1 whitespace-pre-wrap text-[14px] leading-6" lang={reply.locale}>{reply.text}</p>
             )}
+            {reply.code ? (
+              <details className="mt-2">
+                <summary className="cursor-pointer text-[12.5px] font-semibold text-sub">{t('teacher.checked_code')}</summary>
+                <pre className="mt-1.5 overflow-x-auto rounded-lg bg-canvas px-3 py-2 font-mono text-[12.5px] leading-5">{reply.code}</pre>
+              </details>
+            ) : null}
           </li>
         ))}
       </ol>

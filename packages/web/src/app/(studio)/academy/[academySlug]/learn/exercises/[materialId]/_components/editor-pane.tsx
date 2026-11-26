@@ -60,6 +60,8 @@ export function EditorPane({
   starterCode,
   compileDiagnostics = null,
   renderHelp,
+  aiHelpButton = null,
+  aboveOutput = null,
 }: {
   onRunAll: () => void;
   onStop: () => void;
@@ -100,6 +102,10 @@ export function EditorPane({
   compileDiagnostics?: string | null;
   /** A learner's help for a failed attempt; only the student's own workspace passes it. */
   renderHelp?: React.ComponentProps<typeof ResultPanel>['renderHelp'];
+  /** The AI help button, last in the toolbar (the campus courses design, §6). */
+  aiHelpButton?: React.ReactNode;
+  /** Shown first in the output, whichever tab: the AI teacher's answer, and what a Run showed. */
+  aboveOutput?: React.ReactNode;
 }) {
   const compiled = isCompiledLanguage(language);
   const { t } = useLayoutTranslation(['learn', 'common']);
@@ -192,6 +198,7 @@ export function EditorPane({
             sampleTestCases={practiceOnly ? [] : sampleTestCases}
           /> : null}
           {!practiceOnly ? <button type="button" disabled={!canSubmit || testingSamples || runner.running || submission.submitting} onClick={onSubmit} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/20 px-2 py-1 text-[12px] text-white disabled:opacity-50"><Send className="size-3" />{t('workspace.submit')}</button> : null}
+          {aiHelpButton}
           {!practiceOnly ? <SubmissionSummary latest={submission.latestSubmission} loading={submission.summaryLoading} failed={submission.summaryError} onRefresh={submission.refreshSummary} refreshing={submission.summaryRefreshing} dark /> : null}
         </div>
         <div
@@ -200,6 +207,7 @@ export function EditorPane({
           id={`workspace-${tab}-panel`}
           role="region"
         >
+          {aboveOutput ? <div className="pt-3">{aboveOutput}</div> : null}
           {tab !== 'result' && (testingSamples || sampleResults.length > 0) ? (
             <div className="space-y-4 p-3 font-mono text-[12px] text-[#d4d4d4]" aria-live="polite">
               {sampleResults.map((result, index) => {

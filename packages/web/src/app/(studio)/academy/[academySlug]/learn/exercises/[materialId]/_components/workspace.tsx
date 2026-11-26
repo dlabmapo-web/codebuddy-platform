@@ -29,12 +29,14 @@ import { useNavigatorPanel } from '@/lib/workspace/use-navigator-panel';
 import { markErrorLine } from '@/lib/workspace/error-line-decoration';
 import { markCompileDiagnostics, runCommandFor } from '@/lib/workspace/exercise-language';
 import { createRunId, runSampleSequence } from '@/lib/workspace/sample-run';
+import { examplesAreWrong, readRun, runIsWrong, type AiHelpTarget, type RunReading } from '@/lib/workspace/ai-help-target';
 import { usePythonRunner } from '@/lib/workspace/use-python-runner';
 import { useSampleRunner, type SampleRun } from '@/lib/workspace/use-sample-runner';
 import { STATEMENT_PANE } from '@/lib/workspace/statement-canvas';
 import { useSplitPane } from '@/lib/workspace/use-split-pane';
 
 import { canSeedCollaboration } from '../_lib/draft-store';
+import { useAiHelp, type AiHelpSubject } from '../_hooks/use-ai-help';
 import { useDraftAutosave } from '../_hooks/use-draft-autosave';
 import { useSolveSession } from '../_hooks/use-solve-session';
 import {
@@ -50,6 +52,7 @@ import {
 } from '../_lib/python-error-lines';
 import { EditorPane, type OutputTab } from './editor-pane';
 import { FeedbackPanel } from './feedback-panel';
+import { AiHelpButton, AiHelpPanel, RunExampleNote } from './ai-help';
 import { LearnerHelp } from './learner-help';
 import { MonitoringIndicator } from './monitoring-indicator';
 import { RequestHelp } from '@/components/monitoring/request-help';
@@ -191,6 +194,25 @@ function ProgrammingWorkspace({
     starterCode: exercise.starterCode,
     historicalCode: selected?.code ?? null,
   });
+
+  /**
+   * AI help (the campus courses design, §6): the latest Run, Test run or
+   * Submit that showed something wrong, and the AI teacher's answer. Decided
+   * in the browser from results it already has, so nothing is sent until the
+   * student presses the button; the server then checks the code itself.
+   */
+  const aiHelp = useAiHelp({ academyId, scope: exercise.materialId });
+  const { clear: clearAiHelp } = aiHelp;
+  const [aiTarget, setAiTarget] = React.useState<AiHelpTarget | null>(null);
+  const [aiOff, setAiOff] = React.useState<'off' | 'own-input'>('off');
+  const [runReading, setRunReading] = React.useState<RunReading | null>(null);
+  const [aiScope, setAiScope] = React.useState(exercise.materialId);
+  if (aiScope !== exercise.materialId) {
+    setAiScope(exercise.materialId);
+    setAiTarget(null);
+    setAiOff('off');
+    setRunReading(null);
+  }
 
   // The student's own half of monitoring: signals out, a generic indicator
   // back. It publishes nothing the student cannot already see, and learns
@@ -362,17 +384,22 @@ function ProgrammingWorkspace({
     setTestingSamples(true);
     setSampleResults([]);
     setSampleRunFailed(false);
+    const ran: SampleRun[] = [];
     try {
       await runSampleSequence(
         exercise.sampleTestCases.length,
         handleRunSample,
         () => !sampleBatchRef.current,
-        (result) => setSampleResults((previous) => [...previous, result]),
+        (result) => {
+          ran.push(result);
+          setSampleResults((previous) => [...previous, result]);
+        },
       );
     } finally {
       sampleBatchRef.current = false;
       setTestingSamples(false);
     }
+    settleExamples(ran);
   };
 
   /**
@@ -387,6 +414,8 @@ function ProgrammingWorkspace({
     setSampleResults([]);
     setSampleRunFailed(false);
     setOutputTab('terminal');
+    setRunReading(null);
+    const ranCode = draft.code;
     const clientRunId = createRunId();
     monitoring.publishRun({
       clientRunId,
@@ -440,6 +469,21 @@ function ProgrammingWorkspace({
       return;
     }
 
+    if (exercise.aiAssistant) {
+      // An error, or an example's input with the wrong output, turns AI help
+      // on; the student's own input leaves it off, as nobody here knows the answer.
+      const reading = readRun({
+        typed: runner.readTranscript().lines.filter((line) => line.kind === 'in').map((line) => line.text),
+        stdout: outcome.stdout, failed: outcome.failed || Boolean(outcome.error), stopped: outcome.stopped,
+        samples: exercise.sampleTestCases, gradingMode: exercise.gradingMode, inputPromptPolicy: exercise.inputPromptPolicy,
+      });
+      setRunReading(reading);
+      setAiTarget(runIsWrong(reading) ? { source: 'RUN', code: ranCode } : null);
+      setAiOff(reading.kind === 'own-input' ? 'own-input' : 'off');
+      // An example now right: an answer about the wrong code is put away.
+      if (reading.kind === 'match') clearAiHelp();
+    }
+
     monitoring.publishRun({
       clientRunId,
       lifecycle: outcome.stopped
@@ -459,7 +503,7 @@ function ProgrammingWorkspace({
             .join('')
         : outcome.stdout,
     });
-  }, [academyId, classId, compiled, draft.code, exercise.gradingRevision, exercise.language, exercise.materialId, exercise.project, formatError, monitoring, runInteractive, runner]);
+  }, [academyId, classId, clearAiHelp, compiled, draft.code, exercise.aiAssistant, exercise.gradingMode, exercise.gradingRevision, exercise.inputPromptPolicy, exercise.language, exercise.materialId, exercise.project, exercise.sampleTestCases, formatError, monitoring, runInteractive, runner]);
 
   /**
    * The mark lives exactly as long as the error does: a new run clears
@@ -483,6 +527,48 @@ function ProgrammingWorkspace({
       runnerError ? headline(runnerError) : undefined,
     );
   }, [editorReady, headline, runnerError]);
+
+  /** A finished Test run, or one example's run: any failure turns AI help on. */
+  const settleExamples = (results: ReadonlyArray<SampleRun | undefined>) => {
+    if (!exercise.aiAssistant) return;
+    const ran = results.filter((result): result is SampleRun => Boolean(result));
+    if (!ran.length) return;
+    const wrong = examplesAreWrong(ran);
+    setAiTarget(wrong ? { source: 'TEST_RUN', code: latestCodeRef.current } : null);
+    setAiOff('off');
+    if (!wrong) clearAiHelp();
+  };
+
+  // A graded Submit, once each: a failed one turns AI help on, a passed one
+  // off. Decided while rendering, as React advises, not in an effect.
+  const submittedCode = submission.submittedCode;
+  const gradedId = submission.submitting ? null : submission.result?.submissionId ?? null;
+  const gradedFailed = submission.result?.status === 'FAILED';
+  const gradedKey = exercise.aiAssistant && gradedId ? `${gradedId}:${gradedFailed}` : null;
+  const [seenGraded, setSeenGraded] = React.useState<string | null>(null);
+  if (gradedKey !== seenGraded) {
+    setSeenGraded(gradedKey);
+    if (gradedKey && gradedId) {
+      setAiTarget(gradedFailed ? { source: 'SUBMIT', submissionId: gradedId, code: submittedCode ?? '' } : null);
+      setAiOff('off');
+      if (!gradedFailed) clearAiHelp();
+    }
+  }
+
+  const pressAiHelp = () => {
+    if (!aiTarget) return;
+    // The graded code still in the editor: that submission, every test. Any
+    // other code: the server runs it on the examples first.
+    const subject: AiHelpSubject = aiTarget.source === 'SUBMIT' && aiTarget.code === draft.code
+      ? { kind: 'submission', submissionId: aiTarget.submissionId }
+      : {
+          kind: 'code', materialId: exercise.materialId, classId, code: draft.code,
+          source: aiTarget.source === 'SUBMIT' ? 'TEST_RUN' : aiTarget.source, workspaceRevision: exercise.gradingRevision,
+        };
+    aiHelp.ask('analyze', subject);
+  };
+  const aiSubject = aiHelp.subject;
+  const aiCode = aiSubject?.kind === 'code' ? aiSubject.code : aiSubject ? submittedCode : null;
 
   const handleSubmit = React.useCallback(() => {
     // The submitted code is the draft, so it is persisted before grading
@@ -780,7 +866,7 @@ function ProgrammingWorkspace({
               compileDiagnostics={marks}
               onFocusLine={handleFocusLine}
               onRun={() => void handleRun()}
-              onRunSample={(index) => void handleRunSample(index)}
+              onRunSample={(index) => void handleRunSample(index).then((result) => settleExamples([result ?? undefined]))}
               // A C/C++ program waiting for input is still running, as in Python.
               serverCheck={{ ...serverCheck, active: serverCheck.active || runner.serverInputWaiting }}
               language={exercise.language}
@@ -789,6 +875,28 @@ function ProgrammingWorkspace({
               sampleTestCases={exercise.sampleTestCases}
               submission={submission}
               tab={outputTab}
+              aiHelpButton={exercise.aiAssistant ? (
+                <AiHelpButton
+                  busy={aiHelp.asking !== null}
+                  enabled={aiTarget !== null && !runner.running && !testingSamples && !submission.submitting}
+                  onPress={pressAiHelp}
+                  reason={aiTarget ? null : aiOff}
+                />
+              ) : null}
+              aboveOutput={exercise.aiAssistant ? (
+                <>
+                  <AiHelpPanel
+                    academyId={academyId}
+                    classId={classId}
+                    code={aiCode}
+                    help={aiHelp}
+                    onFocusLine={aiCode !== null && aiCode === draft.code ? handleFocusLine : undefined}
+                    source={aiSubject ? (aiSubject.kind === 'submission' ? 'SUBMIT' : aiSubject.source) : null}
+                    userId={userId}
+                  />
+                  {outputTab === 'terminal' ? <RunExampleNote reading={runReading} /> : null}
+                </>
+              ) : null}
               renderHelp={(result, graded) => (
                 <LearnerHelp key={result.submissionId} academyId={academyId} aiAssistant={exercise.aiAssistant} classId={classId} userId={userId} result={result}
                   code={graded.code} onFocusLine={graded.onFocusLine} />

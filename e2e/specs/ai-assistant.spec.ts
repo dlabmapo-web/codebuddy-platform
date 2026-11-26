@@ -99,12 +99,12 @@ test('without the academy switch: the error coach works, and no AI', async ({ re
   await submit(student, NAME_ERROR);
   // The coach Cove already had, now after Submit: no AI, the student's own line.
   await expect(student.getByTestId('error-coach')).toContainText('Python does not recognise this name', { timeout: 120_000 });
-  await expect(student.getByTestId('analyze')).toHaveCount(0);
+  await expect(student.getByTestId('ai-help')).toHaveCount(0);
   await shot(student, '01-coach-after-submit');
   // A rule, too, needs no AI, and shows at once.
   await submit(student, EXTRA_TEXT);
   await expect(student.getByTestId('rule-explanation')).toContainText('printed something else', { timeout: 120_000 });
-  await expect(student.getByTestId('analyze')).toHaveCount(0);
+  await expect(student.getByTestId('ai-help')).toHaveCount(0);
   await shot(student, '02-rule-no-ai');
   expect((await model(request)).requests).toEqual([]);
 });
@@ -154,12 +154,62 @@ test('the hint bank teaches the AI teacher, and students never see it', async ({
   expect((await model(request)).requests.length).toBe(before);
 });
 
+test('after Run and Test run: the server checks the examples, and the AI explains from them (the campus courses design, §6)', async ({ request }) => {
+  const before = (await model(request)).requests.length;
+  const terminal = student.locator('#workspace-terminal-panel');
+  const help = student.getByTestId('ai-help');
+  await write(student, SHORT);
+  // Run with Example 1's input: the browser compares, for free, and turns AI help on.
+  await student.getByRole('button', { name: 'Run', exact: true }).click();
+  const input = student.getByRole('textbox', { name: 'Program input', exact: true });
+  await input.fill('5');
+  await input.press('Enter');
+  await expect(student.getByTestId('run-example')).toContainText('This is Example 1. Expected 15, you printed 10.', { timeout: 60_000 });
+  expect((await model(request)).requests.length).toBe(before);
+  await shot(student, '04a-run-example');
+  await help.click();
+  const card = student.getByTestId('ai-analysis');
+  await expect(card).toContainText('Example 1 wants 15, but your program prints 10.', { timeout: 60_000 });
+  await expect(card).toContainText('after Run');
+  await shot(student, '04b-run-ai-help');
+  const [fromRun] = (await model(request)).requests.slice(before);
+  expect(fromRun!.kind).toBe('analysis');
+  expect(fromRun!.input).toContain('only the examples were run');
+  // Only the examples: no hidden test, no hidden count, no solution.
+  expect(fromRun!.input).not.toMatch(/820|HIDDEN TESTS|Hidden tests: \d|TEACHER SOLUTION/);
+  expect(fromRun!.instructions).toContain('Cove ran only the examples.');
+
+  // Test run on the same code: the check and its answer are reused, free.
+  await student.getByRole('button', { name: 'Test run', exact: true }).click();
+  await expect(terminal).toContainText('Test 2', { timeout: 60_000 });
+  await help.click();
+  await expect(student.getByTestId('ai-analysis')).toContainText('Example 1 wants 15', { timeout: 60_000 });
+  expect((await model(request)).requests.length).toBe(before + 1);
+
+  // Their own input: nobody here knows the answer, so AI help stays off.
+  await student.getByRole('button', { name: 'Run', exact: true }).click();
+  await input.fill('7');
+  await input.press('Enter');
+  await expect(terminal).toContainText('21', { timeout: 60_000 });
+  await expect(help).toBeDisabled();
+  await expect(help).toHaveAttribute('title', "Use an example's input, or press Test run.");
+
+  // Right code: Test run passes, and AI help is off again.
+  await write(student, CORRECT);
+  await student.getByRole('button', { name: 'Test run', exact: true }).click();
+  await expect(terminal).toContainText('Test 2 matches the expected output.', { timeout: 60_000 });
+  await expect(help).toBeDisabled();
+  // The answer about the wrong code is put away once the code passes.
+  await expect(student.getByTestId('ai-help-panel')).toHaveCount(0);
+  expect((await model(request)).requests.length).toBe(before + 1);
+});
+
 test('the AI teacher analyses the code, explains more simply, then the teacher', async ({ request }) => {
   const before = (await model(request)).requests.length;
   await submit(student, SHORT);
-  await expect(student.getByTestId('ai-invite')).toContainText('Want the AI teacher to look at your code?', { timeout: 120_000 });
+  await expect(student.getByTestId('ai-invite')).toContainText('Press ✨ AI help', { timeout: 120_000 });
   await shot(student, '04-analyze-offer');
-  await student.getByTestId('analyze').click();
+  await student.getByTestId('ai-help').click();
   const card = student.getByTestId('ai-analysis');
   await expect(card).toContainText('You passed 0 of 4 tests: for input 5 your program printed 10, not 15.');
   await expect(card).toContainText('stops before n, so the last number is never added.');
@@ -195,12 +245,12 @@ test('the AI teacher analyses the code, explains more simply, then the teacher',
   await expect(card).toContainText('Reported. Thank you.');
   // The third analysis of the day on this problem is the last.
   await submit(student, SHORT);
-  await student.getByTestId('analyze').click({ timeout: 120_000 });
+  await student.getByTestId('ai-help').click({ timeout: 120_000 });
   await expect(student.getByTestId('ai-analysis')).toBeVisible();
   await expect(student.getByTestId('ai-state')).toContainText("used today's AI analyses");
   await expect(student.getByTestId('explain-simpler')).toHaveCount(0);
   await submit(student, SHORT);
-  await student.getByTestId('analyze').click({ timeout: 120_000 });
+  await student.getByTestId('ai-help').click({ timeout: 120_000 });
   await expect(student.getByTestId('ai-state')).toContainText("used today's AI analyses");
   await expect(student.getByTestId('ai-analysis')).toHaveCount(0);
   await student.getByTestId('ask-teacher').click();
@@ -232,6 +282,10 @@ test('only the student who submitted can read or ask; their teacher reads the an
   await expect(replies).toContainText('You passed 0 of 4 tests');
   await expect(replies).toContainText('Explained more simply');
   await expect(replies).toContainText('Reported by the student');
+  // And what it said after Run, with the code it checked.
+  const fromCode = tutorPage.getByTestId('review-ai-code-replies');
+  await expect(fromCode).toContainText('after Run');
+  await expect(fromCode).toContainText('Example 1 wants 15');
   await shot(tutorPage, '08-teacher-review');
 });
 
@@ -258,9 +312,8 @@ test('Korean, a hidden-only failure, code in an answer, a broken model and a pas
   await page.goto(exercise());
   await submit(page, HIDDEN_ONLY);
   let before = (await model(request)).requests.length;
-  await page.getByTestId('analyze').click({ timeout: 120_000 });
+  await page.getByTestId('ai-help').click({ timeout: 120_000 });
   await expect(page.getByTestId('ai-analysis')).toContainText('숨겨진 테스트에서 너무 작은 수를 출력했어요.');
-  await expect(page.getByTestId('ai-invite')).toHaveCount(0);
   const [hidden] = (await model(request)).requests.slice(before);
   expect(hidden!.instructions).toContain('해요체');
   expect(hidden!.input).toContain('Examples: 2 of 2 passed. Hidden tests: 0 of 2 passed.');
@@ -272,7 +325,7 @@ test('Korean, a hidden-only failure, code in an answer, a broken model and a pas
   await setModel(request, 'code');
   await submit(page, SHORT);
   before = (await model(request)).requests.length;
-  await page.getByTestId('analyze').click({ timeout: 120_000 });
+  await page.getByTestId('ai-help').click({ timeout: 120_000 });
   // An answer with new code in it is never shown.
   await expect(page.getByTestId('ai-fallback')).toBeVisible();
   const [edited] = (await model(request)).requests.slice(before);
@@ -284,7 +337,7 @@ test('Korean, a hidden-only failure, code in an answer, a broken model and a pas
   await setModel(request, 'fail');
   await submit(page, SHORT);
   before = (await model(request)).requests.length;
-  await page.getByTestId('analyze').click({ timeout: 120_000 });
+  await page.getByTestId('ai-help').click({ timeout: 120_000 });
   await expect(page.getByTestId('ai-fallback')).toBeVisible();
   await expect(page.getByTestId('ask-teacher')).toBeVisible();
   // One click is at most one call.
@@ -303,7 +356,7 @@ test('switching the academy off removes AI and keeps the rest', async ({ request
   await student.goto(exercise());
   await submit(student, EXTRA_TEXT);
   await expect(student.getByTestId('rule-explanation')).toBeVisible({ timeout: 120_000 });
-  await expect(student.getByTestId('analyze')).toHaveCount(0);
+  await expect(student.getByTestId('ai-help')).toHaveCount(0);
   await setAi(request, { enabled: true });
 });
 

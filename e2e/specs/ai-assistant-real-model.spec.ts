@@ -4,9 +4,9 @@ import { expect, test, type APIRequestContext, type Browser, type Page } from '@
 import { routes } from '../../packages/web/src/lib/routes';
 
 /**
- * One student's whole path with the real model, on an invented problem and
+ * The students' whole path with the real model, on an invented problem and
  * invented people. Run by `test-ai-assistant.sh --real-model` only. It costs
- * well under one cent; Cove's own monthly limits are $1 here.
+ * about two cents; Cove's own monthly limits are $1 here.
  */
 const studio = 'http://127.0.0.1:3309';
 const provider = 'http://127.0.0.1:4320';
@@ -14,6 +14,10 @@ const rpcBase = 'http://127.0.0.1:4319/api/rpc/';
 const out = resolve(__dirname, '../../test-results/ai-assistant-real-model');
 const SHORT = 'n = int(input())\ntotal = 0\nfor i in range(1, n):\n    total += i\nprint(total)';
 const MULTIPLY = 'n = int(input())\ntotal = 1\nfor i in range(1, n + 1):\n    total *= i\nprint(total)';
+/** A mistake the written library may well not know: the running total is printed every time. */
+const INSIDE = 'n = int(input())\ntotal = 0\nfor i in range(1, n + 1):\n    total += i\n    print(total)';
+/** The fix, the formula, or a hidden test's expected value (40 → 820). */
+const GIVES_AWAY = /range\(1,\s*n\s*\+\s*1\)|\b820\b|n\s*\*\s*\(n\s*\+\s*1\)/;
 
 type Fixture = { id: string; academy: { id: string; slug: string } };
 type Room = { courseId: string; lectureId: string; materialId: string; classes: { id: string }[] };
@@ -40,7 +44,7 @@ async function rpc(page: Page, method: string, input: object) {
   const response = await page.request.post(rpcBase + method, { headers: { Authorization: `Bearer ${token}` }, data: { json: input } });
   return { status: response.status(), body: (await response.json()).json };
 }
-async function submit(page: Page, code: string) {
+async function write(page: Page, code: string) {
   await expect(page.locator('.monaco-editor').first()).toBeVisible({ timeout: 90_000 });
   await expect.poll(() => page.evaluate((next) => {
     const { monaco } = window as unknown as { monaco?: { editor: { getModels(): { setValue(value: string): void }[] } } };
@@ -48,10 +52,18 @@ async function submit(page: Page, code: string) {
     first?.setValue(next);
     return Boolean(first);
   }, code), { timeout: 60_000 }).toBe(true);
+}
+async function submit(page: Page, code: string) {
+  await write(page, code);
   await page.getByRole('button', { name: /^(Submit|제출)$/ }).first().click();
 }
+/** Presses AI help and waits for an answer or a fixed message. */
+async function askAi(page: Page) {
+  await page.getByTestId('ai-help').click({ timeout: 120_000 });
+  await expect(page.getByTestId('ai-analysis').or(page.getByTestId('ai-fallback')).or(page.getByTestId('ai-examples-passed')).first()).toBeVisible({ timeout: 90_000 });
+}
 
-test('the real model writes a library and analyses students, in English and Korean', async ({ browser, request }) => {
+test('the real model learns a problem, helps after Run, Test run and Submit in English and Korean, and learns a new mistake', async ({ browser, request }) => {
   test.setTimeout(900_000);
   await mkdir(out, { recursive: true });
   const author = await fixture(request, { role: 'lab_head', name: 'Owner Person' });
@@ -85,33 +97,77 @@ test('the real model writes a library and analyses students, in English and Kore
   await expect(one.locator('.monaco-editor').first()).toBeVisible({ timeout: 120_000 });
   await expect(one.getByTestId('open-hints')).toHaveCount(0);
 
-  // 3. An analysis, and once more simply.
-  const answers: Record<string, string[]> = { en: [], ko: [] };
+  const answers: Record<string, string[]> = { run: [], submit: [], simpler: [], testRunKo: [], submitKo: [], newMistake: [] };
   const sections = (page: Page, testId: string) => page.getByTestId(testId).locator('dd').allTextContents();
-  await submit(one, SHORT);
-  await one.getByTestId('analyze').click({ timeout: 120_000 });
-  await expect(one.getByTestId('ai-analysis').or(one.getByTestId('ai-fallback')).first()).toBeVisible({ timeout: 30_000 });
-  if (await one.getByTestId('ai-analysis').isVisible()) {
-    answers.en.push(...await sections(one, 'ai-analysis'));
-    await one.getByTestId('explain-simpler').click();
-    await expect(one.getByTestId('ai-simpler').or(one.getByTestId('ai-fallback')).first()).toBeVisible({ timeout: 30_000 });
-    if (await one.getByTestId('ai-simpler').isVisible()) answers.en.push(...await sections(one, 'ai-simpler'));
-  }
-  await one.screenshot({ path: resolve(out, '3-analysis-en.png') });
+  const keep = async (page: Page, key: string, testId = 'ai-analysis') => {
+    if (await page.getByTestId(testId).isVisible()) answers[key]!.push(...await sections(page, testId));
+    else answers[key]!.push(`(fixed message) ${await page.getByTestId('ai-fallback').textContent().catch(() => '')}`);
+  };
 
+  // 3. Run with Example 1's input: the free note, then AI help from the
+  // server's check of the examples only (the campus courses design, §6).
+  await write(one, SHORT);
+  await one.getByRole('button', { name: 'Run', exact: true }).click();
+  const input = one.getByRole('textbox', { name: 'Program input', exact: true });
+  await input.fill('5');
+  await input.press('Enter');
+  await expect(one.getByTestId('run-example')).toContainText('Expected 15, you printed 10', { timeout: 90_000 });
+  await askAi(one);
+  await keep(one, 'run');
+  await one.screenshot({ path: resolve(out, '3-run-ai-help-en.png') });
+
+  // 4. Submit: every test, then once more simply.
+  await submit(one, SHORT);
+  await askAi(one);
+  await keep(one, 'submit');
+  if (await one.getByTestId('explain-simpler').isVisible()) {
+    await one.getByTestId('explain-simpler').click();
+    await expect(one.getByTestId('ai-simpler').or(one.getByTestId('ai-fallback')).first()).toBeVisible({ timeout: 60_000 });
+    await keep(one, 'simpler', 'ai-simpler');
+  }
+  await one.screenshot({ path: resolve(out, '4-submit-ai-help-en.png') });
+
+  // 5. Korean: Test run, then AI help from the examples.
   await two.goto(exercise);
+  await write(two, MULTIPLY);
+  await two.getByRole('button', { name: /^(Test run|테스트 실행)$/ }).click();
+  await askAi(two);
+  await keep(two, 'testRunKo');
+  await two.screenshot({ path: resolve(out, '5-test-run-ai-help-ko.png') });
   await submit(two, MULTIPLY);
-  await two.getByTestId('analyze').click({ timeout: 120_000 });
-  await expect(two.getByTestId('ai-analysis').or(two.getByTestId('ai-fallback')).first()).toBeVisible({ timeout: 30_000 });
-  if (await two.getByTestId('ai-analysis').isVisible()) answers.ko.push(...await sections(two, 'ai-analysis'));
-  await two.screenshot({ path: resolve(out, '4-analysis-ko.png') });
+  await askAi(two);
+  await keep(two, 'submitKo');
+
+  // 6. A mistake the library may not know: an answer that matched none is
+  // learned from within about a minute (the campus courses design, §7).
+  await write(one, INSIDE);
+  await one.getByRole('button', { name: 'Test run', exact: true }).click();
+  await askAi(one);
+  await keep(one, 'newMistake');
+  await one.screenshot({ path: resolve(out, '6-new-mistake-en.png') });
+  const unmatched = (await rpc(staff, 'aiAssistant/getLibrary', target)).body.mistakes.unmatched as number;
+  const growth: Record<string, unknown> = { unmatchedAnswers: unmatched };
+  if (unmatched > 0) {
+    await expect.poll(async () => ((await (await request.get(`${provider}/testing/ai-model`)).json()).requests as { kind: string }[])
+      .some((item) => item.kind === 'grow'), { timeout: 240_000, intervals: [5_000] }).toBe(true);
+    // Proven by the grader and reviewed, or skipped: the model decides what is new.
+    await expect.poll(async () => (await rpc(staff, 'aiAssistant/getLibrary', target)).body.state, { timeout: 300_000, intervals: [5_000] }).toBe('READY');
+    const grown = ((await rpc(staff, 'aiAssistant/getLibrary', target)).body.items as { origin: string; state: string; label: string; textEn: string; rejectReason: string | null }[])
+      .filter((item) => item.origin === 'GROWN');
+    growth.grown = grown;
+    await staff.reload();
+    await staff.getByTestId('open-ai-library').click({ timeout: 120_000 });
+    await staff.screenshot({ path: resolve(out, '7-library-after-growth.png'), fullPage: true });
+  }
+  await writeFile(resolve(out, 'growth.json'), JSON.stringify(growth, null, 2));
   await writeFile(resolve(out, 'answers.json'), JSON.stringify(answers, null, 2));
 
-  // Most answers get through; a refused one shows a fixed message instead, never code.
-  expect(answers.en.length + answers.ko.length).toBeGreaterThan(0);
-  for (const text of [...answers.en, ...answers.ko]) {
-    // No answer: neither the fix nor the expected sums of the hidden tests.
-    expect(text).not.toMatch(/range\(1,\s*n\s*\+\s*1\)|\b820\b|n\s*\*\s*\(n\s*\+\s*1\)/);
-  }
+  // A refused answer shows a fixed message instead; no answer ever gives the fix away.
+  const all = Object.values(answers).flat();
+  expect(all.filter((text) => !text.startsWith('(fixed message)')).length).toBeGreaterThan(0);
+  for (const text of all) expect(text).not.toMatch(GIVES_AWAY);
+  // After Run and Test run only the examples ran: kept for a reader to judge.
+  await writeFile(resolve(out, 'examples-only-mentions-hidden.json'), JSON.stringify(
+    [...answers.run, ...answers.testRunKo, ...answers.newMistake].filter((text) => /hidden|숨겨진|숨은/i.test(text)), null, 2));
   for (const page of [staff, one, two]) await page.context().close();
 });

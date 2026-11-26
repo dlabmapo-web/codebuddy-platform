@@ -45,6 +45,8 @@ if (aiE2e && process.env.COVE_AI_ASSISTANT_REAL_MODEL === '1' && !aiRealKey) thr
 if (aiE2e) Object.assign(process.env, {
   OPENAI_API_KEY: aiRealKey || 'local-e2e-model-key-never-production', AI_ASSISTANT_ENABLED: 'true', AI_LIBRARY_ENABLED: 'true',
   AI_LIBRARY_HOURS: '0-24', AI_LIBRARY_QUIET_MINUTES: '0', AI_ASSISTANT_MONTHLY_BUDGET_USD: '1', AI_LIBRARY_MONTHLY_BUDGET_USD: '1',
+  // Four answers per problem a day: the browser test's story reaches the limit on the fourth.
+  AI_ASSISTANT_PROBLEM_LIMIT: '4',
 });
 // Nest reads `.env.local` too: an empty key here keeps a developer's out of other suites.
 else process.env.OPENAI_API_KEY = '';
@@ -102,7 +104,7 @@ const aiModel = {
     if (aiModel.mode === 'fail') return Response.json({ error: { message: 'local failure' } }, { status: 503 });
     const reply = kind === 'analysis' ? aiAnalysis(request) : kind === 'library' ? aiLibrary : kind === 'review'
       ? { reviews: request.input.split(/\n\n(?=ITEM )/).slice(1).map(part => ({ id: part.match(/^ITEM (\w+)/)[1], ok: !part.includes('en: Planted'), reason: 'Not true for this program.' })) }
-      : { mistake: null };
+      : { mistakes: [] };
     return Response.json({ status: 'completed', model: request.model, output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(reply) }] }], usage: { input_tokens: 900, output_tokens: 90 } });
   },
 };
@@ -112,6 +114,9 @@ function aiAnalysis({ instructions, input }) {
   const item = input.match(/MATCHED MISTAKE[^\n]*:\n- (F\d+)/)?.[1] ?? null;
   const line = 3;
   if (aiModel.mode === 'code') return { item: null, result: 'Your loop stops early.', line, why: 'It stops before n.', think: 'Change it to `for i in range(1, n + 1):` and it works.', tryIt: null, alsoCheck: null };
+  // After Run or Test run only the examples ran (the campus courses design, §6).
+  if (input.includes('only the examples were run') && !simpler && !korean) return { item, result: 'Example 1 wants 15, but your program prints 10.', line,
+    why: '`for i in range(1, n):` stops before n, so 5 is never added.', think: 'Where should the loop stop so that n is added too?', tryIt: 'Try 3 by hand.', alsoCheck: null };
   if (simpler) return korean
     ? { item, result: '마지막 수를 빼먹었어요.', line, why: '반복이 한 번 일찍 끝나요.', think: '어떤 수가 빠졌을까요?', tryIt: null, alsoCheck: null }
     : { item, result: 'Your program forgot the last number.', line, why: 'The loop stops one step too early.', think: 'Which number is missing?', tryIt: null, alsoCheck: null };
@@ -412,7 +417,7 @@ const server = createServer(async (req, res) => {
         people[key] = { id, membershipId: membership?.id };
       }
       const owner = people.ai_manager.id;
-      const course = await db.course.create({ data: { academyId: academy.id, title: 'Python with AI help', isVisible: true, createdByUserId: owner } });
+      const course = await db.course.create({ data: { academyId: academy.id, title: 'Python with AI help', isVisible: true, aiTeacherEnabled: true, createdByUserId: owner } });
       const module = await db.courseModule.create({ data: { courseId: course.id, title: 'Loops', externalKey: randomUUID(), position: 1, isVisible: true } });
       const lecture = await db.lecture.create({ data: { courseModuleId: module.id, title: 'Adding numbers', externalKey: randomUUID(), position: 1, isVisible: true } });
       // The stand-in model knows only the first problem, so the others need the real one.
@@ -478,7 +483,9 @@ const server = createServer(async (req, res) => {
           testCases: { create: [['5', '15', 'SAMPLE'], ['3', '6', 'SAMPLE'], ['40', '820', 'HIDDEN'], ['1', '1', 'HIDDEN']]
             .map(([input, expectedOutput, visibility], index) => ({ position: index + 1, input, expectedOutput, visibility })) },
         } });
-        await db.material.update({ where: { id: input.materialId }, data: { title: 'Sum from 1 to N' } });
+        const material = await db.material.update({ where: { id: input.materialId }, data: { title: 'Sum from 1 to N' }, select: { lecture: { select: { courseModule: { select: { courseId: true } } } } } });
+        // A course that includes the AI teacher (the campus courses design, §4).
+        await db.course.update({ where: { id: material.lecture.courseModule.courseId }, data: { aiTeacherEnabled: true } });
       }
       return json(res, { ok: true });
     }

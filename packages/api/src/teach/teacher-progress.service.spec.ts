@@ -439,7 +439,8 @@ describe("getSubmissionReview", () => {
     const review = await service.getSubmissionReview(identity, { academyId, classId, membershipId: alice.membershipId, submissionId: submission.id });
     expect(review.cases.map((item) => item.pythonError)).toEqual([{ type: "NameError", message: "name 'x' is not defined", line: 2 }, null]);
     expect(findAiReplies).toHaveBeenCalledWith({ userId: alice.userId, submissionId: submission.id });
-    expect(review.aiReplies).toEqual([{ level: 1, text: "Where is x made?", locale: "en", reported: true, createdAt: "2026-11-25T01:00:00.000Z" }]);
+    // A reply saved before the Analyze sections existed has none to show.
+    expect(review.aiReplies).toEqual([{ level: 1, text: "Where is x made?", analysis: null, locale: "en", reported: true, createdAt: "2026-11-25T01:00:00.000Z" }]);
     expect(teacherSubmissionReviewSchema.safeParse(review).success).toBe(true);
   });
 

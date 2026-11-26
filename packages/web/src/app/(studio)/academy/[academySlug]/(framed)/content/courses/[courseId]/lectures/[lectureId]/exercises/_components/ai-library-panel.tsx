@@ -84,7 +84,7 @@ export function AiLibraryPanel({ academyId, courseId, materialId, editable }: Ta
       ) : (
         <div className="space-y-5" data-testid="ai-library">
           <div className="space-y-1 text-[14px]" role="status">
-            <p className={view.enabled ? 'font-semibold' : 'text-sub'}>{view.enabled ? t(`state.${view.state}`) : t('off')}</p>
+            <p className={view.enabled ? 'font-semibold' : 'text-sub'}>{view.enabled ? t(`state.${view.state}`) : view.blocked ? t(`blocked.${view.blocked}`) : t('off')}</p>
             <LibraryError code={view.errorCode} ready={view.state === 'READY'} />
             {!view.current && view.items.some((item) => item.state === 'ACTIVE') ? <p className="text-warning">{t('stale')}</p> : null}
             {asking === 'failed' ? <p className="text-danger">{t('regenerate_failed')}</p> : null}

@@ -16,7 +16,12 @@
     "submit": "만들고 열기",
     "submitting": "만드는 중…",
     "title_conflict": "같은 제목의 코스가 이미 있습니다. 다른 제목을 사용하세요.",
-    "next_step": "다음에 만들 것"
+    "next_step": "다음에 만들 것",
+    "ai_label": "AI 선생님",
+    "ai_off": "포함하지 않음",
+    "ai_off_hint": "이 과목에서는 학생이 AI 도움을 받지 않아요.",
+    "ai_on": "포함",
+    "ai_on_hint": "AI가 필요한 문제에서 AI를 켜세요. 문제를 저장하면 AI가 바로 그 문제를 배워요."
   },
   "column": {
     "course": "코스",

@@ -112,6 +112,7 @@ export function ExerciseWorkspace({
           onImageUpload={uploadImage}
           update={update}
           courseLanguage={initialContext.course.language}
+          aiTeacher={initialContext.course.aiTeacherEnabled}
           onLanguageChange={(language) => {
             const next = withLanguage(draft, language);
             update('language', next.language);
@@ -177,7 +178,7 @@ export function ExerciseWorkspace({
           <div className="mt-4 space-y-5">{assessmentEditors}</div>
         </details>
         {/* Its own section: nothing in it has to be filled in, so it stays out of the required box. */}
-        {authoring.savedMaterialId ? (
+        {authoring.savedMaterialId && initialContext.course.aiTeacherEnabled ? (
           <AiLibraryPanel academyId={academyId} courseId={courseId} editable={editable} materialId={authoring.savedMaterialId} />
         ) : null}
         </>}

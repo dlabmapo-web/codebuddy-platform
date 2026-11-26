@@ -88,6 +88,34 @@ export function CourseModal({ manager }: { manager: CoursesManagerState }) {
               value={manager.language}
             />
 
+            {manager.aiTeacherAvailable ? (
+              <fieldset className="grid gap-1.5">
+                <legend className="mb-1.5 text-[14px] font-bold">{t('create.ai_label')}</legend>
+                {([false, true] as const).map((included) => (
+                  <label
+                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-card px-3 py-2.5 transition-colors hover:border-brand/50 has-[:checked]:border-brand has-[:checked]:ring-2 has-[:checked]:ring-brand/20"
+                    key={String(included)}
+                  >
+                    <input
+                      checked={manager.aiTeacher === included}
+                      className="mt-1 size-4 accent-brand"
+                      name="ai-teacher"
+                      onChange={() => manager.setAiTeacher(included)}
+                      type="radio"
+                    />
+                    <span>
+                      <span className="block text-[14px] font-semibold">
+                        {t(included ? 'create.ai_on' : 'create.ai_off')}
+                      </span>
+                      <span className="mt-0.5 block text-[12.5px] leading-5 text-sub">
+                        {t(included ? 'create.ai_on_hint' : 'create.ai_off_hint')}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+            ) : null}
+
             {editing ? null : (
               <CoursePathPreview
                 labels={[

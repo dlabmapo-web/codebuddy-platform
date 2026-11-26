@@ -19,17 +19,20 @@ import { CourseModal } from './course-modal';
 
 export function CoursesManager({
   academyId,
+  aiTeacherAvailable = false,
   canEdit,
   initialCourses,
 }: {
   academyId: string;
+  /** The academy has the AI teacher: Python courses may include it. */
+  aiTeacherAvailable?: boolean;
   canEdit: boolean;
   initialCourses: CourseSummary[];
 }) {
   const { t } = useLayoutTranslation(['courses', 'common']);
   const { t: library } = useTranslation('academy-library');
   const errorText = useErrorText();
-  const manager = useCoursesManager({ academyId, initialCourses });
+  const manager = useCoursesManager({ academyId, initialCourses, aiTeacherAvailable });
   const contentPaths = useContentBasePath();
   // Adopting is the academy's own act, so the way in is offered only where an
   // academy is standing: the console reaches the library through its own rail.

@@ -35,10 +35,13 @@ export function BasicInformation({
   update,
   courseLanguage = 'PYTHON',
   onLanguageChange,
+  aiTeacher = false,
 }: {
   authoring: ExerciseAuthoring;
   draft: ExerciseDraft;
   editable: boolean;
+  /** The course includes the AI teacher: only then does a problem have its own AI switch. */
+  aiTeacher?: boolean;
   /** A C/C++ course's problems each choose C or C++. */
   courseLanguage?: CourseLanguage;
   onLanguageChange?: (language: 'C' | 'CPP') => void;
@@ -180,7 +183,7 @@ export function BasicInformation({
         </span>
       </label>
 
-      {!draft.quiz ? (
+      {aiTeacher && !draft.quiz ? (
       <label className="flex items-start gap-3 rounded-lg border border-border bg-canvas p-4">
         <input
           checked={draft.aiFeedbackEnabled}

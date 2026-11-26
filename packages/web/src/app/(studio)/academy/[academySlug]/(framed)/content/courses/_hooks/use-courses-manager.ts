@@ -14,9 +14,12 @@ import { academyCoursesQueryKey } from '../_lib/courses-query';
 export function useCoursesManager({
   academyId,
   initialCourses,
+  aiTeacherAvailable = false,
 }: {
   academyId: string;
   initialCourses: CourseSummary[];
+  /** The academy has the AI teacher, so a Python course may include it. */
+  aiTeacherAvailable?: boolean;
 }) {
   const contentPaths = useContentBasePath();
   const queryClient = useQueryClient();
@@ -26,6 +29,8 @@ export function useCoursesManager({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [language, setLanguage] = useState<CourseLanguage>('PYTHON');
+  // Not included unless chosen (the campus courses design, §4).
+  const [aiTeacher, setAiTeacher] = useState(false);
   const queryKey = academyCoursesQueryKey(academyId);
 
   const coursesQuery = useQuery({
@@ -46,11 +51,15 @@ export function useCoursesManager({
 
   const createMutation = useMutation({
     mutationFn: () =>
-      orpc.academyCourses.create({ academyId, title, description, language }),
+      orpc.academyCourses.create({
+        academyId, title, description, language,
+        aiTeacherEnabled: aiTeacherAvailable && language === 'PYTHON' && aiTeacher,
+      }),
     onSuccess: async (course) => {
       setTitle('');
       setDescription('');
       setLanguage('PYTHON');
+      setAiTeacher(false);
       setShowCreate(false);
       await queryClient.invalidateQueries({ queryKey });
       openCourse(course);
@@ -66,6 +75,8 @@ export function useCoursesManager({
         description,
         // Sent only while it can change, so a rename never trips the rule.
         ...(languageLocked ? {} : { language }),
+        // Sent only where it can be on; the server decides it again.
+        ...(aiTeacherAvailable ? { aiTeacherEnabled: language === 'PYTHON' && aiTeacher } : {}),
       }),
     onSuccess: async () => {
       setEditingId(null);
@@ -105,6 +116,7 @@ export function useCoursesManager({
     setTitle('');
     setDescription('');
     setLanguage('PYTHON');
+    setAiTeacher(false);
   };
 
   /**
@@ -131,6 +143,7 @@ export function useCoursesManager({
       setTitle('');
       setDescription('');
       setLanguage('PYTHON');
+      setAiTeacher(false);
       setShowCreate(true);
     },
     openEdit: (course: CourseSummary) => {
@@ -139,6 +152,7 @@ export function useCoursesManager({
       setTitle(course.title);
       setDescription(course.description);
       setLanguage(course.language);
+      setAiTeacher(course.aiTeacherEnabled ?? false);
     },
     closeForm,
     title,
@@ -147,6 +161,10 @@ export function useCoursesManager({
     setDescription,
     language,
     setLanguage,
+    /** Shown only for a Python course in an academy with the AI teacher. */
+    aiTeacherAvailable: aiTeacherAvailable && language === 'PYTHON',
+    aiTeacher,
+    setAiTeacher,
     /** Fixed once the course being edited holds a problem. */
     languageLocked,
     submit: () =>

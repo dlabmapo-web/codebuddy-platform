@@ -9,7 +9,7 @@ import {
 } from '@/i18n/namespaces';
 import { getLocale } from '@/i18n/server/get-locale';
 import { getServerTranslation } from '@/i18n/server/get-server-translation';
-import { createServerORPCClient } from '@/lib/orpc-server';
+import { createServerORPCClient, getAcademyFeatures } from '@/lib/orpc-server';
 import {
   canManageContent,
 } from '@/lib/academy-access-state';
@@ -28,12 +28,18 @@ export async function StaffCoursesPage({
   const { t } = await getServerTranslation(['courses']);
   let courses = null;
   let canEdit = false;
+  let aiTeacherAvailable = false;
 
   try {
     const client = createServerORPCClient();
-    const result = await client.academyCourses.list({ academyId });
+    // The features are the studio chrome's own read, shared through `cache`.
+    const [result, features] = await Promise.all([
+      client.academyCourses.list({ academyId }),
+      getAcademyFeatures(academyId).catch(() => ({ features: [] })),
+    ]);
     courses = result.courses;
     canEdit = canManageContent(roles);
+    aiTeacherAvailable = features.features.some((item) => item.feature === 'AI_ASSISTANT' && item.isEnabled);
   } catch {
     // The permission-aware state is rendered below.
   }
@@ -68,6 +74,7 @@ export async function StaffCoursesPage({
       {courses ? (
         <CoursesManager
           academyId={academyId}
+          aiTeacherAvailable={aiTeacherAvailable}
           canEdit={canEdit}
           initialCourses={courses}
         />

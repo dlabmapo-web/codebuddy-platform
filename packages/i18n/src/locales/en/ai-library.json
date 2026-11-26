@@ -6,8 +6,8 @@
   "failed": "The AI library could not be loaded.",
   "retry": "Try again",
   "state": {
-    "NONE": "Not written yet. Cove writes it at night, once editing has stopped.",
-    "WAITING": "Waiting to be written.",
+    "NONE": "Not learned yet. The AI starts right after you save the problem.",
+    "WAITING": "Starts in a moment.",
     "WRITING": "AI is writing it.",
     "CHECKING": "Cove is running the test programs.",
     "REVIEWING": "A second AI check is reading it.",
@@ -78,5 +78,16 @@
     "EXTRA": "More mistakes than a library keeps",
     "review": "Second check: {{reason}}",
     "other": "Dropped ({{code}})"
+  },
+  "blocked": {
+    "FEATURE_OFF": "The AI teacher is not on for this academy.",
+    "COURSE_OFF": "This course does not include the AI teacher. Turn it on in the course settings.",
+    "PROBLEM_OFF": "AI is off for this problem. Turn on \"AI teacher for this problem\" above.",
+    "LANGUAGE": "The AI teacher works on Python problems only, for now.",
+    "QUIZ": "The AI teacher does not work on quiz problems.",
+    "MANUAL": "The AI teacher needs automatic grading.",
+    "PROJECT": "Multi-file problems are not supported yet.",
+    "EXAM": "The AI teacher does not work in exam lectures.",
+    "NO_EXAMPLE": "Add at least one example test, so the AI can learn this problem."
   }
 }

@@ -17,7 +17,12 @@
     "submit": "Create and open",
     "submitting": "Creating…",
     "title_conflict": "Another course already uses this title. Pick a different one.",
-    "next_step": "What you build next"
+    "next_step": "What you build next",
+    "ai_label": "AI teacher",
+    "ai_off": "Not included",
+    "ai_off_hint": "Students get no AI help in this course.",
+    "ai_on": "Included",
+    "ai_on_hint": "Turn AI on for the problems that need it. The AI learns each one right after you save it."
   },
   "column": {
     "course": "Course",

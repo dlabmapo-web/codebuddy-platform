@@ -251,7 +251,7 @@ export class AiHelpService {
     this.active += 1;
     try {
       const answer = await withDeadline(settings.timeoutMs, (signal) => this.model.complete({
-        model: settings.model, effort: settings.effort, instructions: prompt.instructions, content: prompt.content,
+        model: settings.model, effort: settings.effort, serviceTier: settings.serviceTier, instructions: prompt.instructions, content: prompt.content,
         schema: analysisAnswerSchema, maxOutputTokens: settings.maxOutputTokens,
       }, signal));
       const paid = { inputTokens: answer.inputTokens, outputTokens: answer.outputTokens, costMicros: costMicros(answer, settings.price), model: answer.model };

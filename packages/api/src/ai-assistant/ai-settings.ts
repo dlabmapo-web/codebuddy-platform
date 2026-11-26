@@ -1,16 +1,18 @@
 import type { ConfigService } from "@nestjs/config";
 
 import type { ApiEnvironment } from "../config/env.schema.js";
-import type { AiEffort } from "./ai-model.js";
+import type { AiEffort, AiServiceTier } from "./ai-model.js";
 
 /** The assistant's settings, read once per use so a test can change them. */
 export function aiSettings(config: ConfigService<ApiEnvironment, true>) {
   const get = <K extends keyof ApiEnvironment>(key: K) => config.get(key, { infer: true }) as ApiEnvironment[K];
+  const tier = (value: string | undefined): AiServiceTier => value === "fast" ? "fast" : "default";
   return {
     help: {
       enabled: get("AI_ASSISTANT_ENABLED") === true,
       model: get("AI_ASSISTANT_MODEL"),
       effort: get("AI_ASSISTANT_EFFORT") as AiEffort,
+      serviceTier: tier(get("AI_ASSISTANT_SERVICE_TIER")),
       timeoutMs: get("AI_ASSISTANT_TIMEOUT_MS"),
       maxOutputTokens: get("AI_ASSISTANT_MAX_OUTPUT_TOKENS"),
       concurrency: get("AI_ASSISTANT_CONCURRENCY"),
@@ -24,6 +26,7 @@ export function aiSettings(config: ConfigService<ApiEnvironment, true>) {
       enabled: get("AI_LIBRARY_ENABLED") === true,
       model: get("AI_LIBRARY_MODEL"),
       effort: get("AI_LIBRARY_EFFORT") as AiEffort,
+      serviceTier: tier(get("AI_LIBRARY_SERVICE_TIER")),
       budgetMicros: get("AI_LIBRARY_MONTHLY_BUDGET_USD") * 1_000_000,
       price: { inputUsdPerMtok: get("AI_LIBRARY_INPUT_USD_PER_MTOK"), outputUsdPerMtok: get("AI_LIBRARY_OUTPUT_USD_PER_MTOK") },
       hours: get("AI_LIBRARY_HOURS"),

@@ -1,18 +1,23 @@
 import { academyLocalDate } from "@cove/shared";
 
 import type { AiUsageKind, Prisma } from "../generated/prisma/client.js";
+import type { AiUsage } from "./ai-model.js";
 
 /** The first day of this month in Seoul, as the usage table keys it. */
 export function usageMonth(now = new Date()): string {
   return `${academyLocalDate(now).slice(0, 7)}-01`;
 }
 
-/** Millionths of a dollar, rounded up so a limit is never undercounted. */
+/** OpenAI's Fast mode costs twice the standard rate, input and output alike. */
+const FAST_PRICE_FACTOR = 2;
+
+/** Millionths of a dollar, rounded up so a limit is never undercounted. The prices are standard-tier prices. */
 export function costMicros(
-  usage: { inputTokens: number; outputTokens: number },
+  usage: AiUsage,
   price: { inputUsdPerMtok: number; outputUsdPerMtok: number },
 ): number {
-  return Math.ceil(usage.inputTokens * price.inputUsdPerMtok + usage.outputTokens * price.outputUsdPerMtok);
+  const factor = usage.serviceTier === "fast" ? FAST_PRICE_FACTOR : 1;
+  return Math.ceil((usage.inputTokens * price.inputUsdPerMtok + usage.outputTokens * price.outputUsdPerMtok) * factor);
 }
 
 export async function readMonthCost(

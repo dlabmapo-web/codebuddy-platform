@@ -115,6 +115,28 @@ describe.skipIf(!databaseUrl)("AI libraries, end to end", () => {
     expect(await f.prisma.aiLibraryItem.count({ where: { materialId: { in: created }, origin: "COPY" } })).toBeGreaterThan(0);
   });
 
+  it("writes and reviews five libraries at the same time, and says while work is under way", async () => {
+    const created = await Promise.all([1, 2, 3, 4, 5].map(() => f.createExercise()));
+    let active = 0;
+    let most = 0;
+    const slow = new FakeModelClient(async (request) => {
+      active += 1;
+      most = Math.max(most, active);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      active -= 1;
+      return request.schema.name === "library" ? write() : approve(request);
+    });
+    const parallel = new AiLibraryJobService(f.prisma, f.config, slow, f.queue);
+    expect(await parallel.pass()).toBe(true);
+    expect(most).toBe(5);
+    await f.runChecks();
+    most = 0;
+    expect(await parallel.pass()).toBe(true);
+    expect(most).toBe(5);
+    expect(await f.prisma.aiLibrary.count({ where: { materialId: { in: created }, state: "READY" } })).toBe(5);
+    expect(await parallel.pass()).toBe(false);
+  });
+
   it("sends the teacher's solution while writing, and never a hidden test or a person", async () => {
     await f.createExercise();
     await cycle();

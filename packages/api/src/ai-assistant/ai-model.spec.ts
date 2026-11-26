@@ -5,7 +5,7 @@ import { withinHours } from "./ai-settings.js";
 import { costMicros, usageMonth } from "./usage.js";
 
 const request: AiModelRequest = {
-  model: "m", effort: "none", instructions: "i", content: "secret code", maxOutputTokens: 100,
+  model: "m", effort: "none", serviceTier: "default", instructions: "i", content: "secret code", maxOutputTokens: 100,
   schema: { name: "help", schema: { type: "object" } },
 };
 const body = (over: object = {}) => ({
@@ -16,14 +16,26 @@ const client = (response: Response | Error) => {
   const send = vi.fn(async () => { if (response instanceof Error) throw response; return response; });
   return { send, client: new OpenAiModelClient("sk-test-0000000000000000", send as never) };
 };
-const run = (c: OpenAiModelClient) => c.complete(request, new AbortController().signal);
+const run = (c: OpenAiModelClient, over: Partial<AiModelRequest> = {}) => c.complete({ ...request, ...over }, new AbortController().signal);
+const sentBody = (send: ReturnType<typeof vi.fn>) => JSON.parse((send.mock.calls[0] as unknown as [string, { body: string }])[1].body);
 
 describe("OpenAiModelClient", () => {
   it("sends a private request and parses the answer", async () => {
-    const { send, client: c } = client(Response.json(body()));
-    expect(await run(c)).toEqual({ json: { reply: "hi" }, inputTokens: 10, outputTokens: 5, model: "m-1" });
-    const sent = JSON.parse((send.mock.calls[0] as unknown as [string, { body: string }])[1].body);
-    expect(sent).toMatchObject({ store: false, model: "m", reasoning: { effort: "none" }, text: { format: { type: "json_schema", strict: true } } });
+    const { send, client: c } = client(Response.json(body({ service_tier: "default" })));
+    expect(await run(c)).toEqual({ json: { reply: "hi" }, inputTokens: 10, outputTokens: 5, serviceTier: "default", model: "m-1" });
+    expect(sentBody(send)).toMatchObject({
+      store: false, model: "m", reasoning: { effort: "none" }, service_tier: "default", text: { format: { type: "json_schema", strict: true } },
+    });
+  });
+  it.each([
+    ["fast", "fast", "fast"],
+    ["fast, moved to default by OpenAI", "default", "default"],
+    ["fast, under its old name", "priority", "fast"],
+    ["fast, not reported", undefined, "fast"],
+  ])("bills a request sent %s at the tier OpenAI used", async (_, reported, billed) => {
+    const { send, client: c } = client(Response.json(body(reported ? { service_tier: reported } : {})));
+    expect(await run(c, { serviceTier: "fast" })).toMatchObject({ serviceTier: billed });
+    expect(sentBody(send)).toMatchObject({ service_tier: "fast" });
   });
   it.each([401, 429, 500])("reports status %i and nothing from the body", async (status) => {
     const error = await run(client(new Response("sk-leak and secret code", { status })).client).catch((e) => e);
@@ -44,7 +56,7 @@ describe("OpenAiModelClient", () => {
   });
   it("still counts tokens it paid for", async () => {
     const error = await run(client(Response.json(body({ status: "incomplete" }))).client).catch((e) => e);
-    expect(error.usage).toEqual({ inputTokens: 10, outputTokens: 5 });
+    expect(error.usage).toEqual({ inputTokens: 10, outputTokens: 5, serviceTier: "default" });
   });
   it("is unavailable without a key and sends nothing", async () => {
     const send = vi.fn();
@@ -71,6 +83,12 @@ describe("usage", () => {
   it("rounds cost up, so a limit is never undercounted", () => {
     expect(costMicros({ inputTokens: 535, outputTokens: 54 }, { inputUsdPerMtok: 0.1, outputUsdPerMtok: 0.5 })).toBe(81);
     expect(costMicros({ inputTokens: 1, outputTokens: 0 }, { inputUsdPerMtok: 0.1, outputUsdPerMtok: 0.5 })).toBe(1);
+  });
+  it("counts Fast mode at twice the price, and nothing else", () => {
+    const price = { inputUsdPerMtok: 0.1, outputUsdPerMtok: 0.5 };
+    expect(costMicros({ inputTokens: 925, outputTokens: 165, serviceTier: "fast" }, price)).toBe(350);
+    expect(costMicros({ inputTokens: 925, outputTokens: 165, serviceTier: "default" }, price)).toBe(175);
+    expect(costMicros({ inputTokens: 925, outputTokens: 165 }, price)).toBe(175);
   });
   it("starts a month at midnight in Seoul", () => {
     expect(usageMonth(new Date("2026-11-30T14:59:59Z"))).toBe("2026-11-01");

@@ -197,16 +197,24 @@ export const apiEnvironmentSchema = z.object({
   AI_ASSISTANT_EFFORT: z.enum(["none", "low", "medium", "high"]).default("none"),
   AI_ASSISTANT_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(30_000).default(8_000),
   AI_ASSISTANT_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(100).max(4_000).default(400),
-  AI_ASSISTANT_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(8),
+  /**
+   * OpenAI's processing tier. `fast` costs twice as much and answered in about
+   * 1.6 s instead of 2.5 s (measured November 26, 2026); the cost counter
+   * doubles with it.
+   */
+  AI_ASSISTANT_SERVICE_TIER: z.enum(["default", "fast"]).default("fast"),
+  AI_ASSISTANT_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(30),
   AI_ASSISTANT_PROBLEM_LIMIT: z.coerce.number().int().min(1).max(9).default(3),
   AI_ASSISTANT_DAILY_LIMIT: z.coerce.number().int().min(1).max(100).default(10),
-  AI_ASSISTANT_MONTHLY_BUDGET_USD: z.coerce.number().min(0).max(1_000).default(5),
+  AI_ASSISTANT_MONTHLY_BUDGET_USD: z.coerce.number().min(0).max(1_000).default(30),
   AI_ASSISTANT_INPUT_USD_PER_MTOK: z.coerce.number().min(0).max(100).default(0.1),
   AI_ASSISTANT_OUTPUT_USD_PER_MTOK: z.coerce.number().min(0).max(1_000).default(0.5),
   /** Writing libraries. Saved hints still show while it is off. */
   AI_LIBRARY_ENABLED: z.preprocess(v => v === "true" || v === true, z.boolean()).default(false),
   AI_LIBRARY_MODEL: z.string().min(1).max(80).default("gpt-6-luna"),
   AI_LIBRARY_EFFORT: z.enum(["none", "low", "medium", "high"]).default("low"),
+  /** `fast` wrote a library in about 5.6 s instead of 11.5 s, at twice the price. */
+  AI_LIBRARY_SERVICE_TIER: z.enum(["default", "fast"]).default("fast"),
   AI_LIBRARY_MONTHLY_BUDGET_USD: z.coerce.number().min(0).max(1_000).default(10),
   AI_LIBRARY_INPUT_USD_PER_MTOK: z.coerce.number().min(0).max(100).default(0.1),
   AI_LIBRARY_OUTPUT_USD_PER_MTOK: z.coerce.number().min(0).max(1_000).default(0.5),

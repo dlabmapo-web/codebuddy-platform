@@ -1,10 +1,16 @@
 import { z } from "zod";
 
 export type AiEffort = "none" | "low" | "medium" | "high";
+/** OpenAI's processing tier: `fast` answers sooner and costs twice as much. */
+export type AiServiceTier = "default" | "fast";
+
+/** What a call cost in tokens, and the tier OpenAI billed them at (absent: default). */
+export type AiUsage = { inputTokens: number; outputTokens: number; serviceTier?: AiServiceTier };
 
 export type AiModelRequest = {
   model: string;
   effort: AiEffort;
+  serviceTier: AiServiceTier;
   instructions: string;
   content: string;
   /** A strict JSON schema: every object closed and every property required. */
@@ -12,11 +18,9 @@ export type AiModelRequest = {
   maxOutputTokens: number;
 };
 
-export type AiModelAnswer = {
+export type AiModelAnswer = AiUsage & {
   /** The model's JSON, parsed but not yet validated by the caller. */
   json: unknown;
-  inputTokens: number;
-  outputTokens: number;
   model: string;
 };
 
@@ -28,7 +32,7 @@ export class AiModelError extends Error {
     readonly code: AiModelFailure,
     readonly detail: string,
     /** A paid but unusable answer is still paid for. */
-    readonly usage: { inputTokens: number; outputTokens: number } = { inputTokens: 0, outputTokens: 0 },
+    readonly usage: AiUsage = { inputTokens: 0, outputTokens: 0 },
   ) {
     super(`${code}: ${detail}`);
   }
@@ -43,6 +47,7 @@ export abstract class AiModelClient {
 const responseSchema = z.object({
   status: z.string(),
   model: z.string().optional(),
+  service_tier: z.string().nullish(),
   output: z.array(z.object({
     type: z.string(),
     content: z.array(z.object({ type: z.string(), text: z.string().optional() }).loose()).optional(),
@@ -55,6 +60,8 @@ const responseSchema = z.object({
  *
  * `store: false` on every call. No retry: one click is at most one paid call.
  * An error names a status and nothing from the body, which may echo a prompt.
+ * The tier billed is the one OpenAI reports: a `fast` request it moved to
+ * `default` costs the normal price; one it does not report is counted as asked.
  */
 export class OpenAiModelClient extends AiModelClient {
   constructor(
@@ -84,6 +91,7 @@ export class OpenAiModelClient extends AiModelClient {
           input: input.content,
           max_output_tokens: input.maxOutputTokens,
           reasoning: { effort: input.effort },
+          service_tier: input.serviceTier,
           store: false,
           text: { format: { type: "json_schema", strict: true, name: input.schema.name, schema: input.schema.schema } },
         }),
@@ -97,7 +105,12 @@ export class OpenAiModelClient extends AiModelClient {
     }
     const parsed = responseSchema.safeParse(body);
     if (!parsed.success) throw new AiModelError("MALFORMED", "unexpected shape");
-    const usage = { inputTokens: parsed.data.usage.input_tokens, outputTokens: parsed.data.usage.output_tokens };
+    const billed = parsed.data.service_tier ?? input.serviceTier;
+    const usage: AiUsage = {
+      inputTokens: parsed.data.usage.input_tokens, outputTokens: parsed.data.usage.output_tokens,
+      // Fast mode was called priority before July 2026; both cost the same.
+      serviceTier: billed === "fast" || billed === "priority" ? "fast" : "default",
+    };
     if (parsed.data.status !== "completed") throw new AiModelError("MALFORMED", `status ${parsed.data.status.slice(0, 20)}`, usage);
     const text = parsed.data.output
       .filter((item) => item.type === "message")

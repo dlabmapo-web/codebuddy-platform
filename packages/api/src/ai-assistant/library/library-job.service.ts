@@ -11,7 +11,7 @@ import { JudgeQueue, runtimeQueueName } from "../../judge/judge.queue.js";
 import { frozenNativeDescriptor, NativeAdmission } from "../../judge/native-admission.js";
 import { practiceSnapshotSchema } from "../../judge/practice-snapshot.js";
 import { aiSettings, withinHours } from "../ai-settings.js";
-import { AiModelClient, AiModelError, withDeadline, type AiModelRequest } from "../ai-model.js";
+import { AiModelClient, AiModelError, withDeadline, type AiModelRequest, type AiUsage } from "../ai-model.js";
 import { checkLibraryText, plainText } from "../text-check.js";
 import { costMicros, readMonthCost, recordUsage } from "../usage.js";
 import {
@@ -24,10 +24,17 @@ import {
 } from "./library-read.js";
 
 const TICK_MS = 60_000;
+/** While work is under way, the next pass comes this soon instead of at the next minute. */
+const FOLLOW_UP_MS = 10_000;
 const MODEL_TIMEOUT_MS = 150_000;
 const MAX_ATTEMPTS = 3;
 /** One pass starts at most this many; the next tick carries on. */
 const MAX_PER_PASS = 25;
+/**
+ * Libraries written or reviewed at the same moment. Four calls at once took as
+ * long as one (November 26, 2026); OpenAI allows 5,000 a minute.
+ */
+const PARALLEL = 5;
 /** Libraries whose programs may wait in the grader at once, so its night lane stays short. */
 const MAX_CHECKING = 5;
 const MIN_HINTS = 3;
@@ -49,6 +56,8 @@ type ItemVerdict = { id: string; state: "CHECKING" | "REJECTED" | "HIDDEN"; reas
 export class AiLibraryJobService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AiLibraryJobService.name);
   private timer?: ReturnType<typeof setInterval>;
+  private soon?: ReturnType<typeof setTimeout>;
+  private stopped = false;
   private running = false;
   private nativeAdmission?: NativeAdmission;
 
@@ -72,42 +81,73 @@ export class AiLibraryJobService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleDestroy() {
+    this.stopped = true;
     if (this.timer) clearInterval(this.timer);
+    if (this.soon) clearTimeout(this.soon);
   }
 
   async tick(): Promise<void> {
     if (this.running || !this.enabled()) return;
     this.running = true;
+    let busy = false;
     try {
-      await this.pass();
+      busy = await this.pass();
     } catch (error) {
       this.logger.error(`AI library pass failed: ${error instanceof Error ? error.message.slice(0, 200) : "unknown"}`);
     } finally {
       this.running = false;
     }
+    // Libraries are moving (written, reviewed, or programs in the grader): look
+    // again in seconds, not at the next minute. An idle job keeps the minute.
+    if (busy && !this.stopped) {
+      clearTimeout(this.soon);
+      this.soon = setTimeout(() => void this.tick(), FOLLOW_UP_MS);
+      this.soon.unref();
+    }
   }
 
-  /** One pass over everything due. Exposed for tests. */
-  async pass(): Promise<void> {
+  /** One pass over everything due. Exposed for tests. True while work is under way. */
+  async pass(): Promise<boolean> {
     await this.recoverChecks();
     for (const id of await checkedLibraries(this.prisma)) await this.judge(id);
-    for (let i = 0; i < MAX_PER_PASS; i++) {
-      if (await this.overBudget()) break;
-      const claim = await claimLibrary(this.prisma, "REVIEWING", randomUUID());
-      if (!claim) break;
-      await this.review(claim);
-    }
-    if (!withinHours(this.settings().hours)) return;
+    const reviewed = await this.claimAndRun("REVIEWING", MAX_PER_PASS, (claim) => this.review(claim));
+    if (!withinHours(this.settings().hours)) return reviewed.count > 0;
     await queueChangedLibraries(this.prisma, this.settings().quietMinutes);
     const [checking] = await this.prisma.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM ai_libraries WHERE state = 'CHECKING'`;
-    for (let i = 0; i < Math.min(MAX_PER_PASS, MAX_CHECKING - (checking?.n ?? 0)); i++) {
-      if (await this.overBudget()) return;
-      const claim = await claimLibrary(this.prisma, "WAITING", randomUUID());
-      if (!claim) break;
-      await this.write(claim);
-    }
+    const inGrader = checking?.n ?? 0;
+    const written = await this.claimAndRun("WAITING", Math.min(MAX_PER_PASS, MAX_CHECKING - inGrader), (claim) => this.write(claim));
+    const busy = reviewed.count > 0 || written.count > 0 || inGrader > 0;
+    if (written.overBudget) return busy;
     const growth = await claimGrowth(this.prisma, randomUUID());
     if (growth) await this.grow(growth);
+    return busy;
+  }
+
+  /**
+   * Claims up to `limit` due libraries, `PARALLEL` at a time, and works on each
+   * batch at once, so their model calls overlap instead of following each
+   * other. A batch can pass the monthly limit by at most its own calls.
+   */
+  private async claimAndRun(
+    from: "WAITING" | "REVIEWING", limit: number, work: (claim: ClaimedLibrary) => Promise<void>,
+  ): Promise<{ count: number; overBudget: boolean }> {
+    let count = 0;
+    let overBudget = false;
+    let exhausted = false;
+    while (count < limit && !overBudget && !exhausted) {
+      const batch: ClaimedLibrary[] = [];
+      while (batch.length < PARALLEL && count + batch.length < limit) {
+        if (await this.overBudget()) { overBudget = true; break; }
+        const claim = await claimLibrary(this.prisma, from, randomUUID());
+        if (!claim) { exhausted = true; break; }
+        batch.push(claim);
+      }
+      count += batch.length;
+      // Every claim finishes before the pass goes on; the first failure is then reported.
+      const failed = (await Promise.allSettled(batch.map(work))).find((result) => result.status === "rejected");
+      if (failed) throw failed.reason;
+    }
+    return { count, overBudget };
   }
 
   /* ---------------------------------------------------------------- writing */
@@ -436,11 +476,11 @@ export class AiLibraryJobService implements OnModuleInit, OnModuleDestroy {
   /** One paid call, always counted, even when its answer is unusable. */
   private async ask(request: Pick<AiModelRequest, "instructions" | "content" | "schema" | "maxOutputTokens">) {
     const settings = this.settings();
-    const pay = (usage: { inputTokens: number; outputTokens: number }) =>
-      recordUsage(this.prisma, "LIBRARY", { ...usage, costMicros: costMicros(usage, settings.price) });
+    const pay = (usage: AiUsage) =>
+      recordUsage(this.prisma, "LIBRARY", { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, costMicros: costMicros(usage, settings.price) });
     try {
       const answer = await withDeadline(MODEL_TIMEOUT_MS, (signal) =>
-        this.model.complete({ ...request, model: settings.model, effort: settings.effort }, signal));
+        this.model.complete({ ...request, model: settings.model, effort: settings.effort, serviceTier: settings.serviceTier }, signal));
       await pay(answer);
       return answer;
     } catch (error) {

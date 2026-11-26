@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { HttpStatus, Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -13,8 +14,10 @@ import {
   type AiHelpResponse,
   type AiHelpState,
   type AiHelpView,
+  type RequestAiHelpForCodeInput,
   type RequestAiHelpInput,
 } from "@cove/shared";
+import type { QueueEvents } from "bullmq";
 import { z } from "zod";
 
 import type { SupabaseIdentity } from "../auth/auth.types.js";
@@ -23,9 +26,17 @@ import { learningScopeFor } from "../classes/assigned-course-access.js";
 import { AppException } from "../common/app-exception.js";
 import type { ApiEnvironment } from "../config/env.schema.js";
 import { PrismaService } from "../database/prisma.service.js";
-import { JudgeQueue } from "../judge/judge.queue.js";
+import type { Prisma } from "../generated/prisma/client.js";
+import { AI_HELP_CHECK_WAIT_MS } from "../judge/ai-help-check.runner.js";
+import { JudgeQueue, runtimeQueueName } from "../judge/judge.queue.js";
+import { NativeAdmission } from "../judge/native-admission.js";
+import { examplesSnapshotFor } from "../judge/sample-check-snapshot.js";
+import { reachableMaterialWhere } from "../learn/curriculum-visibility.js";
+import { LearningClassContextService } from "../learn/learning-class-context.service.js";
 import { ownedSubmissionWhere } from "../learn/submission.service.js";
-import { finishReply, PENDING_SECONDS, readHelpContext, reserveReply, type HelpContext, type ReplyOutcome, type StoredReply } from "./ai-help-read.js";
+import {
+  finishReply, PENDING_SECONDS, readCheckHelpContext, readHelpContext, reserveReply, type CheckRow, type HelpContext, type ReplyOutcome, type StoredReply,
+} from "./ai-help-read.js";
 import { AiModelClient, AiModelError, withDeadline } from "./ai-model.js";
 import { aiSettings, type AiSettings } from "./ai-settings.js";
 import { differenceKinds, type DifferenceKind } from "../judge/output-difference.js";
@@ -35,6 +46,7 @@ import {
   type AnalysisEvidence, type ExampleEvidence, type KnownMistake,
 } from "./help-prompt.js";
 import { checkReply, hiddenValueIn, hiddenValues, newCode, plainText } from "./text-check.js";
+import { readLibraryExercise } from "./library/library-read.js";
 import { costMicros } from "./usage.js";
 
 const answerSchema = z.object({
@@ -45,10 +57,19 @@ const answerSchema = z.object({
 /** A failing model must not be called without end by one student. */
 const REQUESTS_PER_WINDOW = 20;
 const REQUEST_WINDOW_MS = 10 * 60_000;
+/** Example checks one student may start, so the grader is not a free Run button. */
+const CHECKS_PER_WINDOW = 30;
+/** Waiting for a slot, then the run itself, then a margin. */
+const CHECK_RESULT_WAIT_MS = AI_HELP_CHECK_WAIT_MS + 8_000;
+
+/** What an answer is about: a failed submission, or an example check of the editor's code. */
+type Subject = { submissionId: string | null; checkId: string | null; source: "SUBMIT" | "TEST_RUN" | "RUN" };
+type Ask = { academyId: string; requestId: string; locale: RequestAiHelpInput["locale"]; mode: RequestAiHelpInput["mode"]; subject: Subject };
 
 /**
- * The AI teacher's analysis of a student's own failed submission (the
- * Analyze design).
+ * The AI teacher's analysis of a student's own wrong code: a failed submission
+ * (the Analyze design), or the code in the editor after Run or Test run, which
+ * the server first runs on the examples (the campus courses design, §6).
  *
  * Every request decides again, from one statement: the browser's copy of
  * `aiAssistant` is a convenience and never an authority. A reservation is
@@ -60,14 +81,18 @@ const REQUEST_WINDOW_MS = 10 * 60_000;
 export class AiHelpService {
   private readonly logger = new Logger(AiHelpService.name);
   private active = 0;
+  private nativeAdmission?: NativeAdmission;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AcademyAccessService,
     private readonly config: ConfigService<ApiEnvironment, true>,
     private readonly model: AiModelClient,
+    private readonly classContext: LearningClassContextService,
     @Optional() private readonly queue?: JudgeQueue,
   ) {}
+
+  private native() { return this.nativeAdmission ??= new NativeAdmission(this.config, this.prisma, this.queue); }
 
   async get(identity: SupabaseIdentity, input: { academyId: string; submissionId: string }): Promise<AiHelpView> {
     const actor = await this.access.requirePermission(identity.authUserId, input.academyId, "curriculum.read");
@@ -81,6 +106,81 @@ export class AiHelpService {
     const actor = await this.access.requirePermission(identity.authUserId, input.academyId, "submissions.own.create");
     const settings = aiSettings(this.config).help;
     const context = await this.context(actor, input, true);
+    return this.explain(actor, context, settings, {
+      academyId: input.academyId, requestId: input.requestId, locale: input.locale, mode: input.mode,
+      subject: { submissionId: input.submissionId, checkId: null, source: "SUBMIT" },
+    }, () => this.context(actor, input, false));
+  }
+
+  /**
+   * AI help on the code in the editor, after Run or Test run (the campus
+   * courses design, §6). The server runs that code on every example, waiting
+   * in the grader's interactive line, and never trusts the browser's results.
+   * All examples passing is said for free; a failure is explained exactly as a
+   * failed submission is, from the examples only. The same code again reuses
+   * its check and its answer.
+   */
+  async requestForCode(identity: SupabaseIdentity, input: RequestAiHelpForCodeInput): Promise<AiHelpResponse> {
+    const actor = await this.access.requirePermission(identity.authUserId, input.academyId, "submissions.own.create");
+    const settings = aiSettings(this.config).help;
+    // Reach first, as Test run decides it; the exercise itself is read with
+    // everything else, and its tests only when a new check must run.
+    const reachable = await this.prisma.material.findFirst({
+      where: { id: input.materialId, type: "PROGRAMMING_EXERCISE", ...reachableMaterialWhere(input.academyId, learningScopeFor(input.academyId, actor)) },
+      select: { id: true },
+    });
+    if (!reachable) throw new AppException("SAMPLE_CHECK_NOT_FOUND", HttpStatus.NOT_FOUND);
+    const codeHash = createHash("sha256").update(input.code).digest("hex");
+    const read = async (checkId: string | null) => {
+      const found = await readCheckHelpContext(this.prisma, {
+        academyId: input.academyId, userId: actor.userId, materialId: reachable.id, codeHash, checkId, dayStart: today(), full: true,
+      });
+      if (!found?.context.exercise) throw new AppException("SAMPLE_CHECK_NOT_FOUND", HttpStatus.NOT_FOUND);
+      return found;
+    };
+
+    let { context, check, courseId } = await read(null);
+    // An authorized class context, exactly as Submit and Test run require one.
+    await this.classContext.resolve({ academyId: input.academyId, userId: actor.userId, courseId, requestedClassId: input.classId });
+    if (context.exercise!.gradingRevision !== input.workspaceRevision) throw new AppException("SAMPLE_CHECK_STALE", HttpStatus.CONFLICT);
+    const answer = (context: HelpContext, fallback: AiHelpFallback | null, examplesPassed = false): AiHelpResponse => ({
+      ...this.remaining(context, settings, this.stateOf(context, settings)), reply: null, fallback, ...(examplesPassed ? { examplesPassed } : {}),
+    });
+
+    const state = this.stateOf(context, settings);
+    if (state !== "AVAILABLE" && state !== "LIMIT_PROBLEM" && state !== "LIMIT_DAY") return answer(context, null);
+    const level = input.mode === "simpler" && context.replies.some((item) => item.level === 1) ? 2 : 1;
+    const saved = context.replies.find((item) => item.level === level);
+    // Shown again even at a limit: it was already paid for.
+    if (saved) return { ...answer(context, null), reply: toReply(saved) };
+    if (check?.status === "PASSED") return answer(context, null, true);
+    if (!check) {
+      // Past a limit nothing new is started: the grader is not a free Run button.
+      if (state !== "AVAILABLE") return answer(context, null);
+      if (input.code.length > HELP_CODE_MAX) return answer(context, "try_small");
+      if (!(await this.withinRate(`ai-help-check:${actor.userId}`, CHECKS_PER_WINDOW))) return answer(context, "busy");
+      const started = await this.startCheck(actor.userId, input, codeHash);
+      if (!started) return answer(context, "trace_public");
+      ({ context, check } = await read(started));
+    } else if (check.status === "QUEUED" || check.status === "RUNNING") {
+      // Another tab started this very check: wait for it rather than run it twice.
+      ({ context, check } = await this.waitFor(check, () => read(check!.id)));
+    }
+    if (!check || check.status !== "FAILED") return check?.status === "PASSED" ? answer(context, null, true) : answer(context, "busy");
+    return this.explain(actor, context, settings, {
+      academyId: input.academyId, requestId: input.requestId, locale: input.locale, mode: input.mode,
+      subject: { submissionId: null, checkId: check.id, source: input.source },
+    }, async () => (await read(check!.id)).context);
+  }
+
+  /**
+   * From a context whose code failed to an answer: the saved one, free; else
+   * one reservation and at most one model call. Shared by Submit and by the
+   * example checks of Run and Test run.
+   */
+  private async explain(
+    actor: AcademyAccess, context: HelpContext, settings: AiSettings["help"], ask: Ask, reread: () => Promise<HelpContext>,
+  ): Promise<AiHelpResponse> {
     const evidence = evidenceOf(context);
     const answer = (reply: AiHelpReply | null, fallback: AiHelpFallback | null, spent = 0): AiHelpResponse => ({
       ...this.remaining(context, settings, this.stateOf(context, settings), spent), reply, fallback,
@@ -90,28 +190,28 @@ export class AiHelpService {
     if (state !== "AVAILABLE" && state !== "LIMIT_PROBLEM" && state !== "LIMIT_DAY") return answer(null, null);
     const analysis = context.replies.find((item) => item.level === 1);
     // A simpler explanation is of an analysis; without one, this is the analysis.
-    const level = input.mode === "simpler" && analysis ? 2 : 1;
+    const level = ask.mode === "simpler" && analysis ? 2 : 1;
     const saved = context.replies.find((item) => item.level === level);
     // Shown again even at a limit: it was already paid for.
     if (saved) return answer(toReply(saved), null);
     // Nothing the model could use: no reservation, no call, nothing counted.
     if (context.submission.code.length > HELP_CODE_MAX || (!evidence.examples.failed.length && !problemText(context.exercise!)))
       return answer(null, fallbackFor(evidence));
-    const reserved = await this.reserve(actor, context, input, settings, today(), level, state === "AVAILABLE");
+    const reserved = await this.reserve(actor, context, ask, settings, today(), level, state === "AVAILABLE");
     if (reserved.kind === "done") return answer(reserved.reply, null);
     if (reserved.kind !== "reserved") {
       if (reserved.kind === "conflict") throw new AppException("CONTENT_EDIT_CONFLICT", HttpStatus.CONFLICT);
       if (reserved.kind === "failed") return answer(null, fallbackFor(evidence));
       if (reserved.kind !== "limited") return answer(null, "busy");
       // Another tab took the last one, or wrote this answer, between the read and the reservation.
-      const again = await this.context(actor, input, false);
+      const again = await reread();
       const written = again.replies.find((item) => item.level === level);
       const now = this.stateOf(again, settings);
       // Still allowed and still unwritten: another click on this submission is writing it.
       return { ...this.remaining(again, settings, now), reply: written ? toReply(written) : null, fallback: written || now !== "AVAILABLE" ? null : "busy" };
     }
 
-    const outcome = await this.ask(context, evidence, input, reserved, analysis, settings);
+    const outcome = await this.ask(context, evidence, ask, reserved, analysis, settings);
     await finishReply(this.prisma, outcome);
     if (outcome.status === "FAILED") {
       this.logger.warn(`AI help ${outcome.failureCode} after ${outcome.latencyMs} ms`);
@@ -165,10 +265,13 @@ export class AiHelpService {
 
   private stateOf(context: HelpContext, settings: AiSettings["help"]): AiHelpState {
     const { submission, exercise } = context;
-    if (!settings.enabled || !this.model.available || !context.featureOn || !exercise?.aiFeedbackEnabled) return "OFF";
+    if (!settings.enabled || !this.model.available || !context.featureOn || !exercise?.aiFeedbackEnabled || !exercise.courseOn) return "OFF";
     if (exercise.submissionPolicy !== "AUTOMATIC" || exercise.language !== "PYTHON" || !exercise.plain || exercise.lectureKind !== "STANDARD") return "OFF";
-    if (submission.status !== "FAILED" || submission.submissionPolicy !== "AUTOMATIC" || submission.language !== "PYTHON") return "OFF";
-    if (submission.inExam || submission.quiz || submission.repair || submission.aborted) return "OFF";
+    // An example check is decided by its own status: see `requestForCode`.
+    if (!context.examplesOnly) {
+      if (submission.status !== "FAILED" || submission.submissionPolicy !== "AUTOMATIC" || submission.language !== "PYTHON") return "OFF";
+      if (submission.inExam || submission.quiz || submission.repair || submission.aborted) return "OFF";
+    }
     if (context.monthCostMicros >= settings.budgetMicros) return "OFF";
     if (context.examOpen) return "EXAM_OPEN";
     if (submission.gradingRevision !== exercise.gradingRevision) return "STALE";
@@ -185,7 +288,7 @@ export class AiHelpService {
   }
 
   private async reserve(
-    actor: AcademyAccess, context: HelpContext, input: RequestAiHelpInput, settings: AiSettings["help"], dayStart: Date, level: number, allowed: boolean,
+    actor: AcademyAccess, context: HelpContext, input: Ask, settings: AiSettings["help"], dayStart: Date, level: number, allowed: boolean,
   ): Promise<
     | { kind: "reserved"; id: string; level: number }
     | { kind: "done"; reply: AiHelpReply }
@@ -193,10 +296,10 @@ export class AiHelpService {
   > {
     const existing = await this.prisma.aiHelpReply.findUnique({
       where: { userId_requestId: { userId: actor.userId, requestId: input.requestId } },
-      select: { id: true, submissionId: true, status: true, reply: true, analysis: true, level: true, createdAt: true, reportedAt: true },
+      select: { id: true, submissionId: true, checkId: true, status: true, reply: true, analysis: true, level: true, createdAt: true, reportedAt: true },
     });
     if (existing) {
-      if (existing.submissionId !== input.submissionId) return { kind: "conflict" };
+      if (existing.submissionId !== input.subject.submissionId || existing.checkId !== input.subject.checkId) return { kind: "conflict" };
       if (existing.status === "DONE") {
         return { kind: "done", reply: toReply({ ...existing, reply: existing.reply!, createdAt: existing.createdAt.toISOString(), reported: existing.reportedAt !== null }) };
       }
@@ -204,13 +307,13 @@ export class AiHelpService {
       return { kind: existing.status === "PENDING" && !stale ? "pending" : "failed" };
     }
     if (!allowed) return { kind: "limited" };
-    if (this.active >= settings.concurrency || !(await this.withinRate(actor.userId))) return { kind: "busy" };
+    if (this.active >= settings.concurrency || !(await this.withinRate(`ai-help:${actor.userId}`, REQUESTS_PER_WINDOW))) return { kind: "busy" };
     try {
       const reservation = await this.prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`ai-help:${actor.userId}`}, 0))`;
         return reserveReply(tx, {
           requestId: input.requestId, userId: actor.userId, academyId: input.academyId, classId: context.submission.classId,
-          submissionId: input.submissionId, materialId: context.submission.sourceMaterialId, gradingRevision: context.submission.gradingRevision,
+          ...input.subject, materialId: context.submission.sourceMaterialId, gradingRevision: context.submission.gradingRevision,
           level, locale: input.locale, promptVersion: HELP_PROMPT_VERSION, dayStart, problemLimit: settings.problemLimit, dailyLimit: settings.dailyLimit,
         });
       });
@@ -222,17 +325,89 @@ export class AiHelpService {
     }
   }
 
-  private async withinRate(userId: string): Promise<boolean> {
+  private async withinRate(key: string, limit: number): Promise<boolean> {
     if (!this.queue) return true;
     try {
-      return await this.queue.consumeSubmissionToken(`ai-help:${userId}`, REQUESTS_PER_WINDOW, REQUEST_WINDOW_MS);
+      return await this.queue.consumeSubmissionToken(key, limit, REQUEST_WINDOW_MS);
     } catch {
       return false;
     }
   }
 
+  /**
+   * Stores an example check and sends it to the grader's sample lane. Returns
+   * its id, or null when the problem cannot be checked here (no examples, or a
+   * grading profile the judge would refuse). Waits for the result.
+   */
+  private async startCheck(userId: string, input: RequestAiHelpForCodeInput, codeHash: string): Promise<string | null> {
+    if (!this.queue) return null;
+    // One statement, the same read the AI library's checks are built from.
+    const exercise = await readLibraryExercise(this.prisma, input.materialId);
+    if (!exercise) return null;
+    const courseId = exercise.courseId;
+    const descriptor = await this.native().select({
+      academyId: input.academyId, materialId: exercise.materialId, gradingRevision: exercise.gradingRevision, context: "live", kind: "sample",
+    }, exercise);
+    const snapshot = examplesSnapshotFor(exercise, courseId, this.config.get("PYODIDE_VERSION", { infer: true }), descriptor);
+    if (!snapshot) return null;
+    const check = await this.prisma.aiHelpCheck.create({
+      data: {
+        userId, academyId: input.academyId, classId: input.classId, materialId: exercise.materialId, gradingRevision: exercise.gradingRevision,
+        source: input.source, code: input.code, codeHash, snapshot: JSON.parse(JSON.stringify(snapshot)) as Prisma.InputJsonObject,
+        executionQueue: descriptor ? runtimeQueueName("sample", descriptor) : null,
+      },
+      select: { id: true },
+    });
+    const queue = descriptor ? this.queue.forRuntime(descriptor) : this.queue;
+    const finished = await this.finished(queue.sampleEvents, check.id);
+    try {
+      await queue.enqueueAiHelpCheck(check.id);
+    } catch {
+      finished.cancel();
+      return check.id;
+    }
+    await finished.done;
+    return check.id;
+  }
+
+  /** A check another request started: its result, once it is there. */
+  private async waitFor(check: CheckRow, read: () => Promise<{ context: HelpContext; check: CheckRow | null }>) {
+    if (this.queue) {
+      const finished = await this.finished(this.queue.sampleEvents, check.id);
+      // It may have ended between the first read and listening.
+      const now = await read();
+      if (now.check?.status !== "QUEUED" && now.check?.status !== "RUNNING") {
+        finished.cancel();
+        return now;
+      }
+      await finished.done;
+    }
+    return read();
+  }
+
+  /** Resolves when the job ends in the grader, or after the longest a check may take. */
+  private async finished(events: QueueEvents, jobId: string): Promise<{ done: Promise<void>; cancel: () => void }> {
+    await events.waitUntilReady().catch(() => undefined);
+    let cancel = () => {};
+    const done = new Promise<void>((resolve) => {
+      const onEnd = (event: { jobId: string }) => { if (event.jobId === jobId) end(); };
+      const timer = setTimeout(() => end(), CHECK_RESULT_WAIT_MS);
+      timer.unref();
+      const end = () => {
+        clearTimeout(timer);
+        events.off("completed", onEnd);
+        events.off("failed", onEnd);
+        resolve();
+      };
+      events.on("completed", onEnd);
+      events.on("failed", onEnd);
+      cancel = end;
+    });
+    return { done, cancel: () => cancel() };
+  }
+
   private async ask(
-    context: HelpContext, evidence: AnalysisEvidence, input: RequestAiHelpInput, reserved: { id: string; level: number },
+    context: HelpContext, evidence: AnalysisEvidence, input: Ask, reserved: { id: string; level: number },
     analysis: StoredReply | undefined, settings: AiSettings["help"],
   ): Promise<ReplyOutcome> {
     const started = Date.now();
@@ -244,7 +419,7 @@ export class AiHelpService {
     });
     const earlier = reserved.level === 2 ? aiAnalysisSchema.safeParse(analysis?.analysis) : null;
     const prompt = buildAnalysisPrompt({
-      locale, mode: reserved.level === 2 ? "simpler" : "analyze", earlier: earlier?.success ? earlier.data : null,
+      locale, mode: reserved.level === 2 ? "simpler" : "analyze", earlier: earlier?.success ? earlier.data : null, examplesOnly: context.examplesOnly === true,
       problem: exercise, evidence, code: context.submission.code, mistakes: knownMistakes(context, locale),
       hints: context.hints.map((hint) => locale === "ko" ? hint.ko : hint.en),
     });
@@ -306,8 +481,13 @@ function toReply(row: { id: string; level: number; reply: string; analysis: unkn
 function knownMistakes(context: HelpContext, locale: RequestAiHelpInput["locale"]): KnownMistake[] {
   const student = fingerprintOf(context.cases);
   const rank = { exact: 0, likely: 1 } as const;
+  // After Run or Test run only the examples ran: a mistake is compared on
+  // those same tests, picked out of its whole-test fingerprint by position.
+  const positions = [...context.cases].sort((a, b) => a.position - b.position).map((item) => item.position);
+  const known = (fingerprint: string | null) => !context.examplesOnly || fingerprint === null ? fingerprint
+    : positions.map((position) => fingerprint[position - 1] ?? "?").join("");
   return context.library
-    .map((item) => ({ id: item.id, label: item.label, text: locale === "ko" ? item.textKo : item.textEn, match: matchFingerprint(student, item.fingerprint) }))
+    .map((item) => ({ id: item.id, label: item.label, text: locale === "ko" ? item.textKo : item.textEn, match: matchFingerprint(student, known(item.fingerprint)) }))
     .sort((a, b) => (a.match ? rank[a.match] : 2) - (b.match ? rank[b.match] : 2))
     .slice(0, HELP_LIBRARY_MAX);
 }

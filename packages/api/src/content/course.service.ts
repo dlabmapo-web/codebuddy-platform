@@ -59,6 +59,8 @@ import {
 } from "./content-positions.js";
 import { MonitoringRevocationService } from "../monitoring/monitoring-revocation.service.js";
 import { exerciseProfileColumns } from "../judge/grading-profile.js";
+import { queueLibraries } from "../ai-assistant/library/library-read.js";
+import { wakeLibraryJob } from "../ai-assistant/library/library-wake.js";
 
 type ContentRequestContext = { requestId?: string };
 
@@ -287,7 +289,7 @@ export class CourseService {
 
   async create(
     identity: SupabaseIdentity,
-    input: { academyId: string; title: string; description: string; language?: CourseLanguage },
+    input: { academyId: string; title: string; description: string; language?: CourseLanguage; aiTeacherEnabled?: boolean },
     context: ContentRequestContext = {},
   ) {
     const actor = await this.requireCurriculumManager(
@@ -295,11 +297,13 @@ export class CourseService {
       input.academyId,
     );
     const title = input.title.trim();
+    const language = input.language ?? "PYTHON";
     await this.assertTitleAvailable(input.academyId, title);
     const course = await this.prisma.$transaction(async (tx) => {
       if (actor.via === "platform" && await lockLibraryTitles(tx, input.academyId)) {
         await assertLibraryTitleAvailable(tx, input.academyId, title);
       }
+      const aiTeacherEnabled = input.aiTeacherEnabled === true && await aiTeacherAllowed(tx, input.academyId, language);
       const created = await tx.course.create({
         data: {
           academyId: input.academyId,
@@ -308,7 +312,8 @@ export class CourseService {
           // Visible from the start: students see a course only once it is
           // assigned to their class, and an author can still hide it.
           isVisible: true,
-          language: input.language ?? "PYTHON",
+          language,
+          aiTeacherEnabled,
           createdByUserId: actor.userId,
         },
         include: courseSummaryInclude,
@@ -320,7 +325,7 @@ export class CourseService {
         targetType: "Course",
         targetId: created.id,
         requestId: context.requestId,
-        after: { title: created.title, isVisible: true, language: created.language },
+        after: { title: created.title, isVisible: true, language: created.language, aiTeacherEnabled: created.aiTeacherEnabled },
       });
       return created;
     });
@@ -335,6 +340,7 @@ export class CourseService {
       title?: string;
       description?: string;
       language?: CourseLanguage;
+      aiTeacherEnabled?: boolean;
     },
     context: ContentRequestContext = {},
   ) {
@@ -369,17 +375,25 @@ export class CourseService {
         if (problems > 0)
           throw new AppException("CONTENT_VALIDATION_FAILED", HttpStatus.BAD_REQUEST, "The language is fixed once the course has problems.");
       }
+      // The AI teacher stays only on a Python course in an academy that has
+      // it: a language change away from Python turns it off.
+      const wantsAi = input.aiTeacherEnabled ?? current.aiTeacherEnabled;
+      const aiTeacherEnabled = wantsAi && await aiTeacherAllowed(tx, input.academyId, language ?? current.language);
       const updated = await tx.course.update({
         where: { id: current.id },
         data: {
           ...(title === undefined ? {} : { title }),
           ...(language ? { language } : {}),
+          ...(aiTeacherEnabled === current.aiTeacherEnabled ? {} : { aiTeacherEnabled }),
           ...(input.description === undefined
             ? {}
             : { description: input.description.trim() }),
         },
         include: courseSummaryInclude,
       });
+      // Turned on: its switched-on problems are learned now (the campus
+      // courses design, §5). Unchanged ones keep a library they already have.
+      if (aiTeacherEnabled && !current.aiTeacherEnabled) await queueLibraries(tx, { courseId: current.id });
       await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
@@ -387,14 +401,15 @@ export class CourseService {
         targetType: "Course",
         targetId: current.id,
         requestId: context.requestId,
-        before: { title: current.title, description: current.description, language: current.language },
-        after: { title: updated.title, description: updated.description, language: updated.language },
+        before: { title: current.title, description: current.description, language: current.language, aiTeacherEnabled: current.aiTeacherEnabled },
+        after: { title: updated.title, description: updated.description, language: updated.language, aiTeacherEnabled: updated.aiTeacherEnabled },
       });
       // §9.2 — the course's content moved, so any import preview taken
       // against the old revision is now stale and will be refused.
       await bumpContentRevision(tx, input.courseId);
       return updated;
     });
+    if (course.aiTeacherEnabled && !current.aiTeacherEnabled) wakeLibraryJob();
     return toCourseSummary(course);
   }
 
@@ -1396,6 +1411,8 @@ export class CourseService {
         include: exerciseAuthoringInclude,
       });
       await replaceExerciseSolutions(tx, material.id, input.solutions);
+      // Learned right after Create when its AI is on (the campus courses design, §5).
+      await queueLibraries(tx, { materialIds: [material.id] });
       await this.audit.write(tx, {
         actorUserId: actor.userId,
         academyId: input.academyId,
@@ -1410,6 +1427,7 @@ export class CourseService {
       await bumpContentRevision(tx, input.courseId);
       return material;
     });
+    if (input.aiFeedbackEnabled) wakeLibraryJob();
     return toExerciseAuthoringContext(record);
   }
 
@@ -1544,6 +1562,9 @@ export class CourseService {
         });
         progressResetCount = reset.count;
       }
+      // Learned again right after Save when what it is learned from changed,
+      // or when its AI was just turned on (the campus courses design, §5).
+      await queueLibraries(tx, { materialIds: [current.id] });
       const updated = await tx.material.findUniqueOrThrow({
         where: { id: current.id },
         include: exerciseAuthoringInclude,
@@ -1567,6 +1588,7 @@ export class CourseService {
       await bumpContentRevision(tx, input.courseId);
       return updated;
     });
+    if (input.aiFeedbackEnabled) wakeLibraryJob();
     return toExerciseAuthoringContext(record);
   }
 
@@ -2158,6 +2180,7 @@ export function toCourseSummary(course: {
   description: string;
   isVisible: boolean;
   language: CourseLanguage;
+  aiTeacherEnabled?: boolean;
   createdAt: Date;
   updatedAt: Date;
   libraryImport?: {
@@ -2229,6 +2252,7 @@ export function toCourseSummary(course: {
     description: course.description,
     isVisible: course.isVisible,
     language: course.language,
+    aiTeacherEnabled: course.aiTeacherEnabled ?? false,
     content: counts ?? {
       modules: course.modules!.length,
       lectures,
@@ -2353,7 +2377,10 @@ function serializeExercise(
 function toExerciseAuthoringContext(record: ExerciseRecord) {
   const courseModule = record.lecture.courseModule;
   return {
-    course: { id: courseModule.course.id, title: courseModule.course.title, language: courseModule.course.language },
+    course: {
+      id: courseModule.course.id, title: courseModule.course.title, language: courseModule.course.language,
+      aiTeacherEnabled: courseModule.course.aiTeacherEnabled,
+    },
     module: { id: courseModule.id, title: courseModule.title },
     lecture: { id: record.lecture.id, title: record.lecture.title },
     material: {
@@ -2443,4 +2470,18 @@ function sameOrder(left: readonly string[], right: readonly string[]) {
     left.length === right.length &&
     left.every((id, index) => id === right[index])
   );
+}
+
+/**
+ * Whether a course may have the AI teacher: Python, in an academy with the
+ * AI_ASSISTANT feature (the campus courses design, §4). Otherwise the choice
+ * is saved off.
+ */
+async function aiTeacherAllowed(tx: Prisma.TransactionClient, academyId: string, language: CourseLanguage): Promise<boolean> {
+  if (language !== "PYTHON") return false;
+  const flag = await tx.academyFeatureFlag.findUnique({
+    where: { academyId_feature: { academyId, feature: "AI_ASSISTANT" } },
+    select: { isEnabled: true },
+  });
+  return flag?.isEnabled === true;
 }

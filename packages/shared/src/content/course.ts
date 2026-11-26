@@ -173,6 +173,11 @@ export const courseSummarySchema = z.object({
   isVisible: z.boolean(),
   /** Python, or C/C++: what the course's coding exercises are written in. */
   language: courseLanguageSchema.default("PYTHON"),
+  /**
+   * The AI teacher for this course's problems (the campus courses design,
+   * §4): a master switch over each problem's own. Python only.
+   */
+  aiTeacherEnabled: z.boolean().default(false),
   content: courseContentCountsSchema,
   /**
    * Where this course came from, when it came from the content library.
@@ -323,6 +328,8 @@ export const createCourseSchema = z.object({
   description: descriptionSchema.default(""),
   /** Chosen once, for every coding exercise the course will hold. */
   language: courseLanguageSchema.default("PYTHON"),
+  /** Kept only for Python in an academy with the AI teacher; otherwise saved off. */
+  aiTeacherEnabled: z.boolean().default(false),
 });
 
 export const updateCourseSchema = z.object({
@@ -332,6 +339,8 @@ export const updateCourseSchema = z.object({
   description: descriptionSchema.optional(),
   /** Accepted only while the course has no problems. */
   language: courseLanguageSchema.optional(),
+  /** Kept only for Python in an academy with the AI teacher; otherwise saved off. */
+  aiTeacherEnabled: z.boolean().optional(),
 });
 
 export const setCourseVisibilitySchema = z.object({
@@ -915,7 +924,11 @@ export const moveExerciseSchema = courseIdInputSchema.extend({
 });
 
 export const exerciseAuthoringContextSchema = z.object({
-  course: z.object({ id: z.uuid(), title: titleSchema, language: courseLanguageSchema.default("PYTHON") }),
+  course: z.object({
+    id: z.uuid(), title: titleSchema, language: courseLanguageSchema.default("PYTHON"),
+    /** The course's AI teacher choice: a problem's AI switch shows only when it is on. */
+    aiTeacherEnabled: z.boolean().default(false),
+  }),
   module: z.object({ id: z.uuid(), title: titleSchema }),
   lecture: z.object({ id: z.uuid(), title: titleSchema }),
   material: materialSchema.nullable(),

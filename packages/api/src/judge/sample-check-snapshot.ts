@@ -4,6 +4,33 @@ import { inputPromptPolicySchema, programmingExerciseGradingModeSchema, inputPro
 import type { ExerciseGradingSource } from "./grading-profile.js";
 import { gradingSnapshotFor, gradingPolicySnapshotSchema, resolveGradingProfile } from "./grading-profile.js";
 import type { SampleSnapshot } from "./sample-check.store.js";
+import { practiceSnapshotSchema, type PracticeSnapshot } from "./practice-snapshot.js";
+
+/**
+ * Every example of an exercise as one grading snapshot, for an AI help check
+ * after Run or Test run (the campus courses design, §6). Hidden tests are left
+ * out, so they never run. Positions stay those of the whole test list, which
+ * a library mistake's fingerprint uses. Weights do not count for a check, but
+ * a profile worth nothing is refused, so examples worth nothing count one each.
+ */
+export function examplesSnapshotFor(
+  exercise: ExerciseGradingSource & { gradingRevision: number },
+  courseId: string,
+  engineVersion: string,
+  descriptor?: NativeAnyRuntimeDescriptor | null,
+): PracticeSnapshot | null {
+  if (resolveGradingProfile(exercise, exercise.testCases).kind === "unsupported") return null;
+  const grading = gradingSnapshotFor(exercise, { engineVersion, descriptor });
+  let cases = grading.cases.filter((testCase) => testCase.isSample);
+  if (!cases.length) return null;
+  if (exercise.gradingMode === "ELICE_STDIO" && cases.reduce((total, testCase) => total + testCase.weight, 0) <= 0)
+    cases = cases.map((testCase) => ({ ...testCase, weight: 1 }));
+  return practiceSnapshotSchema.parse({
+    version: 1, courseId, gradingRevision: exercise.gradingRevision, language: exercise.language,
+    timeLimitMs: exercise.timeLimitMs, memoryLimitMb: exercise.memoryLimitMb,
+    ...grading.submission, gradingCases: cases, quizSnapshot: null,
+  });
+}
 
 /** Admission freezes one public case, using the same profile validation as Submit. */
 export function sampleSnapshotFor(

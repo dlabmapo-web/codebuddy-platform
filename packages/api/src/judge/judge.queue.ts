@@ -41,7 +41,13 @@ export function runtimeQueueName(kind: WorkKind, descriptor?: NativeAnyRuntimeDe
   return `${base}-${family}-${nativeRuntimeVersion(descriptor).slice(`${descriptor.engine}-`.length)}`;
 }
 
-export type SampleCheckJob = { checkId: string };
+/**
+ * A public sample check, or with `kind: "ai-help"` an AI help check: the code
+ * in a student's editor on every example, for AI help after Run or Test run.
+ * An older worker finds no sample check by that id and does nothing; the API
+ * then answers "busy".
+ */
+export type SampleCheckJob = { checkId: string; kind?: "ai-help" };
 
 export type GradingJob = { submissionId: string };
 /**
@@ -126,6 +132,7 @@ export class JudgeQueue implements OnModuleDestroy {
   private sampleInstance: Queue<SampleCheckJob> | null = null;
   private eventsInstance: QueueEvents | null = null;
   private practiceEventsInstance: QueueEvents | null = null;
+  private sampleEventsInstance: QueueEvents | null = null;
   private rateLimitClient: Redis | null = null;
   private rateLimitConnection: Promise<void> | null = null;
 
@@ -222,6 +229,11 @@ export class JudgeQueue implements OnModuleDestroy {
     await (descriptor ? this.forRuntime(descriptor) : this).sampleQueue.add("sample", { checkId }, { jobId: checkId });
   }
 
+  /** `jobId` is the check id: a retried dispatch cannot run a check twice. */
+  async enqueueAiHelpCheck(checkId: string, descriptor?: NativeAnyRuntimeDescriptor | null): Promise<void> {
+    await (descriptor ? this.forRuntime(descriptor) : this).sampleQueue.add("ai-help", { checkId, kind: "ai-help" }, { jobId: checkId });
+  }
+
   /**
    * Removes a check that has not started. A job already running is locked
    * and stays; the worker sees the cancel and discards its result.
@@ -234,6 +246,12 @@ export class JudgeQueue implements OnModuleDestroy {
   get practiceEvents(): QueueEvents {
     this.practiceEventsInstance ??= new QueueEvents(runtimeQueueName("practice", this.descriptor), { connection: redisConnection(this.redisUrl) });
     return this.practiceEventsInstance;
+  }
+
+  /** Finished sample-lane jobs, for AI help waiting on its example check. */
+  get sampleEvents(): QueueEvents {
+    this.sampleEventsInstance ??= new QueueEvents(runtimeQueueName("sample", this.descriptor), { connection: redisConnection(this.redisUrl) });
+    return this.sampleEventsInstance;
   }
 
   get events(): QueueEvents {
@@ -410,6 +428,7 @@ export class JudgeQueue implements OnModuleDestroy {
     await this.sampleInstance?.close();
     await this.eventsInstance?.close();
     await this.practiceEventsInstance?.close();
+    await this.sampleEventsInstance?.close();
     await this.rateLimitClient?.quit().catch(() => undefined);
     this.queueInstance = null;
     this.practiceInstance = null;
@@ -417,6 +436,7 @@ export class JudgeQueue implements OnModuleDestroy {
     this.sampleInstance = null;
     this.eventsInstance = null;
     this.practiceEventsInstance = null;
+    this.sampleEventsInstance = null;
     this.rateLimitClient = null;
     this.rateLimitConnection = null;
   }

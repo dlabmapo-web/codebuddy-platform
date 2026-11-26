@@ -106,6 +106,7 @@ function createService(repository: RepositoryStub = {}) {
     findSubmissionForReview: vi.fn(async () => null),
     findStatement: vi.fn(async () => null),
     findAiReplies: vi.fn(async () => []),
+    findAiCodeReplies: vi.fn(async () => []),
     ...repository,
   } as unknown as TeacherProgressRepository;
 
@@ -441,6 +442,19 @@ describe("getSubmissionReview", () => {
     expect(findAiReplies).toHaveBeenCalledWith({ userId: alice.userId, submissionId: submission.id });
     // A reply saved before the Analyze sections existed has none to show.
     expect(review.aiReplies).toEqual([{ level: 1, text: "Where is x made?", analysis: null, locale: "en", reported: true, createdAt: "2026-11-25T01:00:00.000Z" }]);
+    expect(teacherSubmissionReviewSchema.safeParse(review).success).toBe(true);
+  });
+
+  it("shows what the assistant said after Run and Test run on the problem, with the code it checked", async () => {
+    const findAiCodeReplies = vi.fn(async () => [
+      { level: 1, reply: "Example 1 wants 8.", analysis: null, locale: "en", reportedAt: null, createdAt: new Date("2026-11-26T02:00:00Z"), source: "RUN", check: { code: "print(a - b)" } },
+    ]);
+    const { service } = createService({ findSubmissionForReview: vi.fn(async () => submission), findAiCodeReplies });
+    const review = await service.getSubmissionReview(identity, { academyId, classId, membershipId: alice.membershipId, submissionId: submission.id });
+    expect(findAiCodeReplies).toHaveBeenCalledWith({ userId: alice.userId, materialId: submission.sourceMaterialId });
+    expect(review.aiCodeReplies).toEqual([{
+      level: 1, text: "Example 1 wants 8.", analysis: null, locale: "en", reported: false, createdAt: "2026-11-26T02:00:00.000Z", source: "RUN", code: "print(a - b)",
+    }]);
     expect(teacherSubmissionReviewSchema.safeParse(review).success).toBe(true);
   });
 

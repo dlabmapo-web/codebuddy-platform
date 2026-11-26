@@ -629,10 +629,12 @@ export class TeacherProgressService {
       );
     }
     // A test submission also reports its test points, read alongside.
-    const [statement, aiReplies, testPoints] = await Promise.all([
+    const [statement, aiReplies, aiCodeReplies, testPoints] = await Promise.all([
       this.repository.findStatement(submission.sourceMaterialId),
       // What the assistant told the student about this attempt.
       this.repository.findAiReplies({ userId: student.userId, submissionId: submission.id }),
+      // And after Run or Test run on the same problem, with the code it checked.
+      this.repository.findAiCodeReplies({ userId: student.userId, materialId: submission.sourceMaterialId }),
       submission.testAttemptId
         ? this.repository.testPointsForSubmission({
             testAttemptId: submission.testAttemptId,
@@ -708,6 +710,16 @@ export class TeacherProgressService {
         locale: row.locale === "en" ? "en" as const : "ko" as const,
         reported: row.reportedAt !== null,
         createdAt: row.createdAt.toISOString(),
+      })),
+      aiCodeReplies: aiCodeReplies.map((row) => ({
+        level: row.level,
+        text: row.reply ?? "",
+        analysis: aiAnalysisSchema.safeParse(row.analysis).data ?? null,
+        locale: row.locale === "en" ? "en" as const : "ko" as const,
+        reported: row.reportedAt !== null,
+        createdAt: row.createdAt.toISOString(),
+        source: row.source === "RUN" ? "RUN" as const : "TEST_RUN" as const,
+        code: row.check?.code ?? "",
       })),
       hiddenPassed: hidden.filter((item) => isOutputCorrect(item.outcome)).length,
       hiddenTotal: hidden.length,

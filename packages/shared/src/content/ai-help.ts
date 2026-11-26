@@ -78,10 +78,37 @@ export const requestAiHelpInputSchema = getAiHelpInputSchema.extend({
   mode: aiHelpModeSchema.default("analyze"),
 });
 export type RequestAiHelpInput = z.infer<typeof requestAiHelpInputSchema>;
+
+/** Which button a student asked from (the campus courses design, §6). */
+export const aiHelpSources = ["SUBMIT", "TEST_RUN", "RUN"] as const;
+export const aiHelpSourceSchema = z.enum(aiHelpSources);
+export type AiHelpSource = z.infer<typeof aiHelpSourceSchema>;
+
+/**
+ * AI help on the code in the editor, after Run or Test run. The server runs
+ * the code on the problem's examples first and never trusts the browser's
+ * results; hidden tests never run.
+ */
+export const requestAiHelpForCodeInputSchema = z.object({
+  academyId: z.uuid(),
+  classId: z.uuid(),
+  materialId: z.uuid(),
+  code: z.string().min(1).max(100_000),
+  /** The grading revision the workspace was loaded at; a mismatch asks for a refresh. */
+  workspaceRevision: z.number().int().positive(),
+  source: z.enum(["TEST_RUN", "RUN"]),
+  locale: aiHelpLocaleSchema,
+  requestId: z.uuid(),
+  mode: aiHelpModeSchema.default("analyze"),
+}).strict();
+export type RequestAiHelpForCodeInput = z.infer<typeof requestAiHelpForCodeInputSchema>;
+
 export const aiHelpResponseSchema = z.object({
   ...remaining,
   reply: aiHelpReplySchema.nullable(),
   fallback: aiHelpFallbackSchema.nullable(),
+  /** The server ran every example and all passed: nothing to explain, nothing counted. */
+  examplesPassed: z.boolean().optional(),
 }).strict();
 export type AiHelpResponse = z.infer<typeof aiHelpResponseSchema>;
 
@@ -108,9 +135,21 @@ export const aiLibraryItemSchema = z.object({
 export type AiLibraryItemView = z.infer<typeof aiLibraryItemSchema>;
 
 export const aiLibraryInputSchema = z.object({ academyId: z.uuid(), courseId: z.uuid(), materialId: z.uuid() });
+/**
+ * Why the AI teacher cannot learn a problem, in the order a Manager would fix
+ * it (the campus courses design, §5). Null when it can.
+ */
+export const aiLibraryBlockers = [
+  "FEATURE_OFF", "COURSE_OFF", "PROBLEM_OFF", "LANGUAGE", "QUIZ", "MANUAL", "PROJECT", "EXAM", "NO_EXAMPLE",
+] as const;
+export const aiLibraryBlockerSchema = z.enum(aiLibraryBlockers);
+export type AiLibraryBlocker = z.infer<typeof aiLibraryBlockerSchema>;
+
 export const aiLibraryViewSchema = z.object({
   /** The switches this exercise needs, so staff see why there is no library. */
   enabled: z.boolean(),
+  /** The first thing that keeps the AI teacher from this problem, or null. */
+  blocked: aiLibraryBlockerSchema.nullable().default(null),
   state: aiLibraryStateSchema,
   errorCode: z.string().nullable(),
   current: z.boolean(),
@@ -168,3 +207,14 @@ export const teacherAiReplySchema = z.object({
   reported: z.boolean(), createdAt: z.iso.datetime(),
 }).strict();
 export type TeacherAiReply = z.infer<typeof teacherAiReplySchema>;
+
+/**
+ * What the AI assistant told a student after Run or Test run on one problem,
+ * with the code the server checked (the campus courses design, §6). Only the
+ * examples ran, so nothing here concerns a hidden test.
+ */
+export const teacherAiCodeReplySchema = teacherAiReplySchema.extend({
+  source: z.enum(["TEST_RUN", "RUN"]),
+  code: z.string(),
+}).strict();
+export type TeacherAiCodeReply = z.infer<typeof teacherAiCodeReplySchema>;

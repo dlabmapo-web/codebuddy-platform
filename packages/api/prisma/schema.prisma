@@ -434,6 +434,7 @@ model User {
   staffPracticeDrafts StaffPracticeDraft[]
   staffPracticeAttempts StaffPracticeAttempt[]
   aiHelpReplies AiHelpReply[]
+  aiHelpChecks  AiHelpCheck[]
   aiLibraryReports AiLibraryReport[]
   dlabIdentity DlabIdentity?
 
@@ -659,6 +660,7 @@ model Academy {
   helpRequests StudentHelpRequest[]
   turtleUsageHours TurtleUsageHour[]
   aiHelpReplies AiHelpReply[]
+  aiHelpChecks  AiHelpCheck[]
 
   id             String        @id @default(uuid()) @db.Uuid
   organizationId String        @map("organization_id") @db.Uuid
@@ -1439,6 +1441,11 @@ model Course {
   /// captures this number, the browser round-trips it, and the commit compares
   /// it again while holding the course lock.
   contentRevision Int     @default(1) @map("content_revision")
+  /// The AI teacher for this course's problems, chosen by a Manager or Team
+  /// Lead (the campus courses design, §4). A master switch: off stops help and
+  /// learning for every problem in the course; each problem's own switch then
+  /// decides. Python only, in an academy with the AI_ASSISTANT feature.
+  aiTeacherEnabled Boolean @default(false) @map("ai_teacher_enabled")
 
   /// The library course this was copied from, or null for a course the academy
   /// authored itself.
@@ -1494,6 +1501,7 @@ model Course {
 /// term — so the UUID is the identity and the UI shows status for context.
 model Class {
   aiHelpReplies AiHelpReply[]
+  aiHelpChecks  AiHelpCheck[]
   manualSubmissions ManualSubmission[]
   lectureTests      ClassLectureTest[]
   testAttempts      TestAttempt[]
@@ -3506,15 +3514,26 @@ enum AiHelpStatus {
   FAILED
 }
 
-/// One personalized reply to a student about their own failed submission.
-/// The prompt and the code are not stored: both can be rebuilt from the submission.
+/// Which button a student asked from (the campus courses design, §6).
+enum AiHelpSource {
+  SUBMIT
+  TEST_RUN
+  RUN
+}
+
+/// One personalized reply to a student about their own wrong code: a failed
+/// submission, or an example check of the code in their editor. Exactly one of
+/// `submissionId` and `checkId` is set. The prompt is not stored, and the code
+/// lives on the submission or the check.
 model AiHelpReply {
   id              String       @id @default(uuid()) @db.Uuid
   requestId       String       @map("request_id") @db.Uuid
   userId          String       @map("user_id") @db.Uuid
   academyId       String       @map("academy_id") @db.Uuid
   classId         String?      @map("class_id") @db.Uuid
-  submissionId    String       @map("submission_id") @db.Uuid
+  submissionId    String?      @map("submission_id") @db.Uuid
+  checkId         String?      @map("check_id") @db.Uuid
+  source          AiHelpSource @default(SUBMIT)
   /// The submission's frozen source material. Deliberately not a relation.
   materialId      String       @map("material_id") @db.Uuid
   gradingRevision Int          @map("grading_revision")
@@ -3540,16 +3559,54 @@ model AiHelpReply {
   user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   academy     Academy        @relation(fields: [academyId], references: [id], onDelete: Cascade)
   class       Class?         @relation(fields: [classId], references: [id], onDelete: SetNull)
-  submission  Submission     @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submission  Submission?    @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  check       AiHelpCheck?   @relation(fields: [checkId], references: [id], onDelete: Cascade)
   libraryItem AiLibraryItem? @relation(fields: [libraryItemId], references: [id], onDelete: SetNull)
 
   @@unique([userId, requestId])
+  @@index([checkId])
   @@index([userId, createdAt])
   @@index([userId, materialId, createdAt])
   @@index([submissionId])
   /// The weekly growth read and the common-mistakes view start from a problem.
   @@index([materialId, createdAt])
   @@map("ai_help_replies")
+}
+
+/// The code in a student's editor run on the server against the problem's
+/// examples only, for AI help after Run or Test run. Never a submission: no
+/// attempt, points or progress. The browser's own results are never trusted.
+model AiHelpCheck {
+  id              String           @id @default(uuid()) @db.Uuid
+  userId          String           @map("user_id") @db.Uuid
+  academyId       String           @map("academy_id") @db.Uuid
+  classId         String?          @map("class_id") @db.Uuid
+  /// The exercise. Deliberately not a relation, as on a reply.
+  materialId      String           @map("material_id") @db.Uuid
+  gradingRevision Int              @map("grading_revision")
+  source          AiHelpSource
+  code            String           @db.Text
+  codeHash        String           @map("code_hash") @db.VarChar(64)
+  /// The grading snapshot, its example cases only. Server only.
+  snapshot        Json
+  executionQueue  String?          @map("execution_queue")
+  status          SubmissionStatus @default(QUEUED)
+  /// Per example: position, outcome, what the code printed, its Python error.
+  results         Json?
+  /// The code's result on each example, in order: P, F or S.
+  fingerprint     String?
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt       DateTime?        @map("started_at") @db.Timestamptz(6)
+  finishedAt      DateTime?        @map("finished_at") @db.Timestamptz(6)
+
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  academy Academy       @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  class   Class?        @relation(fields: [classId], references: [id], onDelete: SetNull)
+  replies AiHelpReply[]
+
+  @@index([userId, materialId, codeHash])
+  @@index([status, createdAt])
+  @@map("ai_help_checks")
 }
 
 enum AiUsageKind {

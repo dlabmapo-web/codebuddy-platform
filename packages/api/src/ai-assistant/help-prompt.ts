@@ -17,7 +17,7 @@ import {
  * Changing any text here changes `HELP_PROMPT_VERSION` and requires the
  * evaluation in the QA document.
  */
-export const HELP_PROMPT_VERSION = "v4";
+export const HELP_PROMPT_VERSION = "v5";
 
 const STATEMENT_MAX = 4_000;
 const VALUE_MAX = 600;
@@ -81,6 +81,8 @@ export type AnalysisPromptInput = {
   mistakes: readonly KnownMistake[];
   /** The teacher's path: hints written for this problem, in order. */
   hints: readonly string[];
+  /** Only the examples ran: the student pressed Run or Test run, not Submit (the campus courses design, §6). */
+  examplesOnly?: boolean;
 };
 
 const base: Record<AiHelpLocale, string> = {
@@ -112,13 +114,19 @@ const simpler: Record<AiHelpLocale, string> = {
 export function buildAnalysisPrompt(input: AnalysisPromptInput): { instructions: string; content: string; itemIds: Map<string, string> } {
   const mistakes = input.mistakes.slice(0, HELP_LIBRARY_MAX);
   const itemIds = new Map(mistakes.map((item, index) => [`F${index + 1}`, item.id]));
-  const instructions = base[input.locale] + (input.mode === "simpler" && input.earlier ? simpler[input.locale] : "");
+  // After Run or Test run only the examples ran: the instructions say so too.
+  const intro = input.examplesOnly
+    ? base[input.locale].replace("Cove already ran every test.", "Cove ran only the examples.").replace("Cove가 이미 모든 테스트를 실행했습니다.", "Cove가 예제만 실행했습니다.")
+    : base[input.locale];
+  const instructions = intro + (input.mode === "simpler" && input.earlier ? simpler[input.locale] : "");
   const { evidence } = input;
 
   const lines = [
     `TASK: ${problemText(input.problem) || "(The problem is in a document that is not available here.)"}`,
     "STUDENT CODE:", "<code>", numbered(input.code), "</code>",
-    `TESTS: passed ${evidence.passed} of ${evidence.total}. Examples: ${evidence.examples.passed} of ${evidence.examples.total} passed. Hidden tests: ${evidence.hidden.total - evidence.hidden.failed.length} of ${evidence.hidden.total} passed.`,
+    input.examplesOnly
+      ? `TESTS: only the examples were run, because the student pressed Run or Test run, not Submit. Examples: ${evidence.examples.passed} of ${evidence.examples.total} passed. Hidden tests were not run: say nothing about them.`
+      : `TESTS: passed ${evidence.passed} of ${evidence.total}. Examples: ${evidence.examples.passed} of ${evidence.examples.total} passed. Hidden tests: ${evidence.hidden.total - evidence.hidden.failed.length} of ${evidence.hidden.total} passed.`,
   ];
   if (evidence.examples.failed.length) {
     lines.push("FAILED EXAMPLES:");

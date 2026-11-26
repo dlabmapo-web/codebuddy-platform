@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
 
 import { ConfigService } from "@nestjs/config";
 import { Client } from "pg";
@@ -7,6 +8,8 @@ import type { SupabaseIdentity } from "../../auth/auth.types.js";
 import type { ApiEnvironment } from "../../config/env.schema.js";
 import { PrismaService } from "../../database/prisma.service.js";
 import type { ExecutionEngine, ExecutionResult } from "../../judge/execution-engine.js";
+import { AiHelpCheckRunner } from "../../judge/ai-help-check.runner.js";
+import { ExecutionCapacity } from "../../judge/execution-capacity.js";
 import { GradingService } from "../../judge/grading.service.js";
 import type { JudgeQueue } from "../../judge/judge.queue.js";
 import { LibraryCheckRunner } from "../../judge/library-check.runner.js";
@@ -47,6 +50,7 @@ export async function createAiFixture(databaseUrl: string, env: Record<string, u
     // A failed run's queued checks would otherwise be sent again into this one.
     await turn.query("DELETE FROM ai_library_checks");
     await turn.query("DELETE FROM ai_usage_months");
+    await turn.query("DELETE FROM ai_help_checks");
   }
   const config = new ConfigService({
     DATABASE_URL: databaseUrl, PYODIDE_VERSION: "0.27.5", SUBMISSION_RATE_LIMIT: 60,
@@ -82,7 +86,8 @@ export async function createAiFixture(databaseUrl: string, env: Record<string, u
     ],
   });
   await prisma.academyFeatureFlag.create({ data: { academyId: ids.academy, feature: "AI_ASSISTANT", isEnabled: true } });
-  await prisma.course.create({ data: { id: ids.course, academyId: ids.academy, title: "Course", isVisible: true, createdByUserId: ids.manager } });
+  // An AI course (the campus courses design, §4).
+  await prisma.course.create({ data: { id: ids.course, academyId: ids.academy, title: "Course", isVisible: true, aiTeacherEnabled: true, createdByUserId: ids.manager } });
   await prisma.courseModule.create({ data: { id: ids.module, courseId: ids.course, title: "M", position: 1, isVisible: true, externalKey: randomUUID() } as never });
   await prisma.lecture.create({ data: { id: ids.lecture, courseModuleId: ids.module, title: "L", position: 1, isVisible: true, externalKey: randomUUID() } });
   await prisma.class.create({ data: { id: ids.klass, academyId: ids.academy, name: "Class", createdByUserId: ids.manager } });
@@ -118,17 +123,35 @@ export async function createAiFixture(databaseUrl: string, env: Record<string, u
   const grading = new GradingService(prisma, engine, { award: async () => undefined } as never, undefined as never);
   const checks = new LibraryCheckRunner(prisma, grading);
   const enqueued: string[] = [];
+  // AI help's example checks run at once, as the judge's sample lane would,
+  // and say so on a stand-in for BullMQ's queue events.
+  const helpChecks = new AiHelpCheckRunner(prisma, grading, new ExecutionCapacity(2));
+  const sampleEvents = Object.assign(new EventEmitter(), { waitUntilReady: async () => undefined });
+  const helpEnqueued: string[] = [];
   const queue = {
     enqueueLibraryCheck: async (id: string) => { enqueued.push(id); },
     redispatchLibraryCheck: async (id: string) => { enqueued.push(id); },
+    enqueueAiHelpCheck: async (id: string) => {
+      helpEnqueued.push(id);
+      await helpChecks.run(id);
+      sampleEvents.emit("completed", { jobId: id });
+    },
+    sampleEvents,
     consumeSubmissionToken: async () => true,
   } as unknown as JudgeQueue;
 
   return {
-    prisma, config, ids, auth, identity, engine, numbers, grading, checks, queue, enqueued, createExercise,
+    prisma, config, ids, auth, identity, engine, numbers, grading, checks, queue, enqueued, helpEnqueued, createExercise,
     /** Runs every dispatched check, as the judge's background worker would. */
     runChecks: async () => { for (const id of enqueued.splice(0)) await checks.run(id); },
-    close: async () => { await prisma.$disconnect(); await turn?.end(); },
+    // Its academy's AI goes off when the spec ends: problems are learned even
+    // when hidden, so what a spec leaves behind must not be learned by the next
+    // process on this database (the browser test runs after these specs).
+    close: async () => {
+      await prisma.academyFeatureFlag.updateMany({ where: { academyId: ids.academy, feature: "AI_ASSISTANT" }, data: { isEnabled: false } }).catch(() => undefined);
+      await prisma.$disconnect();
+      await turn?.end();
+    },
   };
 }
 export type AiFixture = Awaited<ReturnType<typeof createAiFixture>>;

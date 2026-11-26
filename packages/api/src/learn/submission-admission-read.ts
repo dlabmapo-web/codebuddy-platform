@@ -12,7 +12,7 @@ type AdmissionMaterial = Prisma.MaterialGetPayload<{include: {
   lecture: {include: {courseModule: {include: {course: true}}}}
 }}> & {
   /** Workspace reads only: the academy's AI switch. */
-  ai?: { featureOn: boolean };
+  ai?: { featureOn: boolean; courseOn?: boolean };
 };
 function columns<T>(value: Record<string, unknown>): T {
   return Object.fromEntries(Object.entries(value).map(([key, value]) => {
@@ -25,7 +25,8 @@ export async function readSubmissionAdmission(db: Prisma.TransactionClient, mate
   // Part of this statement rather than another one: opening a problem costs no more.
   const ai = options.workspace && options.ai
     ? Prisma.sql`jsonb_build_object('featureOn',
-        EXISTS (SELECT 1 FROM academy_feature_flags f WHERE f.academy_id = c.academy_id AND f.feature = 'AI_ASSISTANT' AND f.is_enabled))`
+        EXISTS (SELECT 1 FROM academy_feature_flags f WHERE f.academy_id = c.academy_id AND f.feature = 'AI_ASSISTANT' AND f.is_enabled),
+        'courseOn', c.ai_teacher_enabled)`
     : Prisma.sql`NULL::jsonb`;
   const [row] = await db.$queryRaw<Array<{ material: Record<string, unknown>; exercise: Record<string, unknown> | null;
     tests: Record<string, unknown>[]; hints: Record<string, unknown>[]; reference: ReferenceProjection | null; ai: AdmissionMaterial['ai'] | null; lecture: Record<string, unknown>; module: Record<string, unknown>; course: Record<string, unknown> }>>(Prisma.sql`

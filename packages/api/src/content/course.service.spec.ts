@@ -441,6 +441,8 @@ function createExerciseService() {
   const updated = exerciseRecord();
   const transaction = {
     $queryRaw: vi.fn().mockResolvedValue([]),
+    // Queues the AI teacher's learning in the same transaction (the campus courses design, §5).
+    $executeRaw: vi.fn().mockResolvedValue(0),
 
     programmingExerciseSolution: { deleteMany: vi.fn(), createMany: vi.fn() },
     programmingExercise: {

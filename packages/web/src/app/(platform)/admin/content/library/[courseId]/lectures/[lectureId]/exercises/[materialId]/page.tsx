@@ -65,7 +65,7 @@ export default async function LibraryExercisePage({
       notFound();
     }
     context = {
-      course: { id: tree.course.id, title: tree.course.title, language: tree.course.language },
+      course: { id: tree.course.id, title: tree.course.title, language: tree.course.language, aiTeacherEnabled: tree.course.aiTeacherEnabled },
       module: { id: courseModule.id, title: courseModule.title },
       lecture: { id: lecture.id, title: lecture.title },
       material: null,

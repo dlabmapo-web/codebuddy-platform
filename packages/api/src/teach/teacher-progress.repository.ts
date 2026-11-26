@@ -534,6 +534,19 @@ export class TeacherProgressRepository {
     });
   }
 
+  /**
+   * The assistant's replies after Run or Test run on one problem, with the code
+   * the server checked. The caller has read an attempt of this student on it in scope.
+   */
+  async findAiCodeReplies(input: { userId: string; materialId: string }) {
+    return this.prisma.aiHelpReply.findMany({
+      where: { userId: input.userId, materialId: input.materialId, checkId: { not: null }, status: "DONE" },
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      take: 10,
+      select: { level: true, reply: true, analysis: true, locale: true, reportedAt: true, createdAt: true, source: true, check: { select: { code: true } } },
+    });
+  }
+
   /** The current statement, for context beside historical code. */
   async findStatement(materialId: string): Promise<string | null> {
     const exercise = await this.prisma.programmingExercise.findUnique({

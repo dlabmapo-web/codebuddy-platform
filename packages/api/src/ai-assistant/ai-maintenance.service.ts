@@ -25,7 +25,7 @@ export class AiMaintenanceService implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
-  async run(): Promise<{ replies: number; checks: number; items: number }> {
+  async run(): Promise<{ replies: number; checks: number; items: number; helpChecks: number }> {
     const days = aiSettings(this.config).help.retentionDays;
     const replies = await this.prisma.$executeRaw`
       DELETE FROM ai_help_replies WHERE id IN (
@@ -34,11 +34,19 @@ export class AiMaintenanceService implements OnModuleInit, OnModuleDestroy {
       DELETE FROM ai_library_checks WHERE id IN (
         SELECT k.id FROM ai_library_checks k JOIN ai_libraries lib ON lib.material_id = k.material_id
         WHERE k.finished_at < now() - interval '7 days' AND lib.state NOT IN ('CHECKING', 'REVIEWING') LIMIT ${BATCH})`;
+    // A student's example check goes with its answers; one with none after a
+    // day only saved running the same code twice, and has done that job.
+    const helpChecks = await this.prisma.$executeRaw`
+      DELETE FROM ai_help_checks WHERE id IN (
+        SELECT k.id FROM ai_help_checks k
+        WHERE k.created_at < now() - make_interval(days => ${days}::int)
+           OR (k.created_at < now() - interval '1 day' AND NOT EXISTS (SELECT 1 FROM ai_help_replies r WHERE r.check_id = k.id))
+        LIMIT ${BATCH})`;
     // Kept while a reply of the last month names it, so its counts stay true.
     const items = await this.prisma.$executeRaw`
       DELETE FROM ai_library_items WHERE id IN (
         SELECT i.id FROM ai_library_items i WHERE i.state = 'REJECTED' AND i.updated_at < now() - interval '30 days'
           AND NOT EXISTS (SELECT 1 FROM ai_help_replies r WHERE r.library_item_id = i.id AND r.created_at > now() - interval '30 days') LIMIT ${BATCH})`;
-    return { replies, checks, items };
+    return { replies, checks, items, helpChecks };
   }
 }

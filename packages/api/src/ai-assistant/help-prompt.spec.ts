@@ -24,6 +24,17 @@ const input = (over: Partial<AnalysisPromptInput> = {}): AnalysisPromptInput => 
 });
 
 describe("buildAnalysisPrompt", () => {
+  it("after Run or Test run says only the examples ran, in the instructions and the tests (the campus courses design, §6)", () => {
+    for (const locale of ["en", "ko"] as const) {
+      const { content, instructions } = buildAnalysisPrompt(input({ locale, examplesOnly: true, evidence: evidence({ hidden: { total: 0, failed: [] } }) }));
+      expect(content).toContain("TESTS: only the examples were run");
+      expect(content).not.toMatch(/Hidden tests: \d/);
+      expect(instructions).not.toMatch(/already ran every test|이미 모든 테스트를/);
+      expect(instructions).toMatch(/Cove ran only the examples\.|Cove가 예제만 실행했습니다\./);
+    }
+    expect(buildAnalysisPrompt(input()).instructions).toContain("Cove already ran every test.");
+  });
+
   it("carries the problem, the numbered code and every test as counts", () => {
     const { content, instructions } = buildAnalysisPrompt(input());
     expect(content).toContain("TASK: Count the vowels. Capital letters count too.\nInput: One sentence");

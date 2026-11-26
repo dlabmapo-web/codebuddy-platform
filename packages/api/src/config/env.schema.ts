@@ -204,8 +204,12 @@ export const apiEnvironmentSchema = z.object({
    */
   AI_ASSISTANT_SERVICE_TIER: z.enum(["default", "fast"]).default("fast"),
   AI_ASSISTANT_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(30),
-  AI_ASSISTANT_PROBLEM_LIMIT: z.coerce.number().int().min(1).max(9).default(3),
-  AI_ASSISTANT_DAILY_LIMIT: z.coerce.number().int().min(1).max(100).default(10),
+  /**
+   * Answers per student, shared by Run, Test run and Submit (the campus
+   * courses design, §6). Free messages do not count.
+   */
+  AI_ASSISTANT_PROBLEM_LIMIT: z.coerce.number().int().min(1).max(9).default(5),
+  AI_ASSISTANT_DAILY_LIMIT: z.coerce.number().int().min(1).max(100).default(15),
   AI_ASSISTANT_MONTHLY_BUDGET_USD: z.coerce.number().min(0).max(1_000).default(30),
   AI_ASSISTANT_INPUT_USD_PER_MTOK: z.coerce.number().min(0).max(100).default(0.1),
   AI_ASSISTANT_OUTPUT_USD_PER_MTOK: z.coerce.number().min(0).max(1_000).default(0.5),
@@ -218,10 +222,14 @@ export const apiEnvironmentSchema = z.object({
   AI_LIBRARY_MONTHLY_BUDGET_USD: z.coerce.number().min(0).max(1_000).default(10),
   AI_LIBRARY_INPUT_USD_PER_MTOK: z.coerce.number().min(0).max(100).default(0.1),
   AI_LIBRARY_OUTPUT_USD_PER_MTOK: z.coerce.number().min(0).max(1_000).default(0.5),
-  /** Seoul hours when libraries are written and tested, such as 22-7; 0-24 is always. */
-  AI_LIBRARY_HOURS: z.string().regex(/^(?:[01]?\d|2[0-4])-(?:[01]?\d|2[0-4])$/, "must look like 22-7").default("22-7"),
-  /** How long a problem must be left alone before its library is written. */
-  AI_LIBRARY_QUIET_MINUTES: z.coerce.number().int().min(0).max(1_440).default(10),
+  /**
+   * Seoul hours when libraries are written and tested, such as 22-7; 0-24 is
+   * always (the default since November 26, 2026: a problem is learned right
+   * after it is saved, and students' checks go before learning in the grader).
+   */
+  AI_LIBRARY_HOURS: z.string().regex(/^(?:[01]?\d|2[0-4])-(?:[01]?\d|2[0-4])$/, "must look like 22-7").default("0-24"),
+  /** How long a problem must be left alone before the sweep queues it. The editor queues its own saves at once. */
+  AI_LIBRARY_QUIET_MINUTES: z.coerce.number().int().min(0).max(1_440).default(0),
   /** Include the teacher's solution when writing a library. Never during student help. */
   AI_LIBRARY_SEND_SOLUTIONS: z.preprocess(v => v === undefined || v === "true" || v === true, z.boolean()).default(true),
   /** How long students' AI replies are kept. */

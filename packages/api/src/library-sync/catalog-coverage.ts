@@ -35,6 +35,7 @@ export const MODEL_COVERAGE: Record<string, Record<string, Claim>> = {
     sourceContentRevision: excluded("provenance"),
     baselineRevision: excluded("provenance"),
     retiredAt: excluded("library lifecycle"),
+    aiTeacherEnabled: excluded("the academy's own choice: a library update never turns its AI teacher on or off"),
     createdByUserId: excluded("authorship"),
     createdAt: STAMP,
     updatedAt: STAMP,

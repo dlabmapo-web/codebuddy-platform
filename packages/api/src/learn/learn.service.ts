@@ -90,7 +90,7 @@ type WorkspaceMaterial = Omit<
       include: typeof workspaceMaterialInclude;
     }>["programmingExercise"]
   >;
-  ai?: { featureOn: boolean };
+  ai?: { featureOn: boolean; courseOn?: boolean };
 };
 
 @Injectable()
@@ -492,7 +492,11 @@ export class LearnService {
             expectedOutput: testCase.expectedOutput,
             comparator: testCase.comparator,
           })),
-        aiAssistant: !staffPractice && material.ai?.featureOn === true && exercise.aiFeedbackEnabled &&
+        // Whether to draw the AI help button: the course's and the problem's
+        // switches, and a kind of problem the AI teacher works on. Every
+        // request decides it again on the server.
+        aiAssistant: !staffPractice && material.ai?.featureOn === true && material.ai.courseOn === true && exercise.aiFeedbackEnabled &&
+          (material.lecture as { kind?: string }).kind !== "TEST" &&
           (exercise.submissionPolicy ?? "AUTOMATIC") === "AUTOMATIC" && exercise.language === "PYTHON" && exercise.quiz == null && exercise.sourceProject == null,
         // Only what a teacher wrote: AI hints teach the AI teacher, not the student.
         hints: exercise.hints.map((hint) => ({ position: hint.position, content: hint.content })),

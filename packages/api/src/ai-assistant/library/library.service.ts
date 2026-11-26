@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { AI_LIBRARY_TEXT_MAX, type AiLibraryView, type UpdateAiLibraryItemInput } from "@cove/shared";
+import { AI_LIBRARY_TEXT_MAX, type AiLibraryBlocker, type AiLibraryView, type UpdateAiLibraryItemInput } from "@cove/shared";
 
 import { AuditService } from "../../academies/audit.service.js";
 import type { SupabaseIdentity } from "../../auth/auth.types.js";
@@ -94,8 +94,15 @@ export class AiLibraryService {
   private async read(input: LibraryInput): Promise<AiLibraryView> {
     const exercise = await this.requireExercise(input);
     const library = exercise.aiLibrary;
-    const [flag, items, errors, totals, matched] = await Promise.all([
-      this.prisma.academyFeatureFlag.findUnique({ where: { academyId_feature: { academyId: input.academyId, feature: "AI_ASSISTANT" } }, select: { isEnabled: true } }),
+    const [[place], items, errors, totals, matched] = await Promise.all([
+      // The switches and kinds the AI teacher needs, in one statement.
+      this.prisma.$queryRaw<{ feature_on: boolean; course_on: boolean; lecture_kind: string; project: boolean; has_example: boolean }[]>`
+        SELECT EXISTS (SELECT 1 FROM academy_feature_flags f WHERE f.academy_id = c.academy_id AND f.feature = 'AI_ASSISTANT' AND f.is_enabled) AS feature_on,
+          c.ai_teacher_enabled AS course_on, l.kind::text AS lecture_kind, pe.source_project IS NOT NULL AS project,
+          EXISTS (SELECT 1 FROM exercise_test_cases s WHERE s.exercise_material_id = pe.material_id AND s.visibility = 'SAMPLE') AS has_example
+        FROM programming_exercises pe JOIN materials m ON m.id = pe.material_id JOIN lectures l ON l.id = m.lecture_id
+        JOIN course_modules cm ON cm.id = l.course_module_id JOIN courses c ON c.id = cm.course_id
+        WHERE pe.material_id = ${input.materialId}::uuid`,
       this.prisma.aiLibraryItem.findMany({
         where: { materialId: input.materialId, OR: [{ state: { in: ["ACTIVE", "HIDDEN", "CHECKING"] } }, { state: "REJECTED", rejectReason: { not: "REPLACED" } }] },
         orderBy: [{ kind: "asc" }, { state: "asc" }, { position: "asc" }], take: 60,
@@ -111,13 +118,22 @@ export class AiLibraryService {
         SELECT count(*)::int AS failures, count(DISTINCT s.user_id)::int AS students FROM submissions s
         WHERE s.material_id = ${input.materialId}::uuid AND s.created_at > now() - interval '30 days' AND s.status = 'FAILED' AND s.regrade_run_id IS NULL AND s.test_attempt_id IS NULL`,
       this.prisma.$queryRaw<{ item_id: string | null; count: number; students: number }[]>`
-        SELECT r.library_item_id AS item_id, count(DISTINCT r.submission_id)::int AS count, count(DISTINCT r.user_id)::int AS students
+        SELECT r.library_item_id AS item_id, count(DISTINCT COALESCE(r.submission_id, r.check_id))::int AS count, count(DISTINCT r.user_id)::int AS students
         FROM ai_help_replies r WHERE r.material_id = ${input.materialId}::uuid AND r.status = 'DONE' AND r.created_at > now() - interval '30 days'
         GROUP BY 1 ORDER BY 2 DESC LIMIT 20`,
     ]);
+    const blocked: AiLibraryBlocker | null = !place?.feature_on ? "FEATURE_OFF"
+      : !place.course_on ? "COURSE_OFF"
+      : !exercise.aiFeedbackEnabled ? "PROBLEM_OFF"
+      : exercise.language !== "PYTHON" ? "LANGUAGE"
+      : exercise.quiz !== null ? "QUIZ"
+      : exercise.submissionPolicy !== "AUTOMATIC" ? "MANUAL"
+      : place.project ? "PROJECT"
+      : place.lecture_kind !== "STANDARD" ? "EXAM"
+      : !place.has_example ? "NO_EXAMPLE" : null;
     return {
-      enabled: aiSettings(this.config).help.enabled && (flag?.isEnabled ?? false) && exercise.aiFeedbackEnabled &&
-        exercise.submissionPolicy === "AUTOMATIC" && exercise.language === "PYTHON" && exercise.quiz === null,
+      enabled: aiSettings(this.config).help.enabled && blocked === null,
+      blocked,
       state: library?.state ?? "NONE",
       errorCode: library?.lastErrorCode ?? null,
       current: library?.gradingRevision === exercise.gradingRevision,

@@ -9,6 +9,7 @@ import {
   getAiHelpInputSchema,
   reportAiHelpInputSchema,
   requestAiHelpInputSchema,
+  requestAiHelpForCodeInputSchema,
 } from '../../content/ai-help.js';
 import { latestSubmissionInputSchema, latestSubmissionSchema } from '../../content/latest-submission.js';
 
@@ -176,6 +177,8 @@ export const learnContract = {
    */
   getAiHelp: oc.input(getAiHelpInputSchema).output(aiHelpViewSchema),
   requestAiHelp: oc.input(requestAiHelpInputSchema).output(aiHelpResponseSchema),
+  /** The AI assistant after Run or Test run: the server checks the examples first. */
+  requestAiHelpForCode: oc.input(requestAiHelpForCodeInputSchema).output(aiHelpResponseSchema),
   reportAiHelp: oc.input(reportAiHelpInputSchema).output(aiReportedSchema),
   getSampleCheck: oc.input(getSampleCheckInputSchema).output(sampleCheckViewSchema),
   cancelSampleCheck: oc.input(sampleCheckInputSchema).output(sampleCheckViewSchema),

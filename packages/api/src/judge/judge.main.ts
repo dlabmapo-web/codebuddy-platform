@@ -20,6 +20,7 @@ import { JudgeQueue } from "./judge.queue.js";
 import { RegradeRunner } from "./regrade.runner.js";
 import { ComparatorPool } from "./comparator-pool.js";
 import { ExecutionCapacity } from "./execution-capacity.js";
+import { AiHelpCheckRunner } from "./ai-help-check.runner.js";
 import { SampleCheckRunner } from "./sample-check.runner.js";
 import { SampleCheckStore } from "./sample-check.store.js";
 import type { ExecutionEngine } from "./execution-engine.js";
@@ -132,7 +133,10 @@ async function bootstrap(): Promise<void> {
   const practiceWorker = queue.createPracticeWorker(
     (job, queuedAtMs) => {
       if (queuedAtMs !== undefined) telemetry.observe("queue", Math.max(0, Date.now() - queuedAtMs), "practice");
-      return measured("practice", () => capacity.runBackground(() => job.kind === "library" ? libraryChecks.run(job.attemptId) : practice.run(job.attemptId)), job.attemptId);
+      // A staff member waits for their own practice; AI learning is batch work.
+      return measured("practice", () => job.kind === "library"
+        ? capacity.runBackground(() => libraryChecks.run(job.attemptId), "batch")
+        : capacity.runBackground(() => practice.run(job.attemptId), "interactive"), job.attemptId);
     },
     environment.REGRADE_CONCURRENCY,
   );
@@ -158,13 +162,15 @@ async function bootstrap(): Promise<void> {
     comparator,
     capacity,
   );
+  // AI help checks share the sample lane: a student is waiting for both.
+  const aiHelpChecks = new AiHelpCheckRunner(prisma, grading, capacity);
   const sampleWorker = queue.createSampleWorker(
     (job) => {
       if (job.queuedAtMs !== undefined) telemetry.observe("queue", Math.max(0, Date.now() - job.queuedAtMs), "sample");
-      return measured("sample", () => samples.run(job.data.checkId), job.data.checkId);
+      return measured("sample", () => job.data.kind === "ai-help" ? aiHelpChecks.run(job.data.checkId) : samples.run(job.data.checkId), job.data.checkId);
     },
     environment.SAMPLE_CHECK_CONCURRENCY,
-    (checkId) => void samples.markFailed(checkId),
+    (checkId) => { void samples.markFailed(checkId); void aiHelpChecks.markFailed(checkId); },
   );
   const healthPort = Number(process.env.JUDGE_HEALTH_PORT ?? 0);
   const monitor = startJudgeMonitor({ port: healthPort, bind: environment.JUDGE_HEALTH_BIND,

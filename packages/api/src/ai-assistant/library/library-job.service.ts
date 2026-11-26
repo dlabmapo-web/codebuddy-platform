@@ -19,11 +19,14 @@ import {
   reviewSchema, reviewsSchema, writeSchema, writtenLibrarySchema, type PublicCase, type ReviewItem,
 } from "./library-prompt.js";
 import {
-  checkedLibraries, claimGrowth, claimLibrary, queueChangedLibraries, readLibraryExercise,
-  type ClaimedLibrary, type LibraryExercise,
+  checkedLibraries, claimGrowth, claimLibrary, FEEDBACK_MAX, queueChangedLibraries, readLibraryExercise,
+  type ClaimedGrowth, type ClaimedLibrary, type LibraryExercise,
 } from "./library-read.js";
+import { onLibraryWake } from "./library-wake.js";
 
 const TICK_MS = 60_000;
+/** A save wakes the job this soon: long enough for several quick saves to share one pass. */
+const WAKE_MS = 1_000;
 /** While work is under way, the next pass comes this soon instead of at the next minute. */
 const FOLLOW_UP_MS = 10_000;
 const MODEL_TIMEOUT_MS = 150_000;
@@ -40,7 +43,12 @@ const MAX_CHECKING = 5;
 const MIN_HINTS = 3;
 const MIN_FEEDBACK = 2;
 const FEEDBACK_KEPT = 5;
-const FEEDBACK_MAX = 10;
+/**
+ * A wrong program's whole run, at most: one that hangs on every test must not
+ * hold the grader's background slot for the problem's full budget. Over it,
+ * the program has still failed, which is all a wrong program must prove.
+ */
+const WRONG_PROGRAM_BUDGET_MS = 10_000;
 
 type CheckSeed = { itemId: string | null; role: "SOLUTION" | "CORRECT" | "WRONG"; label: string; code: string };
 type ItemVerdict = { id: string; state: "CHECKING" | "REJECTED" | "HIDDEN"; reason: string | null; outputs: unknown; fingerprint?: string | null };
@@ -59,6 +67,9 @@ export class AiLibraryJobService implements OnModuleInit, OnModuleDestroy {
   private soon?: ReturnType<typeof setTimeout>;
   private stopped = false;
   private running = false;
+  /** A wake that came while a pass ran: one more pass follows it. */
+  private again = false;
+  private unwake?: () => void;
   private nativeAdmission?: NativeAdmission;
 
   constructor(
@@ -78,16 +89,31 @@ export class AiLibraryJobService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     this.timer = setInterval(() => void this.tick(), TICK_MS);
     this.timer.unref();
+    this.unwake = onLibraryWake(() => this.kick());
   }
 
   onModuleDestroy() {
     this.stopped = true;
+    this.unwake?.();
     if (this.timer) clearInterval(this.timer);
     if (this.soon) clearTimeout(this.soon);
   }
 
+  /** A problem was just queued: a pass in a moment, or right after the one running. */
+  kick(): void {
+    if (this.stopped) return;
+    if (this.running) {
+      this.again = true;
+      return;
+    }
+    this.later(WAKE_MS);
+  }
+
   async tick(): Promise<void> {
-    if (this.running || !this.enabled()) return;
+    if (this.running || !this.enabled()) {
+      if (this.running) this.again = true;
+      return;
+    }
     this.running = true;
     let busy = false;
     try {
@@ -99,11 +125,17 @@ export class AiLibraryJobService implements OnModuleInit, OnModuleDestroy {
     }
     // Libraries are moving (written, reviewed, or programs in the grader): look
     // again in seconds, not at the next minute. An idle job keeps the minute.
-    if (busy && !this.stopped) {
-      clearTimeout(this.soon);
-      this.soon = setTimeout(() => void this.tick(), FOLLOW_UP_MS);
-      this.soon.unref();
-    }
+    if (this.again) {
+      this.again = false;
+      this.later(WAKE_MS);
+    } else if (busy) this.later(FOLLOW_UP_MS);
+  }
+
+  private later(ms: number): void {
+    if (this.stopped) return;
+    clearTimeout(this.soon);
+    this.soon = setTimeout(() => void this.tick(), ms);
+    this.soon.unref();
   }
 
   /** One pass over everything due. Exposed for tests. True while work is under way. */
@@ -118,9 +150,15 @@ export class AiLibraryJobService implements OnModuleInit, OnModuleDestroy {
     const written = await this.claimAndRun("WAITING", Math.min(MAX_PER_PASS, MAX_CHECKING - inGrader), (claim) => this.write(claim));
     const busy = reviewed.count > 0 || written.count > 0 || inGrader > 0;
     if (written.overBudget) return busy;
-    const growth = await claimGrowth(this.prisma, randomUUID());
-    if (growth) await this.grow(growth);
-    return busy;
+    // Every new mistake, soon after the answer that showed it: a few problems at once.
+    const growing: ClaimedGrowth[] = [];
+    while (growing.length < PARALLEL && !(await this.overBudget())) {
+      const claim = await claimGrowth(this.prisma, randomUUID(), FEEDBACK_MAX);
+      if (!claim) break;
+      growing.push(claim);
+    }
+    await Promise.all(growing.map((claim) => this.grow(claim)));
+    return busy || growing.length > 0;
   }
 
   /**
@@ -241,6 +279,11 @@ export class AiLibraryJobService implements OnModuleInit, OnModuleDestroy {
       timeLimitMs: exercise.timeLimitMs, memoryLimitMb: exercise.memoryLimitMb,
       ...grading.submission, gradingCases: grading.cases, quizSnapshot: null,
     }))) as Prisma.InputJsonObject;
+    // A wrong program needs only to fail: its whole run is capped. Legacy
+    // grading already stops at the first case over its limit.
+    const total = grading.submission.totalTimeLimitMs;
+    const wrongSnapshot = total !== null && total > WRONG_PROGRAM_BUDGET_MS
+      ? { ...snapshot, totalTimeLimitMs: WRONG_PROGRAM_BUDGET_MS } : snapshot;
 
     const checks = await this.prisma.$transaction(async (tx) => {
       const fenced = await tx.$executeRaw`
@@ -261,7 +304,8 @@ export class AiLibraryJobService implements OnModuleInit, OnModuleDestroy {
         : [];
       const rows = [...seeds, ...staff.map((item): CheckSeed => ({ itemId: item.id, role: "WRONG", label: item.label, code: item.wrongProgram! }))]
         .map((seed) => ({
-          id: randomUUID(), materialId: claim.materialId, itemId: seed.itemId, role: seed.role, label: seed.label.slice(0, 120), code: seed.code, snapshot,
+          id: randomUUID(), materialId: claim.materialId, itemId: seed.itemId, role: seed.role, label: seed.label.slice(0, 120), code: seed.code,
+          snapshot: seed.role === "WRONG" ? wrongSnapshot : snapshot,
           executionQueue: descriptor ? runtimeQueueName("practice", descriptor) : null,
         }));
       await tx.aiLibraryCheck.createMany({ data: rows });
@@ -434,32 +478,45 @@ export class AiLibraryJobService implements OnModuleInit, OnModuleDestroy {
 
   /* ---------------------------------------------------------------- growing */
 
-  /** One new item from replies that matched none. Only AI text is read, never a student's code. */
-  private async grow(claim: ClaimedLibrary): Promise<void> {
+  /**
+   * New items from the answers that matched none since the last growth (the
+   * campus courses design, §7). Only AI text is read, never a student's code.
+   * Each new mistake must still be proven by the grader and pass the review.
+   */
+  private async grow(claim: ClaimedGrowth): Promise<void> {
     try {
+      const since = new Date(Math.max(claim.since?.getTime() ?? 0, Date.now() - 30 * 86_400_000));
       const [exercise, replies, known] = await Promise.all([
         readLibraryExercise(this.prisma, claim.materialId),
         this.prisma.aiHelpReply.findMany({
-          where: { materialId: claim.materialId, status: "DONE", libraryItemId: null, createdAt: { gt: new Date(Date.now() - 30 * 86_400_000) } },
-          orderBy: { createdAt: "desc" }, take: 30, select: { reply: true },
+          where: { materialId: claim.materialId, status: "DONE", libraryItemId: null, completedAt: { gt: since } },
+          orderBy: { completedAt: "desc" }, take: 30, select: { reply: true },
         }),
         this.prisma.aiLibraryItem.findMany({ where: { materialId: claim.materialId, kind: "FEEDBACK", state: "ACTIVE" }, select: { label: true, wrongProgram: true } }),
       ]);
-      if (!exercise?.eligible) return await this.release(claim);
+      if (!exercise?.eligible || !replies.length) return await this.release(claim);
       const prompt = buildGrowPrompt({
         problem: exercise, publicCases: publicCases(exercise), solutions: this.settings().sendSolutions ? exercise.solutions : [],
       }, known.map((item) => item.label), replies.flatMap((item) => item.reply ?? []));
-      const answer = await this.ask({ ...prompt, schema: growSchema, maxOutputTokens: 4_000 });
+      const answer = await this.ask({ ...prompt, schema: growSchema, maxOutputTokens: 6_000 });
       const grown = grownSchema.safeParse(answer.json);
-      const mistake = grown.success ? grown.data.mistake : null;
-      if (!mistake || known.some((item) => item.wrongProgram && squash(item.wrongProgram) === squash(mistake.wrongProgram))) return await this.release(claim);
-      const id = randomUUID();
-      await this.startChecks(claim, exercise, [{
-        id, materialId: claim.materialId, kind: "FEEDBACK", position: 1, label: clean(mistake.label), origin: "GROWN",
+      // A program already known, or given twice, is one mistake.
+      const programs = new Set(known.flatMap((item) => item.wrongProgram ? [squash(item.wrongProgram)] : []));
+      const room = Math.max(0, FEEDBACK_MAX - known.length);
+      const mistakes = (grown.success ? grown.data.mistakes : []).filter((mistake) => {
+        const key = squash(mistake.wrongProgram);
+        if (programs.has(key)) return false;
+        programs.add(key);
+        return true;
+      }).slice(0, room);
+      if (!mistakes.length) return await this.release(claim);
+      const items = mistakes.map((mistake, index) => ({
+        id: randomUUID(), materialId: claim.materialId, kind: "FEEDBACK" as const, position: index + 1, label: clean(mistake.label), origin: "GROWN" as const,
         textKo: cut(mistake.ko), textEn: cut(mistake.en), wrongProgram: clean(mistake.wrongProgram),
-      }], [
+      }));
+      await this.startChecks(claim, exercise, items, [
         ...exercise.solutions.slice(0, 1).map((code): CheckSeed => ({ itemId: null, role: "SOLUTION", label: "solution 1", code })),
-        { itemId: id, role: "WRONG", label: clean(mistake.label), code: clean(mistake.wrongProgram) },
+        ...items.map((item): CheckSeed => ({ itemId: item.id, role: "WRONG", label: item.label, code: item.wrongProgram })),
       ], { model: answer.model, replace: false });
     } catch (error) {
       await this.release(claim);

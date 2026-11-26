@@ -165,7 +165,7 @@ describe('exercise draft helpers', () => {
     // contract defaulted the rest: opening a 30/30/40 problem and saving it
     // untouched turned it into 1/1/1.
     const loaded = contextToDraft({
-      course: { id: '10000000-0000-4000-8000-000000000001', title: 'Course', language: 'PYTHON' },
+      course: { id: '10000000-0000-4000-8000-000000000001', title: 'Course', language: 'PYTHON', aiTeacherEnabled: false },
       module: { id: '20000000-0000-4000-8000-000000000001', title: 'Module' },
       lecture: { id: '30000000-0000-4000-8000-000000000001', title: 'Lecture' },
       material: {
@@ -377,7 +377,7 @@ describe('withLanguage', () => {
 
 describe('a new problem', () => {
   const context = (language: 'PYTHON' | 'C_CPP') => ({
-    course: { id: '10000000-0000-4000-8000-000000000001', title: 'Course', language },
+    course: { id: '10000000-0000-4000-8000-000000000001', title: 'Course', language, aiTeacherEnabled: false },
     module: { id: '20000000-0000-4000-8000-000000000001', title: 'Module' },
     lecture: { id: '30000000-0000-4000-8000-000000000001', title: 'Lecture' },
     material: null,

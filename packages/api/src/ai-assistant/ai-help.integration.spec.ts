@@ -3,6 +3,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
+import { LearningClassContextService } from "../learn/learning-class-context.service.js";
 import { SupportGrantResolver } from "../authorization/support-grant.resolver.js";
 import type { PrismaService } from "../database/prisma.service.js";
 import { PrismaClient } from "../generated/prisma/client.js";
@@ -32,7 +33,10 @@ describe.skipIf(!databaseUrl)("the AI teacher's analysis", () => {
     const config = Object.create(f.config) as typeof f.config;
     config.get = ((key: string) => over.env && key in over.env ? over.env[key] : (f.config.get as (k: string) => unknown)(key)) as never;
     const prisma = over.prisma ?? f.prisma;
-    return new AiHelpService(prisma, new AcademyAccessService(prisma, new SupportGrantResolver(prisma)), config, over.model ?? model, (over.queue ?? f.queue) as never);
+    return new AiHelpService(
+      prisma, new AcademyAccessService(prisma, new SupportGrantResolver(prisma)), config, over.model ?? model,
+      new LearningClassContextService(prisma), (over.queue ?? f.queue) as never,
+    );
   };
   const student = () => f.identity(f.auth.student);
   const other = () => f.identity(f.auth.other);
@@ -84,7 +88,7 @@ describe.skipIf(!databaseUrl)("the AI teacher's analysis", () => {
     } });
     expect(result.reply!.text.split("\n")).toHaveLength(4);
     const row = await f.prisma.aiHelpReply.findFirstOrThrow({ where: { submissionId: id } });
-    expect(row).toMatchObject({ status: "DONE", level: 1, locale: "en", classId: f.ids.klass, inputTokens: 100, outputTokens: 20, costMicros: 20, promptVersion: "v4", libraryItemId: null });
+    expect(row).toMatchObject({ status: "DONE", level: 1, locale: "en", classId: f.ids.klass, inputTokens: 100, outputTokens: 20, costMicros: 20, promptVersion: "v5", libraryItemId: null });
     expect(row.analysis).toMatchObject({ line: 3 });
     expect(await f.prisma.aiUsageMonth.findFirstOrThrow()).toMatchObject({ kind: "HELP", requests: 1, costMicros: 20n });
     // Asking again shows the same answer, and costs nothing.
@@ -430,4 +434,104 @@ describe.skipIf(!databaseUrl)("the AI teacher's analysis", () => {
     expect(one.ask).toBeLessThanOrEqual(8 + 1); // BEGIN and COMMIT are counted too.
     await client.$disconnect();
   }, 60_000);
+
+  describe("after Run and Test run (the campus courses design, §6)", () => {
+    const askCode = (materialId: string, code: string, over: Record<string, unknown> = {}, from = help) =>
+      from.requestForCode(student(), {
+        academyId: f.ids.academy, classId: f.ids.klass, materialId, code, workspaceRevision: 1, source: "TEST_RUN",
+        locale: "en", requestId: randomUUID(), mode: "analyze", ...over,
+      } as never);
+    beforeEach(async () => {
+      f.helpEnqueued.length = 0;
+      f.engine.programs.set(WRONG, (stdin) => `${Math.min(...f.numbers(stdin))}\n`);
+    });
+
+    it("runs the editor's code on the examples on the server and explains a failure from them only", async () => {
+      const materialId = await f.createExercise();
+      const runs = f.engine.runs;
+      const result = await askCode(materialId, WRONG, { source: "RUN" });
+      expect(result).toMatchObject({ state: "AVAILABLE", remainingForProblem: 2, fallback: null });
+      expect(result.reply?.analysis?.line).toBe(3);
+      // The two examples, never the hidden tests.
+      expect(f.engine.runs - runs).toBe(2);
+      expect(f.helpEnqueued).toHaveLength(1);
+      const check = await f.prisma.aiHelpCheck.findFirstOrThrow({ where: { materialId } });
+      expect(check).toMatchObject({ source: "RUN", status: "FAILED", fingerprint: "FF", userId: f.ids.student });
+      expect((check.results as { position: number }[]).map((item) => item.position)).toEqual([1, 2]);
+      const row = await f.prisma.aiHelpReply.findFirstOrThrow({ where: { checkId: check.id } });
+      expect(row).toMatchObject({ source: "RUN", submissionId: null, status: "DONE", level: 1 });
+      const content = model.requests[0]!.content;
+      expect(content).toContain("only the examples were run");
+      expect(content).not.toContain("111222");
+      expect(content).not.toContain("333444");
+      // No submission, attempt or progress.
+      expect(await f.prisma.submission.count({ where: { materialId } })).toBe(0);
+    });
+
+    it("says all examples pass for free, with no model call and nothing counted", async () => {
+      const materialId = await f.createExercise();
+      const result = await askCode(materialId, "SOLUTION_SENTINEL");
+      expect(result).toMatchObject({ examplesPassed: true, reply: null, fallback: null, remainingForProblem: 3 });
+      expect(model.requests).toEqual([]);
+      expect(await f.prisma.aiHelpReply.count({ where: { materialId } })).toBe(0);
+      // Asked again: the check is reused, not run again.
+      expect(await askCode(materialId, "SOLUTION_SENTINEL")).toMatchObject({ examplesPassed: true });
+      expect(f.helpEnqueued).toHaveLength(1);
+    });
+
+    it("gives the saved answer for the same code again: no new check, no new call", async () => {
+      const materialId = await f.createExercise();
+      const first = await askCode(materialId, WRONG);
+      const again = await askCode(materialId, WRONG);
+      expect(again.reply?.id).toBe(first.reply?.id);
+      expect(f.helpEnqueued).toHaveLength(1);
+      expect(model.requests).toHaveLength(1);
+      // A simpler explanation is of the same check's analysis.
+      const simpler = await askCode(materialId, WRONG, { mode: "simpler" });
+      expect(simpler.reply?.level).toBe(2);
+      expect(f.helpEnqueued).toHaveLength(1);
+    });
+
+    it("shares one limit with Submit, and starts no check past it", async () => {
+      const materialId = await f.createExercise();
+      await ask(await submit(materialId));
+      await askCode(materialId, WRONG);
+      f.engine.programs.set(`${WRONG}\n`, (stdin) => `${Math.min(...f.numbers(stdin))}\n`);
+      expect(await askCode(materialId, `${WRONG}\n`)).toMatchObject({ reply: { level: 1 }, remainingForProblem: 0, state: "LIMIT_PROBLEM" });
+      f.engine.programs.set(`${WRONG}\n\n`, (stdin) => `${Math.min(...f.numbers(stdin))}\n`);
+      const checks = f.helpEnqueued.length;
+      expect(await askCode(materialId, `${WRONG}\n\n`)).toMatchObject({ state: "LIMIT_PROBLEM", reply: null });
+      expect(f.helpEnqueued).toHaveLength(checks);
+    });
+
+    it("is off when the course has no AI teacher, and refuses a stale workspace", async () => {
+      const materialId = await f.createExercise();
+      await f.prisma.course.update({ where: { id: f.ids.course }, data: { aiTeacherEnabled: false } });
+      try {
+        expect(await askCode(materialId, WRONG)).toMatchObject({ state: "OFF", reply: null });
+        expect(f.helpEnqueued).toEqual([]);
+      } finally {
+        await f.prisma.course.update({ where: { id: f.ids.course }, data: { aiTeacherEnabled: true } });
+      }
+      expect(await code(askCode(materialId, WRONG, { workspaceRevision: 2 }))).toBe("SAMPLE_CHECK_STALE");
+      expect(await code(askCode(materialId, WRONG, { academyId: randomUUID() }))).not.toBe("ok");
+    });
+
+    it("costs a bounded number of statements, the same with much history", async () => {
+      const client = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl! }), log: [{ emit: "event", level: "query" }] });
+      let statements: string[] = [];
+      client.$on("query", (event) => statements.push(event.query));
+      const counted = service({ prisma: client as unknown as PrismaService });
+      const measure = async (action: () => Promise<unknown>) => { statements = []; await action(); return statements.length; };
+      const materialId = await f.createExercise();
+      const one = { ask: await measure(() => askCode(materialId, WRONG, {}, counted)), again: await measure(() => askCode(materialId, WRONG, {}, counted)) };
+      console.log("AI help after Run/Test run statements", one);
+      // Access, reach, one read and the class; then the exercise in one read,
+      // the check, its result, the reservation and the answer. BEGIN and COMMIT count.
+      expect(one.ask).toBeLessThanOrEqual(12);
+      // The same code again: access, reach, one read and the class.
+      expect(one.again).toBeLessThanOrEqual(4);
+      await client.$disconnect();
+    }, 60_000);
+  });
 });

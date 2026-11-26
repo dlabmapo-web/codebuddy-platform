@@ -58,15 +58,17 @@ describe.skipIf(!databaseUrl)("AI libraries, end to end", () => {
   afterAll(async () => { await f?.close(); });
 
   beforeEach(async () => {
-    // Earlier cases' problems must not compete for a pass.
-    await f.prisma.material.updateMany({ where: { lectureId: f.ids.lecture }, data: { isVisible: false } });
+    // Earlier cases' problems must not compete for a pass. Hiding them would
+    // not do: a hidden problem is learned too (the campus courses design, §5).
+    await f.prisma.programmingExercise.updateMany({ where: { material: { lectureId: f.ids.lecture } }, data: { aiFeedbackEnabled: false } });
+    await f.prisma.course.update({ where: { id: f.ids.course }, data: { aiTeacherEnabled: true } });
     await f.prisma.aiLibrary.deleteMany({ where: { exercise: { material: { lectureId: f.ids.lecture } } } });
     await f.prisma.aiLibraryCheck.deleteMany({});
     await f.prisma.aiUsageMonth.deleteMany({});
     f.enqueued.length = 0;
     write = good;
     review = approve;
-    grow = () => ({ mistake: null });
+    grow = () => ({ mistakes: [] });
     model = new FakeModelClient((request) => request.schema.name === "library" ? write() : request.schema.name === "grow" ? grow() : review(request));
     jobs = new AiLibraryJobService(f.prisma, f.config, model, f.queue);
   });
@@ -154,7 +156,7 @@ describe.skipIf(!databaseUrl)("AI libraries, end to end", () => {
       expect(model.requests.filter((r) => r.schema.name === "library").length).toBeGreaterThan(0);
       for (const request of model.requests) expect(request.content).not.toContain("SOLUTION_SENTINEL");
     } finally {
-      await quiet.prisma.material.updateMany({ where: { lectureId: quiet.ids.lecture }, data: { isVisible: false } });
+      await quiet.prisma.programmingExercise.updateMany({ where: { material: { lectureId: quiet.ids.lecture } }, data: { aiFeedbackEnabled: false } });
       await quiet.close();
     }
   });
@@ -245,7 +247,19 @@ describe.skipIf(!databaseUrl)("AI libraries, end to end", () => {
     await f.prisma.academyFeatureFlag.updateMany({ where: { academyId: f.ids.academy }, data: { isEnabled: true } });
     await f.prisma.programmingExercise.update({ where: { materialId }, data: { aiFeedbackEnabled: false } });
     await jobs.pass();
+    // The course's AI teacher choice is a master switch over the problem's own.
+    await f.prisma.programmingExercise.update({ where: { materialId }, data: { aiFeedbackEnabled: true } });
+    await f.prisma.course.update({ where: { id: f.ids.course }, data: { aiTeacherEnabled: false } });
+    await jobs.pass();
     expect(model.requests).toEqual([]);
+    expect(await f.prisma.aiLibrary.count({ where: { materialId } })).toBe(0);
+  });
+
+  it("learns a problem students cannot see yet, so its notes are ready before they can", async () => {
+    const materialId = await f.createExercise();
+    await f.prisma.material.update({ where: { id: materialId }, data: { isVisible: false } });
+    await cycle();
+    expect((await library(materialId)).state).toBe("READY");
   });
 
   it.each([
@@ -335,7 +349,7 @@ describe.skipIf(!databaseUrl)("AI libraries, end to end", () => {
     expect((await library(materialId)).state).toBe("READY");
   });
 
-  it("grows one tested item from unmatched replies, without a student's code", async () => {
+  it("learns every new mistake from one unmatched answer, several at a time, without a student's code (the campus courses design, §7)", async () => {
     const materialId = await f.createExercise();
     await cycle();
     const submission = async (userId: string) => (await f.prisma.submission.create({
@@ -345,17 +359,22 @@ describe.skipIf(!databaseUrl)("AI libraries, end to end", () => {
         problemTitle: "t", courseTitle: "t", moduleTitle: "t", lectureTitle: "t", modulePosition: 1, lecturePosition: 1, problemPosition: 1,
       },
     })).id;
-    const third = (await f.prisma.user.create({ data: { authUserId: crypto.randomUUID(), status: "ACTIVE", username: `t${materialId.slice(0, 7)}` } })).id;
-    const students = [f.ids.student, f.ids.other, third];
-    for (let i = 0; i < 6; i++) {
-      await f.prisma.aiHelpReply.create({
+    const unmatched = async (reply: string) => {
+      const row = await f.prisma.aiHelpReply.create({
         data: {
-          requestId: crypto.randomUUID(), userId: students[i % 3]!, academyId: f.ids.academy, submissionId: await submission(students[i % 3]!), materialId, gradingRevision: 1,
-          level: 1, locale: "en", status: "DONE", reply: "You took the smallest after sorting.", promptVersion: "v2",
+          requestId: crypto.randomUUID(), userId: f.ids.student, academyId: f.ids.academy, submissionId: await submission(f.ids.student), materialId, gradingRevision: 1,
+          level: 1, locale: "en", status: "DONE", reply, promptVersion: "v5",
         },
       });
-    }
-    grow = () => ({ mistake: mistake(8, "SORT_BAD") });
+      // Finished on the database's clock, as `finishReply` does: the growth
+      // compares it with a time the database wrote.
+      await f.prisma.$executeRaw`UPDATE ai_help_replies SET completed_at = now() WHERE id = ${row.id}::uuid`;
+    };
+    // One student, one answer: enough to learn from.
+    await unmatched("You took the smallest after sorting.");
+    // Two new mistakes and one the library already knows (FIRST is Mistake 1's program).
+    grow = () => ({ mistakes: [mistake(8, "SORT_BAD"), mistake(9, "FIRST"), mistake(10, "ALWAYS9 ")] });
+    f.engine.programs.set("ALWAYS9 ", () => "9");
     await jobs.pass();
     const request = model.requests.find((item) => item.schema.name === "grow")!;
     expect(request.content).toContain("You took the smallest after sorting.");
@@ -363,12 +382,47 @@ describe.skipIf(!databaseUrl)("AI libraries, end to end", () => {
     await f.runChecks();
     await jobs.pass();
     const grown = (await items(materialId)).filter((item) => item.origin === "GROWN");
-    expect(grown.map((item) => item.label)).toEqual(["Mistake 8"]);
+    expect(grown.map((item) => item.label).sort()).toEqual(["Mistake 10", "Mistake 8"]);
     expect((await library(materialId)).state).toBe("READY");
-    expect((await items(materialId)).filter((item) => item.kind === "FEEDBACK")).toHaveLength(6);
-    // Once a week.
+    expect((await items(materialId)).filter((item) => item.kind === "FEEDBACK")).toHaveLength(7);
+
+    // Nothing new since: no call. A newer answer is learned from on the next pass.
     await jobs.pass();
     expect(model.requests.filter((item) => item.schema.name === "grow")).toHaveLength(1);
+    await unmatched("You printed the sum of both numbers.");
+    grow = () => ({ mistakes: [mistake(11, "SUM ")] });
+    f.engine.programs.set("SUM ", (s) => String(f.numbers(s)[0] + f.numbers(s)[1]));
+    await jobs.pass();
+    const second = model.requests.filter((item) => item.schema.name === "grow");
+    expect(second).toHaveLength(2);
+    // Only the answers since the last growth.
+    expect(second[1]!.content).toContain("You printed the sum of both numbers.");
+    expect(second[1]!.content).not.toContain("You took the smallest after sorting.");
+  });
+
+  it("stops growing a problem at thirty mistakes", async () => {
+    const materialId = await f.createExercise();
+    await cycle();
+    await f.prisma.aiLibraryItem.createMany({
+      data: Array.from({ length: 25 }, (_, index) => ({
+        materialId, kind: "FEEDBACK" as const, position: 10 + index, label: `Staff ${index}`, textKo: "실수예요.", textEn: "A mistake.", origin: "STAFF" as const, state: "ACTIVE" as const,
+      })),
+    });
+    const submissionId = (await f.prisma.submission.create({
+      data: {
+        userId: f.ids.student, materialId, sourceMaterialId: materialId, courseId: f.ids.course, classId: f.ids.klass, gradingRevision: 1, language: "PYTHON",
+        timeLimitMs: 1, memoryLimitMb: 1, code: "x", totalCount: 1, engineVersion: "x", status: "FAILED",
+        problemTitle: "t", courseTitle: "t", moduleTitle: "t", lectureTitle: "t", modulePosition: 1, lecturePosition: 1, problemPosition: 1,
+      },
+    })).id;
+    await f.prisma.aiHelpReply.create({
+      data: {
+        requestId: crypto.randomUUID(), userId: f.ids.student, academyId: f.ids.academy, submissionId, materialId, gradingRevision: 1,
+        level: 1, locale: "en", status: "DONE", reply: "Something new.", promptVersion: "v5", completedAt: new Date(),
+      },
+    });
+    await jobs.pass();
+    expect(model.requests.filter((item) => item.schema.name === "grow")).toHaveLength(0);
   });
 
   it("goes with its exercise", async () => {

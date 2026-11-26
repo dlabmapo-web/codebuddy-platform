@@ -20,7 +20,7 @@ const item = (over: Partial<AiLibraryItemView>): AiLibraryItemView => ({
   origin: 'AI', state: 'ACTIVE', rejectReason: null, reports: 0, version: 1, ...over,
 });
 const view = (over: Partial<AiLibraryView> = {}): AiLibraryView => ({
-  enabled: true, state: 'READY', errorCode: null, current: true,
+  enabled: true, blocked: null, state: 'READY', errorCode: null, current: true,
   items: [
     item({}),
     item({ id: '10000000-0000-4000-8000-000000000005', kind: 'FEEDBACK', label: 'off by one', textKo: '끝 값', textEn: 'The end value', wrongProgram: 'print(1)' }),

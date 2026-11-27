@@ -98,7 +98,9 @@
       "remove": "테스트 케이스 {{number}} 삭제",
       "sample_badge": "학생에게 공개",
       "hidden_badge": "비공개",
-      "toggle_visibility": "공개 여부 전환"
+      "toggle_visibility": "공개 여부 전환",
+      "load_file": "파일에서 불러오기 (.txt)",
+      "size": "{{characters}}자 · {{lines}}줄"
     },
     "hint": {
       "add": "힌트 추가",

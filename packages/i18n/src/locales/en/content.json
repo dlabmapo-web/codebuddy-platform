@@ -101,7 +101,9 @@
       "remove": "Remove test case {{number}}",
       "sample_badge": "Shown to students",
       "hidden_badge": "Hidden",
-      "toggle_visibility": "Toggle visibility"
+      "toggle_visibility": "Toggle visibility",
+      "load_file": "Load from file (.txt)",
+      "size": "{{characters}} characters · {{lines}} lines"
     },
     "hint": {
       "add": "Add hint",

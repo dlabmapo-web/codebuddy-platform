@@ -47,6 +47,11 @@ export function AnswersEditor({
   updateGrading: (grading: ExerciseGradingProfile, testCases: TestCaseDraft[]) => void;
 }) {
   const { t } = useTranslation(['content', 'grading', 'pdf-practice']);
+  // Test data has no length cap; its size shows, and a .txt file loads whole.
+  const testFile = {
+    load: t('exercise.test.load_file'),
+    size: (characters: number, lines: number) => t('exercise.test.size', { characters: characters.toLocaleString(), lines: lines.toLocaleString() }),
+  };
   const weighted = grading.mode === 'ELICE_STDIO';
 
   return (
@@ -163,6 +168,7 @@ export function AnswersEditor({
               <TextAreaField
                 dark={false}
                 disabled={!editable}
+                file={testFile}
                 label={t('exercise.test.input')}
                 onChange={(input) =>
                   update(
@@ -174,6 +180,7 @@ export function AnswersEditor({
               <TextAreaField
                 dark
                 disabled={!editable}
+                file={testFile}
                 label={t(expectedLabelKey(testCase.comparator))}
                 onChange={(expectedOutput) =>
                   update(

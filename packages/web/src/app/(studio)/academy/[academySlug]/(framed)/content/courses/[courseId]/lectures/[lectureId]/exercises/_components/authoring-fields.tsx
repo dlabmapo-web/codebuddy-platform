@@ -1,6 +1,6 @@
-import type { LucideIcon } from 'lucide-react';
+import { FileUp, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useId } from 'react';
+import { useId, useMemo, useRef } from 'react';
 
 import { useTranslation } from 'react-i18next';
 import { useLayoutTranslation } from '@/i18n';
@@ -109,32 +109,89 @@ export function invalidClass(error?: string | null) {
   return error ? 'border-danger focus:border-danger focus:ring-danger/20' : '';
 }
 
+/**
+ * A test case's input or expected output.
+ *
+ * No length cap: a test is as long as the problem needs (a large hidden test
+ * is often 100,000 numbers and more than 500 KB). The browser's `maxLength`
+ * used to stop it at 100,000 characters without a word, so a pasted input was
+ * cut and every correct solution failed that test. With `file`, its size shows
+ * under it, so a cut input is visible, and a .txt test file can be loaded
+ * whole instead of copied from a page that shows only its beginning.
+ */
 export function TextAreaField({
   label,
   value,
   onChange,
   disabled,
   dark,
+  file,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
   dark: boolean;
+  /** Test data: the size line and a button that loads a text file into the field. */
+  file?: { load: string; size: (characters: number, lines: number) => string };
 }) {
+  const picker = useRef<HTMLInputElement>(null);
+  const lines = useMemo(() => lineCount(value), [value]);
   return (
-    <Field label={label}>
-      <textarea
-        className={`min-h-28 w-full resize-y rounded-lg border px-3 py-2.5 font-mono text-[14px] outline-none transition-colors disabled:opacity-60 ${
-          dark
-            ? 'border-[#2d2d2d] bg-[#1e1e1e] text-[#d4d4d4] focus:border-brand'
-            : 'border-border bg-card text-ink focus:border-brand focus:ring-2 focus:ring-brand/20'
-        }`}
-        disabled={disabled}
-        maxLength={100_000}
-        onChange={(event) => onChange(event.target.value)}
-        value={value}
-      />
-    </Field>
+    <div className="space-y-1.5">
+      <Field label={label}>
+        <textarea
+          className={`min-h-28 w-full resize-y rounded-lg border px-3 py-2.5 font-mono text-[14px] outline-none transition-colors disabled:opacity-60 ${
+            dark
+              ? 'border-[#2d2d2d] bg-[#1e1e1e] text-[#d4d4d4] focus:border-brand'
+              : 'border-border bg-card text-ink focus:border-brand focus:ring-2 focus:ring-brand/20'
+          }`}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+          spellCheck={false}
+          value={value}
+        />
+      </Field>
+      {file ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-sub">
+          <span className="tabular-nums" data-testid="test-data-size">{file.size(value.length, lines)}</span>
+          <button
+            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-semibold text-brand hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:opacity-50"
+            data-testid="test-data-load"
+            disabled={disabled}
+            onClick={() => picker.current?.click()}
+            type="button"
+          >
+            <FileUp aria-hidden className="size-3.5" />{file.load}
+          </button>
+          <input
+            accept=".txt,.in,.out,.ans,text/plain"
+            aria-label={`${label}: ${file.load}`}
+            className="hidden"
+            onChange={async (event) => {
+              const chosen = event.target.files?.[0];
+              // The same file may be chosen again after an edit.
+              event.target.value = '';
+              if (chosen) onChange(testFileText(await chosen.text()));
+            }}
+            ref={picker}
+            type="file"
+          />
+        </div>
+      ) : null}
+    </div>
   );
+}
+
+/** A test file as the grader reads it: Windows line ends become \n, and a leading byte-order mark goes. */
+export function testFileText(text: string): string {
+  return text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+}
+
+/** Lines as a person counts them: a final line break does not start another. */
+export function lineCount(text: string): number {
+  if (!text) return 0;
+  let breaks = 0;
+  for (let index = text.indexOf('\n'); index !== -1; index = text.indexOf('\n', index + 1)) breaks += 1;
+  return text.endsWith('\n') ? breaks : breaks + 1;
 }

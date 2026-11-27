@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { ManualSession } from "@cove/shared";
 @Injectable()
@@ -42,6 +42,8 @@ export class GuiClientService {
     const data = (await response.json()) as ManualSession & {
       message?: string;
     };
+    if (response.status === 404 && method === "GET" && path.startsWith("/sessions/"))
+      throw new NotFoundException("Turtle session has ended");
     if (!response.ok)
       throw new ServiceUnavailableException(
         data.message ?? "Turtle runtime is busy or unavailable",

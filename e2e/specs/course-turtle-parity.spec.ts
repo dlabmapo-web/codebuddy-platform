@@ -136,7 +136,10 @@ test('converted course activity: static/error frames, files, layouts, focus, cal
   await painted(page);
   await expect.poll(async () => (await (await page.request.get(`${api}/sessions/${failure.id}`, { headers })).json()).state).toBe('ERROR');
   await page.screenshot({ path: info.outputPath('partial-error.png') });
+  // Retire the session while the workspace still has its ID, as happens after expiry.
+  expect((await page.request.delete(`${api}/sessions/${failure.id}`, { headers })).ok()).toBe(true);
   const recovered = await run(page, line.replace('STATIC_COMPLETE', 'CORRECTED_COMPLETE'));
+  expect(recovered.id).not.toBe(failure.id);
   await painted(page);
   await expect(page.getByTestId('turtle-terminal')).toContainText('CORRECTED_COMPLETE');
   await expect(page.getByTestId('turtle-terminal')).not.toContainText('EXPECTED_PARTIAL_ERROR');

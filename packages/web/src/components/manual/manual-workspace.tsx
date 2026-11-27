@@ -207,6 +207,7 @@ export function ManualWorkspace({
           if (!cancelled && currentGeneration === generation.current) {
             connectionFailed.current = true;
             setError(e.message);
+            if (e.status === 404) active.current = null;
             if ([401, 403, 404].includes(e.status))
               setSession((old) =>
                 old ? { ...old, state: "DISCONNECTED" } : null,
@@ -303,9 +304,9 @@ export function ManualWorkspace({
     setInput('');
     setSession(null);
     try {
-      if (active.current) await manualApi.stop(active.current);
+      // The course broker replaces this learner's previous run during start,
+      // including when the old session has already expired.
       active.current = null;
-      if (current !== generation.current) return;
       const next = await manualApi.start({
         ...target,
         ...latest.current,

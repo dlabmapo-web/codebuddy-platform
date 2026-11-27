@@ -8,12 +8,15 @@ import { QuizFeedback } from '@/components/workspace/quiz-feedback';
 import type { TeacherReviewCase, TeacherSubmissionReview } from '@cove/shared';
 import type { TFunction } from 'i18next';
 import { formatDateTime } from '@cove/i18n/format';
-import { Lock, Sparkles } from 'lucide-react';
+import { ChevronRight, Lock, Sparkles } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AiText } from '@/components/ai/ai-text';
 import { useLocale } from '@/i18n';
 import { EDITOR_FONT_FAMILY, registerPaircodeTheme } from '@/lib/monaco/theme';
+import type { MonacoCodeEditor } from '@/lib/monitoring/yjs-monaco';
 import { cn } from '@/lib/utils';
 
 import { durationDisplay } from '../../../../../progress/_lib/progress-view';
@@ -45,8 +48,26 @@ export function SubmissionReview({
   review: TeacherSubmissionReview;
 }) {
   const { t } = useTranslation('teach');
+  const { t: ta } = useTranslation('learning-help');
   const locale = useLocale();
   const samples = review.cases.filter((item) => item.isSample);
+  // What the AI teacher said, each answer with its simpler version, newest first.
+  const attempt = React.useMemo(() => groupAnswers(review.aiReplies ?? []), [review.aiReplies]);
+  const fromCode = React.useMemo(() => groupAnswers(review.aiCodeReplies ?? []), [review.aiCodeReplies]);
+  const hasAi = attempt.length + fromCode.length > 0;
+  // A reviewer opens on what the student was told about this attempt, when
+  // they were told anything; otherwise on the tests.
+  const [tab, setTab] = React.useState<ReviewTab>(attempt.length ? 'ai' : 'tests');
+  // The line an answer names, marked in the submitted code on the left.
+  const editorRef = React.useRef<MonacoCodeEditor | null>(null);
+  const [editorReady, setEditorReady] = React.useState(false);
+  const [focusLine, setFocusLine] = React.useState<{ line: number; seq: number } | null>(null);
+  React.useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !editorReady || !focusLine) return;
+    return markLine(editor, focusLine.line);
+  }, [editorReady, focusLine]);
+  const showLine = (line: number) => setFocusLine((current) => ({ line, seq: (current?.seq ?? 0) + 1 }));
 
   if (review.manualAssessment) return <div className="grid gap-5 p-4 lg:grid-cols-2">
     <section className="min-w-0 space-y-3"><h1 className="text-lg font-bold">{review.problemTitle}</h1><p className="text-sm text-sub">{review.studentName} · {formatDateTime(review.createdAt, locale, true)}</p>
@@ -56,15 +77,8 @@ export function SubmissionReview({
   </div>;
   return (
     <div className="flex flex-col gap-4">
-      {/* The way back moved to the page's `back` slot, above the heading,
-          where every other detail page keeps it. */}
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[12px] font-semibold text-sub">
-          <Lock aria-hidden className="size-3.5" />
-          {t('progress.review.read_only')}
-        </span>
-      </div>
-
+      {/* The way back is the page's `back` slot, above the heading, where
+          every other detail page keeps it. */}
       <header className="rounded-card border border-border bg-card px-4 py-3.5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
@@ -86,19 +100,27 @@ export function SubmissionReview({
             </p>
           </div>
 
-          <span
-            className={cn(
-              'shrink-0 rounded-full px-3 py-1 text-[13px] font-bold',
-              review.accepted
-                ? 'bg-success/10 text-success'
-                : 'bg-danger/10 text-danger',
-            )}
-            data-testid="review-verdict"
-          >
-            {review.accepted
-              ? t('progress.result.accepted')
-              : t('progress.result.not_accepted')}
-          </span>
+          {/* The verdict and what the reviewer may do with it, together, so
+              the panes below get the height a separate row used to take. */}
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <span
+              className={cn(
+                'rounded-full px-3 py-1 text-[13px] font-bold',
+                review.accepted
+                  ? 'bg-success/10 text-success'
+                  : 'bg-danger/10 text-danger',
+              )}
+              data-testid="review-verdict"
+            >
+              {review.accepted
+                ? t('progress.result.accepted')
+                : t('progress.result.not_accepted')}
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-sub" title={t('progress.review.read_only')}>
+              <Lock aria-hidden className="size-3" />
+              {t('progress.review.read_only')}
+            </span>
+          </div>
         </div>
 
         <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-border pt-3 sm:grid-cols-5">
@@ -139,21 +161,25 @@ export function SubmissionReview({
         </dl>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      {/* Two panes of one height, each scrolling inside itself: the code stays
+          beside whatever is being read about it, and the page never grows a
+          column of answers below the fold. */}
+      <div className="grid gap-4 lg:h-[calc(100dvh-21.5rem)] lg:min-h-[24rem] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         {review.quiz ? <QuizFeedback quiz={review.quiz} /> : <section
           aria-label={t('progress.review.editor_label')}
-          className="overflow-hidden rounded-card border border-border"
+          className="flex h-[26rem] flex-col overflow-hidden rounded-card border border-border lg:h-full"
         >
-          <h2 className="border-b border-border bg-card px-4 py-2.5 text-[13px] font-bold">
+          <h2 className="shrink-0 border-b border-border bg-card px-4 py-2.5 text-[13px] font-bold">
             {t('progress.review.code_heading')}
           </h2>
-          <div className="flex h-[26rem] flex-col">
+          <div className="flex min-h-0 flex-1 flex-col">
             {isFileBundle(review.code) && (review.language === 'C' || review.language === 'CPP') ? (
               <MultiFileEditor code={review.code} fontSize={13} language={review.language} />
             ) : <MonacoEditor
               beforeMount={registerPaircodeTheme}
               height="100%"
               language={monacoLanguageFor(review.language)}
+              onMount={(editor) => { editorRef.current = editor; setEditorReady(true); }}
               options={{
                 automaticLayout: true,
                 // Read-only and announced as such, but still focusable and
@@ -176,148 +202,340 @@ export function SubmissionReview({
           </div>
         </section>}
 
-        <div className="flex flex-col gap-4">
-          {review.compileFailed ? <CompileFailure diagnostics={review.compileDiagnostics ?? null} /> : null}
-          {review.aiReplies?.length ? <AiReplies replies={review.aiReplies} /> : null}
-          {review.aiCodeReplies?.length ? <AiReplies code replies={review.aiCodeReplies} /> : null}
-          <section className="rounded-card border border-border bg-card">
-            <h2 className="border-b border-border px-4 py-2.5 text-[13px] font-bold">
-              {t('progress.review.cases_heading')}
-            </h2>
-            {samples.length === 0 ? (
-              <p className="px-4 py-5 text-[13px] text-sub">
-                {t('progress.review.hidden_note')}
-              </p>
-            ) : (
-              <ul className="divide-y divide-border">
-                {samples.map((sample) => (
-                  <SampleCase item={sample} key={sample.position} />
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="rounded-card border border-border bg-card px-4 py-3.5">
-            <h2 className="text-[13px] font-bold">
-              {t('progress.review.hidden_heading')}
-            </h2>
-            <p className="mt-1.5 text-[13.5px] font-semibold tabular-nums">
-              {t('progress.review.hidden_summary', {
-                passed: review.hiddenPassed,
-                total: review.hiddenTotal,
-              })}
-            </p>
-            <p className="mt-1 text-[12.5px] leading-[1.5] text-sub">
-              {t('progress.review.hidden_note')}
-            </p>
-          </section>
-
-          <section className="rounded-card border border-border bg-card px-4 py-3.5">
-            <h2 className="text-[13px] font-bold">
+        <section className="flex min-h-[26rem] flex-col overflow-hidden rounded-card border border-border bg-card lg:min-h-0">
+          <div aria-label={t('progress.review.title')} className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-2 pt-2" role="tablist">
+            {hasAi ? (
+              <ReviewTabButton active={tab === 'ai'} id="ai" onSelect={setTab}>
+                <Sparkles aria-hidden className="size-3.5 text-brand" />{ta('teacher.tab')}
+                <Count>{attempt.length + fromCode.length}</Count>
+              </ReviewTabButton>
+            ) : null}
+            <ReviewTabButton active={tab === 'tests'} id="tests" onSelect={setTab}>
+              {t('progress.review.tab_tests')}
+              <Count tone={review.passedCount === review.totalCount ? 'success' : 'danger'}>{review.passedCount}/{review.totalCount}</Count>
+            </ReviewTabButton>
+            <ReviewTabButton active={tab === 'problem'} id="problem" onSelect={setTab}>
               {t('progress.review.statement_heading')}
-            </h2>
-            {review.statement ? (
-              <div
-                className="tiptap-render mt-2 max-h-64 overflow-y-auto text-[13.5px] leading-[1.6]"
-                // The authored statement, rendered the same way the student's
-                // own workspace renders it.
-                dangerouslySetInnerHTML={{ __html: review.statement }}
-              />
+            </ReviewTabButton>
+          </div>
+          <div aria-labelledby={`review-tab-${tab}`} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" id="review-panel" role="tabpanel">
+            {tab === 'ai' && hasAi ? (
+              <AiAnswers attempt={attempt} fromCode={fromCode} onShowLine={review.quiz ? undefined : showLine} submittedCode={review.code} />
+            ) : tab === 'problem' ? (
+              review.statement ? (
+                <div
+                  className="tiptap-render text-[13.5px] leading-[1.6]"
+                  // The authored statement, rendered the same way the student's
+                  // own workspace renders it.
+                  dangerouslySetInnerHTML={{ __html: review.statement }}
+                />
+              ) : (
+                <p className="text-[12.5px] text-sub">{t('progress.review.statement_missing')}</p>
+              )
             ) : (
-              <p className="mt-1.5 text-[12.5px] text-sub">
-                {t('progress.review.statement_missing')}
-              </p>
+              <div className="space-y-3">
+                {review.compileFailed ? <CompileFailure diagnostics={review.compileDiagnostics ?? null} /> : null}
+                {review.hiddenTotal > 0 ? (
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-bold">{t('progress.review.hidden_summary', { passed: review.hiddenPassed, total: review.hiddenTotal })}</p>
+                      <p className="mt-0.5 text-[12px] text-sub">{t('progress.review.hidden_note')}</p>
+                    </div>
+                    <Count tone={review.hiddenPassed === review.hiddenTotal ? 'success' : 'danger'}>{review.hiddenPassed}/{review.hiddenTotal}</Count>
+                  </div>
+                ) : null}
+                <h3 className="text-[12px] font-bold uppercase tracking-[0.05em] text-sub">{t('progress.review.cases_heading')}</h3>
+                {samples.length === 0 ? (
+                  <p className="text-[13px] text-sub">{t('progress.review.hidden_note')}</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {samples.map((sample) => (
+                      <SampleCase item={sample} key={sample.position} />
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
-          </section>
-        </div>
+          </div>
+        </section>
       </div>
     </div>
   );
 }
 
+type ReviewTab = 'ai' | 'tests' | 'problem';
+
+function ReviewTabButton({ id, active, onSelect, children }: { id: ReviewTab; active: boolean; onSelect: (tab: ReviewTab) => void; children: React.ReactNode }) {
+  return (
+    <button
+      aria-controls="review-panel"
+      aria-selected={active}
+      className={cn(
+        '-mb-px inline-flex shrink-0 items-center gap-1.5 rounded-t-lg border border-b-0 px-3 py-2 text-[13px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40',
+        active ? 'border-border bg-card text-ink' : 'border-transparent text-sub hover:text-ink',
+      )}
+      data-testid={`review-tab-${id}`}
+      id={`review-tab-${id}`}
+      onClick={() => onSelect(id)}
+      role="tab"
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
+
+function Count({ tone = 'neutral', children }: { tone?: 'neutral' | 'success' | 'danger'; children: React.ReactNode }) {
+  return (
+    <span className={cn(
+      'rounded-full px-1.5 py-px text-[11.5px] font-bold tabular-nums',
+      tone === 'success' ? 'bg-success/10 text-success' : tone === 'danger' ? 'bg-danger/10 text-danger' : 'bg-accent text-sub',
+    )}>
+      {children}
+    </span>
+  );
+}
+
+/** Marks one line of the submitted code and brings it to the middle of the editor. */
+function markLine(editor: MonacoCodeEditor, line: number): () => void {
+  const target = Math.min(line, editor.getModel()?.getLineCount() ?? line);
+  let decorations = editor.deltaDecorations([], [{
+    range: { startLineNumber: target, startColumn: 1, endLineNumber: target, endColumn: 1 },
+    options: { isWholeLine: true, className: 'cove-warning-line', glyphMarginClassName: 'cove-warning-glyph' },
+  }]);
+  editor.revealLineInCenter(target);
+  return () => { decorations = editor.deltaDecorations(decorations, []); };
+}
+
+/**
+ * One public case. A failed one opens, a passed one folds to its title, so the
+ * failures are what a reviewer reads first; what it should print and what it
+ * printed sit side by side.
+ */
 function SampleCase({ item }: { item: TeacherReviewCase }) {
   const { t } = useTranslation('teach');
   const passed = item.outcome === 'PASSED';
 
   return (
-    <li className="px-4 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[12.5px] font-bold">
-          {t('progress.review.case', { position: item.position })}
-        </span>
-        <span
-          className={cn(
-            'rounded-full px-2 py-0.5 text-[11.5px] font-bold',
-            passed ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger',
-          )}
-        >
-          {t(`progress.review.outcome.${item.outcome}`)}
-        </span>
-      </div>
-      <dl className="mt-2 space-y-1.5">
-        <CaseLine label={t('progress.review.case_input')} value={item.input} />
-        <CaseLine
-          label={t('progress.review.case_expected')}
-          value={item.expectedOutput}
-        />
-        <CaseLine
-          label={t('progress.review.case_actual')}
-          value={item.actualOutput}
-        />
-      </dl>
-      <ProgramEnding item={item} />
+    <li className={cn('rounded-lg border', passed ? 'border-border' : 'border-danger/30')}>
+      <details className="group" open={!passed}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-1.5 text-[12.5px] font-bold">
+            <ChevronRight aria-hidden className="size-4 text-sub transition-transform group-open:rotate-90" />
+            {t('progress.review.case', { position: item.position })}
+          </span>
+          <span
+            className={cn(
+              'rounded-full px-2 py-0.5 text-[11.5px] font-bold',
+              passed ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger',
+            )}
+          >
+            {t(`progress.review.outcome.${item.outcome}`)}
+          </span>
+        </summary>
+        <div className="space-y-2 border-t border-border px-3 py-3">
+          <CaseBlock label={t('progress.review.case_input')} value={item.input} />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <CaseBlock label={t('progress.review.case_expected')} value={item.expectedOutput} />
+            <CaseBlock label={t('progress.review.case_actual')} value={item.actualOutput} wrong={!passed} />
+          </div>
+          <ProgramEnding item={item} />
+        </div>
+      </details>
     </li>
   );
 }
 
 type ReviewAiReply = NonNullable<TeacherSubmissionReview['aiReplies']>[number] & { source?: 'RUN' | 'TEST_RUN'; code?: string };
 
+type AnswerGroup = { key: string; analysis: ReviewAiReply; simpler: ReviewAiReply | null };
+
 /**
- * What the AI assistant told the student about this attempt, in order; or,
- * with `code`, what it told them after Run and Test run on this problem, each
- * with the code the server checked (the campus courses design, §6).
+ * Each analysis with the simpler version written after it about the same code,
+ * newest first. A simpler version whose analysis is not in the list stands alone.
  */
-function AiReplies({ replies, code = false }: { replies: ReviewAiReply[]; code?: boolean }) {
+function groupAnswers(replies: readonly ReviewAiReply[]): AnswerGroup[] {
+  const groups: AnswerGroup[] = [];
+  const ordered = [...replies].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  for (const [index, reply] of ordered.entries()) {
+    let owner: AnswerGroup | undefined;
+    for (let at = groups.length - 1; reply.level !== 1 && !owner && at >= 0; at -= 1) {
+      const group = groups[at]!;
+      if (!group.simpler && (group.analysis.code ?? null) === (reply.code ?? null)) owner = group;
+    }
+    if (owner) owner.simpler = reply;
+    else groups.push({ key: `${reply.createdAt}:${index}`, analysis: reply, simpler: null });
+  }
+  return groups.reverse();
+}
+
+/**
+ * What the AI teacher told the student: about this attempt, or after Run and
+ * Test run on this problem (the campus courses design, §6), one list at a
+ * time. Each answer folds to one line; the newest is open.
+ */
+function AiAnswers({ attempt, fromCode, submittedCode, onShowLine }: {
+  attempt: AnswerGroup[]; fromCode: AnswerGroup[]; submittedCode: string;
+  /** Marks a line of the submitted code; absent where there is no editor. */
+  onShowLine?: (line: number) => void;
+}) {
+  const { t } = useTranslation('learning-help');
+  const [list, setList] = React.useState<'attempt' | 'code'>(attempt.length ? 'attempt' : 'code');
+  const groups = list === 'attempt' ? attempt : fromCode;
+  const [open, setOpen] = React.useState<string | null>(groups[0]?.key ?? null);
+  const choose = (next: 'attempt' | 'code') => {
+    setList(next);
+    setOpen((next === 'attempt' ? attempt : fromCode)[0]?.key ?? null);
+  };
+  return (
+    <div className="space-y-3">
+      <div className="inline-flex rounded-lg bg-accent p-0.5" role="group">
+        {(['attempt', 'code'] as const).map((name) => (
+          <button
+            aria-pressed={list === name}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40',
+              list === name ? 'bg-card text-ink shadow-card' : 'text-sub hover:text-ink',
+            )}
+            data-testid={`review-ai-list-${name}`}
+            key={name}
+            onClick={() => choose(name)}
+            type="button"
+          >
+            {t(name === 'attempt' ? 'teacher.this_attempt' : 'teacher.run_test')}
+            <Count>{(name === 'attempt' ? attempt : fromCode).length}</Count>
+          </button>
+        ))}
+      </div>
+      <p className="text-[12.5px] text-sub">{t(list === 'attempt' ? 'teacher.body' : 'teacher.code_body')}</p>
+      {groups.length ? (
+        <ol className="space-y-2" data-testid={list === 'attempt' ? 'review-ai-replies' : 'review-ai-code-replies'}>
+          {groups.map((group) => (
+            <AnswerItem
+              group={group}
+              key={group.key}
+              onShowLine={group.analysis.code ? undefined : onShowLine}
+              onToggle={() => setOpen((current) => current === group.key ? null : group.key)}
+              open={open === group.key}
+              submittedCode={submittedCode}
+            />
+          ))}
+        </ol>
+      ) : (
+        <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-[13px] text-sub">
+          {t(list === 'attempt' ? 'teacher.none_attempt' : 'teacher.none_code')}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function AnswerItem({ group, open, onToggle, submittedCode, onShowLine }: {
+  group: AnswerGroup; open: boolean; onToggle: () => void; submittedCode: string; onShowLine?: (line: number) => void;
+}) {
   const { t } = useTranslation('learning-help');
   const locale = useLocale();
+  const { analysis, simpler } = group;
+  const reported = analysis.reported || simpler?.reported === true;
+  // The code the answer is about: what the server checked, or this submission.
+  const code = analysis.code ?? submittedCode;
+  const preview = (analysis.analysis?.result ?? analysis.text).replace(/\*\*|`/g, '');
   return (
-    <section className="rounded-card border border-border bg-card px-4 py-3.5" data-testid={code ? 'review-ai-code-replies' : 'review-ai-replies'}>
-      <h2 className="flex items-center gap-2 text-[14px] font-bold"><Sparkles aria-hidden className="size-4 text-brand" />{t(code ? 'teacher.code_title' : 'teacher.title')}</h2>
-      <p className="mt-0.5 text-[12.5px] text-sub">{t(code ? 'teacher.code_body' : 'teacher.body')}</p>
-      <ol className="mt-3 space-y-2">
-        {replies.map((reply, index) => (
-          <li className="rounded-lg border border-border px-3 py-2.5" key={index}>
-            <p className="flex flex-wrap items-center gap-2 text-[12px] text-sub">
-              <span className="font-bold">{t(reply.level === 2 ? 'teacher.simpler' : 'teacher.analysis')}</span>
-              {reply.source ? <span className="rounded-full bg-brand/10 px-2 py-0.5 font-semibold text-brand">{t(`ai.from.${reply.source}`)}</span> : null}
-              <span>{formatDateTime(reply.createdAt, locale, true)}</span>
-              {reply.reported ? <span className="rounded-full bg-danger/10 px-2 py-0.5 font-semibold text-danger">{t('teacher.reported')}</span> : null}
-            </p>
-            {reply.analysis ? (
-              <dl className="mt-1.5 grid gap-x-3 gap-y-1.5 text-[13.5px] leading-6 sm:grid-cols-[6rem_1fr]" lang={reply.locale}>
-                {([
-                  ['result', reply.analysis.result],
-                  ['where', reply.analysis.line === null ? null : t('ai.line', { number: reply.analysis.line })],
-                  ['why', reply.analysis.why], ['think', reply.analysis.think],
-                  ['try_it', reply.analysis.tryIt], ['also_check', reply.analysis.alsoCheck],
-                ] as const).flatMap(([key, text]) => text ? [
-                  <dt className="text-[12px] font-semibold text-sub" key={`${key}-label`}>{t(`ai.section.${key}`)}</dt>,
-                  <dd className="whitespace-pre-wrap" key={key}>{text}</dd>,
-                ] : [])}
-              </dl>
-            ) : (
-              <p className="mt-1 whitespace-pre-wrap text-[14px] leading-6" lang={reply.locale}>{reply.text}</p>
-            )}
-            {reply.code ? (
-              <details className="mt-2">
-                <summary className="cursor-pointer text-[12.5px] font-semibold text-sub">{t('teacher.checked_code')}</summary>
-                <pre className="mt-1.5 overflow-x-auto rounded-lg bg-canvas px-3 py-2 font-mono text-[12.5px] leading-5">{reply.code}</pre>
-              </details>
+    <li className={cn('overflow-hidden rounded-lg border', open ? 'border-brand/40' : 'border-border')}>
+      <button
+        aria-expanded={open}
+        className="flex w-full items-start gap-2 px-3 py-2.5 text-left hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40"
+        onClick={onToggle}
+        type="button"
+      >
+        <ChevronRight aria-hidden className={cn('mt-0.5 size-4 shrink-0 text-sub transition-transform', open && 'rotate-90')} />
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-1.5 text-[12px] text-sub">
+            {analysis.source
+              ? <span className="rounded-full bg-brand/10 px-2 py-0.5 font-semibold text-brand">{t(`ai.from.${analysis.source}`)}</span>
+              : <span className="font-bold text-ink">{t('teacher.analysis')}</span>}
+            <span className="tabular-nums">{formatDateTime(analysis.createdAt, locale, true)}</span>
+            {simpler ? <span className="rounded-full bg-accent px-2 py-0.5 font-semibold">{t('teacher.has_simpler')}</span> : null}
+            {reported ? <span className="rounded-full bg-danger/10 px-2 py-0.5 font-semibold text-danger">{t('teacher.reported')}</span> : null}
+          </span>
+          {open ? null : <span className="mt-1 block truncate text-[13px]">{preview}</span>}
+        </span>
+      </button>
+      {open ? (
+        <div className="space-y-3 border-t border-border px-3 py-3">
+          <AnswerBody code={code} onShowLine={onShowLine} reply={analysis} />
+          {simpler ? (
+            <div className="rounded-lg bg-accent/60 px-3 py-2.5">
+              <p className="mb-1.5 text-[12px] font-bold text-sub">{t('teacher.simpler')}</p>
+              <AnswerBody code={code} onShowLine={onShowLine} reply={simpler} />
+            </div>
+          ) : null}
+          {analysis.code ? <CheckedCode code={analysis.code} line={analysis.analysis?.line ?? null} /> : null}
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+/** One answer's sections, the words to notice highlighted as the student saw them. */
+function AnswerBody({ reply, code, onShowLine }: { reply: ReviewAiReply; code: string; onShowLine?: (line: number) => void }) {
+  const { t } = useTranslation('learning-help');
+  const analysis = reply.analysis;
+  if (!analysis) return <p className="whitespace-pre-wrap text-[13.5px] leading-6" lang={reply.locale}><AiText text={reply.text} tone="light" /></p>;
+  const line = analysis.line;
+  const quoted = line === null ? null : code.split('\n')[line - 1]?.trim() || null;
+  const sections = ([
+    ['result', analysis.result], ['why', analysis.why], ['think', analysis.think], ['try_it', analysis.tryIt], ['also_check', analysis.alsoCheck],
+  ] as const).filter(([, text]) => text);
+  return (
+    <dl className="grid gap-x-3 gap-y-2 text-[13.5px] leading-6 sm:grid-cols-[5.5rem_1fr]" lang={reply.locale}>
+      {sections.slice(0, 1).map(([key, text]) => <Section key={key} label={t(`ai.section.${key}`)} text={text!} />)}
+      {line !== null ? (
+        <>
+          <dt className="text-[12px] font-semibold text-sub sm:pt-0.5">{t('ai.section.where')}</dt>
+          <dd className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold">{t('ai.line', { number: line })}</span>
+            {quoted ? <code className="rounded bg-[#fde68a]/60 px-1.5 py-0.5 font-mono text-[12.5px]">{quoted}</code> : null}
+            {onShowLine ? (
+              <button className="rounded text-[12.5px] font-semibold text-brand underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40" onClick={() => onShowLine(line)} type="button">
+                {t('teacher.show_line')}
+              </button>
             ) : null}
-          </li>
+          </dd>
+        </>
+      ) : null}
+      {sections.slice(1).map(([key, text]) => <Section key={key} label={t(`ai.section.${key}`)} text={text!} />)}
+    </dl>
+  );
+}
+
+function Section({ label, text }: { label: string; text: string }) {
+  return (
+    <>
+      <dt className="text-[12px] font-semibold text-sub sm:pt-0.5">{label}</dt>
+      <dd className="whitespace-pre-wrap"><AiText text={text} tone="light" /></dd>
+    </>
+  );
+}
+
+/** The code the server ran on the examples, numbered, the line the answer names marked. */
+function CheckedCode({ code, line }: { code: string; line: number | null }) {
+  const { t } = useTranslation('learning-help');
+  return (
+    <details className="group" open>
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[12.5px] font-semibold text-sub [&::-webkit-details-marker]:hidden">
+        <ChevronRight aria-hidden className="size-4 transition-transform group-open:rotate-90" />
+        {t('teacher.checked_code')}
+      </summary>
+      <pre className="mt-1.5 max-h-72 overflow-auto rounded-lg bg-editor-bg py-2 font-mono text-[12.5px] leading-5 text-[#d4d4d4]">
+        {code.split('\n').map((text, index) => (
+          <div className={cn('flex px-3', index + 1 === line && 'bg-[#facc15]/15 shadow-[inset_3px_0_0_0_#f59e0b]')} key={index}>
+            <span aria-hidden className="w-8 shrink-0 select-none pr-3 text-right text-[#6b7280]">{index + 1}</span>
+            <span className="whitespace-pre">{text || ' '}</span>
+          </div>
         ))}
-      </ol>
-    </section>
+      </pre>
+    </details>
   );
 }
 
@@ -351,16 +569,14 @@ function CompileFailure({ diagnostics }: { diagnostics: string | null }) {
   );
 }
 
-function CaseLine({ label, value }: { label: string; value: string | null }) {
+function CaseBlock({ label, value, wrong = false }: { label: string; value: string | null; wrong?: boolean }) {
   if (value === null) return null;
   return (
-    <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-2">
-      <dt className="text-[11.5px] font-semibold uppercase tracking-[0.04em] text-sub">
-        {label}
-      </dt>
-      <dd className="overflow-x-auto whitespace-pre-wrap break-words rounded bg-accent px-2 py-1 font-mono text-[12px]">
+    <div className="min-w-0">
+      <p className="text-[11.5px] font-semibold uppercase tracking-[0.04em] text-sub">{label}</p>
+      <pre className={cn('mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded px-2 py-1.5 font-mono text-[12px]', wrong ? 'bg-danger/[0.06]' : 'bg-accent')}>
         {value}
-      </dd>
+      </pre>
     </div>
   );
 }

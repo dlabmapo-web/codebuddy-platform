@@ -160,6 +160,7 @@
       "statement_heading": "문제",
       "statement_missing": "이 문제는 더 이상 볼 수 없습니다.",
       "cases_heading": "예시 테스트",
+      "tab_tests": "테스트",
       "hidden_heading": "숨김 테스트",
       "hidden_summary": "숨김 테스트 {{total}}개 중 {{passed}}개 통과",
       "hidden_note": "숨김 테스트의 입력과 출력은 표시되지 않습니다.",

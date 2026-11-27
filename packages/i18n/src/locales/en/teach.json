@@ -163,6 +163,7 @@
       "statement_heading": "Problem",
       "statement_missing": "This problem is no longer available to read.",
       "cases_heading": "Sample cases",
+      "tab_tests": "Tests",
       "hidden_heading": "Hidden cases",
       "hidden_summary": "{{passed}} of {{total}} hidden cases passed",
       "hidden_note": "Hidden case inputs and outputs are never shown.",

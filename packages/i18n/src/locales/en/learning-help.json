@@ -108,6 +108,13 @@
     "simpler": "Explained more simply",
     "code_title": "AI help after Run and Test run on this problem",
     "code_body": "Only the examples ran for these answers. Newest first.",
-    "checked_code": "The code it checked"
+    "checked_code": "The code it checked",
+    "tab": "AI teacher",
+    "this_attempt": "This submission",
+    "run_test": "After Run · Test run",
+    "show_line": "Show in code",
+    "has_simpler": "+ More simply",
+    "none_attempt": "The student did not ask the AI teacher about this submission.",
+    "none_code": "No AI help after Run or Test run on this problem."
   }
 }

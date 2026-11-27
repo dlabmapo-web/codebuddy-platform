@@ -105,6 +105,13 @@
     "simpler": "더 쉽게 설명",
     "code_title": "이 문제에서 실행·테스트 실행 후 받은 AI 도움",
     "code_body": "이 답변들은 예제만 실행해서 만들었어요. 최근 것부터 보여요.",
-    "checked_code": "확인한 코드"
+    "checked_code": "확인한 코드",
+    "tab": "AI 선생님",
+    "this_attempt": "이 제출",
+    "run_test": "실행 · 테스트 실행 후",
+    "show_line": "코드에서 보기",
+    "has_simpler": "+ 더 쉽게",
+    "none_attempt": "학생이 이 제출에 대해 AI 선생님에게 묻지 않았어요.",
+    "none_code": "이 문제에서 실행·테스트 실행 후 받은 AI 도움이 없어요."
   }
 }

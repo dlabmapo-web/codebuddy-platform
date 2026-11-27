@@ -82,7 +82,9 @@
         "updated": "Point policy changed"
       },
       "student": {
-        "renamed": "Student academy name changed"
+        "recovery_recorded": "Recorded former classes for recovery",
+        "renamed": "Student academy name changed",
+        "restored_from_os": "Restored classes after D.LAB OS login"
       },
       "manager_required": "Academy needs an active manager"
     },

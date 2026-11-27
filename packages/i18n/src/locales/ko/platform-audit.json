@@ -82,7 +82,9 @@
         "updated": "포인트 정책 변경"
       },
       "student": {
-        "renamed": "학생 학원 이름 변경"
+        "recovery_recorded": "반 복구를 위한 이전 등록 정보 기록",
+        "renamed": "학생 학원 이름 변경",
+        "restored_from_os": "디랩 OS 로그인 후 반 복구"
       },
       "manager_required": "아카데미에 활성 관리자가 필요함"
     },

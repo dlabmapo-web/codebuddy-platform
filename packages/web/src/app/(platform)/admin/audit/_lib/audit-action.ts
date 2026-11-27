@@ -162,7 +162,10 @@ export const auditActionLabels: Record<
   'profile.identity.unlink_requested':
     'action.profile.identity.unlink_requested',
   'profile.identity.unlinked': 'action.profile.identity.unlinked',
+  'academy.student.recovery_recorded':
+    'action.academy.student.recovery_recorded',
   'academy.student.renamed': 'action.academy.student.renamed',
+  'academy.student.restored_from_os': 'action.academy.student.restored_from_os',
   'academy.member.password.issued': 'action.academy.member.password.issued',
   'academy.member.password.revealed': 'action.academy.member.password.revealed',
   'academy.member_profile.image_removed':

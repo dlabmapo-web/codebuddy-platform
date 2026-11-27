@@ -167,9 +167,13 @@ test('after Run and Test run: the server checks the examples, and the AI explain
   await expect(student.getByTestId('run-example')).toContainText('This is Example 1. Expected 15, you printed 10.', { timeout: 60_000 });
   expect((await model(request)).requests.length).toBe(before);
   await shot(student, '04a-run-example');
+  const cards = student.getByTestId('ai-analysis');
+  const earlier = await cards.count();
   await help.click();
-  const card = student.getByTestId('ai-analysis');
+  // Every answer stays in the thread; the newest is last.
+  const card = cards.last();
   await expect(card).toContainText('Example 1 wants 15, but your program prints 10.', { timeout: 60_000 });
+  await expect(cards).toHaveCount(earlier + 1);
   await expect(card).toContainText('after Run');
   await shot(student, '04b-run-ai-help');
   const [fromRun] = (await model(request)).requests.slice(before);
@@ -183,7 +187,9 @@ test('after Run and Test run: the server checks the examples, and the AI explain
   await student.getByRole('button', { name: 'Test run', exact: true }).click();
   await expect(terminal).toContainText('Test 2', { timeout: 60_000 });
   await help.click();
-  await expect(student.getByTestId('ai-analysis')).toContainText('Example 1 wants 15', { timeout: 60_000 });
+  await expect(cards.last()).toContainText('Example 1 wants 15', { timeout: 60_000 });
+  // The same answer, served again: no second card.
+  await expect(cards).toHaveCount(earlier + 1);
   expect((await model(request)).requests.length).toBe(before + 1);
 
   // Their own input: nobody here knows the answer, so AI help stays off.
@@ -199,8 +205,9 @@ test('after Run and Test run: the server checks the examples, and the AI explain
   await student.getByRole('button', { name: 'Test run', exact: true }).click();
   await expect(terminal).toContainText('Test 2 matches the expected output.', { timeout: 60_000 });
   await expect(help).toBeDisabled();
-  // The answer about the wrong code is put away once the code passes.
-  await expect(student.getByTestId('ai-help-panel')).toHaveCount(0);
+  // The question is over once the code passes; its answer stays to read.
+  await expect(cards).toHaveCount(earlier + 1);
+  await expect(student.getByTestId('explain-simpler')).toHaveCount(0);
   expect((await model(request)).requests.length).toBe(before + 1);
 });
 
@@ -210,16 +217,16 @@ test('the AI teacher analyses the code, explains more simply, then the teacher',
   await expect(student.getByTestId('ai-invite')).toContainText('Press ✨ AI help', { timeout: 120_000 });
   await shot(student, '04-analyze-offer');
   await student.getByTestId('ai-help').click();
-  const card = student.getByTestId('ai-analysis');
+  const card = student.getByTestId('ai-analysis').last();
   await expect(card).toContainText('You passed 0 of 4 tests: for input 5 your program printed 10, not 15.');
   await expect(card).toContainText('stops before n, so the last number is never added.');
-  await expect(student.getByTestId('analysis-line')).toContainText('Line 3');
-  await expect(student.getByTestId('analysis-line')).toContainText('for i in range(1, n):');
+  await expect(card.getByTestId('analysis-line')).toContainText('Line 3');
+  await expect(card.getByTestId('analysis-line')).toContainText('for i in range(1, n):');
   await expect(student.getByText('2 analyses left for this problem today')).toBeVisible();
   await shot(student, '05-analysis');
 
   await student.getByTestId('explain-simpler').click();
-  await expect(student.getByTestId('ai-simpler')).toContainText('Your program forgot the last number.');
+  await expect(student.getByTestId('ai-simpler').last()).toContainText('Your program forgot the last number.');
   await expect(student.getByTestId('explain-simpler')).toHaveCount(0);
   await shot(student, '06-simpler');
 
@@ -245,14 +252,16 @@ test('the AI teacher analyses the code, explains more simply, then the teacher',
   await expect(card).toContainText('Reported. Thank you.');
   // The third analysis of the day on this problem is the last.
   await submit(student, SHORT);
+  const given = await student.getByTestId('ai-analysis').count();
   await student.getByTestId('ai-help').click({ timeout: 120_000 });
-  await expect(student.getByTestId('ai-analysis')).toBeVisible();
+  await expect(student.getByTestId('ai-analysis')).toHaveCount(given + 1);
   await expect(student.getByTestId('ai-state')).toContainText("used today's AI analyses");
   await expect(student.getByTestId('explain-simpler')).toHaveCount(0);
   await submit(student, SHORT);
   await student.getByTestId('ai-help').click({ timeout: 120_000 });
   await expect(student.getByTestId('ai-state')).toContainText("used today's AI analyses");
-  await expect(student.getByTestId('ai-analysis')).toHaveCount(0);
+  // Nothing new to read; every earlier answer is still there.
+  await expect(student.getByTestId('ai-analysis')).toHaveCount(given + 1);
   await student.getByTestId('ask-teacher').click();
   await expect(student.getByTestId('student-help-request')).toContainText(/Requested|requested|waiting/i);
   await shot(student, '07-limit-and-teacher');
@@ -273,19 +282,27 @@ test('only the student who submitted can read or ask; their teacher reads the an
   }
   // A student may read neither the library nor the operator's numbers.
   expect((await rpc(student, 'aiAssistant/getLibrary', { academyId: author.academy.id, courseId: room.courseId, materialId: room.materialId })).status).toBeGreaterThanOrEqual(400);
-  expect((await rpc(student, 'aiAssistant/platformUsage', {})).status).toBeGreaterThanOrEqual(400);
-  expect((await rpc(staff, 'aiAssistant/platformUsage', {})).status).toBeGreaterThanOrEqual(400);
+  // The campus's AI numbers are its manager's: not a student's, not a tutor's.
+  expect((await rpc(student, 'aiAssistant/academyUsage', { academyId: author.academy.id })).status).toBeGreaterThanOrEqual(400);
+  expect((await rpc(tutorPage, 'aiAssistant/academyUsage', { academyId: author.academy.id })).status).toBeGreaterThanOrEqual(400);
+  expect((await rpc(staff, 'aiAssistant/academyUsage', { academyId: author.academy.id })).status).toBe(200);
 
   await tutorPage.goto(routes.academyTeachSubmission(author.academy.slug, room.classes[0]!.id, room.studentMembershipId, id));
+  // The review opens on the AI teacher's tab, on this attempt, the newest answer open.
+  await expect(tutorPage.getByTestId('review-tab-ai')).toHaveAttribute('aria-selected', 'true', { timeout: 120_000 });
   const replies = tutorPage.getByTestId('review-ai-replies');
-  await expect(replies).toContainText('AI teacher on this attempt', { timeout: 120_000 });
   await expect(replies).toContainText('You passed 0 of 4 tests');
   await expect(replies).toContainText('Explained more simply');
   await expect(replies).toContainText('Reported by the student');
   // And what it said after Run, with the code it checked.
+  await tutorPage.getByTestId('review-ai-list-code').click();
   const fromCode = tutorPage.getByTestId('review-ai-code-replies');
   await expect(fromCode).toContainText('after Run');
   await expect(fromCode).toContainText('Example 1 wants 15');
+  await expect(fromCode).toContainText('The code it checked');
+  // The tests are a tab away.
+  await tutorPage.getByTestId('review-tab-tests').click();
+  await expect(tutorPage.getByRole('tabpanel')).toContainText('Case 1');
   await shot(tutorPage, '08-teacher-review');
 });
 
@@ -313,7 +330,7 @@ test('Korean, a hidden-only failure, code in an answer, a broken model and a pas
   await submit(page, HIDDEN_ONLY);
   let before = (await model(request)).requests.length;
   await page.getByTestId('ai-help').click({ timeout: 120_000 });
-  await expect(page.getByTestId('ai-analysis')).toContainText('숨겨진 테스트에서 너무 작은 수를 출력했어요.');
+  await expect(page.getByTestId('ai-analysis').last()).toContainText('숨겨진 테스트에서 너무 작은 수를 출력했어요.');
   const [hidden] = (await model(request)).requests.slice(before);
   expect(hidden!.instructions).toContain('해요체');
   expect(hidden!.input).toContain('Examples: 2 of 2 passed. Hidden tests: 0 of 2 passed.');

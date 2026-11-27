@@ -59,8 +59,11 @@ async function submit(page: Page, code: string) {
 }
 /** Presses AI help and waits for an answer or a fixed message. */
 async function askAi(page: Page) {
+  // Earlier answers stay in the thread: wait for one more, not for any.
+  const cards = page.getByTestId('ai-analysis');
+  const before = await cards.count();
   await page.getByTestId('ai-help').click({ timeout: 120_000 });
-  await expect(page.getByTestId('ai-analysis').or(page.getByTestId('ai-fallback')).or(page.getByTestId('ai-examples-passed')).first()).toBeVisible({ timeout: 90_000 });
+  await expect(cards.nth(before).or(page.getByTestId('ai-fallback')).or(page.getByTestId('ai-examples-passed')).first()).toBeVisible({ timeout: 90_000 });
 }
 
 test('the real model learns a problem, helps after Run, Test run and Submit in English and Korean, and learns a new mistake', async ({ browser, request }) => {
@@ -98,9 +101,11 @@ test('the real model learns a problem, helps after Run, Test run and Submit in E
   await expect(one.getByTestId('open-hints')).toHaveCount(0);
 
   const answers: Record<string, string[]> = { run: [], submit: [], simpler: [], testRunKo: [], submitKo: [], newMistake: [] };
-  const sections = (page: Page, testId: string) => page.getByTestId(testId).locator('dd').allTextContents();
+  // The newest answer's sections, as written: highlight marks included.
+  const sections = (page: Page, testId: string) => page.getByTestId(testId).last().locator('dd').evaluateAll((items) => items.map((item) => item.innerHTML
+    .replace(/<mark[^>]*>/g, '**').replace(/<\/mark>/g, '**').replace(/<code[^>]*>/g, '`').replace(/<\/code>/g, '`').replace(/<[^>]+>/g, '')));
   const keep = async (page: Page, key: string, testId = 'ai-analysis') => {
-    if (await page.getByTestId(testId).isVisible()) answers[key]!.push(...await sections(page, testId));
+    if (await page.getByTestId(testId).last().isVisible().catch(() => false)) answers[key]!.push(...await sections(page, testId));
     else answers[key]!.push(`(fixed message) ${await page.getByTestId('ai-fallback').textContent().catch(() => '')}`);
   };
 

@@ -1,12 +1,12 @@
 'use client';
 
 import { explainOutput, type SubmissionResult } from '@cove/shared';
-import { skipToken, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Hand, Sparkles } from 'lucide-react';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { askTeacherEvent, myHelpRequestKey } from '@/lib/monitoring/use-help-requests';
+import { askTeacherEvent, myHelpRequestQuery } from '@/lib/monitoring/use-help-requests';
 
 
 const quietButtonClass =
@@ -67,11 +67,9 @@ export function LearnerHelp({
 /** The header's request control, offered where the student is reading. */
 export function AskTeacher({ academyId, classId, userId }: { academyId: string; classId: string; userId: string }) {
   const { t } = useTranslation('monitoring');
-  // Read from the control's own cache and never fetched twice.
-  const { data } = useQuery<{ denied: boolean; request: { status: string } | null; teacherAssigned: boolean }>({
-    queryKey: myHelpRequestKey(academyId, classId, userId),
-    queryFn: skipToken,
-  });
+  // The header's control reads and refreshes it; this only watches, with the
+  // same definition, so a refresh started here or there runs the real read.
+  const { data } = useQuery({ ...myHelpRequestQuery(academyId, classId, userId), enabled: false });
   if (!data || data.denied) return null;
   if (data.request) return <p className="text-[12px] font-semibold text-[#93c5fd]" role="status">{t('help.requested')}</p>;
   return (

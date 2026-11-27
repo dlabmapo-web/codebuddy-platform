@@ -1,8 +1,9 @@
 'use client';
 
 import { helpRequestChangedSchema, monitoringServerEvents, type HelpMutationResult } from '@cove/shared';
-import { useQueryClient } from '@tanstack/react-query';
+import { queryOptions, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
+import { orpc } from '@/lib/orpc';
 import { isSessionEnded } from '@/lib/session/expired-session';
 import { endSession } from '@/lib/session/end-session';
 import { createClient } from '@/lib/supabase/client';
@@ -12,6 +13,25 @@ export const helpQueryKey = (academyId: string, classId: string) => ['help-reque
 /** One student's own request in a class, as every place that shows it reads it. */
 export const myHelpRequestKey = (academyId: string, classId: string, userId: string) =>
   [...helpQueryKey(academyId, classId), 'self', userId] as const;
+/**
+ * The student's own request, as every observer of it reads it.
+ *
+ * One definition for all of them: TanStack Query keeps a single query per key
+ * and each observer writes its options onto it, so an observer with another
+ * `queryFn` (once `skipToken`) would replace the real one, and the next
+ * refresh would fail in the header's control.
+ */
+export function myHelpRequestQuery(academyId: string, classId: string, userId: string) {
+  return queryOptions({
+    queryKey: myHelpRequestKey(academyId, classId, userId),
+    queryFn: async ({ signal }) => {
+      try { return { ...await orpc.monitoring.getMyActiveHelpRequest({ academyId, classId }, { signal }), denied: false }; }
+      catch (error) { if (helpAccessDenied(error)) return { request: null, latestClosed: null, teacherAssigned: false, serverTime: new Date().toISOString(), denied: true }; throw error; }
+    },
+    retry: false,
+    gcTime: 0,
+  });
+}
 /** Asks the mounted request control to send; see `RequestHelp`. */
 export const askTeacherEvent = 'cove:ask-teacher';
 export function helpAccessDenied(error: unknown): boolean {

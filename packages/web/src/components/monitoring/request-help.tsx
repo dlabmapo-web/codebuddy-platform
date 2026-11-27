@@ -9,7 +9,7 @@ import type { Socket } from 'socket.io-client';
 import { useAcademySlug } from '@/components/studio/academy-route-provider';
 import { orpc } from '@/lib/orpc';
 import { routes } from '@/lib/routes';
-import { askTeacherEvent, helpAccessDenied, myHelpRequestKey, useHelpClock, useHelpOperation, useHelpRefresh } from '@/lib/monitoring/use-help-requests';
+import { askTeacherEvent, helpAccessDenied, myHelpRequestKey, myHelpRequestQuery, useHelpClock, useHelpOperation, useHelpRefresh } from '@/lib/monitoring/use-help-requests';
 import { HelpWait } from './help-wait';
 
 export function RequestHelp({ academyId, classId, materialId, userId, socket, onNavigate }: {
@@ -20,10 +20,7 @@ export function RequestHelp({ academyId, classId, materialId, userId, socket, on
   const refresh = useHelpRefresh(academyId, classId, socket);
   const client = useQueryClient();
   const queryKey = myHelpRequestKey(academyId, classId, userId);
-  const query = useQuery({ queryKey, queryFn: async ({ signal }) => {
-    try { return { ...await orpc.monitoring.getMyActiveHelpRequest({ academyId, classId }, { signal }), denied: false }; }
-    catch (error) { if (helpAccessDenied(error)) return { request: null, latestClosed: null, teacherAssigned: false, serverTime: new Date().toISOString(), denied: true }; throw error; }
-  }, retry: false, gcTime: 0 });
+  const query = useQuery(myHelpRequestQuery(academyId, classId, userId));
   const operation = useHelpOperation(refresh, async result => {
     // The mutation returns the authorized, committed state. Cancel older reads
     // before applying it so a pre-mutation response cannot overwrite the result.

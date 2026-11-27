@@ -1,3 +1,4 @@
+import { AI_HELP_HISTORY_MAX, aiHelpHistoryItemSchema } from "./ai-help.js";
 import { latestSubmissionSchema } from "./latest-submission.js";
 import { manualAssessmentSettingsSchema } from "./course.js";
 import { submissionPolicySchema } from "./course.js";
@@ -322,6 +323,11 @@ export const learnExerciseWorkspaceSchema = z.object({
   }),
   draft: z.object({ code: z.string(), updatedAt: z.iso.datetime(), gradingRevision: z.number().int().optional() }).nullable(),
   status: exerciseProgressStatusSchema,
+  /**
+   * The student's own AI teacher answers on this problem, oldest first. Read
+   * only where `exercise.aiAssistant` is on.
+   */
+  aiHelpHistory: z.array(aiHelpHistoryItemSchema).max(AI_HELP_HISTORY_MAX).optional(),
 });
 export type LearnExerciseWorkspace = z.infer<
   typeof learnExerciseWorkspaceSchema

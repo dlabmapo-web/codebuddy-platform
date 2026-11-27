@@ -84,11 +84,11 @@ describe.skipIf(!databaseUrl)("the AI teacher's analysis", () => {
     const result = await ask(id);
     expect(result).toMatchObject({ state: "AVAILABLE", remainingForProblem: 2, remainingToday: 9, fallback: null, reply: {
       level: 1, reported: false,
-      analysis: { result: "With 2 and 5 your program printed 2, not 5.", line: 3, why: "print(min(a, b)) picks the smaller number, but the task asks for the bigger one.", tryIt: "Try 1 and 2 on paper.", alsoCheck: null },
+      analysis: { result: "With 2 and 5 your program printed 2, not 5.", line: 3, why: "`print(min(a, b))` picks the smaller number, but the task asks for the bigger one.", tryIt: "Try 1 and 2 on paper.", alsoCheck: null },
     } });
     expect(result.reply!.text.split("\n")).toHaveLength(4);
     const row = await f.prisma.aiHelpReply.findFirstOrThrow({ where: { submissionId: id } });
-    expect(row).toMatchObject({ status: "DONE", level: 1, locale: "en", classId: f.ids.klass, inputTokens: 100, outputTokens: 20, costMicros: 20, promptVersion: "v5", libraryItemId: null });
+    expect(row).toMatchObject({ status: "DONE", level: 1, locale: "en", classId: f.ids.klass, inputTokens: 100, outputTokens: 20, costMicros: 20, promptVersion: "v6", libraryItemId: null });
     expect(row.analysis).toMatchObject({ line: 3 });
     expect(await f.prisma.aiUsageMonth.findFirstOrThrow()).toMatchObject({ kind: "HELP", requests: 1, costMicros: 20n });
     // Asking again shows the same answer, and costs nothing.
@@ -247,6 +247,7 @@ describe.skipIf(!databaseUrl)("the AI teacher's analysis", () => {
     ["a code block", () => analysis({ think: "```python\nprint(5)\n```" }), "REJECTED:NEW_CODE"],
     ["the corrected line", () => analysis({ think: "Change it to `print(max(a, b))`." }), "REJECTED:NEW_CODE"],
     ["a corrected expression in words", () => analysis({ think: "Write print(max(a, b)) on line 3." }), "REJECTED:NEW_CODE"],
+    ["code inside a highlight", () => analysis({ think: "Write **print(max(a, b))** on line 3." }), "REJECTED:NEW_CODE"],
     ["the solution", () => analysis({ think: "Just write SOLUTION_SENTINEL." }), "REJECTED:SOLUTION"],
     ["a hidden test's data", () => analysis({ tryIt: "Try 111222 and 333444." }), "REJECTED:HIDDEN"],
   ])("falls back on %s, without spending a reply", async (_, behave, failureCode) => {
@@ -254,6 +255,16 @@ describe.skipIf(!databaseUrl)("the AI teacher's analysis", () => {
     answer = behave as never;
     expect(await ask(id)).toMatchObject({ state: "AVAILABLE", reply: null, fallback: "trace_public", remainingForProblem: 3 });
     expect(await f.prisma.aiHelpReply.findFirstOrThrow({ where: { submissionId: id } })).toMatchObject({ status: "FAILED", failureCode, reply: null });
+  });
+
+  it("keeps the words to notice marked for the page, and checks the words alone", async () => {
+    const id = await submit(await f.createExercise());
+    answer = () => analysis({ why: "`print(min(a, b))` picks the **smaller** number, but the task asks for the **bigger** one.", think: "Which **one word** in line 3 decides that?" });
+    const { reply } = await ask(id);
+    expect(reply?.analysis).toMatchObject({
+      why: "`print(min(a, b))` picks the **smaller** number, but the task asks for the **bigger** one.", think: "Which **one word** in line 3 decides that?",
+    });
+    expect((await f.prisma.aiHelpReply.findFirstOrThrow({ where: { submissionId: id } })).reply).toContain("**bigger**");
   });
 
   it("keeps an analysis whose line the code does not have, pointing nowhere", async () => {

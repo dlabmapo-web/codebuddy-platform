@@ -50,6 +50,7 @@ import { ManualAssetsService } from "../manual/manual-assets.service.js";
 import { SubmissionService } from "./submission.service.js";
 import { LearningClassContextService } from "./learning-class-context.service.js";
 import { automaticLatestSubmission } from './latest-submission.js';
+import { readHelpHistory } from "../ai-assistant/ai-help-read.js";
 
 /** The material graph one authorized workspace read produces. */
 const workspaceMaterialInclude = {
@@ -418,7 +419,13 @@ export class LearnService {
     // own rule, which keeps Test clicks off the judge's few slots.
     const compiled = isCompiledLanguage(exercise.language);
     const needsFlag = !compiled && !comparesSampleLocally(exercise.gradingMode, exercise.inputPromptPolicy);
-    const [draft, progress, sampleChecks] = await Promise.all([
+    // Whether to draw the AI help button: the course's and the problem's
+    // switches, and a kind of problem the AI teacher works on. Every request
+    // decides it again on the server.
+    const aiAssistant = !staffPractice && material.ai?.featureOn === true && material.ai.courseOn === true && exercise.aiFeedbackEnabled &&
+      (material.lecture as { kind?: string }).kind !== "TEST" &&
+      (exercise.submissionPolicy ?? "AUTOMATIC") === "AUTOMATIC" && exercise.language === "PYTHON" && exercise.quiz == null && exercise.sourceProject == null;
+    const [draft, progress, sampleChecks, aiHelpHistory] = await Promise.all([
       staffPractice ? Promise.resolve(null) : this.prisma.exerciseDraft.findUnique({
         where: { userId_materialId: { userId, materialId: material.id } },
         select: { code: true, updatedAt: true },
@@ -437,6 +444,8 @@ export class LearnService {
         },
         select: { isEnabled: true },
       }),
+      // Every answer the student was given here, so none is lost on a reload.
+      aiAssistant ? readHelpHistory(this.prisma, { academyId: course.academyId, userId, materialId: material.id }) : Promise.resolve(null),
     ]);
     const ordered = flattenOutlineExercises(
       nonemptyModules(course).map((module) => ({
@@ -492,12 +501,7 @@ export class LearnService {
             expectedOutput: testCase.expectedOutput,
             comparator: testCase.comparator,
           })),
-        // Whether to draw the AI help button: the course's and the problem's
-        // switches, and a kind of problem the AI teacher works on. Every
-        // request decides it again on the server.
-        aiAssistant: !staffPractice && material.ai?.featureOn === true && material.ai.courseOn === true && exercise.aiFeedbackEnabled &&
-          (material.lecture as { kind?: string }).kind !== "TEST" &&
-          (exercise.submissionPolicy ?? "AUTOMATIC") === "AUTOMATIC" && exercise.language === "PYTHON" && exercise.quiz == null && exercise.sourceProject == null,
+        aiAssistant,
         // Only what a teacher wrote: AI hints teach the AI teacher, not the student.
         hints: exercise.hints.map((hint) => ({ position: hint.position, content: hint.content })),
         hiddenTestCaseCount: ((exercise.submissionPolicy ?? "AUTOMATIC") !== "AUTOMATIC" ? [] : exercise.testCases).filter(
@@ -514,6 +518,7 @@ export class LearnService {
           progress.status !== "NOT_STARTED"
           ? progress.status
           : progressStatusFromDraft(draft !== null),
+      ...(aiHelpHistory ? { aiHelpHistory } : {}),
     };
   }
 

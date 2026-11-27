@@ -61,6 +61,27 @@ export function plainText(text: string): string {
 }
 
 /**
+ * The words a student reads in an analysis, with the answer's two marks kept
+ * for the page to draw: `code` quotes their own program and **words** are what
+ * to notice (help prompt v6). The page draws them from text, never as markup.
+ */
+export function answerText(text: string): string {
+  return text.replaceAll("\u0000", "").trim();
+}
+
+/**
+ * A highlight, as the page draws it: two asterisks on each side of up to 80
+ * characters on one line, not touching a letter or another asterisk outside,
+ * so `n**2` stays a power and is still read as code.
+ */
+const emphasis = /(?<![\w*])\*\*(?=\S)([^*\n]{1,80}?)(?<=\S)\*\*(?![\w*])/g;
+
+/** The words without highlight marks, which every check reads: a mark is formatting, not code. */
+export function unmarked(text: string): string {
+  return text.replace(emphasis, "$1");
+}
+
+/**
  * Code in an analysis that the student does not already have.
  *
  * Pointing at the student's own code is how an analysis explains a mistake,

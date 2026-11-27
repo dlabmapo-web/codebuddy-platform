@@ -84,6 +84,21 @@ export const aiHelpSources = ["SUBMIT", "TEST_RUN", "RUN"] as const;
 export const aiHelpSourceSchema = z.enum(aiHelpSources);
 export type AiHelpSource = z.infer<typeof aiHelpSourceSchema>;
 
+/** The most saved answers a workspace opens with. */
+export const AI_HELP_HISTORY_MAX = 20;
+/**
+ * One of the student's own saved answers on a problem, so every answer they
+ * were given stays on screen after a reload, not only the latest.
+ */
+export const aiHelpHistoryItemSchema = aiHelpReplySchema.extend({
+  source: aiHelpSourceSchema,
+  /** The submission or example check it answered: an answer and its simpler version share it. */
+  subjectId: z.uuid(),
+  /** The line the answer names, as the code read when it was asked. */
+  quoted: z.string().max(200).nullable(),
+}).strict();
+export type AiHelpHistoryItem = z.infer<typeof aiHelpHistoryItemSchema>;
+
 /**
  * AI help on the code in the editor, after Run or Test run. The server runs
  * the code on the problem's examples first and never trusts the browser's

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkLibraryText, checkReply, codeLike, hiddenValueIn, hiddenValues, newCode, plainText, solutionLines } from "./text-check.js";
+import { answerText, checkLibraryText, checkReply, codeLike, hiddenValueIn, hiddenValues, newCode, plainText, solutionLines, unmarked } from "./text-check.js";
 
 const solution = "a = int(input())\nb = int(input())\nif a > b:\n    print(a)\nelse:\n    print(b)";
 const reply = (text: string, over: Partial<Parameters<typeof checkReply>[0]> = {}) =>
@@ -87,6 +87,21 @@ describe("plainText", () => {
     expect(plainText("`total`와 `i`를 보세요.")).toBe("total와 i를 보세요.");
     expect(plainText("```\nprint(1)\n```")).toBe("```\nprint(1)\n```");
     expect(plainText("a\u0000b")).toBe("ab");
+  });
+});
+
+describe("answerText and unmarked", () => {
+  it("keeps the two marks a student sees, and nothing that cannot be stored", () => {
+    expect(answerText(" The **loop stops early** at `range(1, n)`.\u0000 ")).toBe("The **loop stops early** at `range(1, n)`.");
+  });
+
+  it("gives the checks the words alone, but leaves a power as code", () => {
+    expect(unmarked("The **loop stops early**, so **n**은 더해지지 않아요.")).toBe("The loop stops early, so n은 더해지지 않아요.");
+    expect(unmarked("Try n**2 and m**3.")).toBe("Try n**2 and m**3.");
+    expect(unmarked("** not a mark **")).toBe("** not a mark **");
+    // A highlight never hides new code from the check.
+    expect(newCode(unmarked("Use **n**2** here."), "", "n = 3")).toBe(true);
+    expect(newCode(unmarked("The **loop stops early** at `range(1, n)`."), "for i in range(1, n):", "for i in range(1, n):")).toBe(false);
   });
 });
 

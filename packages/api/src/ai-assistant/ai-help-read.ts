@@ -1,4 +1,4 @@
-import type { CaseOutcome } from "@cove/shared";
+import { AI_HELP_HISTORY_MAX, aiAnalysisSchema, aiHelpSourceSchema, type AiHelpHistoryItem, type CaseOutcome } from "@cove/shared";
 
 import { Prisma } from "../generated/prisma/client.js";
 import type { PrismaService } from "../database/prisma.service.js";
@@ -292,4 +292,42 @@ export async function finishReply(db: Pick<PrismaService, "$executeRaw">, outcom
     VALUES (${usageMonth(now)}::date, 'HELP', 1, ${outcome.inputTokens}, ${outcome.outputTokens}, ${outcome.costMicros})
     ON CONFLICT (month, kind) DO UPDATE SET requests = u.requests + 1, input_tokens = u.input_tokens + EXCLUDED.input_tokens,
       output_tokens = u.output_tokens + EXCLUDED.output_tokens, cost_micros = u.cost_micros + EXCLUDED.cost_micros`);
+}
+
+type HistoryRow = {
+  id: string; level: number; reply: string; analysis: unknown; source: string; subject_id: string;
+  created_at: string; reported: boolean; quoted: string | null;
+};
+
+/**
+ * One student's saved answers on one problem, oldest first, in one statement
+ * (the `user_id, material_id, created_at` index). The newest
+ * `AI_HELP_HISTORY_MAX` only, and of each answer's code only the line it
+ * names: a workspace lists answers, it never needs the programs again.
+ */
+export async function readHelpHistory(
+  db: Pick<PrismaService, "$queryRaw">,
+  input: { academyId: string; userId: string; materialId: string },
+): Promise<AiHelpHistoryItem[]> {
+  const rows = await db.$queryRaw<HistoryRow[]>(Prisma.sql`
+    SELECT r.id, r.level, r.reply, r.analysis, r.source::text AS source, COALESCE(r.submission_id, r.check_id) AS subject_id,
+      to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, r.reported_at IS NOT NULL AS reported,
+      CASE WHEN jsonb_typeof(r.analysis -> 'line') = 'number' AND (r.analysis ->> 'line')::int >= 1
+        THEN left(btrim(split_part(COALESCE(s.code, k.code), chr(10), (r.analysis ->> 'line')::int), ' ' || chr(9) || chr(13)), 200) END AS quoted
+    FROM ai_help_replies r
+    LEFT JOIN submissions s ON s.id = r.submission_id
+    LEFT JOIN ai_help_checks k ON k.id = r.check_id
+    WHERE r.user_id = ${input.userId}::uuid AND r.material_id = ${input.materialId}::uuid AND r.academy_id = ${input.academyId}::uuid
+      AND r.status = 'DONE' AND r.reply IS NOT NULL
+    ORDER BY r.created_at DESC, r.level DESC
+    LIMIT ${AI_HELP_HISTORY_MAX}`);
+  return rows.reverse().flatMap((row) => {
+    const source = aiHelpSourceSchema.safeParse(row.source);
+    if (!source.success || !row.subject_id) return [];
+    const analysis = aiAnalysisSchema.safeParse(row.analysis);
+    return [{
+      id: row.id, level: row.level, text: row.reply, analysis: analysis.success ? analysis.data : null, createdAt: row.created_at,
+      reported: row.reported, source: source.data, subjectId: row.subject_id, quoted: row.quoted || null,
+    }];
+  });
 }

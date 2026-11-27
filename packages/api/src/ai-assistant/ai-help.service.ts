@@ -45,7 +45,7 @@ import {
   analysisAnswerSchema, buildAnalysisPrompt, differenceOf, fallbackFor, HELP_CODE_MAX, HELP_LIBRARY_MAX, HELP_PROMPT_VERSION, problemText,
   type AnalysisEvidence, type ExampleEvidence, type KnownMistake,
 } from "./help-prompt.js";
-import { checkReply, hiddenValueIn, hiddenValues, newCode, plainText } from "./text-check.js";
+import { answerText, checkReply, hiddenValueIn, hiddenValues, newCode, unmarked } from "./text-check.js";
 import { readLibraryExercise } from "./library/library-read.js";
 import { costMicros } from "./usage.js";
 
@@ -438,18 +438,21 @@ export class AiHelpService {
       const visible = [context.submission.code, problemText(exercise), ...publicText(context)].join("\n");
       const sections = [reply.result, reply.why, reply.think, reply.tryIt, reply.alsoCheck];
       // Words only: a quote of the student's own code is allowed, new code is not.
-      if (sections.some((text) => text !== null && newCode(text, visible, context.submission.code))) return refuse("NEW_CODE");
+      // Every check reads the words without highlight marks; the student reads them with.
+      if (sections.some((text) => text !== null && newCode(unmarked(text), visible, context.submission.code))) return refuse("NEW_CODE");
       const shown = aiAnalysisSchema.safeParse({
-        result: plainText(reply.result), why: plainText(reply.why), think: plainText(reply.think),
-        tryIt: reply.tryIt === null ? null : plainText(reply.tryIt) || null, alsoCheck: reply.alsoCheck === null ? null : plainText(reply.alsoCheck) || null,
+        result: answerText(reply.result), why: answerText(reply.why), think: answerText(reply.think),
+        tryIt: reply.tryIt === null ? null : answerText(reply.tryIt) || null, alsoCheck: reply.alsoCheck === null ? null : answerText(reply.alsoCheck) || null,
         // A line the code does not have points nowhere; the words still stand.
         line: reply.line !== null && reply.line >= 1 && reply.line <= context.submission.code.split("\n").length ? reply.line : null,
       });
       if (!shown.success) return refuse("SIZE");
       const text = [shown.data.result, shown.data.why, shown.data.think, shown.data.tryIt, shown.data.alsoCheck].filter(Boolean).join("\n");
-      const problem = checkReply({ text, locale, max: AI_HELP_REPLY_MAX, solutions: context.solutions, visible: `${visible}\n${prompt.content}` });
+      if (text.length > AI_HELP_REPLY_MAX) return refuse("SIZE");
+      const words = unmarked(text);
+      const problem = checkReply({ text: words, locale, max: AI_HELP_REPLY_MAX, solutions: context.solutions, visible: `${visible}\n${prompt.content}` });
       if (problem) return refuse(problem);
-      if (hiddenValueIn(text, hiddenValues(hiddenData(context), visible))) return refuse("HIDDEN");
+      if (hiddenValueIn(words, hiddenValues(hiddenData(context), visible))) return refuse("HIDDEN");
       // An id the prompt never gave names no mistake; the analysis still stands.
       const itemId = reply.item === null ? null : prompt.itemIds.get(reply.item) ?? null;
       return outcome({ ...paid, status: "DONE", reply: text, analysis: shown.data, libraryItemId: itemId });

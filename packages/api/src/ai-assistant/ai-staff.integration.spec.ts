@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { AuditService } from "../academies/audit.service.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
 import { PlatformAccessService } from "../authorization/platform-access.service.js";
+import { PrismaClient } from "../generated/prisma/client.js";
 import { SupportGrantResolver } from "../authorization/support-grant.resolver.js";
 import { CurriculumOutlineService } from "../learn/curriculum-outline.service.js";
 import { LearnService } from "../learn/learn.service.js";
@@ -129,6 +131,55 @@ describe.skipIf(!databaseUrl)("AI library for staff, operators and readers", () 
       expect((await open(f.config)).exercise.hints).toEqual([{ position: 1, content: "Teacher" }]);
     });
   });
+
+  it("opens a student's workspace with their own answers, oldest first, in one more statement", async () => {
+    const materialId = await withLibrary();
+    const submitted = await failure(materialId, f.ids.student, { code: "n = int(input())\n  total = n - 1\t\nprint(total)" });
+    const check = await f.prisma.aiHelpCheck.create({
+      data: { userId: f.ids.student, academyId: f.ids.academy, classId: f.ids.klass, materialId, gradingRevision: 1, source: "RUN", code: "print(1)\nprint(2)", codeHash: "h", snapshot: {}, status: "PASSED" },
+    });
+    const at = (minute: number) => new Date(Date.UTC(2026, 10, 27, 1, minute));
+    const analysis = (line: number | null) => ({ result: "R", line, why: "The **loop** stops.", think: "T?", tryIt: null, alsoCheck: null });
+    const reply = (over: Record<string, unknown>) => f.prisma.aiHelpReply.create({
+      data: {
+        requestId: randomUUID(), userId: f.ids.student, academyId: f.ids.academy, classId: f.ids.klass, submissionId: submitted.id, materialId, gradingRevision: 1,
+        level: 1, locale: "en", status: "DONE", reply: "R", analysis: analysis(2), promptVersion: "v6", source: "SUBMIT", ...over,
+      } as never,
+    });
+    const first = await reply({ createdAt: at(1) });
+    const simpler = await reply({ level: 2, analysis: analysis(null), createdAt: at(2) });
+    const fromRun = await reply({ submissionId: null, checkId: check.id, source: "RUN", analysis: analysis(2), createdAt: at(3) });
+    // Not this student's, not finished, or another problem's: never listed.
+    await reply({ userId: f.ids.other, requestId: randomUUID(), createdAt: at(4) });
+    await reply({ status: "FAILED", reply: null, analysis: null, createdAt: at(5) });
+    const elsewhere = await withLibrary();
+    await reply({ materialId: elsewhere, createdAt: at(6) });
+
+    const client = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl! }), log: [{ emit: "event", level: "query" }] });
+    let statements = 0;
+    client.$on("query", () => { statements += 1; });
+    try {
+      const counted = (config: unknown) => new LearnService(client as never, {} as never, new AcademyAccessService(client as never, new SupportGrantResolver(client as never)),
+        new CurriculumOutlineService(client as never), {} as never, new LearningClassContextService(client as never), undefined, undefined, config as never);
+      const open = async (config: unknown) => {
+        statements = 0;
+        const workspace = await counted(config).getExerciseWorkspace(f.identity(f.auth.student), { academyId: f.ids.academy, materialId, classId: f.ids.klass });
+        return { workspace, statements };
+      };
+      const on = await open(f.config);
+      const off = await open(undefined);
+      expect(on.statements - off.statements).toBe(1);
+      expect(off.workspace.aiHelpHistory).toBeUndefined();
+      expect(on.workspace.aiHelpHistory!.map((item) => [item.id, item.level, item.source, item.subjectId, item.quoted])).toEqual([
+        [first.id, 1, "SUBMIT", submitted.id, "total = n - 1"],
+        [simpler.id, 2, "SUBMIT", submitted.id, null],
+        [fromRun.id, 1, "RUN", check.id, "print(2)"],
+      ]);
+      expect(on.workspace.aiHelpHistory![0]).toMatchObject({ text: "R", reported: false, createdAt: at(1).toISOString(), analysis: { why: "The **loop** stops." } });
+    } finally {
+      await client.$disconnect();
+    }
+  }, 60_000);
 
   it("removes what is past its time and keeps the rest", async () => {
     const materialId = await withLibrary();

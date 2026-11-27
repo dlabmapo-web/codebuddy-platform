@@ -40,76 +40,25 @@ const statusLabels = {
 } as const;
 
 /**
- * A hue and a glyph per feature.
+ * One colour and a glyph per feature.
  *
- * The product already colours by subject — every overview section owns a hue,
- * and `toneStyles` in the panel primitives is that legend. A grid of switches
- * is the case that needs it most: four identical blue columns have to be
- * checked against the header every time, where four hues let an operator read
- * one academy's whole configuration as a shape and scan a column down the page
- * without leaving it.
- *
- * The hues are not arbitrary. Live monitoring is teal because it is the
- * watching surface; class standing takes `peer`, which exists in this palette
- * precisely for "where you sit among others"; points take the ranking's gold;
- * and the leaderboard — the only feature built on another — takes a hue of its
- * own so a reader can see it lit beside its prerequisite.
+ * Every switch is Cove blue, as every other switch in the product is: a grid
+ * of seven hues read as seven kinds of control, and an operator asked for one.
+ * What tells the features apart is each column's name and the glyph on its
+ * summary card.
  */
+const brandStyle = { tone: 'brand', dot: 'bg-brand', chip: 'bg-brand-soft text-brand', meter: 'bg-brand' } as const;
 const featureStyles: Record<
   AcademyFeatureName,
   { tone: SwitchTone; dot: string; chip: string; meter: string; icon: typeof Eye }
 > = {
-  TEACHER_LIVE_MONITORING: {
-    tone: 'teal',
-    dot: 'bg-teal',
-    chip: 'bg-teal-soft text-teal',
-    meter: 'bg-teal',
-    icon: Eye,
-  },
-  STUDENT_CLASS_STANDING: {
-    tone: 'peer',
-    dot: 'bg-peer',
-    chip: 'bg-peer-soft text-peer',
-    meter: 'bg-peer',
-    icon: Users,
-  },
-  STUDENT_POINTS: {
-    tone: 'gold',
-    dot: 'bg-rank-gold',
-    chip: 'bg-rank-gold-soft text-rank-gold',
-    meter: 'bg-rank-gold',
-    icon: Coins,
-  },
-  STUDENT_CLASS_LEADERBOARD: {
-    tone: 'rose',
-    dot: 'bg-course-d',
-    chip: 'bg-course-d-soft text-course-d',
-    meter: 'bg-course-d',
-    icon: Trophy,
-  },
-  // The grading server's colour: this switch sends practice runs to the judge.
-  SERVER_SAMPLE_CHECKS: {
-    tone: 'brand',
-    dot: 'bg-brand',
-    chip: 'bg-brand-soft text-brand',
-    meter: 'bg-brand',
-    icon: ClipboardCheck,
-  },
-  EXAMS: {
-    tone: 'teal',
-    dot: 'bg-teal',
-    chip: 'bg-teal-soft text-teal',
-    meter: 'bg-teal',
-    icon: BadgeCheck,
-  },
-  // Operator-only: Cove pays for every AI call.
-  AI_ASSISTANT: {
-    tone: 'peer',
-    dot: 'bg-peer',
-    chip: 'bg-peer-soft text-peer',
-    meter: 'bg-peer',
-    icon: Sparkles,
-  },
+  TEACHER_LIVE_MONITORING: { ...brandStyle, icon: Eye },
+  STUDENT_CLASS_STANDING: { ...brandStyle, icon: Users },
+  STUDENT_POINTS: { ...brandStyle, icon: Coins },
+  STUDENT_CLASS_LEADERBOARD: { ...brandStyle, icon: Trophy },
+  SERVER_SAMPLE_CHECKS: { ...brandStyle, icon: ClipboardCheck },
+  EXAMS: { ...brandStyle, icon: BadgeCheck },
+  AI_ASSISTANT: { ...brandStyle, icon: Sparkles },
 };
 
 /**

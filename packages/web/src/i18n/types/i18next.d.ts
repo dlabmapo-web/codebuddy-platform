@@ -81,7 +81,7 @@ declare module 'i18next' {
       "sample-check": typeof sampleCheck;
       "learning-help": typeof import("@cove/i18n/locales/en/learning-help.json");
       "ai-library": typeof import("@cove/i18n/locales/en/ai-library.json");
-      "platform-ai": typeof import("@cove/i18n/locales/en/platform-ai.json");
+      "ai-usage": typeof import("@cove/i18n/locales/en/ai-usage.json");
       academy: typeof academy;
       applications: typeof applications;
       audit: typeof audit;

@@ -11,7 +11,6 @@ import {
   ScrollText,
   Shield,
   SlidersHorizontal,
-  Sparkles,
   Trophy,
   Turtle,
   Users,
@@ -191,7 +190,6 @@ export function PlatformSidebar() {
           icon: Wrench,
         },
         { href: routes.adminTurtle, label: t('nav.turtle'), icon: Turtle },
-        { href: routes.adminAi, label: t('nav.ai'), icon: Sparkles },
       ],
     },
     {

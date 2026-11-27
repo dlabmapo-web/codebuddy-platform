@@ -331,11 +331,11 @@ export const operationsNamespaces = ["platform-operations", "errors"] as const;
 /** The console page for public Turtle use; no other route reads it. */
 export const platformTurtleNamespaces = ["platform-turtle"] as const;
 
-/** The console page for the AI assistant; no other route reads it. */
-export const platformAiNamespaces = ["platform-ai"] as const;
+/** A campus manager's AI teacher page; no other route reads it. */
+export const aiUsageNamespaces = ["ai-usage"] as const;
 
 export type PageNamespace =
-  | (typeof platformAiNamespaces)[number]
+  | (typeof aiUsageNamespaces)[number]
   | (typeof platformTurtleNamespaces)[number]
   | (typeof librarySyncNamespaces)[number]
   | (typeof authNamespaces)[number]

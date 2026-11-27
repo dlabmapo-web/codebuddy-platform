@@ -1,9 +1,10 @@
 import { oc } from "@orpc/contract";
 
 import {
+  academyAiUsageInputSchema,
+  academyAiUsageSchema,
   aiLibraryInputSchema,
   aiLibraryViewSchema,
-  platformAiUsageSchema,
   updateAiLibraryItemInputSchema,
 } from "../../content/ai-help.js";
 
@@ -16,6 +17,6 @@ export const aiAssistantContract = {
   getLibrary: oc.input(aiLibraryInputSchema).output(aiLibraryViewSchema),
   updateLibraryItem: oc.input(updateAiLibraryItemInputSchema).output(aiLibraryViewSchema),
   regenerateLibrary: oc.input(aiLibraryInputSchema).output(aiLibraryViewSchema),
-  /** Counts and cost for Cove operators. Never a student's code or words. */
-  platformUsage: oc.output(platformAiUsageSchema),
+  /** One campus's counts and cost, for its manager. Never a student's code or words. */
+  academyUsage: oc.input(academyAiUsageInputSchema).output(academyAiUsageSchema),
 };

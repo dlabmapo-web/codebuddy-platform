@@ -191,8 +191,7 @@
     "features": "Features",
     "point_policies": "Point policies",
     "maintenance": "Maintenance",
-    "turtle": "Public Turtle",
-    "ai": "AI assistant"
+    "turtle": "Public Turtle"
   },
   "unavailable": {
     "title": "Academies are unavailable",

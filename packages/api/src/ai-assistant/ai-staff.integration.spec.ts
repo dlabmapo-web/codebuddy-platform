@@ -4,9 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { AuditService } from "../academies/audit.service.js";
 import { AcademyAccessService } from "../authorization/academy-access.service.js";
-import { PlatformAccessService } from "../authorization/platform-access.service.js";
-import { PrismaClient } from "../generated/prisma/client.js";
 import { SupportGrantResolver } from "../authorization/support-grant.resolver.js";
+import { PrismaClient } from "../generated/prisma/client.js";
 import { CurriculumOutlineService } from "../learn/curriculum-outline.service.js";
 import { LearnService } from "../learn/learn.service.js";
 import { LearningClassContextService } from "../learn/learning-class-context.service.js";
@@ -201,13 +200,27 @@ describe.skipIf(!databaseUrl)("AI library for staff, operators and readers", () 
     expect(await f.prisma.aiLibraryItem.count({ where: { materialId, state: "ACTIVE" } })).toBe(4);
   });
 
-  it("gives operators counts and cost, and nobody else anything", async () => {
-    const usage = new AiUsageService(f.prisma, new PlatformAccessService(f.prisma), f.config, new FakeModelClient(() => ({})));
-    expect(await code(usage.platform(manager()))).toBe("PLATFORM_ACCESS_DENIED");
-    const operator = await f.prisma.user.create({ data: { authUserId: randomUUID(), status: "ACTIVE", platformRole: "ADMIN", username: `op${randomUUID().slice(0, 8)}` } });
-    const view = await usage.platform(f.identity(operator.authUserId!));
-    expect(view).toMatchObject({ enabled: { help: true, library: true, key: true, model: "fake" }, budgetUsd: { help: 5, library: 10 } });
-    expect(view.academies.map((row) => row.academyId)).toContain(f.ids.academy);
+  it("gives a campus manager their campus's counts and cost, and nobody else anything", async () => {
+    const usage = new AiUsageService(f.prisma, access, f.config, new FakeModelClient(() => ({})));
+    const input = { academyId: f.ids.academy };
+    expect(await code(usage.academy(f.identity(f.auth.student), input))).not.toBe("ok");
+    const materialId = await withLibrary();
+    const row = await failure(materialId, f.ids.student);
+    await f.prisma.aiHelpReply.create({
+      data: {
+        requestId: randomUUID(), userId: f.ids.student, academyId: f.ids.academy, submissionId: row.id, materialId, gradingRevision: 1, level: 1,
+        locale: "ko", status: "DONE", reply: "SECRETNAME 가", promptVersion: "v6", costMicros: 1_500, latencyMs: 900,
+      },
+    });
+    const view = await usage.academy(manager(), input);
+    expect(view).toMatchObject({ enabled: { campus: true, help: true, library: true, model: "fake" }, problemLimit: 3, dailyLimit: 10, helpBudgetUsd: 5 });
+    expect(view.last7Days.replies).toBeGreaterThanOrEqual(1);
+    const month = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit" }).format(new Date());
+    expect(view.months[0]).toMatchObject({ month });
+    expect(view.months[0]!.costUsd).toBeGreaterThanOrEqual(0.0015);
+    expect(view.courses.find((course) => course.courseId === f.ids.course)).toMatchObject({ title: "Course" });
+    expect(view.courses.find((course) => course.courseId === f.ids.course)!.replies).toBeGreaterThanOrEqual(1);
+    expect(view.libraries.find((library) => library.state === "READY")!.count).toBeGreaterThanOrEqual(1);
     expect(JSON.stringify(view)).not.toMatch(/SECRETNAME|가/);
   });
 });

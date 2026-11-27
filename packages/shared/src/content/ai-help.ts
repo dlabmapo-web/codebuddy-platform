@@ -190,29 +190,36 @@ export const updateAiLibraryItemInputSchema = aiLibraryInputSchema.extend({
 });
 export type UpdateAiLibraryItemInput = z.infer<typeof updateAiLibraryItemInputSchema>;
 
-/* ---------------------------------------------------------------- operators */
+/* ---------------------------------------------------------- campus managers */
 
-export const aiUsageRowSchema = z.object({
-  month: z.string(),
-  kind: z.enum(["HELP", "LIBRARY"]),
-  requests: z.number().int(),
-  inputTokens: z.number().int(),
-  outputTokens: z.number().int(),
-  costUsd: z.number(),
-});
-export const platformAiUsageSchema = z.object({
-  enabled: z.object({ help: z.boolean(), library: z.boolean(), key: z.boolean(), model: z.string(), libraryModel: z.string() }),
-  budgetUsd: z.object({ help: z.number(), library: z.number() }),
-  months: z.array(aiUsageRowSchema),
+export const academyAiUsageInputSchema = z.object({ academyId: z.uuid() });
+
+/**
+ * How one campus uses the AI teacher, for its manager. Counts and cost only,
+ * never a student's code or words.
+ */
+export const academyAiUsageSchema = z.object({
+  /** The campus's own switch, then Cove's: students get answers only with both on. */
+  enabled: z.object({ campus: z.boolean(), help: z.boolean(), library: z.boolean(), model: z.string(), libraryModel: z.string() }),
+  /** Answers each student may get on one problem in a day; no limit across problems unless `dailyLimit`. */
+  problemLimit: z.number().int().positive(),
+  dailyLimit: z.number().int().positive().nullable(),
+  /** Cove's monthly limit on student help, shared by every campus. */
+  helpBudgetUsd: z.number().nonnegative(),
+  /** This campus's student help, by month in Seoul, newest first. */
+  months: z.array(z.object({ month: z.string(), requests: z.number().int(), costUsd: z.number() })),
   libraries: z.array(z.object({ state: aiLibraryStateSchema, count: z.number().int() })),
   last7Days: z.object({
     replies: z.number().int(), failed: z.number().int(), rejected: z.number().int(),
     reported: z.number().int(), matched: z.number().int(), p95Ms: z.number().int().nullable(), students: z.number().int(),
   }),
   hiddenItems: z.number().int(),
-  academies: z.array(z.object({ academyId: z.uuid(), name: z.string(), replies: z.number().int(), students: z.number().int() })),
-});
-export type PlatformAiUsage = z.infer<typeof platformAiUsageSchema>;
+  /** The campus's courses with the AI teacher on. */
+  courses: z.array(z.object({
+    courseId: z.uuid(), title: z.string(), problems: z.number().int(), ready: z.number().int(), replies: z.number().int(),
+  })),
+}).strict();
+export type AcademyAiUsage = z.infer<typeof academyAiUsageSchema>;
 
 /* ------------------------------------------------------------------ teacher */
 

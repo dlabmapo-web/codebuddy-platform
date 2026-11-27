@@ -13,6 +13,7 @@ import {
   Presentation,
   School,
   Settings,
+  Sparkles,
   Trophy,
   Wrench,
   type LucideIcon,
@@ -97,6 +98,7 @@ export function StudioSidebar({
   canReadAcademyMembers,
   canReviewApplications,
   canMonitor,
+  hasAi,
   hasPoints,
   isStudent,
   viewRole,
@@ -121,6 +123,7 @@ export function StudioSidebar({
   canReadAcademyMembers: boolean;
   canReviewApplications: boolean;
   canMonitor: boolean;
+  hasAi: boolean;
   hasPoints: boolean;
   isStudent: boolean;
 }) {
@@ -136,6 +139,7 @@ export function StudioSidebar({
     canReadAcademyMembers,
     canReviewApplications,
     canMonitor,
+    hasAi,
     hasPoints,
     isStudent,
   });
@@ -364,6 +368,7 @@ export function studioNavGroups({
   canReadAcademyMembers,
   canReviewApplications,
   canMonitor,
+  hasAi = false,
   hasPoints,
   isStudent,
 }: {
@@ -377,6 +382,8 @@ export function studioNavGroups({
   canReadAcademyMembers: boolean;
   canReviewApplications: boolean;
   canMonitor: boolean;
+  /** The academy has the AI teacher on: its manager gets the AI teacher's numbers. */
+  hasAi?: boolean;
   /** §5 — the academy switched points on. Off means the link is not there. */
   hasPoints: boolean;
   isStudent: boolean;
@@ -542,6 +549,15 @@ export function studioNavGroups({
         href: routes.academyPointPolicy(academySlug),
         labelKey: 'link.point_policy',
         icon: Coins,
+      });
+    }
+    // How the campus uses the AI teacher: answers, libraries and cost. Only
+    // where the campus has the AI teacher on.
+    if (hasAi) {
+      settings.push({
+        href: routes.academyAiTeacher(academySlug),
+        labelKey: 'link.ai_teacher',
+        icon: Sparkles,
       });
     }
     groups.push({ id: 'settings', labelKey: 'group.settings', items: settings });

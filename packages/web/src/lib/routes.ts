@@ -83,7 +83,6 @@ export const routes = {
    */
   adminOperations: '/admin/operations',
   adminTurtle: '/admin/turtle',
-  adminAi: '/admin/ai',
   adminAcademyNew: '/admin/academies/new',
   adminAcademy: (academySlug: string) =>
     `/admin/academies/${segment(academySlug)}`,
@@ -285,6 +284,9 @@ export const routes = {
     `${academyRoot(academySlug)}/settings`,
   academyPointPolicy: (academySlug: string) =>
     `${academyRoot(academySlug)}/settings/points`,
+  /** The campus's AI teacher numbers, for its manager, where the campus has it on. */
+  academyAiTeacher: (academySlug: string) =>
+    `${academyRoot(academySlug)}/settings/ai`,
   academyClassPoints: (academySlug: string) =>
     `${academyRoot(academySlug)}/points/classes`,
   academyStudentPoints: (academySlug: string, membershipId: string) =>

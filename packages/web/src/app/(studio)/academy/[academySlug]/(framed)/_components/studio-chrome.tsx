@@ -77,6 +77,7 @@ export async function StudioChrome({
   let held: readonly AcademyRole[] = [];
   let primaryRole: AcademyRole | null = null;
   let hasPoints = false;
+  let hasAi = false;
   let viewer: {
     academyImageUrl: string | null;
     imageUrl: string | null;
@@ -112,6 +113,7 @@ export async function StudioChrome({
       ];
     }
     hasPoints = (selectedMembership?.features ?? []).includes('STUDENT_POINTS');
+    hasAi = (selectedMembership?.features ?? []).includes('AI_ASSISTANT');
     // Feeds My Page in the header's avatar menu, the only entry since QA-04.
     // The name is only for the initials fallback, so the global one is right
     // even inside an academy.
@@ -133,7 +135,7 @@ export async function StudioChrome({
     // has none, so reading them from one left every flagged surface hidden.
     // Class ranking was the visible casualty: a Team Lead view with the Team
     // Lead's own board missing.
-    hasPoints = await academyPointsEnabled(academyId);
+    ({ hasPoints, hasAi } = await academyFeaturesOn(academyId));
     // No membership: the name has to come from the operator's own seam, since
     // `auth.me` only knows the academies this account belongs to. Memoised per
     // request, and the route guard has already asked, so this is a map lookup.
@@ -208,6 +210,7 @@ export async function StudioChrome({
         canMonitor={
           canMonitorClasses(shown) && (support ? support.allowMonitoring : true)
         }
+        hasAi={hasAi}
         hasPoints={hasPoints}
         isStudent={isStudent(shown)}
       />
@@ -277,21 +280,21 @@ export async function StudioChrome({
  * renders only while a grant is live.
  */
 /**
- * Whether this academy runs the point economy.
+ * Whether this academy runs the point economy, and has the AI teacher on
+ * (whose manager then gets the AI teacher page under Settings).
  *
  * Read from the academy rather than from a membership, for a viewer who has
  * none. Gated on `academy.read`, which every role a platform operator may
  * stand in holds, and answers false on any failure — a nav link that leads to
  * an empty board is worse than one that is absent.
  */
-async function academyPointsEnabled(academyId: string): Promise<boolean> {
+async function academyFeaturesOn(academyId: string): Promise<{ hasPoints: boolean; hasAi: boolean }> {
   try {
     const { features } = await getAcademyFeatures(academyId);
-    return features.some(
-      (feature) => feature.feature === 'STUDENT_POINTS' && feature.isEnabled,
-    );
+    const on = (name: string) => features.some((feature) => feature.feature === name && feature.isEnabled);
+    return { hasPoints: on('STUDENT_POINTS'), hasAi: on('AI_ASSISTANT') };
   } catch {
-    return false;
+    return { hasPoints: false, hasAi: false };
   }
 }
 

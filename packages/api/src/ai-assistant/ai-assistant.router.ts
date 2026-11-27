@@ -10,7 +10,7 @@ export function createAiAssistantRouter(os: ORPCImplementer, deps: ORPCDeps) {
       .handler(({ context, input }) => deps.aiLibraryService.updateItem(context.identity, input)),
     regenerateLibrary: os.aiAssistant.regenerateLibrary.use(access.authenticated)
       .handler(({ context, input }) => deps.aiLibraryService.regenerate(context.identity, input)),
-    platformUsage: os.aiAssistant.platformUsage.use(access.authenticated)
-      .handler(({ context }) => deps.aiUsageService.platform(context.identity)),
+    academyUsage: os.aiAssistant.academyUsage.use(access.authenticated)
+      .handler(({ context, input }) => deps.aiUsageService.academy(context.identity, input)),
   };
 }

@@ -377,29 +377,19 @@ test('switching the academy off removes AI and keeps the rest', async ({ request
   await setAi(request, { enabled: true });
 });
 
-test('an operator sees counts and cost, and nobody’s words', async ({ browser, request }) => {
-  const admin = await fixture(request, { role: 'ADMIN', legacy: true });
-  const context = await browser.newContext({ baseURL: studio, viewport: { width: 1440, height: 1000 } });
-  await context.addCookies([{ name: 'i18next', value: 'en', url: studio }]);
-  const page = await context.newPage();
-  await page.goto('/login');
-  const password = page.getByLabel('Password', { exact: true });
-  await expect(async () => {
-    if (await password.getAttribute('type') !== 'text') await page.getByRole('button', { name: 'Show password', exact: true }).click();
-    await expect(password).toHaveAttribute('type', 'text');
-  }).toPass({ timeout: 30_000 });
-  await page.getByRole('textbox', { name: /ID|username/i }).fill(admin.username!);
-  await password.fill('LocalLegacyTest123!');
-  await page.getByRole('button', { name: /^(Log in|Sign in)$/i }).click();
-  await expect(page).toHaveURL(/\/admin/);
-  await page.goto('/admin/ai');
-  const main = page.getByRole('main');
-  await expect(main).toContainText('AI assistant', { timeout: 120_000 });
+test('the campus manager sees the campus’s counts and cost, and nobody’s words', async () => {
+  // Settings → AI teacher, only where the campus has the AI teacher on.
+  await staff.goto(routes.academy(author.academy.slug));
+  await staff.getByRole('link', { name: 'AI teacher', exact: true }).click();
+  await expect(staff).toHaveURL(new RegExp(`${routes.academyAiTeacher(author.academy.slug)}$`));
+  const main = staff.getByRole('main');
+  await expect(main).toContainText('How this campus uses the AI teacher', { timeout: 120_000 });
   await expect(main).toContainText('Student help');
-  await expect(main).toContainText('SSO Browser Academy');
-  await expect(main).toContainText(/\$0\.00\d\d \/ \$1\.00/);
+  await expect(main).toContainText(/a problem each day/);
+  await expect(main).toContainText('No daily limit across problems');
+  await expect(main).toContainText(/Monthly limit, all campuses\s*\$1\.00/);
+  await expect(main).toContainText('Courses with the AI teacher');
   await expect(main).not.toContainText('Minji');
   await expect(main).not.toContainText('left out the last number');
-  await shot(page, '12-operator');
-  await context.close();
+  await shot(staff, '12-campus-ai-teacher');
 });

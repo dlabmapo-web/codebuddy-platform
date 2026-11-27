@@ -148,6 +148,7 @@ function createService(options?: {
     record?.enrollments.map((enrollment) => enrollment.membershipId) ?? [],
   );
   const transaction = {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     // Enrolment changes bump the academy's people revision in the same
     // transaction — §8.1 of the manager control tower design — so the double
     // has to answer for the academy row as well as the class.

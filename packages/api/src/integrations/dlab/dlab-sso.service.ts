@@ -12,9 +12,15 @@ import { DlabReconcilerService, desiredDlabCampuses, dlabAdmitted } from './dlab
 import { dlabTransaction } from './dlab-transaction.js';
 import { DlabError } from './dlab-error.js';
 import { DlabDirectoryService } from './dlab-directory.service.js';
+import type { StudentRestorationNotice } from './dlab-student-restoration.js';
 
 type Attempt = { startedAt: number; returnTo: string | null; redirectUri: string };
-type Activation = { authUserId: string; generation: number; returnTo: string | null };
+type Activation = {
+  authUserId: string;
+  generation: number;
+  returnTo: string | null;
+  studentRestorationNotices?: Record<string, StudentRestorationNotice>;
+};
 @Injectable()
 export class DlabSsoService {
   constructor(private readonly config: ConfigService<ApiEnvironment, true>, private readonly prisma: PrismaService, private readonly state: DlabStateService, private readonly source: DlabSourceService, private readonly policy: DlabPolicyService, private readonly auth: SupabaseAuthService, private readonly reconciler: DlabReconcilerService, @Optional() private readonly directory?: DlabDirectoryService) {}
@@ -50,13 +56,16 @@ export class DlabSsoService {
       if (!campuses.length) throw new DlabError('campus_mapping_required', 403);
       const directory = this.directory ?? new DlabDirectoryService(this.config, this.prisma, this.state, this.source, this.auth, this.reconciler);
       // Signing in from OS brings back someone a manager deleted here.
-      await directory.provision(saved, requestId, assertOwned, undefined, { revive: true });
+      const directoryResult = await directory.provision(saved, requestId, assertOwned, undefined, { revive: true });
       const authUserId = saved.reservedUserId;
       const email = buildPlaceholderEmail(saved.reservedUserId);
       const eligible = await this.policy.eligible(authUserId);
       if (!eligible) throw new DlabError('identity_not_bound', 403);
       const tokenHash = await this.auth.dlabTokenHash(authUserId, email);
-      const ticket = await this.state.issue('activation', binding, { authUserId, generation: eligible.identity.generation, returnTo: attempt.returnTo }, 60);
+      const ticket = await this.state.issue('activation', binding, {
+        authUserId, generation: eligible.identity.generation, returnTo: attempt.returnTo,
+        studentRestorationNotices: directoryResult.studentRestorationNotices,
+      }, 60);
       return { tokenHash, authUserId, ticket };
     });
   }
@@ -69,10 +78,16 @@ export class DlabSsoService {
     await this.prisma.user.update({ where: { authUserId: identity.authUserId }, data: { lastSignInAt: new Date() } });
     if (allowed.isPlatformAdmin) return { destination: DLAB_ADMIN_DESTINATION, requiresStudentSession: false };
     const path = safeDlabReturnTo(info.returnTo);
-    const requested = path && allowed.bindings.find(b => {
+    const requested = path ? allowed.bindings.find(b => {
       const root = `/academy/${b.membership.academy.slug}`;
       return path === root || path.startsWith(root + '/');
-    });
-    return { destination: requested ? path! : `/academy/${allowed.academy!.slug}`, requiresStudentSession: allowed.requiresStudentSession };
+    }) : undefined;
+    const academy = requested?.membership.academy ?? allowed.academy!;
+    const studentRestoration = info.studentRestorationNotices?.[academy.id];
+    return {
+      destination: requested ? path! : `/academy/${academy.slug}`,
+      requiresStudentSession: allowed.requiresStudentSession,
+      ...(studentRestoration && allowed.requiresStudentSession ? { studentRestoration } : {}),
+    };
   }
 }

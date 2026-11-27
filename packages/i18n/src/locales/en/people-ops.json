@@ -113,6 +113,7 @@
       "teacher_assignments_stranded": "{{count}} teach classes that will be left without a teacher",
       "teacher_assignments_stranded_one": "1 teaches classes that will be left without a teacher",
       "enrollments_dropped": "{{count}} will lose their place in every class",
+      "dlab_student_restoration": "{{count}} D.LAB OS students will be removed. Their previous active classes and saved work will return when they sign in through OS again, if they still have access.",
       "already_in_state": "{{count}} are already in that state",
       "already_in_state_one": "1 is already in that state",
       "last_manager_blocked": "{{count}} cannot change: an academy must keep one active manager",
@@ -136,6 +137,8 @@
     "action_delete": "Delete",
     "delete_title": "Delete these people?",
     "delete_warning": "They are removed from this academy and every class right away. Anyone who belongs to no other academy has their account deleted too and can no longer sign in. Their past work stays in the records. This cannot be undone.",
+    "delete_os_warning": "The selected people will lose access to this academy and their classes immediately. Their saved work stays in Cove.",
+    "delete_os_ack": "I understand the selected people will lose access now.",
     "delete_ack": "I understand this cannot be undone.",
     "delete_confirm": "Delete",
     "deleting": "Deleting"

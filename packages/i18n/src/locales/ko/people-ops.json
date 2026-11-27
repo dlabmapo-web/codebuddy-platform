@@ -111,6 +111,7 @@
     "consequence": {
       "teacher_assignments_stranded": "{{count}}명이 담당하던 반에 담당자가 없어집니다",
       "enrollments_dropped": "{{count}}명이 모든 반에서 제외됩니다",
+      "dlab_student_restoration": "디랩 OS 학생 {{count}}명이 제외됩니다. 학생이 디랩 OS로 다시 로그인할 때 이용 권한이 있으면 이전에 등록한 운영 중인 반과 저장된 학습 기록이 복구됩니다.",
       "already_in_state": "{{count}}명은 이미 해당 상태입니다",
       "last_manager_blocked": "{{count}}명은 변경할 수 없습니다. 학원에는 활성 관리자가 한 명 이상 있어야 합니다",
       "ineligible": "{{count}}명은 이 변경 대상이 아닙니다",
@@ -131,6 +132,8 @@
     "action_delete": "삭제",
     "delete_title": "이 사용자들을 삭제할까요?",
     "delete_warning": "이 학원과 모든 반에서 즉시 제외됩니다. 다른 학원에 속하지 않은 사용자는 계정도 삭제되어 더 이상 로그인할 수 없습니다. 지난 학습 기록은 그대로 남습니다. 되돌릴 수 없습니다.",
+    "delete_os_warning": "선택한 구성원은 이 학원과 반에 대한 이용 권한을 즉시 잃습니다. 저장된 학습 기록은 Cove에 남습니다.",
+    "delete_os_ack": "선택한 구성원의 이용 권한이 즉시 해제되는 것을 이해했습니다.",
     "delete_ack": "되돌릴 수 없다는 것을 이해했습니다.",
     "delete_confirm": "삭제",
     "deleting": "삭제 중"

@@ -665,3 +665,108 @@ for (const engine of ['chromium','webkit']) test(`directory sync: manager assign
     await page.screenshot({path:test.info().outputPath(`prelogin-members-${engine}.png`),animations:'disabled'});
   } finally {await managerContext.close();await studentContext.close();if(selected!==browser) await selected.close();}
 });
+
+for (const engine of ['Chromium', 'WebKit'] as const) {
+  test(`${engine} restores the same classes and saved work after member deletion and OS login`, async ({ browser, request }) => {
+    test.setTimeout(180_000);
+    const ownedBrowser = engine === 'WebKit' ? await webkit.launch() : null;
+    const selected = ownedBrowser ?? browser;
+    const managerContext = await selected.newContext({ baseURL: studioOrigin });
+    const studentContext = await selected.newContext({ baseURL: studioOrigin });
+    const returningContext = await selected.newContext({ baseURL: studioOrigin });
+    for (const context of [managerContext, studentContext, returningContext]) {
+      await context.route('https://os.dlabcampus.com/**', (route) => route.abort());
+    }
+    await returningContext.route('https://dlab-sso-provider.invalid/storage/v1/object/sign/**', (route) =>
+      route.fulfill({
+        path: resolve('e2e/fixtures/lecture-material.pdf'),
+        contentType: 'application/pdf',
+        headers: { 'Access-Control-Allow-Origin': '*', 'Cross-Origin-Resource-Policy': 'cross-origin' },
+      }));
+    try {
+      const manager = await fixture(request, 'lab_head', { autoCampus: true, name: 'Restoration Manager' });
+      const student = await fixture(request, 'student', { parentFixtureId: manager.id, name: 'Returning Student' });
+      const staff = await managerContext.newPage();
+      const learner = await studentContext.newPage();
+      await enter(staff, manager);
+      await enter(learner, student);
+      const root = '/academy/' + manager.academy.slug;
+      await expect(learner).toHaveURL(studioOrigin + root + '/learn/classes');
+      const initial = await (await request.get(fixtureOrigin + '/fixtures/' + student.id)).json();
+      const seeded = await request.post(fixtureOrigin + '/fixtures/' + manager.id + '/classroom', {
+        data: { studentFixtureId: student.id, includePdf: true, includeTurtle: true, emptyWork: true },
+      });
+      expect(seeded.ok(), await seeded.text()).toBe(true);
+      const classroom = await seeded.json(), [assigned, other] = classroom.classes;
+      const base = { academyId: manager.academy.id, classId: assigned.id };
+      const classList = root + '/learn/classes';
+      const href = (kind: string, id: string) => root + '/learn/' + kind + '/' + id + '?classId=' + assigned.id;
+      const coding = href('exercises', classroom.materialId);
+      const answer = href('turtle', classroom.shortMaterialId);
+      const code = '# Saved before deletion\nprint(2 + 3)';
+
+      await learner.goto(classList);
+      await expect(learner.getByText(assigned.name, { exact: true })).toBeVisible();
+      await expect(learner.getByText(other.name, { exact: true })).toBeVisible();
+      await learner.screenshot({ path: test.info().outputPath('classes-before.png') });
+      const draft = await rpc(learner, request, 'learn/saveDraft', { ...base, materialId: classroom.materialId, code });
+      expect(draft.ok(), await draft.text()).toBe(true);
+      expect((await draft.json()).json.outcome).toBe('SAVED');
+      await learner.goto(answer);
+      await learner.getByRole('textbox', { name: 'Your answer', exact: true }).fill('Python');
+      await learner.getByRole('button', { name: 'Submit', exact: true }).click();
+      await expect(learner.getByText('100 / 100', { exact: false }).first()).toBeVisible();
+      const oldToken = await tokenFor(learner);
+
+      await staff.goto(routes.academyPeople(manager.academy.slug));
+      const member = staff.getByRole('row').filter({ hasText: 'Returning Student' });
+      await member.getByRole('button', { name: 'More actions', exact: true }).click({ timeout: 25_000 });
+      await staff.getByRole('menuitem', { name: 'Delete user', exact: true }).click({ timeout: 25_000 });
+      const dialog = staff.getByRole('dialog');
+      await expect(dialog.getByText(/previous active classes and saved work/)).toBeVisible();
+      await dialog.getByRole('checkbox').check();
+      await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
+      await expect(member).toHaveCount(0);
+      await staff.screenshot({ path: test.info().outputPath('manager-deleted.png') });
+      const oldRequest = () => request.post(apiOrigin + '/api/rpc/learn/listCourses', {
+        headers: { Authorization: 'Bearer ' + oldToken },
+        data: { json: { academyId: base.academyId } },
+      });
+      expect((await oldRequest()).ok()).toBe(false);
+      await learner.goto(classList);
+      await expect(learner.getByText(assigned.name, { exact: true })).toHaveCount(0);
+      await learner.screenshot({ path: test.info().outputPath('student-removed.png') });
+
+      const returning = await returningContext.newPage();
+      await enter(returning, student);
+      await expect(returning).toHaveURL(studioOrigin + classList);
+      await returning.goto(classList);
+      await expect(returning.getByText(assigned.name, { exact: true })).toBeVisible();
+      await expect(returning.getByText(other.name, { exact: true })).toBeVisible();
+      await returning.screenshot({ path: test.info().outputPath('classes-restored.png') });
+      await returning.goto(coding);
+      await expect.poll(() => visibleEditor(returning)).toBe(code);
+      await returning.screenshot({ path: test.info().outputPath('saved-code.png') });
+      await returning.goto(answer);
+      await expect(returning.getByText('100 / 100', { exact: false }).first()).toBeVisible();
+      await returning.screenshot({ path: test.info().outputPath('saved-result.png') });
+      await returning.goto(href('documents', classroom.pdfMaterialId));
+      await expect(returning.getByTestId('pdf-reader').locator('.react-pdf__Page__canvas')).toBeVisible();
+      await returning.goto(href('quizzes', classroom.quizMaterialId));
+      await expect(returning.getByRole('radio', { name: 'Option 1: +', exact: true })).toBeVisible();
+      await returning.goto(href('turtle', classroom.turtleMaterialId));
+      await expect(returning.getByRole('heading', { name: 'Draw a red square', exact: true })).toBeVisible();
+      await staff.goto(root + '/classes/' + assigned.id);
+      await expect(staff.getByText('Returning Student', { exact: true })).toBeVisible();
+      await staff.screenshot({ path: test.info().outputPath('manager-roster-restored.png') });
+
+      const reentered = await (await request.get(fixtureOrigin + '/fixtures/' + student.id)).json();
+      expect(reentered.userId).toBe(initial.userId);
+      expect(reentered.memberships[0].id).toBe(initial.memberships[0].id);
+      expect((await oldRequest()).ok()).toBe(false);
+    } finally {
+      await Promise.all([managerContext.close(), studentContext.close(), returningContext.close()]);
+      await ownedBrowser?.close();
+    }
+  });
+}

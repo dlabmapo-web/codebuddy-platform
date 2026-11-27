@@ -85,6 +85,7 @@ export async function purgeAcademy(
   await tx.course.deleteMany({ where: { academyId } });
 
   /* --------------------------------------------------------- people */
+  await tx.dlabStudentRemoval.deleteMany({ where: { academyId } });
   await tx.peopleBulkOperation.deleteMany({ where: { academyId } });
   await tx.peopleImportSession.deleteMany({ where: { academyId } });
   await tx.academyJoinRequest.deleteMany({ where: { academyId } });

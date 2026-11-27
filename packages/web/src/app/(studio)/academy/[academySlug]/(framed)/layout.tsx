@@ -1,4 +1,7 @@
+import { cookies } from 'next/headers';
 import { requireAcademyOrLobbyRoute } from '@/lib/academy-route';
+import { studentRestorationCookieName } from '@/lib/dlab-sso';
+import { getServerTranslation } from '@/i18n/server/get-server-translation';
 
 import { LobbyChrome } from './_components/lobby/lobby-chrome';
 import { StudioChrome } from './_components/studio-chrome';
@@ -52,8 +55,14 @@ export default async function FramedAcademyLayout({
     return <LobbyChrome academySlug={academySlug} />;
   }
 
+  const notice = role === 'STUDENT' ? (await cookies()).get(studentRestorationCookieName)?.value : undefined;
+  const message = notice === 'history_missing' || notice === 'classes_unavailable'
+    ? (await getServerTranslation(['auth'])).t(`student_restoration.${notice}`)
+    : null;
+
   return (
     <StudioChrome academyId={academyId} academySlug={academySlug} routeRole={role}>
+      {message && <p role="status" className="mx-4 mt-4 rounded-lg border border-border bg-muted px-4 py-3 text-sm">{message}</p>}
       {children}
     </StudioChrome>
   );

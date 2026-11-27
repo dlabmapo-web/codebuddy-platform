@@ -17,6 +17,8 @@
     "academy.people.bulk.role_change": "Changed roles in bulk",
     "academy.people.bulk.suspend": "Suspended members in bulk",
     "academy.people.bulk.delete": "Deleted people",
+    "academy.student.restored_from_os": "Restored classes after D.LAB OS login",
+    "academy.student.recovery_recorded": "Recorded former classes for recovery",
     "academy.people.bulk.restore": "Restored members in bulk",
     "class.created": "Created a class",
     "class.updated": "Updated a class",

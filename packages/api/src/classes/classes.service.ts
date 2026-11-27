@@ -26,6 +26,7 @@ import { AcademyAccessService } from "../authorization/academy-access.service.js
 import { AppException } from "../common/app-exception.js";
 import { atRevision } from "../common/optimistic-lock.js";
 import { bumpPeopleRevision } from "../manage/people-revision.js";
+import { lockAcademyRosters } from "../integrations/dlab/dlab-student-restoration.js";
 import {
   memberAvatarSelect,
   noMemberAvatar,
@@ -326,6 +327,7 @@ export class ClassesService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      await lockAcademyRosters(tx, [input.academyId]);
       // Children before parents, for the relations the schema refuses to
       // cascade. Test submissions belong to their attempt, not to the
       // student's practice record, so they go with it.
@@ -373,6 +375,7 @@ export class ClassesService {
     const archiving = input.status === "ARCHIVED";
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      await lockAcademyRosters(tx, [input.academyId]);
       const current = await requireClass(tx, input.academyId, input.classId);
       if (current.status === input.status) return current;
 
@@ -646,6 +649,7 @@ export class ClassesService {
     const requested = [...new Set(input.membershipIds)];
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      await lockAcademyRosters(tx, [input.academyId]);
       const current = await requireClass(tx, input.academyId, input.classId);
       assertActive(current);
       const eligible = await tx.academyMembership.findMany({
@@ -722,6 +726,7 @@ export class ClassesService {
   ): Promise<ClassDetail> {
     const actor = await this.requireEnrollmentManager(identity, input.academyId);
     const updated = await this.prisma.$transaction(async (tx) => {
+      await lockAcademyRosters(tx, [input.academyId]);
       const current = await requireClass(tx, input.academyId, input.classId);
       assertActive(current);
       const enrollment = await tx.classEnrollment.findFirst({

@@ -2,7 +2,7 @@
 
 Date: 2026-11-27
 
-Status: Design. Implementation and verification are pending.
+Status: Implementation on the feature branch. See the verification record for coverage.
 
 Requested behavior approved in chat: a student deleted in Cove returns through D.LAB OS and resumes the same account, classes and saved learning work.
 
@@ -81,7 +81,7 @@ Extend `PeopleBulkService` through a focused restoration helper:
 3. Capture every existing enrollment for those memberships, with the original metadata, in the same transaction as removal.
 4. Mark an earlier pending cycle `SUPERSEDED` when a genuinely new deletion cycle starts. Capture only current enrollments; a class explicitly removed before this deletion must not return from an older cycle.
 5. Create the new snapshots and saved-enrollment rows before removing live enrollments and setting memberships `LEFT`.
-6. Preserve the existing account tombstone, credential handling and post-commit access/monitoring revocation. No learning data is deleted, reset or recalculated.
+6. Preserve the account tombstone and post-commit access and monitoring revocation. Retain the OS-managed student provider record as described below. No learning data is deleted, reset or recalculated.
 
 Snapshot persistence and removal must commit together. If the snapshot cannot be saved, deletion fails and leaves account/membership/enrollment state unchanged. A replay of a completed bulk operation neither captures an empty replacement snapshot nor starts another cycle.
 
@@ -104,7 +104,7 @@ Within the shared provisioning database-finalization transaction:
 
 Provider operations stay outside SQL transactions. Keep the existing recoverable provider/database boundary: a provider identity may already exist after a failed finalize, and the next attempt must reuse it.
 
-The current deletion writer removes provider credentials after its database transaction. Coordinate that cleanup with SSO through the same per-external-user lease: acquire the lease before provider cleanup, re-read the account and the deletion cycle, and delete credentials only if that exact deletion still applies. If the account has already returned, skip stale cleanup. If cleanup holds the lease first, SSO waits/retries and then recreates the same managed provider identity. Do not allow delayed deletion cleanup to erase credentials that a returning student's new SSO has just ensured. A failed cleanup must remain diagnosable/retryable without granting a deleted account access.
+Keep the OS-only provider identity for managed students when removing them from Cove. It has no local sign-in method. The Cove account tombstone and membership transition invalidate old sessions through the existing generation checks, including after restoration. Keeping the provider identity also removes the race between delayed provider deletion and a returning student's login. Earlier deletions may have removed the provider record, so SSO still verifies or recreates it at the reserved ID. The existing credential cleanup behavior continues for other accounts.
 
 Directory PUTs and catch-up jobs call provisioning without SSO revival and must never restore saved enrollments. Replayed activation tickets, ordinary page visits and stale pre-deletion cookies are not new SSO logins and cannot trigger restoration. Keep current generation/session revocation rules.
 
@@ -208,7 +208,7 @@ Implement on `feat/dlab-student-full-restoration`, the dedicated branch created 
 6. Delete, restore, remove one class explicitly, then delete/restore again: only the second deletion's roster returns.
 7. Cover zero classes, already-present enrollment, several memberships, another-campus class, changed OS campus/role, inactive source, local suspension, archived class, platform status deletion and ordinary/staff accounts.
 8. Inject snapshot-save and finalization failures: deletion/restoration rolls back as specified; provider success plus finalize failure is retryable with the same identity.
-9. Exercise actual concurrent transactions for duplicate SSO, delete-versus-login, enroll/unenroll-versus-delete, archive-versus-login and source-inactive-versus-login. Also delay post-commit credential deletion across a returning login and prove stale cleanup cannot delete the new sign-in. Assert serializable outcomes and no deadlock retry without bound.
+9. Exercise actual concurrent transactions for duplicate SSO, delete-versus-login, enroll/unenroll-versus-delete, archive-versus-login and source-inactive-versus-login. Verify that managed student deletion preserves the provider identity and that the old session is rejected both before and after the new login. Assert serializable outcomes and no deadlock retry without bound.
 10. Test legacy dry-run/apply, stale-plan rejection, unknown roster reporting, exact identity matching and retry idempotency.
 11. Assert query-count invariance and direct-table access protection. Run purge regression coverage with pending/completed snapshots.
 

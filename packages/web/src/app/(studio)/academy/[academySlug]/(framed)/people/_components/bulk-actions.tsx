@@ -283,6 +283,8 @@ export function BulkConfirmDialog({
     },
   });
 
+  const includesManagedStudents = preview.data?.consequences.some(({ kind }) => kind === 'dlab_student_restoration');
+
   React.useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !run.isPending) onClose();
@@ -326,7 +328,7 @@ export function BulkConfirmDialog({
           <div className="px-5 py-4">
             {deleting ? (
               <p className="mb-3 rounded-lg border border-danger/25 bg-danger/5 px-3.5 py-2.5 text-[13px] leading-5 text-danger">
-                {t('bulk.delete_warning')}
+                {t(includesManagedStudents ? 'bulk.delete_os_warning' : 'bulk.delete_warning')}
               </p>
             ) : null}
             {options.kind === 'ENROLL' ? (
@@ -373,7 +375,7 @@ export function BulkConfirmDialog({
               <label className="mt-3 flex items-center gap-2 text-[13px] font-semibold text-ink">
                 <input type="checkbox" className="size-4 accent-[var(--danger)]" checked={acknowledged}
                   onChange={(event) => setAcknowledged(event.target.checked)} />
-                {t('bulk.delete_ack')}
+                {t(includesManagedStudents ? 'bulk.delete_os_ack' : 'bulk.delete_ack')}
               </label>
             ) : null}
 

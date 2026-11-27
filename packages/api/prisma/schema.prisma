@@ -425,6 +425,8 @@ enum ExerciseProgressStatus {
 }
 
 model User {
+  dlabStudentRemovals DlabStudentRemoval[] @relation("DlabRemovedStudent")
+  dlabStudentRemovalActions DlabStudentRemoval[] @relation("DlabStudentRemovalActor")
   testAttempts TestAttempt[]
   syncNotificationReads LibrarySyncNotificationRead[]
   libraryReleases        LibraryRelease[]
@@ -653,6 +655,7 @@ model Organization {
 }
 
 model Academy {
+  dlabStudentRemovals DlabStudentRemoval[]
   staffPracticeDrafts StaffPracticeDraft[]
   staffPracticeAttempts StaffPracticeAttempt[]
   dlabCampus DlabCampus?
@@ -834,6 +837,7 @@ model AcademySlugHistory {
 }
 
 model AcademyMembership {
+  dlabStudentRemovals DlabStudentRemoval[]
   dlabBinding DlabMembershipBinding?
 
   helpRequestsAsStudent StudentHelpRequest[] @relation("HelpRequestStudent")
@@ -1138,6 +1142,7 @@ model ContentImportSession {
 /// answer when the first response was lost on the wire after the transaction
 /// committed.
 model PeopleBulkOperation {
+  dlabStudentRemovals DlabStudentRemoval[]
   id             String           @id @default(uuid()) @db.Uuid
   academyId      String           @map("academy_id") @db.Uuid
   actorUserId    String           @map("actor_user_id") @db.Uuid
@@ -2867,6 +2872,7 @@ model DlabCampus {
 }
 
 model DlabIdentity {
+  studentRemovals DlabStudentRemoval[]
   externalUserId String @id @map("external_user_id") @db.VarChar(64)
   userId String? @unique @map("user_id") @db.Uuid
   reservedUserId String @unique @default(uuid()) @map("reserved_user_id") @db.Uuid
@@ -3764,4 +3770,55 @@ model AiLibraryCheck {
   @@index([materialId, status])
   @@index([status, createdAt])
   @@map("ai_library_checks")
+}
+
+/// Enrollment recovery evidence. A partial unique index allows only one
+/// pending removal per membership. The migration enforces origin and status.
+model DlabStudentRemoval {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  version              Int       @default(1)
+  externalUserId       String    @map("external_user_id") @db.VarChar(64)
+  userId               String    @map("user_id") @db.Uuid
+  academyId            String    @map("academy_id") @db.Uuid
+  membershipId         String    @map("membership_id") @db.Uuid
+  actorUserId          String    @map("actor_user_id") @db.Uuid
+  origin               String
+  deletionOperationId  String?   @map("deletion_operation_id") @db.Uuid
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz(6)
+  recoveryOperationId  String?   @map("recovery_operation_id") @db.Uuid
+  planDigest           String?   @map("plan_digest")
+  wasLocallySuspended  Boolean   @default(false) @map("was_locally_suspended")
+  capturedAt           DateTime  @default(now()) @map("captured_at") @db.Timestamptz(6)
+  status               String    @default("PENDING")
+  restoredAt           DateTime? @map("restored_at") @db.Timestamptz(6)
+  restorationRequestId String?   @map("restoration_request_id") @db.Uuid
+
+  identity          DlabIdentity                 @relation(fields: [externalUserId], references: [externalUserId], onDelete: Restrict)
+  user              User                         @relation("DlabRemovedStudent", fields: [userId], references: [id], onDelete: Restrict)
+  actor             User                         @relation("DlabStudentRemovalActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  academy           Academy                      @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  membership        AcademyMembership            @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  deletionOperation PeopleBulkOperation?         @relation(fields: [deletionOperationId], references: [id], onDelete: Restrict)
+  enrollments       DlabStudentSavedEnrollment[]
+
+  @@unique([deletionOperationId, membershipId])
+  @@unique([recoveryOperationId, membershipId])
+  @@index([externalUserId, status])
+  @@index([academyId])
+  @@map("dlab_student_removals")
+}
+
+model DlabStudentSavedEnrollment {
+  removalId          String    @map("removal_id") @db.Uuid
+  classId            String    @map("class_id") @db.Uuid
+  enrolledByUserId   String?   @map("enrolled_by_user_id") @db.Uuid
+  enrolledAt         DateTime? @map("enrolled_at") @db.Timestamptz(6)
+  lastLearningSeenAt DateTime? @map("last_learning_seen_at") @db.Timestamptz(6)
+  outcome            String    @default("PENDING")
+  skipReason         String?   @map("skip_reason")
+
+  removal DlabStudentRemoval @relation(fields: [removalId], references: [id], onDelete: Cascade)
+
+  @@id([removalId, classId])
+  @@map("dlab_student_saved_enrollments")
 }

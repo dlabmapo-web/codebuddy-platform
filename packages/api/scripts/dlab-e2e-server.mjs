@@ -334,8 +334,8 @@ const server = createServer(async (req, res) => {
         videoMaterialId = videoMaterial.id;
       }
       let turtleMaterialId;
-      if (input.includeTurtle && (process.env.COVE_OBSERVATION_E2E === '1' || process.env.COVE_MATERIAL_LOADING_E2E === '1')) {
-        const health = process.env.COVE_MATERIAL_LOADING_E2E === '1' ? {runtimeVersion:'local-read-only-runtime'} : await (await fetch('http://127.0.0.1:4029/health', { headers: { Authorization: 'Bearer local-observation-runtime-secret-never-production' } })).json();
+      if (input.includeTurtle) {
+        const health = process.env.COVE_OBSERVATION_E2E !== '1' ? {runtimeVersion:'local-read-only-runtime'} : await (await fetch('http://127.0.0.1:4029/health', { headers: { Authorization: 'Bearer local-observation-runtime-secret-never-production' } })).json();
         const drawing = await db.material.create({ data: { lectureId: lecture.id, title: 'Draw a red square', type: 'TURTLE_EXERCISE', position: 7, isVisible: true,
           manualMaterial: { create: { description: 'Draw a red square and print a message.', runtimeVersion: health.runtimeVersion,
             width: 640, height: 480, files: { 'main.py': "import turtle\nt = turtle.Turtle()\nt.color('red')\nt.begin_fill()\nfor _ in range(4):\n    t.forward(90)\n    t.left(90)\nt.end_fill()\nprint('MONITORED TURTLE', flush=True)\nturtle.mainloop()" } } } } });

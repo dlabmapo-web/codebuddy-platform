@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { safeDlabReturnTo, DLAB_ADMIN_DESTINATION } from '@cove/shared';
-import { dlabEnabled, dlabCookieName, parseAttempt, dlabPost, dlabFailure, dlabCookie, authResponse, clearDlabContext } from '@/lib/dlab-sso';
+import { dlabEnabled, dlabCookieName, parseAttempt, dlabPost, dlabFailure, dlabCookie, authResponse, clearDlabContext, studentRestorationCookieName } from '@/lib/dlab-sso';
 import { createClient } from '@/lib/supabase/server';
 import { createServerORPCClient } from '@/lib/orpc-server';
 import { routes } from '@/lib/routes';
@@ -20,7 +20,11 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.verifyOtp({ token_hash: bridge.tokenHash, type: 'email' });
     issuedSession = Boolean(data.session);
     if (error || !data.session || data.session.user.id !== bridge.authUserId) throw new Error('Invalid session');
-    const activated = z.object({ destination: z.string(), requiresStudentSession: z.boolean() }).parse(await dlabPost<unknown>('activate', { binding: attempt.binding, ticket: bridge.ticket }, data.session.access_token));
+    const activated = z.object({
+      destination: z.string(),
+      requiresStudentSession: z.boolean(),
+      studentRestoration: z.enum(['classes_unavailable', 'history_missing']).optional(),
+    }).parse(await dlabPost<unknown>('activate', { binding: attempt.binding, ticket: bridge.ticket }, data.session.access_token));
     const adminDestination = activated.destination === DLAB_ADMIN_DESTINATION;
     const destination = adminDestination ? DLAB_ADMIN_DESTINATION : safeDlabReturnTo(activated.destination);
     if (!destination) throw new Error('Invalid destination');
@@ -42,6 +46,15 @@ export async function GET(request: NextRequest) {
       ? academyEntryPath(target.academy.slug, target.role)
       : destination);
     response.cookies.set({ ...dlabCookie(''), maxAge: 0 });
+    if (target) {
+      const notice = target.role === 'STUDENT' ? activated.studentRestoration : undefined;
+      response.cookies.set({
+        ...dlabCookie(notice ?? ''),
+        name: studentRestorationCookieName,
+        path: routes.academy(target.academy.slug),
+        maxAge: notice ? 90 : 0,
+      });
+    }
     return response;
   } catch {
     if (issuedSession) await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);

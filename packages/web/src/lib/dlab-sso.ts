@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { publicConfig } from '@/lib/config';
 
 export const dlabEnabled = () => process.env.DLAB_SSO_ENABLED === 'true';
+export const studentRestorationCookieName = 'cove-dlab-student-restoration';
 export const dlabCookieName = () => process.env.NODE_ENV === 'production' ? '__Host-cove-dlab-sso' : 'cove-dlab-sso-dev';
 export function dlabCookie(value: string) {
   return { name: dlabCookieName(), value, httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', maxAge: 300 };

@@ -30,6 +30,10 @@ import { AcademyAccessService } from "../../authorization/academy-access.service
 import { SupportGrantResolver } from "../../authorization/support-grant.resolver.js";
 import { ManagerScopeService } from "../../manage/manager-scope.service.js";
 import { PeopleBulkService } from "../../manage/people-bulk.service.js";
+import { LearningClassContextService } from "../../learn/learning-class-context.service.js";
+import { DlabSsoService } from "./dlab-sso.service.js";
+import { DlabPolicyService } from "./dlab-policy.service.js";
+import { applyStudentRecovery, previewStudentRecovery, studentRecoveryPlan } from "./dlab-student-recovery.js";
 
 const database =
   process.env.COVE_INTEGRATION_DATABASE_URL ??
@@ -63,6 +67,9 @@ describe.skipIf(!database || !redisUrl)(
     });
     async function fixture(count = 1) {
       const config = new ConfigService({
+        DLAB_OS_BASE_URL: "http://127.0.0.1:4199/v1",
+        DLAB_REDIRECT_URI: "http://127.0.0.1:3309/sso/callback",
+        DLAB_CLIENT_SECRET: "disposable-directory-fixture",
         DLAB_DIRECTORY_SYNC_ENABLED: true,
         DLAB_SSO_ENABLED: true,
         DLAB_AUTO_PROVISION_CAMPUSES: true,
@@ -963,7 +970,7 @@ describe.skipIf(!database || !redisUrl)(
       expect(deleted.status).toBe("DELETED");
       expect(deleted.username).toMatch(/^dlab_/);
       expect(deleted.authUserId).not.toBeNull();
-      expect(signIns.deleteUser).toHaveBeenCalledTimes(1);
+      expect(signIns.deleteUser).not.toHaveBeenCalled();
       // The teacher keeps the other campus and the account.
       expect(await db.user.findUniqueOrThrow({ where: { id: teacherUser } })).toMatchObject({ status: "ACTIVE" });
 
@@ -1031,5 +1038,286 @@ describe.skipIf(!database || !redisUrl)(
         expect((await db.user.findUniqueOrThrow({ where: { id: userId } })).status).toBe("ACTIVE");
       },
     );
+
+    async function restorationFixture(classCount: number) {
+      const f = await fixture();
+      const academyId = f.academyIds[0]!;
+      const externalUserId = randomUUID();
+      const payload = f.payload();
+      const userId = (await f.directory.syncUser(externalUserId, payload, randomUUID())).id;
+      const membership = await db.academyMembership.findUniqueOrThrow({
+        where: { academyId_userId: { academyId, userId } },
+      });
+      const managerId = randomUUID();
+      const manager = { authUserId: randomUUID() };
+      await db.user.create({
+        data: { id: managerId, authUserId: manager.authUserId, status: "ACTIVE", displayName: "Restoration manager" },
+      });
+      await db.academyMembership.create({
+        data: { academyId, userId: managerId, role: "MANAGER", status: "ACTIVE" },
+      });
+      const classIds = Array.from({ length: classCount }, () => randomUUID()).sort();
+      await db.class.createMany({
+        data: classIds.map((id) => ({ id, academyId, name: "Returning class " + id, createdByUserId: managerId })),
+      });
+      const enrollments = classIds.map((classId) => ({
+        classId, membershipId: membership.id, enrolledByUserId: managerId,
+        enrolledAt: new Date("2026-11-13T01:00:00Z"), lastLearningSeenAt: new Date("2026-11-14T01:00:00Z"),
+      }));
+      if (enrollments.length) await db.classEnrollment.createMany({ data: enrollments });
+      const prisma = db as PrismaService;
+      const bulk = new PeopleBulkService(prisma,
+        new ManagerScopeService(prisma, new AcademyAccessService(prisma, new SupportGrantResolver(prisma))),
+        new AuditService(), new RateLimitService(),
+        { revokeTeacher: vi.fn(), revokeStudent: vi.fn() } as never,
+        { deleteUser: vi.fn() } as never);
+      const selection = { mode: "ids" as const, membershipIds: [membership.id] };
+      const options = { kind: "DELETE" as const };
+      const remove = async (membershipIds = selection.membershipIds) => {
+        const selection = { mode: "ids" as const, membershipIds };
+        const preview = await bulk.preview(manager as never, { academyId, selection, options });
+        expect(preview.consequences).toContainEqual(expect.objectContaining({ kind: "dlab_student_restoration" }));
+        const result = await bulk.run(manager as never, {
+          academyId, selection, options, idempotencyKey: randomUUID(), peopleRevision: preview.peopleRevision,
+        });
+        expect(result.succeeded).toBe(membershipIds.length);
+      };
+      const policy = new DlabPolicyService(prisma, f.state, f.config as never);
+      const oldSession = { authUserId: userId, sessionId: randomUUID() } as never;
+      const oldEligibility = await policy.eligible(userId);
+      await policy.activate(oldSession, oldEligibility!.identity.generation);
+      const auth = {
+        ...f.auth,
+        dlabTokenHash: vi.fn().mockResolvedValue("fixture-token"),
+        verifyTokenClaims: vi.fn(async (sessionId: string) => ({ authUserId: userId, sessionId })),
+      };
+      const service = new DlabSsoService(f.config as never, prisma, f.state, f.source, policy, auth as never,
+        f.reconciler, f.directory);
+      const signIn = async () => {
+        const binding = randomUUID();
+        const { state } = await service.start(binding);
+        const tokenPayload = { ...payload, external_user_id: externalUserId };
+        delete tokenPayload.updated_at;
+        vi.stubGlobal("fetch", vi.fn(async () => Response.json(tokenPayload)));
+        try {
+          const completed = await service.complete("fixture-code", state, binding);
+          expect(completed.authUserId).toBe(userId);
+          return await service.activate(completed.ticket, binding, randomUUID());
+        } finally {
+          vi.unstubAllGlobals();
+        }
+      };
+      const liveEnrollments = () => db.classEnrollment.findMany({
+        where: { membershipId: membership.id }, orderBy: { classId: "asc" },
+      });
+      return { ...f, prisma, academyId, externalUserId, userId, membership, payload, policy, oldSession,
+        managerId, classIds, enrollments, liveEnrollments, remove, signIn };
+    }
+
+    it("restores the same roster and learning data only through fresh SSO", async () => {
+      const f = await restorationFixture(2);
+      const classId = f.classIds[0]!;
+      const course = await db.course.create({
+        data: { academyId: f.academyId, title: "Prior course", createdByUserId: f.managerId, isVisible: true },
+      });
+      await db.classCourse.create({
+        data: { classId, courseId: course.id, assignedByUserId: f.managerId },
+      });
+      const module = await db.courseModule.create({
+        data: { courseId: course.id, title: "Earlier module", position: 1, externalKey: randomUUID(), isVisible: true },
+      });
+      const lecture = await db.lecture.create({
+        data: { courseModuleId: module.id, title: "Earlier lesson", position: 1, externalKey: randomUUID(), isVisible: true },
+      });
+      const material = await db.material.create({
+        data: { lectureId: lecture.id, title: "Earlier exercise", type: "PROGRAMMING_EXERCISE", position: 1, isVisible: true },
+      });
+      const draft = await db.exerciseDraft.create({
+        data: { userId: f.userId, courseId: course.id, materialId: material.id, sourceMaterialId: material.id, code: "print(7)" },
+      });
+      const progress = await db.studentExerciseProgress.create({
+        data: { userId: f.userId, materialId: material.id, status: "SOLVED", attemptCount: 1, bestScore: 100 },
+      });
+      const submission = await db.submission.create({
+        data: {
+          userId: f.userId, materialId: material.id, sourceMaterialId: material.id, courseId: course.id,
+          classId, code: draft.code, language: "PYTHON", gradingRevision: 1, engineVersion: "fixture",
+          timeLimitMs: 1000, memoryLimitMb: 128, status: "PASSED", score: 100, passedCount: 1, totalCount: 1,
+          problemTitle: material.title, courseTitle: course.title, moduleTitle: module.title, lectureTitle: lecture.title,
+          modulePosition: 1, lecturePosition: 1, problemPosition: 1,
+        },
+      });
+      const context = new LearningClassContextService(f.prisma);
+      const scope = { academyId: f.academyId, userId: f.userId, courseId: course.id, requestedClassId: classId };
+      await expect(context.resolve(scope)).resolves.toMatchObject({ classId });
+
+      await f.remove();
+      expect(await f.liveEnrollments()).toEqual([]);
+      await expect(context.resolve(scope)).rejects.toThrow();
+      await expect(f.policy.assertSession(f.oldSession)).rejects.toThrow();
+      await f.directory.syncUser(f.externalUserId, f.payload, randomUUID());
+      await f.directory.syncUser(f.externalUserId, { ...f.payload, updated_at: "2026-11-14T01:00:00Z" }, randomUUID());
+      expect(await f.liveEnrollments()).toEqual([]);
+      expect(await db.dlabStudentRemoval.count({ where: { userId: f.userId, status: "PENDING" } })).toBe(1);
+
+      await expect(f.signIn()).resolves.toMatchObject({ requiresStudentSession: true });
+      expect(await f.liveEnrollments()).toEqual(f.enrollments);
+      await expect(context.resolve(scope)).resolves.toMatchObject({ classId, membershipId: f.membership.id });
+      expect(await db.exerciseDraft.findUnique({ where: { id: draft.id } })).toEqual(draft);
+      expect(await db.studentExerciseProgress.findUnique({ where: { id: progress.id } })).toEqual(progress);
+      expect(await db.submission.findUnique({ where: { id: submission.id } })).toEqual(submission);
+      await expect(f.policy.assertSession(f.oldSession)).rejects.toThrow();
+
+      // An intentional unenrollment stays removed on the next login and deletion cycle.
+      await db.classEnrollment.delete({ where: { classId_membershipId: { classId, membershipId: f.membership.id } } });
+      await f.signIn();
+      expect(await f.liveEnrollments()).toEqual(f.enrollments.slice(1));
+      await f.remove();
+      await db.class.update({ where: { id: f.classIds[1]! }, data: { status: "ARCHIVED" } });
+      await expect(f.signIn()).resolves.toMatchObject({ studentRestoration: "classes_unavailable" });
+      expect(await f.liveEnrollments()).toEqual([]);
+      expect(await db.auditLog.count({ where: { targetId: f.membership.id, action: "academy.student.restored_from_os" } })).toBe(2);
+      const skipped = await db.dlabStudentSavedEnrollment.findMany({
+        where: { removal: { membershipId: f.membership.id }, outcome: "SKIPPED" },
+        select: { classId: true, skipReason: true },
+      });
+      expect(skipped).toEqual([{ classId: f.classIds[1]!, skipReason: "class_archived" }]);
+    });
+
+    it("rejects invalid class scope and rolls back the returning membership", async () => {
+      const f = await restorationFixture(1);
+      const other = await restorationFixture(1);
+      await f.remove();
+      const removal = await db.dlabStudentRemoval.findFirstOrThrow({ where: { userId: f.userId } });
+      await db.dlabStudentSavedEnrollment.create({ data: { removalId: removal.id, classId: other.classIds[0]! } });
+      await expect(f.signIn()).rejects.toThrow();
+      expect(await f.liveEnrollments()).toEqual([]);
+      expect(await db.academyMembership.findUnique({ where: { id: f.membership.id } })).toMatchObject({ status: "LEFT" });
+      expect(await db.dlabStudentRemoval.findUnique({ where: { id: removal.id } })).toMatchObject({ status: "PENDING" });
+      await db.dlabStudentSavedEnrollment.delete({
+        where: { removalId_classId: { removalId: removal.id, classId: other.classIds[0]! } },
+      });
+      await f.signIn();
+      expect(await f.liveEnrollments()).toEqual(f.enrollments);
+    });
+
+    it("creates a reviewed legacy recovery for an existing account with missing class history", async () => {
+      const f = await restorationFixture(1);
+      const adminId = randomUUID();
+      await db.user.create({ data: { id: adminId, status: "ACTIVE", platformRole: "ADMIN", displayName: "Recovery operator" } });
+      await f.remove();
+      // Simulate a deletion performed by the old code, which kept the receipt
+      // and original user IDs but had no saved enrollment snapshot.
+      await db.dlabStudentRemoval.deleteMany({ where: { userId: f.userId } });
+      await expect(f.signIn()).resolves.toMatchObject({ studentRestoration: "history_missing" });
+      const input = { externalUserId: f.externalUserId, userId: f.userId, academyId: f.academyId,
+        membershipId: f.membership.id, classIds: f.classIds };
+      await expect(previewStudentRecovery(f.prisma, adminId, "test", { ...input, classIds: [] }))
+        .rejects.toThrow();
+      const stale = await previewStudentRecovery(f.prisma, adminId, "test", input);
+      await db.class.update({ where: { id: f.classIds[0]! }, data: { name: "Updated class" } });
+      await expect(applyStudentRecovery(f.prisma, "test", stale, stale.digest)).rejects.toThrow();
+      const plan = studentRecoveryPlan.parse(JSON.parse(JSON.stringify(await previewStudentRecovery(f.prisma, adminId, "test", input))));
+      const recovery = await applyStudentRecovery(f.prisma, "test", plan, plan.digest);
+      expect(recovery.replayed).toBe(false);
+      expect(await f.liveEnrollments()).toEqual([]);
+      expect(await applyStudentRecovery(f.prisma, "test", plan, plan.digest)).toEqual({ ...recovery, replayed: true });
+      await f.signIn();
+      expect(await f.liveEnrollments()).toEqual([expect.objectContaining({ classId: f.classIds[0], enrolledByUserId: adminId })]);
+    });
+
+
+    it("preserves a separate local suspension and keeps recovery pending", async () => {
+      const f = await restorationFixture(1);
+      await db.academyMembership.update({
+        where: { id: f.membership.id }, data: { status: "SUSPENDED", suspendedAt: new Date() },
+      });
+      await f.remove();
+      await expect(f.signIn()).rejects.toThrow();
+      expect(await f.liveEnrollments()).toEqual([]);
+      expect(await db.academyMembership.findUnique({ where: { id: f.membership.id } })).toMatchObject({ status: "SUSPENDED" });
+      expect(await db.dlabStudentRemoval.count({ where: { userId: f.userId, status: "PENDING" } })).toBe(1);
+    });
+
+    it("preserves existing enrollments for a platform status deletion", async () => {
+      const f = await restorationFixture(1);
+      await db.user.update({ where: { id: f.userId }, data: { status: "DELETED" } });
+      await expect(f.policy.assertSession(f.oldSession)).rejects.toThrow();
+      await f.signIn();
+      expect(await f.liveEnrollments()).toEqual(f.enrollments);
+      expect(await db.dlabStudentRemoval.count({ where: { userId: f.userId } })).toBe(0);
+      await expect(f.policy.assertSession(f.oldSession)).rejects.toThrow();
+    });
+
+    it("serializes deletion with a returning login", async () => {
+      const f = await restorationFixture(2);
+      const [removed] = await Promise.allSettled([f.remove(), f.signIn()]);
+      expect(removed.status).toBe("fulfilled");
+      const member = await db.academyMembership.findUniqueOrThrow({ where: { id: f.membership.id } });
+      expect(await f.liveEnrollments()).toEqual(member.status === "ACTIVE" ? f.enrollments : []);
+      await f.signIn();
+      expect(await f.liveEnrollments()).toEqual(f.enrollments);
+      expect(await db.dlabStudentRemoval.count({ where: { userId: f.userId, status: "RESTORED" } })).toBe(1);
+    });
+
+    it("keeps managed student bulk deletion at fixed query count and protects recovery rows", async () => {
+      const f = await restorationFixture(1);
+      const targets = Array.from({ length: 100 }, () => ({ userId: randomUUID(), memberId: randomUUID(), externalUserId: randomUUID() }));
+      await dlabTransaction(f.prisma, async (tx) => {
+        await sourceWrite(tx);
+        await tx.user.createMany({ data: targets.map(({ userId }) => ({
+          id: userId, authUserId: userId, displayName: "Batch student", status: "ACTIVE",
+        })) });
+        await tx.dlabIdentity.createMany({ data: targets.map(({ userId, externalUserId }) => ({
+          userId, externalUserId, reservedUserId: userId, name: "Batch student", userRole: "student",
+          accountStatus: "active", externalCampusId: f.campusIds[0]!, externalCampusIds: f.campusIds,
+          payloadHash: "restoration-quantity-fixture",
+        })) });
+        await tx.academyMembership.createMany({ data: targets.map(({ userId, memberId }) => ({
+          id: memberId, userId, academyId: f.academyId, status: "ACTIVE", role: "STUDENT",
+        })) });
+        await tx.dlabMembershipBinding.createMany({ data: targets.map(({ memberId, externalUserId }) => ({
+          membershipId: memberId, externalUserId, externalCampusId: f.campusIds[0]!, appliedRevision: 1, sourceAccessStatus: "ALLOWED",
+        })) });
+        await tx.classEnrollment.createMany({ data: targets.map(({ memberId }) => ({
+          membershipId: memberId, classId: f.classIds[0]!, enrolledByUserId: f.managerId,
+        })) });
+      });
+      const measured = [];
+      for (const membershipIds of [[f.membership.id], targets.map((target) => target.memberId)]) {
+        const start = queries.length;
+        await f.remove(membershipIds);
+        const sql = queries.slice(start);
+        measured.push({ statements: sql.length, reads: sql.filter((query) => /^\s*SELECT\b/i.test(query)).length });
+      }
+      expect(measured[0]).toEqual(measured[1]);
+      console.info("D.LAB managed deletions (1 and 100 students)", measured);
+      expect(await db.dlabStudentRemoval.count({ where: { academyId: f.academyId, status: "PENDING" } })).toBe(101);
+      const permissions = await db.$queryRaw<Array<{ readable: boolean; rls: boolean }>>`
+        SELECT has_table_privilege(roles.role, tables.oid, 'SELECT') AS readable, tables.relrowsecurity AS rls
+        FROM pg_class tables CROSS JOIN (VALUES ('anon'), ('authenticated')) AS roles(role)
+        WHERE tables.relname IN ('dlab_student_removals', 'dlab_student_saved_enrollments')
+      `;
+      expect(permissions).toHaveLength(4);
+      expect(permissions.every((row) => !row.readable && row.rls)).toBe(true);
+    });
+
+    it("uses the same statement count for one and 100 saved enrollments", async () => {
+      const measured = [];
+      for (const count of [1, 100]) {
+        const f = await restorationFixture(count);
+        const beforeRemove = queries.length;
+        await f.remove();
+        const removed = queries.slice(beforeRemove);
+        const beforeLogin = queries.length;
+        await f.signIn();
+        const signedIn = queries.slice(beforeLogin);
+        expect(await f.liveEnrollments()).toHaveLength(count);
+        const counts = (sql: string[]) => ({ statements: sql.length, reads: sql.filter((q) => /^\s*SELECT\b/i.test(q)).length });
+        measured.push({ remove: counts(removed), signIn: counts(signedIn) });
+      }
+      console.info("D.LAB restoration query counts (1 and 100 saved enrollments)", measured);
+      expect(measured[0]).toEqual(measured[1]);
+    });
   },
 );

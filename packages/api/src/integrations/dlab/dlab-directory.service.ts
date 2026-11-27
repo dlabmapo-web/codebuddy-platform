@@ -19,6 +19,7 @@ import {
 } from "./dlab-directory-read.js";
 import { directoryCampusAllowed } from "./dlab-directory-reconciler.js";
 import { DlabError } from "./dlab-error.js";
+import { lockAcademyRosters, type StudentRestorationNotice } from "./dlab-student-restoration.js";
 
 export type DirectoryResult = {
   ok: true;
@@ -27,6 +28,7 @@ export type DirectoryResult = {
   provisioning_status: "READY";
   outcome: "applied" | "unchanged" | "applied_restricted";
   membership_ids: string[];
+  studentRestorationNotices?: Record<string, StudentRestorationNotice>;
 };
 
 /** No sessions here. Both authenticated sync and SSO use the same fixed-ID,
@@ -122,6 +124,13 @@ export class DlabDirectoryService {
       await assertOwned();
       const result = await dlabTransaction(this.prisma, async (tx) => {
         await sourceWrite(tx);
+        if (options.revive) {
+          const academyIds = before.campuses.flatMap(({ academyId }) => academyId ? [academyId] : []);
+          await lockAcademyRosters(tx, academyIds);
+          if (before.userId) {
+            await tx.$queryRaw`SELECT id FROM users WHERE id = ${before.userId}::uuid FOR UPDATE`;
+          }
+        }
         const [current] = await readDlabDirectory(tx, [saved.externalUserId]);
         if (
           !current ||
@@ -176,12 +185,13 @@ export class DlabDirectoryService {
             displayName: user.displayName,
           },
         };
+        const studentNotices = new Map<string, StudentRestorationNotice>();
         const changed = await this.reconciler.reconcileBatch(
           tx,
           [saved.externalUserId],
           [snapshot],
           renamed ? [userId] : [],
-          { revive: options.revive === true },
+          { revive: options.revive === true, requestId, studentNotices },
         );
         const memberships = await tx.$queryRaw<
           Array<{ id: string; status: string; source: string }>
@@ -238,6 +248,7 @@ export class DlabDirectoryService {
                 ? ("unchanged" as const)
                 : ("applied" as const),
             membership_ids: memberships.map((m) => m.id),
+            ...(studentNotices.size ? { studentRestorationNotices: Object.fromEntries(studentNotices) } : {}),
           },
         };
       });

@@ -728,6 +728,8 @@ export const academyAuditActions = [
   "academy.people.bulk.suspend",
   "academy.people.bulk.restore",
   "academy.people.bulk.delete",
+  "academy.student.restored_from_os",
+  "academy.student.recovery_recorded",
   "class.created",
   "class.updated",
   "class.archived",

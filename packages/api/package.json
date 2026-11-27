@@ -44,6 +44,7 @@
     "dlab:invalidate-sessions": "tsx src/integrations/dlab/scripts/operator.ts invalidate",
     "benchmark:native-classroom": "node --max-old-space-size=512 scripts/benchmark-native-classroom.mjs",
     "test:native-harness": "node --test scripts/benchmark-native-classroom.test.mjs ../../deploy/native/deployment-contract.test.mjs",
+    "dlab:recover-student": "tsx src/integrations/dlab/scripts/recover-student.ts",
     "dlab:sync-directory": "tsx src/integrations/dlab/scripts/sync-directory.ts",
     "library:initial-release": "tsx src/library-sync/initial-release.ts",
     "images:backfill": "tsx src/migrations/remote-images/cli.ts"

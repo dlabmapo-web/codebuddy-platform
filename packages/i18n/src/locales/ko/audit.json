@@ -17,6 +17,8 @@
     "academy.people.bulk.role_change": "일괄 역할 변경",
     "academy.people.bulk.suspend": "일괄 정지",
     "academy.people.bulk.delete": "구성원 삭제",
+    "academy.student.restored_from_os": "디랩 OS 로그인 후 반 복구",
+    "academy.student.recovery_recorded": "반 복구를 위한 이전 등록 정보 기록",
     "academy.people.bulk.restore": "일괄 복구",
     "class.created": "반 생성",
     "class.updated": "반 수정",

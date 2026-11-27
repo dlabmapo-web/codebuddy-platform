@@ -9,9 +9,10 @@ vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => ({ value: 'a
 vi.mock('@/lib/dlab-sso', () => ({
   dlabEnabled: () => true,
   dlabCookieName: () => 'attempt',
+  studentRestorationCookieName: 'cove-dlab-student-restoration',
   parseAttempt: () => ({ state: 'state', binding: 'binding' }),
   dlabPost: mocks.post,
-  dlabCookie: () => ({ name: 'attempt', value: '' }),
+  dlabCookie: (value: string) => ({ name: 'attempt', value }),
   clearDlabContext: vi.fn(),
   authResponse: (path: string) => NextResponse.redirect(new URL(path, 'https://cove.test')),
   dlabFailure: () => NextResponse.redirect('https://cove.test/login?error=sso'),
@@ -33,9 +34,13 @@ beforeEach(() => {
   mocks.signOut.mockResolvedValue({});
 });
 
-async function complete(destination: string, role: 'MANAGER' | 'TEAM_LEAD' | 'TEACHER' | 'STUDENT') {
+async function complete(
+  destination: string,
+  role: 'MANAGER' | 'TEAM_LEAD' | 'TEACHER' | 'STUDENT',
+  studentRestoration?: 'classes_unavailable' | 'history_missing',
+) {
   mocks.post.mockResolvedValueOnce({ tokenHash: 'hash', authUserId, ticket: 'a'.repeat(64) });
-  mocks.post.mockResolvedValueOnce({ destination, requiresStudentSession: role === 'STUDENT' });
+  mocks.post.mockResolvedValueOnce({ destination, requiresStudentSession: role === 'STUDENT', studentRestoration });
   mocks.account.mockResolvedValue({ user: {
     authUserId, platformRole: 'USER',
     memberships: [{ academy: { slug: 'dlab-mapo' }, status: 'ACTIVE', role }],
@@ -57,6 +62,13 @@ describe('SSO academy entry', () => {
   it('preserves an explicit course deep link', async () => {
     const destination = '/academy/dlab-mapo/learn/courses/course-1';
     expect((await complete(destination, 'STUDENT')).headers.get('location')).toBe(`https://cove.test${destination}`);
+  });
+
+  it('scopes a restoration notice to the verified student academy', async () => {
+    const response = await complete('/academy/dlab-mapo', 'STUDENT', 'classes_unavailable');
+    expect(response.cookies.get('cove-dlab-student-restoration')).toMatchObject({
+      value: 'classes_unavailable', path: '/academy/dlab-mapo', maxAge: 90,
+    });
   });
 
   it('still rejects destinations belonging to another academy', async () => {

@@ -103,6 +103,7 @@ export const bulkConsequenceKinds = [
   "teacher_assignments_stranded",
   /** A target is enrolled in active classes they will be removed from. */
   "enrollments_dropped",
+  "dlab_student_restoration",
   /** A target is already in the requested state; nothing will change. */
   "already_in_state",
   /** A target is the last active manager and cannot be changed. */

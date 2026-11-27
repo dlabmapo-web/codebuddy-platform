@@ -1,4 +1,6 @@
 import { restoreDlabMembership } from '../integrations/dlab/dlab-local-restriction.js';
+import { captureStudentEnrollments, lockAcademyRosters } from "../integrations/dlab/dlab-student-restoration.js";
+import { sourceLock } from "../integrations/dlab/dlab-transaction.js";
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import {
   BULK_MAX_TARGETS,
@@ -158,9 +160,8 @@ export class PeopleBulkService {
 
     const outcome = await this.prisma.$transaction(async (transaction) => {
       // The serialization point for every people mutation in this academy.
-      await transaction.$queryRaw`
-        SELECT id FROM academies WHERE id = ${input.academyId}::uuid FOR UPDATE
-      `;
+      if (input.options.kind === "DELETE") await sourceLock(transaction);
+      await lockAcademyRosters(transaction, [input.academyId]);
       const academy = await transaction.academy.findUniqueOrThrow({
         where: { id: input.academyId },
         select: { peopleRevision: true },
@@ -206,6 +207,7 @@ export class PeopleBulkService {
       const { rows, deletedAuthUserIds } = await this.apply({
         actor,
         academyId: input.academyId,
+        operationId: operation.id,
         eligible: decided.eligible,
         blocked: decided.blocked,
         options: input.options,
@@ -362,7 +364,7 @@ export class PeopleBulkService {
         userId: true,
         user: {
           select: {
-            displayName: true, username: true, email: true, platformRole: true,
+            displayName: true, username: true, email: true, platformRole: true, status: true,
             // Any other academy the person still belongs to keeps the account.
             memberships: { where: { academyId: { not: academyId }, status: { not: "LEFT" } }, select: { id: true }, take: 1 },
           },
@@ -403,7 +405,9 @@ export class PeopleBulkService {
       userId: member.userId,
       // Cove staff are never deleted from an academy page, and someone who
       // still belongs to another academy keeps their account there.
-      accountDeletable: member.user.platformRole === "USER" && member.user.memberships.length === 0,
+      accountDeletable: member.user.platformRole === "USER" &&
+        member.user.memberships.length === 0 &&
+        !(member.dlabBinding && member.role === "STUDENT" && member.user.status === "SUSPENDED"),
       role: member.role,
       status: member.status,
       displayName: memberDisplayName(member),
@@ -525,8 +529,10 @@ export class PeopleBulkService {
       );
       add(
         "enrollments_dropped",
-        decided.eligible.filter((member) => member.enrolledClassIds.length > 0),
+        decided.eligible.filter((member) =>
+          !isManagedStudent(member) && member.enrolledClassIds.length > 0),
       );
+      add("dlab_student_restoration", decided.eligible.filter(isManagedStudent));
       add("monitoring_revoked", decided.eligible.filter(holdsTeacher));
       add("accounts_deleted", decided.eligible.filter((member) => member.accountDeletable));
     }
@@ -600,6 +606,7 @@ export class PeopleBulkService {
   private async apply(input: {
     actor: ManagerActor;
     academyId: string;
+    operationId: string;
     eligible: TargetMember[];
     blocked: BlockedMember[];
     options: BulkOptions;
@@ -612,6 +619,15 @@ export class PeopleBulkService {
 
     switch (options.kind) {
       case "DELETE": {
+        const managedStudents = input.eligible.filter(isManagedStudent);
+        const managedStudentUserIds = managedStudents.map((member) => member.userId);
+        const managedStudentAccounts = new Set(managedStudentUserIds);
+        await captureStudentEnrollments(transaction, {
+          academyId: input.academyId,
+          operationId: input.operationId,
+          actorUserId: input.actor.userId,
+          membershipIds: managedStudents.map((member) => member.id),
+        });
         // Out of the academy: the membership is history (LEFT), which every
         // people list and access check already leaves out.
         await transaction.academyMembership.updateMany({
@@ -647,8 +663,14 @@ export class PeopleBulkService {
             UPDATE users u SET status = 'DELETED'::"UserStatus", updated_at = now(),
               email = CASE WHEN EXISTS (SELECT 1 FROM dlab_identities d WHERE d.user_id = u.id) THEN u.email END,
               username = CASE WHEN EXISTS (SELECT 1 FROM dlab_identities d WHERE d.user_id = u.id) THEN u.username END
-            WHERE u.id = ANY(${userIds}::uuid[])`;
-          deletedAuthUserIds = users.flatMap((user) => (user.authUserId ? [user.authUserId] : []));
+            WHERE u.id = ANY(${userIds}::uuid[])
+              AND (u.status <> 'SUSPENDED' OR u.id <> ALL(${managedStudentUserIds}::uuid[]))`;
+          // The OS-only provider record has no local sign-in method. Keeping
+          // it avoids racing an asynchronous provider delete with the next SSO.
+          // Cove's tombstone and generation checks revoke existing sessions.
+          deletedAuthUserIds = users.flatMap(({ id, authUserId }) =>
+            authUserId && !managedStudentAccounts.has(id) ? [authUserId] : [],
+          );
         }
         break;
       }
@@ -810,6 +832,10 @@ type TargetMember = {
 
 type BlockedMember = { member: TargetMember; code: string };
 type Decided = { eligible: TargetMember[]; blocked: BlockedMember[] };
+
+function isManagedStudent(member: TargetMember): boolean {
+  return member.dlabManaged === true && member.role === "STUDENT";
+}
 
 /** Whether this member holds TEACHER now, primary or granted beside it. */
 function holdsTeacher(member: TargetMember): boolean {

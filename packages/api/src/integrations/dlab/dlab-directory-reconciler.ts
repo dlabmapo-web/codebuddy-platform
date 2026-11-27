@@ -16,6 +16,12 @@ import type {
 import { DlabError } from "./dlab-error.js";
 import { sourceWrite } from "./dlab-transaction.js";
 import {
+  readPendingStudentRemovals,
+  restoreStudentEnrollments,
+  type PendingStudentRemoval,
+  type StudentRestorationNotice,
+} from "./dlab-student-restoration.js";
+import {
   readDlabDirectory,
   type DirectorySnapshot,
   type DirectoryCampus,
@@ -115,10 +121,18 @@ export class DlabReconcilerService {
     ids: readonly string[],
     snapshots?: DirectorySnapshot[],
     renamedUserIds: readonly string[] = [],
-    options: { revive?: boolean } = {},
+    options: {
+      revive?: boolean;
+      requestId?: string;
+      studentNotices?: Map<string, StudentRestorationNotice>;
+    } = {},
   ) {
     const revivedIds: string[] = [];
     const rows = snapshots ?? (await readDlabDirectory(tx, ids));
+    const pending = await readPendingStudentRemovals(tx, options.revive
+      ? rows.flatMap((row) => row.memberships.filter((member) => member.binding).map((member) => member.id))
+      : []);
+    const restorations: PendingStudentRemoval[] = [];
     await sourceWrite(tx);
     const directory =
       this.config.get("DLAB_DIRECTORY_SYNC_ENABLED", { infer: true }) === true;
@@ -195,9 +209,23 @@ export class DlabReconcilerService {
         // A directory sync leaves them out; only the binding keeps up with the
         // revision, so the identity is not reprocessed forever. Signing in from
         // D-LAB OS again (`revive`) brings them back like a new member.
-        const revived = options.revive === true && before?.status === "LEFT";
-        if (revived) revivedIds.push(id);
+        const sourceAllowed = directoryCampusAllowed(this.config, identity, campus);
+        const removal = pending.get(id);
+        if (removal && (removal.externalUserId !== identity.externalUserId ||
+            removal.userId !== user.id || removal.academyId !== academyId))
+          throw new DlabError("student_restoration_conflict", 409);
+        const revived = options.revive === true && before?.status === "LEFT" &&
+          sourceAllowed && user.status === "ACTIVE";
+        if (revived && !removal?.wasLocallySuspended) revivedIds.push(id);
         else if (before?.status === "LEFT") {
+          // An eligible login can surface an independently suspended member
+          // to their manager. Their existing suspension marker still wins.
+          if (revived && removal?.wasLocallySuspended) {
+            members.push({ id, academyId, userId: user.id, role: before.role, status: "SUSPENDED" });
+            changed.add(id);
+            academies.add(academyId);
+            continue;
+          }
           if (before.binding!.appliedRevision !== identity.revision)
             bindings.push({
               externalUserId: identity.externalUserId,
@@ -208,17 +236,16 @@ export class DlabReconcilerService {
             });
           continue;
         }
-        const sourceAllowed = directoryCampusAllowed(
-          this.config,
-          identity,
-          campus,
-        );
         const status =
           sourceAllowed &&
           user.status === "ACTIVE" &&
           (revived || !before?.binding?.localSuspendedAt)
             ? "ACTIVE"
             : "SUSPENDED";
+        if (options.revive && role === "STUDENT" && status === "ACTIVE") {
+          if (removal) restorations.push(removal);
+          else if (revived) options.studentNotices?.set(academyId, "history_missing");
+        }
         const extras = sourceAllowed
           ? dlabAcademyRoles(identity.userRole).filter((r) => r !== role)
           : [];
@@ -369,6 +396,15 @@ export class DlabReconcilerService {
       FROM jsonb_to_recordset(${JSON.stringify(profiles)}::jsonb) AS x("membershipId" text,"academyId" text,"schoolGrade" text)
       ON CONFLICT (membership_id) DO UPDATE SET school_grade=EXCLUDED.school_grade,updated_at=now()
     `);
+    if (restorations.length) {
+      const restored = await restoreStudentEnrollments(tx, restorations, {
+        requestId: options.requestId,
+        revisionByIdentity: new Map(rows.map((row) => [row.externalUserId, row.revision])),
+      });
+      for (const academyId of restored.changedAcademies) academies.add(academyId);
+      for (const academyId of restored.unavailableAcademies)
+        options.studentNotices?.set(academyId, "classes_unavailable");
+    }
     if (academies.size)
       await tx.academy.updateMany({
         where: { id: { in: [...academies] } },

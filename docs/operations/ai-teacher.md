@@ -17,12 +17,12 @@ A Manager or Team Lead creates a Python course with **AI teacher: included**, an
 
 | Who | Where | What |
 | --- | --- | --- |
-| Student | Toolbar: **Reset · Test run · Run · Submit · ✨ AI help** | **AI help** shows only where AI is on for the problem, and can be pressed only after a Run that ended in an error or printed the wrong output for an example's input, a failed Test run, or a failed Submit. Run with an example's input also says, free: "This is Example 1. Expected 15, you printed 10." The answer card above the output has *Result*, *Where* (line, the student's own line, **Show in editor**), *Why*, *Think*, *Try it*, sometimes *Also check*, and is labelled *after Run / Test run / Submit*. One **Explain more simply**. **Ask your teacher**. **Report** |
+| Student | Toolbar: **Reset · Test run · Run · Submit · ✨ AI help** | **AI help** shows only where AI is on for the problem, and can be pressed only after a Run that ended in an error or printed the wrong output for an example's input, a failed Test run, or a failed Submit. Run with an example's input also says, free: "This is Example 1. Expected 15, you printed 10." One **AI teacher** box sits between the toolbar and the output, takes at most 60% of the pane, scrolls inside itself and folds to its title bar. It keeps every answer on the problem, oldest first and newest last, also after a reload (the workspace reads the student's saved answers). Each answer has *Result*, *Where* (line, the student's own line, **Show in editor**), *Why*, *Think*, *Try it*, sometimes *Also check*, with the words to notice highlighted, and is labelled *after Run / Test run / Submit* and its time. While it works, the box shows the steps it is on. One **Explain more simply**. **Ask your teacher**. **Report** |
 | Student | Problem statement | Only hints a teacher wrote, as before. AI hints are **not** shown |
 | Teacher | Student's attempt (class → student → submission) | **AI teacher on this attempt**: the same sections the student read, and whether the student reported it; below it, **AI help after Run and Test run on this problem**, with the code the server checked |
 | Manager / Team Lead | Add course / Edit course | **AI teacher: Not included / Included**, only for Python courses at an academy with the AI assistant. Not included by default. A master switch: off stops help and learning for the whole course; notes are kept |
 | Teacher / manager | Problem editor → **What the AI teacher knows about this problem** | The hint bank, the mistakes with the wrong program used to test each, dropped items and why, correct programs, and common mistakes of the last 30 days. **Edit**, **Hide**, **Write again** |
-| Operator | `/admin/ai` | Switches, cost this month against each limit, libraries by state, last 7 days (answers, students, fallbacks, refusals, reports, p95 time), academies with AI on. Counts only, never a student's code or words |
+| Manager | Settings → **AI teacher** (`/academy/<slug>/settings/ai`), only where the academy has AI on | The campus's switches, the answer limits, its student-help cost this month and Cove's monthly limit, its libraries by state, last 7 days (answers, students, fallbacks, refusals, reports, p95 time), its courses with the AI teacher (problems with AI, libraries ready, answers in 7 days), and its cost by month. Counts only, never a student's code or words. Moved from the operator console `/admin/ai` on November 27, 2026 |
 | Operator | Admin → Features | The **AI assistant** switch per academy (managers cannot turn it on themselves) |
 
 ## 3. Workflow 1: the AI learns each problem right after it is saved
@@ -61,8 +61,8 @@ Student presses "AI help" (after Run, Test run or Submit)
         │
         ▼
 1. Cove checks: AI on for the academy, the course and the problem? Python,
-   automatic, not an exam? limits left (5 per problem a day, 15 a day, shared
-   by the three buttons)? Nothing is spent otherwise.
+   automatic, not an exam? limits left (5 per problem a day, shared by the
+   three buttons; no daily limit across problems)? Nothing is spent otherwise.
    · after Submit, with that code still in the editor: that submission, every test
    · otherwise: the server runs the editor's code on the EXAMPLES ONLY, in the
      grader's interactive lane. All pass → "All examples pass. Press Submit to
@@ -158,7 +158,7 @@ Fast mode (`AI_*_SERVICE_TIER=fast`, the default since November 26, 2026) costs 
 | `AI_ASSISTANT_EFFORT`, `AI_LIBRARY_EFFORT` | `none`, `low` | Reasoning effort |
 | `AI_ASSISTANT_SERVICE_TIER`, `AI_LIBRARY_SERVICE_TIER` | `fast`, `fast` | OpenAI's tier: `fast` is quicker at twice the price, `default` is standard |
 | `AI_ASSISTANT_TIMEOUT_MS` | `8000` | Then a fixed message |
-| `AI_ASSISTANT_PROBLEM_LIMIT`, `AI_ASSISTANT_DAILY_LIMIT` | `5`, `15` | Per student, shared by Run, Test run and Submit (were 3 and 10 before November 26, 2026) |
+| `AI_ASSISTANT_PROBLEM_LIMIT`, `AI_ASSISTANT_DAILY_LIMIT` | `5`, `0` | Per student, shared by Run, Test run and Submit. `0` is no daily limit across problems, the default since November 27, 2026 (was 15, and 10 before November 26) |
 | `AI_ASSISTANT_CONCURRENCY` | `30` | Calls at once per API process |
 | `AI_ASSISTANT_MONTHLY_BUDGET_USD`, `AI_LIBRARY_MONTHLY_BUDGET_USD` | `30`, `10` | Monthly limits |
 | `AI_LIBRARY_HOURS` | `0-24` | Seoul hours for writing: all day since November 26, 2026 (was `22-7`) |
@@ -195,7 +195,7 @@ COVE_INTEGRATION_DATABASE_URL=postgresql://… pnpm --filter @cove/api exec vite
 1. Release a version containing this branch, with `OPENAI_API_KEY` in `secrets/api.env`.
 2. Set `AI_LIBRARY_ENABLED=true` first, and switch AI on for **one** academy (Admin → Features). Let the libraries be written at night; teachers read them in the problem editor.
 3. When the conditions in [section 5 of the checks](../qa/2026-11-25-cove-ai-learning-assistant.md#5-before-real-students) are met, set `AI_ASSISTANT_ENABLED=true` and restart the API.
-4. Watch `/admin/ai` for cost, fallbacks, refusals and reports.
+4. Watch the campus's Settings → **AI teacher** for cost, fallbacks, refusals and reports.
 
 **Turning it off:** the academy switch, or `AI_ASSISTANT_ENABLED=false` / `AI_LIBRARY_ENABLED=false` and a restart. Nothing needs migrating; the error coach and rules stay.
 
@@ -208,7 +208,7 @@ COVE_INTEGRATION_DATABASE_URL=postgresql://… pnpm --filter @cove/api exec vite
 | AI teacher (API) | `src/ai-assistant/`: `ai-help.service.ts`, `ai-help-read.ts`, `help-prompt.ts` (prompt `v4`), `text-check.ts`, `fingerprint.ts`, `ai-model.ts` (OpenAI Responses API, `store: false`), `ai-settings.ts`, `usage.ts`, `ai-usage.service.ts`, `ai-maintenance.service.ts`; `library/` (job, prompt `lib-v1`, read, staff service) |
 | Other API | `learn/` (workspace switch, routes, submission results), `teach/teacher-progress.*` (answers on the attempt, +1 statement there), `manage/academy-features.service.ts` (operator-only switch), `config/env.schema.ts`, oRPC router and context |
 | Shared contracts | `content/ai-help.ts`, `content/output-rules.ts`, `content/statement-text.ts`, `content/python-error.ts`, `api/orpc/ai-assistant.contract.ts`, learn contract (`getAiHelp`, `requestAiHelp` with `mode`, `reportAiHelp`) |
-| Web | Exercise workspace `learner-help.tsx`, `use-ai-help.ts`, `result-panel.tsx`; editor `ai-library-panel.tsx`; teacher `submission-review.tsx`; operator `/admin/ai`; feature settings; texts in `learning-help`, `ai-library`, `platform-ai` (Korean and English) |
+| Web | Exercise workspace `learner-help.tsx`, `use-ai-help.ts`, `result-panel.tsx`; editor `ai-library-panel.tsx`; teacher `submission-review.tsx`; manager Settings → AI teacher (`settings/ai`); feature settings; texts in `learning-help`, `ai-library`, `ai-usage` (Korean and English) |
 | Tests and tools | Unit and integration specs beside the code; `e2e/specs/ai-assistant*.spec.ts`; `packages/api/scripts/test-ai-assistant.sh` and the local model stand-in in `dlab-e2e-server.mjs` |
 | Deploy | `deploy/scripts/clear-ai-gates.sh`, its test, `rollback.sh`, CI |
 
@@ -301,6 +301,6 @@ Tried and not worth it: streaming (first words about 0.7 s sooner with Fast mode
 - **For the campus courses (November 26, 2026):**
   - a larger, scored evaluation of prompt `v5` (one real-model run passed on November 26) and of growth prompt `lib-v2` on real students' answers;
   - the speed of AI help after Run and Test run on a copy of production (2 grader slots), and how long a student waits while a 100-problem course is being learned;
-  - set `AI_ASSISTANT_PROBLEM_LIMIT=5`, `AI_ASSISTANT_DAILY_LIMIT=15`, `AI_LIBRARY_HOURS=0-24` and `AI_LIBRARY_QUIET_MINUTES=0` in production `secrets/api.env` before the release tag, if it sets them;
+  - set `AI_ASSISTANT_PROBLEM_LIMIT=5`, `AI_ASSISTANT_DAILY_LIMIT=0`, `AI_LIBRARY_HOURS=0-24` and `AI_LIBRARY_QUIET_MINUTES=0` in production `secrets/api.env` before the release tag, if it sets them;
   - a teacher sees a student's AI answers after Run and Test run only from a submission review, so not for a student who never submitted the problem;
   - C/C++ courses, with their own quality test.

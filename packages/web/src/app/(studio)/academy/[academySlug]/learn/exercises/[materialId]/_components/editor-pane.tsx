@@ -63,6 +63,7 @@ export function EditorPane({
   renderHelp,
   aiHelpButton = null,
   aboveOutput = null,
+  aiPanel = null,
 }: {
   onRunAll: () => void;
   onStop: () => void;
@@ -105,8 +106,14 @@ export function EditorPane({
   renderHelp?: React.ComponentProps<typeof ResultPanel>['renderHelp'];
   /** The AI help button, last in the toolbar (the campus courses design, §6). */
   aiHelpButton?: React.ReactNode;
-  /** Shown first in the output, whichever tab: the AI teacher's answer, and what a Run showed. */
+  /** Shown first in the output, whichever tab: what a Run with an example's input showed. */
   aboveOutput?: React.ReactNode;
+  /**
+   * The AI teacher's box, between the toolbar and the output, whichever tab:
+   * it scrolls inside itself and takes at most part of the pane, so the
+   * output keeps its own place below it.
+   */
+  aiPanel?: React.ReactNode;
 }) {
   const compiled = isCompiledLanguage(language);
   const { t } = useLayoutTranslation(['learn', 'common']);
@@ -220,6 +227,7 @@ export function EditorPane({
           {aiHelpButton}
           {!practiceOnly ? <SubmissionSummary latest={submission.latestSubmission} loading={submission.summaryLoading} failed={submission.summaryError} onRefresh={submission.refreshSummary} refreshing={submission.summaryRefreshing} dark /> : null}
         </div>
+        {aiPanel}
         <div
           aria-label={t('workspace.tab_result')}
           className="min-h-0 flex-1 overflow-y-auto"

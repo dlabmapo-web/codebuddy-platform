@@ -43,7 +43,6 @@
     "label": "AI 선생님",
     "invite": "AI 선생님이 코드를 봐 드릴까요?",
     "analyze": "내 코드 분석하기",
-    "reading": "AI 선생님이 코드와 모든 테스트를 읽고 있어요…",
     "simpler_heading": "더 쉽게",
     "section": {
       "result": "결과",
@@ -56,7 +55,6 @@
     "line": "{{number}}번째 줄",
     "show_line": "편집기에서 보기",
     "simpler": "더 쉽게 설명해 주세요",
-    "simplifying": "더 쉽게 설명하고 있어요…",
     "left_other": "오늘 이 문제의 AI 분석이 {{count}}번 남았어요",
     "note": "AI가 쓴 글이에요. 틀릴 수 있어요.",
     "report": "신고하기",
@@ -80,7 +78,6 @@
     "button": "AI 도움",
     "button_off": "코드에 틀린 곳이 있으면 AI 도움을 쓸 수 있어요.",
     "button_own_input": "예제의 입력을 넣어 보거나 테스트 실행을 눌러 보세요.",
-    "checking": "Cove가 예제로 코드를 실행하고 있어요…",
     "examples_passed": "예제를 모두 통과했어요. 나머지는 제출해서 확인해 보세요.",
     "run_example": "예제 {{number}}의 입력이에요. {{expected}}이(가) 나와야 하는데 {{actual}}이(가) 나왔어요.",
     "from": {
@@ -88,7 +85,17 @@
       "TEST_RUN": "테스트 실행 후",
       "SUBMIT": "제출 후"
     },
-    "invite_toolbar": "도움이 더 필요하면 결과 위의 ✨ AI 도움을 눌러 보세요."
+    "invite_toolbar": "도움이 더 필요하면 결과 위의 ✨ AI 도움을 눌러 보세요.",
+    "thinking": {
+      "title": "AI 선생님이 생각하고 있어요",
+      "seconds_other": "{{count}}초",
+      "run": "예제로 코드를 실행하는 중",
+      "read": "제출 결과와 테스트를 읽는 중",
+      "find": "어디서 틀렸는지 찾는 중",
+      "write": "설명을 쓰는 중",
+      "simpler": "더 쉬운 말로 다시 쓰는 중"
+    },
+    "thread_other": "답변 {{count}}개"
   },
   "teacher": {
     "title": "이 제출에 대한 AI 선생님의 설명",

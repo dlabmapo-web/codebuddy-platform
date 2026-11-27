@@ -201,7 +201,7 @@ function ProgrammingWorkspace({
    * in the browser from results it already has, so nothing is sent until the
    * student presses the button; the server then checks the code itself.
    */
-  const aiHelp = useAiHelp({ academyId, scope: exercise.materialId });
+  const aiHelp = useAiHelp({ academyId, userId, scope: exercise.materialId, history: workspace.aiHelpHistory });
   const { clear: clearAiHelp } = aiHelp;
   const [aiTarget, setAiTarget] = React.useState<AiHelpTarget | null>(null);
   const [aiOff, setAiOff] = React.useState<'off' | 'own-input'>('off');
@@ -560,15 +560,13 @@ function ProgrammingWorkspace({
     // The graded code still in the editor: that submission, every test. Any
     // other code: the server runs it on the examples first.
     const subject: AiHelpSubject = aiTarget.source === 'SUBMIT' && aiTarget.code === draft.code
-      ? { kind: 'submission', submissionId: aiTarget.submissionId }
+      ? { kind: 'submission', submissionId: aiTarget.submissionId, code: aiTarget.code }
       : {
           kind: 'code', materialId: exercise.materialId, classId, code: draft.code,
           source: aiTarget.source === 'SUBMIT' ? 'TEST_RUN' : aiTarget.source, workspaceRevision: exercise.gradingRevision,
         };
     aiHelp.ask('analyze', subject);
   };
-  const aiSubject = aiHelp.subject;
-  const aiCode = aiSubject?.kind === 'code' ? aiSubject.code : aiSubject ? submittedCode : null;
 
   const handleSubmit = React.useCallback(() => {
     // The submitted code is the draft, so it is persisted before grading
@@ -883,19 +881,18 @@ function ProgrammingWorkspace({
                   reason={aiTarget ? null : aiOff}
                 />
               ) : null}
-              aboveOutput={exercise.aiAssistant ? (
-                <>
-                  <AiHelpPanel
-                    academyId={academyId}
-                    classId={classId}
-                    code={aiCode}
-                    help={aiHelp}
-                    onFocusLine={aiCode !== null && aiCode === draft.code ? handleFocusLine : undefined}
-                    source={aiSubject ? (aiSubject.kind === 'submission' ? 'SUBMIT' : aiSubject.source) : null}
-                    userId={userId}
-                  />
-                  {outputTab === 'terminal' ? <RunExampleNote reading={runReading} /> : null}
-                </>
+              aboveOutput={exercise.aiAssistant && outputTab === 'terminal' && runReading?.kind === 'mismatch' ? (
+                <RunExampleNote reading={runReading} />
+              ) : null}
+              aiPanel={exercise.aiAssistant ? (
+                <AiHelpPanel
+                  academyId={academyId}
+                  classId={classId}
+                  currentCode={draft.code}
+                  help={aiHelp}
+                  onFocusLine={handleFocusLine}
+                  userId={userId}
+                />
               ) : null}
               renderHelp={(result, graded) => (
                 <LearnerHelp key={result.submissionId} academyId={academyId} aiAssistant={exercise.aiAssistant} classId={classId} userId={userId} result={result}

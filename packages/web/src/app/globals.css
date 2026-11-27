@@ -675,6 +675,31 @@ h1, h2, h3, h4 {
 @keyframes cove-spin { to { transform: rotate(360deg); } }
 .cove-spinner { animation: cove-spin 800ms linear infinite; }
 
+/*
+ * The AI teacher at work, in the learn workspace's output.
+ *
+ * The words being worked on carry a light travelling through them in reading
+ * direction, as a chat shows its assistant thinking: it says "busy" without a
+ * spinner's urgency. A new answer rises in section by section (each `dd` is
+ * given its own delay), so it reads as being written rather than dropped in.
+ * Both stop for a reader who asks for less motion, and the words stay legible.
+ */
+@keyframes cove-ai-shimmer { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+.cove-ai-shimmer {
+  background-image: linear-gradient(90deg, #93c5fd 0%, #93c5fd 38%, #f8fafc 50%, #93c5fd 62%, #93c5fd 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: cove-ai-shimmer 1800ms linear infinite;
+}
+@keyframes cove-ai-rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.cove-ai-rise { animation: cove-ai-rise 320ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .cove-ai-shimmer { animation: none; background: none; color: #93c5fd; }
+  .cove-ai-rise { animation: none; }
+}
+
 /* Grey on grey reads as noise on the dark canvas, so the highlight borrows the
    faintest blue instead — enough to read as light, far below the point where
    anyone would call it blue. The one place this system spends any colour. */

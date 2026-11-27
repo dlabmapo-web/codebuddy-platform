@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { AiHelpReply } from '@cove/shared';
+import type { AiHelpHistoryItem, AiHelpReply } from '@cove/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -35,13 +35,16 @@ const reply = (over: Partial<AiHelpReply> = {}): AiHelpReply => ({
 });
 const answer = (over: Record<string, unknown> = {}) => ({ state: 'AVAILABLE', remainingForProblem: 2, remainingToday: 9, reply: reply(), fallback: null, ...over });
 const teacher = { request: null, latestClosed: null, teacherAssigned: true, serverTime: '2026-11-25T01:00:00.000Z', denied: false };
-const submission: AiHelpSubject = { kind: 'submission', submissionId };
+const submission: AiHelpSubject = { kind: 'submission', submissionId, code };
 const fromCode = (source: 'RUN' | 'TEST_RUN' = 'RUN', text = code): AiHelpSubject => ({ kind: 'code', materialId, classId, code: text, source, workspaceRevision: 1 });
 
 let host: HTMLElement;
 let root: ReturnType<typeof createRoot>;
 let client: QueryClient;
+/** Answers stay in the tab per problem, so each test is its own problem. */
+let problem: string;
 beforeEach(() => {
+  problem = crypto.randomUUID();
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(myHelpRequestKey(academyId, classId, userId), teacher);
   host = document.createElement('div');
@@ -56,22 +59,23 @@ afterEach(async () => {
 });
 
 /** The workspace's part: a press asks about a subject, and the panel shows what comes back. */
-function Harness({ subject, scope, onFocusLine }: { subject: AiHelpSubject; scope: string; onFocusLine?: (line: number, column: number) => void }) {
-  const help = useAiHelp({ academyId, scope });
-  const source = help.subject ? (help.subject.kind === 'submission' ? 'SUBMIT' : help.subject.source) : null;
+function Harness({ subject, scope, onFocusLine, history, editor }: {
+  subject: AiHelpSubject; scope: string; onFocusLine?: (line: number, column: number) => void; history?: AiHelpHistoryItem[]; editor: string;
+}) {
+  const help = useAiHelp({ academyId, userId, scope, history });
   return (
     <>
       <AiHelpButton busy={help.asking !== null} enabled onPress={() => help.ask('analyze', subject)} reason={null} />
       <button data-testid="passes" onClick={help.clear} type="button" />
-      <AiHelpPanel academyId={academyId} classId={classId} code={code} help={help} onFocusLine={onFocusLine} source={source} userId={userId} />
+      <AiHelpPanel academyId={academyId} classId={classId} currentCode={editor} help={help} onFocusLine={onFocusLine} userId={userId} />
     </>
   );
 }
 const settle = () => act(async () => { for (let i = 0; i < 5; i += 1) await new Promise((done) => setTimeout(done, 0)); });
-async function show(subject: AiHelpSubject = submission, props: { scope?: string; onFocusLine?: (line: number, column: number) => void } = {}) {
+async function show(subject: AiHelpSubject = submission, props: { scope?: string; onFocusLine?: (line: number, column: number) => void; history?: AiHelpHistoryItem[]; editor?: string } = {}) {
   await act(() => root.render(
     <QueryClientProvider client={client}>
-      <Harness onFocusLine={props.onFocusLine} scope={props.scope ?? materialId} subject={subject} />
+      <Harness editor={props.editor ?? code} history={props.history} onFocusLine={props.onFocusLine} scope={props.scope ?? problem} subject={subject} />
     </QueryClientProvider>,
   ));
 }
@@ -182,22 +186,112 @@ it('reports an answer once and says so', async () => {
   expect(byId('ai-analysis')?.textContent).toContain('ai.reported');
 });
 
-it('puts the answer away once the code passes', async () => {
+it('ends the question once the code passes, and keeps its answer to read', async () => {
   api.requestForCode.mockResolvedValue(answer());
   await show(fromCode());
   await press(byId('ai-help'));
-  expect(byId('ai-analysis')).not.toBeNull();
+  expect(byId('explain-simpler')).not.toBeNull();
   await press(byId('passes'));
-  expect(byId('ai-help-panel')).toBeNull();
+  expect(byId('ai-analysis')).not.toBeNull();
+  expect(byId('explain-simpler')).toBeNull();
 });
 
-it('starts over on another problem', async () => {
+it('keeps each problem\'s answers apart, and brings them back on return', async () => {
   api.request.mockResolvedValue(answer());
-  await show(submission, { scope: 'first' });
+  const first = crypto.randomUUID();
+  await show(submission, { scope: first });
   await press(byId('ai-help'));
   expect(byId('ai-analysis')).not.toBeNull();
-  await show(submission, { scope: 'second' });
+  await show(submission, { scope: crypto.randomUUID() });
   expect(byId('ai-help-panel')).toBeNull();
+  await show(submission, { scope: first });
+  expect(byId('ai-analysis')?.textContent).toContain('You passed 0 of 4 tests.');
+});
+
+it('keeps every answer: a second question adds one below the first', async () => {
+  api.requestForCode
+    .mockResolvedValueOnce(answer())
+    .mockResolvedValueOnce(answer({ reply: reply({ id: '10000000-0000-4000-8000-000000000009', createdAt: '2026-11-25T01:05:00.000Z', analysis: { result: 'Second answer.', line: null, why: 'Again.', think: 'Hm?', tryIt: null, alsoCheck: null } }) }));
+  await show(fromCode('RUN'));
+  await press(byId('ai-help'));
+  await show(fromCode('TEST_RUN', `${code}\n`));
+  await press(byId('ai-help'));
+  const cards = [...host.querySelectorAll('[data-testid="ai-analysis"]')].map((card) => card.textContent);
+  expect(cards).toHaveLength(2);
+  expect(cards[0]).toContain('You passed 0 of 4 tests.');
+  expect(cards[1]).toContain('Second answer.');
+  expect(byId('ai-thread-count')?.textContent).toBe('ai.thread:2');
+});
+
+it('opens with the saved answers, the line they name, and no request', async () => {
+  const saved = (over: Partial<AiHelpHistoryItem>): AiHelpHistoryItem => ({ ...reply(), source: 'SUBMIT', subjectId: submissionId, quoted: 'for i in range(1, n):', ...over });
+  const history = [
+    saved({}),
+    saved({ id: '10000000-0000-4000-8000-000000000010', level: 2, analysis: { result: 'Simply.', line: null, why: 'Short.', think: 'Why?', tryIt: null, alsoCheck: null } }),
+    saved({ id: '10000000-0000-4000-8000-000000000011', source: 'RUN', subjectId: '10000000-0000-4000-8000-000000000012', createdAt: '2026-11-25T02:00:00.000Z', quoted: 'print(total + 1)' }),
+  ];
+  const onFocusLine = vi.fn();
+  await show(submission, { history, onFocusLine });
+  expect(api.request).not.toHaveBeenCalled();
+  const cards = host.querySelectorAll('[data-testid="ai-analysis"]');
+  expect(cards).toHaveLength(2);
+  expect(byId('ai-simpler')?.textContent).toContain('Simply.');
+  expect(cards[0]!.textContent).toContain('ai.from.SUBMIT');
+  expect(cards[1]!.textContent).toContain('ai.from.RUN');
+  // The editor still has the first answer's line, not the second's.
+  const showLine = (card: Element) => [...card.querySelectorAll('button')].find((item) => item.textContent === 'ai.show_line');
+  expect(cards[0]!.textContent).toContain('for i in range(1, n):');
+  expect(showLine(cards[0]!)).toBeDefined();
+  expect(cards[1]!.textContent).toContain('print(total + 1)');
+  expect(showLine(cards[1]!)).toBeUndefined();
+  // Asking about the same submission again serves its saved answer: no second card.
+  api.request.mockResolvedValue(answer());
+  await press(byId('ai-help'));
+  expect(host.querySelectorAll('[data-testid="ai-analysis"]')).toHaveLength(2);
+});
+
+it('keeps every answer in one box that folds, and opens it again for a new question', async () => {
+  api.requestForCode.mockResolvedValue(answer());
+  await show(fromCode());
+  await press(byId('ai-help'));
+  expect(host.querySelectorAll('[data-testid="ai-help-panel"]')).toHaveLength(1);
+  expect(byId('ai-help-scroll')?.contains(byId('ai-analysis'))).toBe(true);
+  await press(byId('ai-help-toggle'));
+  expect(byId('ai-help-toggle')?.getAttribute('aria-expanded')).toBe('false');
+  expect(byId('ai-analysis')).toBeNull();
+  api.requestForCode.mockResolvedValue(answer({ reply: reply({ id: '10000000-0000-4000-8000-000000000013', createdAt: '2026-11-25T03:00:00.000Z' }) }));
+  await show(fromCode('TEST_RUN', `${code}\n`));
+  await press(byId('ai-help'));
+  expect(byId('ai-help-toggle')?.getAttribute('aria-expanded')).toBe('true');
+  expect(host.querySelectorAll('[data-testid="ai-analysis"]')).toHaveLength(2);
+});
+
+it('shows the teacher at work while it asks', async () => {
+  let resolve!: (value: unknown) => void;
+  api.requestForCode.mockReturnValue(new Promise((done) => { resolve = done; }));
+  await show(fromCode());
+  await act(async () => { byId('ai-help')!.click(); });
+  const thinking = byId('ai-thinking');
+  expect(thinking?.textContent).toContain('ai.thinking.title');
+  expect(thinking?.textContent).toContain('ai.thinking.run');
+  await act(async () => { resolve(answer()); });
+  await settle();
+  expect(byId('ai-thinking')).toBeNull();
+  expect(byId('ai-analysis')).not.toBeNull();
+});
+
+it('draws the words to notice and the student\'s code, and nothing else, from the text', async () => {
+  api.request.mockResolvedValue(answer({ reply: reply({ analysis: {
+    result: 'You passed 0 of 4 tests.', line: null, why: 'The loop **stops one early** at `range(1, n)`, so <b>n</b> is never added.',
+    think: 'Is `n**2` the same as **n squared**?', tryIt: null, alsoCheck: null,
+  } }) }));
+  await show();
+  await press(byId('ai-help'));
+  const card = byId('ai-analysis')!;
+  expect([...card.querySelectorAll('mark')].map((mark) => mark.textContent)).toEqual(['stops one early', 'n squared']);
+  expect([...card.querySelectorAll('code')].map((item) => item.textContent)).toEqual(['range(1, n)', 'n**2']);
+  expect(card.querySelector('b')).toBeNull();
+  expect(card.textContent).toContain('<b>n</b>');
 });
 
 it('is off with a reason until something is wrong', async () => {

@@ -121,13 +121,13 @@ describe('pythonErrorLines', () => {
 
     expect(text).toContain('IndexError: list index out of range');
     expect(text).toContain('Line 2:  print(values[5])');
-    expect(text).toContain('Error interpretation tab');
+    expect(text).toContain('See the explanation below');
   });
 
   it('reads as real copy in Korean', () => {
     const text = joined(pythonErrorLines(error(), code, catalog('ko')));
 
     expect(text).toContain('2번째 줄:  print(values[5])');
-    expect(text).toContain('오류 해석 탭');
+    expect(text).toContain('바로 아래 오류 설명');
   });
 });

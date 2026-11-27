@@ -39,6 +39,7 @@ const kindClass: Record<TerminalKind, string> = {
 export function TerminalPanel({
   awaitingInput,
   emptyHint,
+  fit = false,
   lines,
   mode = 'interactive',
   onEndInput,
@@ -51,6 +52,12 @@ export function TerminalPanel({
 }: {
   lines: TerminalLine[];
   awaitingInput: boolean;
+  /**
+   * As tall as its lines instead of the whole box, for a finished program, so
+   * what follows it (the error coach, the AI teacher) starts right below the
+   * last line instead of under a screen of empty terminal.
+   */
+  fit?: boolean;
   /** Absent in mirror mode: there is no process on this side to feed. */
   onSubmitInput?: (value: string) => void;
   /** Ctrl+D. Absent where the process cannot be told its input has ended. */
@@ -131,7 +138,7 @@ export function TerminalPanel({
     // `h-full` rather than auto: the log scrolls inside this box, which is what
     // lets the effect above keep the newest line in view instead of leaving an
     // ancestor to scroll and the caret to drift off screen.
-    <div className="flex h-full min-h-0 flex-col">
+    <div className={`flex min-h-0 flex-col ${fit ? '' : 'h-full'}`}>
       {!supported && !mirrored ? (
         <p className="flex items-start gap-2 border-b border-white/10 bg-warning/10 px-3 py-2 text-[12px] leading-5 text-warning">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />

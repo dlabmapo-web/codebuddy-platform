@@ -35,7 +35,7 @@
     "where_with_column": "Line {{line}}, around character {{column}} — {{detail}}",
     "where_line_only": "Line {{line}} — {{detail}}",
     "where_no_line": "{{detail}}",
-    "terminal_pointer": "See the Error interpretation tab for what to do next."
+    "terminal_pointer": "See the explanation below for what to do next."
   },
   "lesson": {
     "missing-colon": {

@@ -35,7 +35,7 @@
     "where_with_column": "{{line}}번째 줄 {{column}}번째 글자 근처에서 {{detail}}",
     "where_line_only": "{{line}}번째 줄에서 {{detail}}",
     "where_no_line": "{{detail}}",
-    "terminal_pointer": "무엇을 하면 될지 오류 해석 탭에서 확인해 보세요."
+    "terminal_pointer": "무엇을 하면 될지 바로 아래 오류 설명에서 확인해 보세요."
   },
   "lesson": {
     "missing-colon": {

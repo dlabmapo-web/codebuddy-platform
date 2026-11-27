@@ -15,6 +15,7 @@ import { languageLabelKey, monacoLanguageFor } from '@/lib/workspace/exercise-la
 import { LanguageTag } from '@/components/workspace/language-tag';
 import { surfaceProps } from '@/lib/monitoring/awareness/surfaces';
 import { useEditorPreferences } from '@/lib/workspace/use-editor-preferences';
+import { revealInRegion, revealRegionAttribute } from '@/lib/workspace/reveal-in-region';
 import type { SampleRun } from '@/lib/workspace/use-sample-runner';
 import type { PythonRunnerState } from '@/lib/workspace/use-python-runner';
 import { useSplitPane } from '@/lib/workspace/use-split-pane';
@@ -124,6 +125,24 @@ export function EditorPane({
    * the wrong program, so a run takes it away again.
    */
   const coached = runner.running ? null : runner.lastError;
+  // A new error: its explanation is what the student needs next, so the output
+  // scrolls to it instead of leaving it below the terminal's last line.
+  const coachRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (coached) revealInRegion(coachRef.current, 'start');
+  }, [coached]);
+  // A program that just finished: its last lines stay in view, as the
+  // terminal's own scrolling kept them while it ran.
+  const terminalEndRef = React.useRef<HTMLDivElement>(null);
+  const [wasRunning, setWasRunning] = React.useState(runner.running);
+  const [finishedRuns, setFinishedRuns] = React.useState(0);
+  if (wasRunning !== runner.running) {
+    setWasRunning(runner.running);
+    if (!runner.running) setFinishedRuns((count) => count + 1);
+  }
+  React.useEffect(() => {
+    if (finishedRuns && !runner.lastError) revealInRegion(terminalEndRef.current);
+  }, [finishedRuns, runner.lastError]);
   // Reset asks in Cove's dialog, not the browser's; in a fullscreen workspace
   // the dialog has to render inside it to be seen.
   const [resetDialog, setResetDialog] = React.useState<{ container: HTMLElement | null } | null>(null);
@@ -206,6 +225,7 @@ export function EditorPane({
           className="min-h-0 flex-1 overflow-y-auto"
           id={`workspace-${tab}-panel`}
           role="region"
+          {...{ [revealRegionAttribute]: '' }}
         >
           {aboveOutput ? <div className="pt-3">{aboveOutput}</div> : null}
           {tab !== 'result' && (testingSamples || sampleResults.length > 0) ? (
@@ -244,17 +264,21 @@ export function EditorPane({
           ) : tab !== 'result' ? (<>
             <TerminalPanel
               awaitingInput={runner.awaitingInput}
+              fit={!runner.running}
               lines={runner.lines}
               onEndInput={runner.endInput}
               onSubmitInput={runner.submitInput}
               supported={runner.supported}
             />
+            <div ref={terminalEndRef} />
             {coached ? (
-            <ErrorCoachPanel
-              code={code}
-              error={coached}
-              onFocusLine={onFocusLine}
-            />
+            <div ref={coachRef}>
+              <ErrorCoachPanel
+                code={code}
+                error={coached}
+                onFocusLine={onFocusLine}
+              />
+            </div>
             ) : null}
           </>) : (
             <ResultPanel compiled={compiled} currentCode={code} onFocusLine={onFocusLine} renderHelp={renderHelp} submission={submission} />

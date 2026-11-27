@@ -276,13 +276,14 @@ export class AiHelpService {
     if (context.examOpen) return "EXAM_OPEN";
     if (submission.gradingRevision !== exercise.gradingRevision) return "STALE";
     if (context.usedForProblem >= settings.problemLimit) return "LIMIT_PROBLEM";
-    if (context.usedToday >= settings.dailyLimit) return "LIMIT_DAY";
+    if (settings.dailyLimit !== null && context.usedToday >= settings.dailyLimit) return "LIMIT_DAY";
     return "AVAILABLE";
   }
 
   private remaining(context: HelpContext, settings: AiSettings["help"], state: AiHelpState, spent = 0) {
     const problem = Math.max(0, settings.problemLimit - context.usedForProblem - spent);
-    const today = Math.max(0, settings.dailyLimit - context.usedToday - spent);
+    // No daily limit: what is left today is what is left on this problem.
+    const today = settings.dailyLimit === null ? problem : Math.max(0, settings.dailyLimit - context.usedToday - spent);
     const after: AiHelpState = state !== "AVAILABLE" ? state : problem === 0 ? "LIMIT_PROBLEM" : today === 0 ? "LIMIT_DAY" : state;
     return { state: after, remainingForProblem: Math.min(problem, today), remainingToday: today };
   }

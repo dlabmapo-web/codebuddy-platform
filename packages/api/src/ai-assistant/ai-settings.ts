@@ -17,7 +17,8 @@ export function aiSettings(config: ConfigService<ApiEnvironment, true>) {
       maxOutputTokens: get("AI_ASSISTANT_MAX_OUTPUT_TOKENS"),
       concurrency: get("AI_ASSISTANT_CONCURRENCY"),
       problemLimit: get("AI_ASSISTANT_PROBLEM_LIMIT"),
-      dailyLimit: get("AI_ASSISTANT_DAILY_LIMIT"),
+      /** Null: no limit across problems, only `problemLimit` on each. */
+      dailyLimit: get("AI_ASSISTANT_DAILY_LIMIT") || null,
       budgetMicros: get("AI_ASSISTANT_MONTHLY_BUDGET_USD") * 1_000_000,
       price: { inputUsdPerMtok: get("AI_ASSISTANT_INPUT_USD_PER_MTOK"), outputUsdPerMtok: get("AI_ASSISTANT_OUTPUT_USD_PER_MTOK") },
       retentionDays: get("AI_HELP_RETENTION_DAYS"),

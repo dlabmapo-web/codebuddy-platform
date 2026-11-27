@@ -242,7 +242,9 @@ export async function reserveReply(
     requestId: string; userId: string; academyId: string; classId: string | null; materialId: string;
     /** A failed submission's answer, or an example check's: exactly one. */
     submissionId: string | null; checkId: string | null; source: "SUBMIT" | "TEST_RUN" | "RUN";
-    gradingRevision: number; level: number; locale: string; promptVersion: string; dayStart: Date; problemLimit: number; dailyLimit: number;
+    gradingRevision: number; level: number; locale: string; promptVersion: string; dayStart: Date; problemLimit: number;
+    /** Null: no limit across problems. */
+    dailyLimit: number | null;
   },
 ): Promise<Reservation | null> {
   const sameSubject = input.checkId === null
@@ -257,7 +259,7 @@ export async function reserveReply(
       SELECT count(*) FILTER (WHERE r.material_id = ${input.materialId}::uuid) AS problem, count(*) AS today FROM ai_help_replies r
       WHERE r.user_id = ${input.userId}::uuid AND r.created_at >= ${input.dayStart}
         AND (r.status = 'DONE' OR (r.status = 'PENDING' AND r.created_at > now() - make_interval(secs => ${PENDING_SECONDS}::int)))) used
-    WHERE used.problem < ${input.problemLimit} AND used.today < ${input.dailyLimit}
+    WHERE used.problem < ${input.problemLimit} AND (${input.dailyLimit}::int IS NULL OR used.today < ${input.dailyLimit}::int)
       AND NOT EXISTS (SELECT 1 FROM ai_help_replies x WHERE ${sameSubject} AND x.level = ${input.level}
         AND (x.status = 'DONE' OR (x.status = 'PENDING' AND x.created_at > now() - make_interval(secs => ${PENDING_SECONDS}::int))))
     RETURNING id, level::int`);

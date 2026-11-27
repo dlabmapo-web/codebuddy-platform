@@ -199,6 +199,24 @@ describe.skipIf(!databaseUrl)("the AI teacher's analysis", () => {
     expect((await ask(last, { mode: "simpler" })).reply?.level).toBe(2);
   });
 
+  it("with no daily limit, only each problem's own limit stops a student", async () => {
+    const unlimited = service({ env: { AI_ASSISTANT_DAILY_LIMIT: 0 } });
+    await f.prisma.aiHelpReply.updateMany({ where: { academyId: f.ids.academy }, data: { createdAt: new Date(Date.now() - 25 * 3_600_000) } });
+    // Twelve answers in a day, three on each of four problems: past the old daily ten.
+    for (const materialId of await Promise.all([1, 2, 3, 4].map(() => f.createExercise()))) {
+      const id = await submit(materialId);
+      const first = await ask(id, {}, student(), unlimited);
+      expect(first.reply).not.toBeNull();
+      expect(first.remainingToday).toBe(first.remainingForProblem);
+      expect((await ask(id, { mode: "simpler" }, student(), unlimited)).reply).not.toBeNull();
+      // The third is the problem's last; a fourth is refused there and nowhere else.
+      const third = await ask(await submit(materialId), {}, student(), unlimited);
+      expect(third).toMatchObject({ state: "LIMIT_PROBLEM", remainingForProblem: 0 });
+      expect(third.reply).not.toBeNull();
+      expect(await ask(await submit(materialId), {}, student(), unlimited)).toMatchObject({ state: "LIMIT_PROBLEM", reply: null });
+    }
+  });
+
   it("writes one analysis for two clicks at once, and lets one of two submissions take the last", async () => {
     const materialId = await f.createExercise();
     const id = await submit(materialId);

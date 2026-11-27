@@ -209,7 +209,8 @@ export const apiEnvironmentSchema = z.object({
    * courses design, §6). Free messages do not count.
    */
   AI_ASSISTANT_PROBLEM_LIMIT: z.coerce.number().int().min(1).max(9).default(5),
-  AI_ASSISTANT_DAILY_LIMIT: z.coerce.number().int().min(1).max(100).default(15),
+  /** Per student and day across problems; 0, the default, is no daily limit: each problem's own limit is the only one. */
+  AI_ASSISTANT_DAILY_LIMIT: z.coerce.number().int().min(0).max(100).default(0),
   AI_ASSISTANT_MONTHLY_BUDGET_USD: z.coerce.number().min(0).max(1_000).default(30),
   AI_ASSISTANT_INPUT_USD_PER_MTOK: z.coerce.number().min(0).max(100).default(0.1),
   AI_ASSISTANT_OUTPUT_USD_PER_MTOK: z.coerce.number().min(0).max(1_000).default(0.5),

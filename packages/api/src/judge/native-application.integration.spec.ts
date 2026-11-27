@@ -33,6 +33,8 @@ import { GradingService } from "./grading.service.js";
 import { gradingSnapshotFor } from "./grading-profile.js";
 import { RegradeRunner } from "./regrade.runner.js";
 import { SampleCheckStore } from "./sample-check.store.js";
+import { examplesSnapshotFor } from "./sample-check-snapshot.js";
+import { readLibraryExercise } from "../ai-assistant/library/library-read.js";
 
 const databaseUrl = process.env.COVE_INTEGRATION_DATABASE_URL;
 const redisUrl = process.env.COVE_INTEGRATION_REDIS_URL;
@@ -191,6 +193,23 @@ describe.skipIf(!databaseUrl || !redisUrl)("native application launcher-contract
     expect((await new SampleCheckStore(() => queue.redis()).get(check.checkId))?.snapshot.executionRuntimeSnapshot).toEqual(manifest.descriptor);
     expect(await db.submission.count()).toBe(studentRows); expect(await db.pointAward.count()).toBe(points);
   });
+  it("runs an AI help check of the examples on the native sample queue (the campus courses design, §6)", async () => {
+    // Production v2.0.75: the native sample worker ended these jobs unread, and the student was told the AI teacher was busy.
+    if (!worker) worker = await boot();
+    const exercise = await readLibraryExercise(db, ids.material);
+    const snapshot = examplesSnapshotFor(exercise!, ids.course, "0.27.5", manifest.descriptor);
+    const check = await db.aiHelpCheck.create({ data: {
+      userId: ids.student, academyId: ids.academy, classId: ids.class1, materialId: ids.material, gradingRevision: exercise!.gradingRevision, source: "RUN",
+      code: "fixture:correct", codeHash: "fixture", snapshot: JSON.parse(JSON.stringify(snapshot)), executionQueue: runtimeQueueName("sample", manifest.descriptor),
+    } });
+    await queue.enqueueAiHelpCheck(check.id, manifest.descriptor);
+    const done = await until(() => db.aiHelpCheck.findUniqueOrThrow({ where: { id: check.id } }), (row) => row.status !== "QUEUED" && row.status !== "RUNNING");
+    expect(done.status).toBe("PASSED");
+    // The examples only: the hidden case never runs for AI help.
+    expect(done.results).toEqual([expect.objectContaining({ position: 1, outcome: "PASSED", actualOutput: "ok" })]);
+    expect(done.fingerprint).toBe("P");
+  });
+
   it("recovers durable native dispatch after stopped workers/lost enqueue acknowledgement and excludes older releases", async () => {
     // Staff snapshot/dispatch intent survives an acknowledged enqueue loss too.
     const drop = vi.spyOn(queue, "enqueuePractice").mockResolvedValueOnce(undefined);

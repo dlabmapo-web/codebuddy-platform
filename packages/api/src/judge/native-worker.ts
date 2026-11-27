@@ -13,6 +13,7 @@ import { NativeJobGate, nativeBackgroundCapable } from "./native-job-gate.js";
 import { loadNativeManifest, frozenNativeDescriptor, nativeReadinessKey, NATIVE_READINESS_HEARTBEAT } from "./native-admission.js";
 import { JudgeQueue, runtimeQueueName } from "./judge.queue.js";
 import { GradingService } from "./grading.service.js";
+import { AiHelpCheckRunner } from "./ai-help-check.runner.js";
 import { LibraryCheckRunner } from "./library-check.runner.js";
 import { PracticeRunner } from "./practice.runner.js";
 import { RegradeRunner } from "./regrade.runner.js";
@@ -191,13 +192,29 @@ export async function bootstrapNativeWorker(configuration: Record<string, unknow
         ? Math.max(1, manifest.resources.cpuSlots - manifest.resources.officialReservedSlots)
         : 1;
       family.workers.push(q.createSampleWorker(async job => {
+        // AI help after Run and Test run (the campus courses design, §6): the
+        // student's code on the examples. Its check lives in the database, not
+        // in the sample store, so it must be told apart here; without this the
+        // job ended unread and the student was told the grader was busy.
+        if (job.data.kind === "ai-help") {
+          const row = await prisma.aiHelpCheck.findUnique({ where: { id: job.data.checkId }, select: { snapshot: true } });
+          if (!row) return;
+          const snapshot = practiceSnapshotSchema.safeParse(row.snapshot);
+          if (!snapshot.success) { await new AiHelpCheckRunner(prisma, grading, new ExecutionCapacity(2)).markFailed(job.data.checkId); return; }
+          // The native gate holds the background slot; the runner's own capacity never waits.
+          await execute(snapshot.data.memoryLimitMb, snapshot.data.executionRuntimeSnapshot, "background", g => withExecutionKind("sample", () => telemetry.time("service", () => new AiHelpCheckRunner(prisma, g, new ExecutionCapacity(2)).run(job.data.checkId))));
+          return;
+        }
         const record = await store.get(job.data.checkId);
         if (!record) return;
         await execute(record.snapshot.memoryLimitMb, record.snapshot.executionRuntimeSnapshot, "background", async (_, client) => {
           // Native gate already reserves background capacity for the entire job.
           await withExecutionKind(record.kind === "run" ? "run" : "sample", () => telemetry.time("service", () => new SampleCheckRunner(store, measuredNativeClient(client, telemetry), comparator, new ExecutionCapacity(2)).run(job.data.checkId)), job.data.checkId);
         });
-      }, sampleConcurrency, id => { void new SampleCheckRunner(store, probe, comparator, new ExecutionCapacity(2)).markFailed(id); }));
+      }, sampleConcurrency, id => {
+        void new SampleCheckRunner(store, probe, comparator, new ExecutionCapacity(2)).markFailed(id);
+        void new AiHelpCheckRunner(prisma, grading, new ExecutionCapacity(2)).markFailed(id);
+      }));
     }
     await Promise.all(workers().map(w => w.waitUntilReady()));
     await ready();
